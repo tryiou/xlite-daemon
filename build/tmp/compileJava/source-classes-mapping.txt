@@ -1,0 +1,4 @@
+io/cloudchains/app/App.java
+ io.cloudchains.app.App
+ io.cloudchains.app.App$1
+ io.cloudchains.app.App$2

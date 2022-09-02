@@ -1,0 +1,12 @@
+{
+  "resources":[
+    {"pattern":"META-INF/services/jdk.vm.ci.hotspot.HotSpotJVMCIBackendFactory"}, 
+    {"pattern":"META-INF/services/jdk.vm.ci.services.JVMCIServiceLocator"}, 
+    {"pattern":"mozilla/public-suffix-list.txt"}, 
+    {"pattern":"org/apache/http/client/version.properties"}, 
+    {"pattern":"org/bitcoinj/crypto/mnemonic/wordlist/english.txt"}, 
+    {"pattern":"org/slf4j/impl/StaticLoggerBinder.class"}, 
+    {"pattern":"sun/net/idn/uidna.spp"}, 
+    {"pattern":"sun/text/resources/unorm.icu"}
+  ]
+}
