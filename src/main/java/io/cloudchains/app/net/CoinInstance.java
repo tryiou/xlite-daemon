@@ -11,20 +11,20 @@ import io.cloudchains.app.Version;
 import io.cloudchains.app.crypto.KeyHandler;
 import io.cloudchains.app.net.api.JSONRPCController;
 import io.cloudchains.app.net.api.JSONRPCServer;
-import io.cloudchains.app.net.protocols.alqocoin.AlqocoinNetworkParameters;
-import io.cloudchains.app.net.protocols.bitbay.BitbayNetworkParameters;
-import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParameters;
+//import io.cloudchains.app.net.protocols.alqocoin.AlqocoinNetworkParameters;
+//import io.cloudchains.app.net.protocols.bitbay.BitbayNetworkParameters;
+//import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParameters;
 import io.cloudchains.app.net.protocols.blocknet.*;
 import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParameters;
-import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
+//import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
 import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParameters;
-import io.cloudchains.app.net.protocols.phorecoin.PhorecoinNetworkParameters;
+//import io.cloudchains.app.net.protocols.phorecoin.PhorecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
-import io.cloudchains.app.net.protocols.poliscoin.PoliscoinNetworkParameters;
-import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
+//import io.cloudchains.app.net.protocols.poliscoin.PoliscoinNetworkParameters;
+//import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
 import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParameters;
-import io.cloudchains.app.net.protocols.trezarcoin.TrezarcoinNetworkParameters;
+//import io.cloudchains.app.net.protocols.trezarcoin.TrezarcoinNetworkParameters;
 import io.cloudchains.app.net.xrouter.XRouterMessage;
 import io.cloudchains.app.net.xrouter.XRouterMessageSerializer;
 import io.cloudchains.app.net.xrouter.XRouterPacketManager;
@@ -56,6 +56,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import com.subgraph.orchid.encoders.Hex;
 
 public class CoinInstance {
     public static class CoinError {
@@ -138,7 +139,6 @@ public class CoinInstance {
 
         return Joiner.on(" ").join(seed);
     }
-
 	public static int getBlockCountByTicker(CoinTicker ticker) {
 		if (!blockCounts.containsKey(ticker)) {
 			return -1;
@@ -350,12 +350,12 @@ public class CoinInstance {
 				rpcPort = 8332;
 				break;
 			}
-			case BITCOIN_CASH: {
-				LOGGER.log(Level.FINER, "[coin] Initializing for BitcoinCash main network.");
-				networkParameters = new BitcoinCashNetworkParameters();
-				rpcPort = 48332;
-				break;
-			}
+			// case BITCOIN_CASH: {
+			// 	LOGGER.log(Level.FINER, "[coin] Initializing for BitcoinCash main network.");
+			// 	networkParameters = new BitcoinCashNetworkParameters();
+			// 	rpcPort = 48332;
+			// 	break;
+			// }
 			case LITECOIN: {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Litecoin main network.");
 				networkParameters = new LitecoinNetworkParameters();
@@ -368,12 +368,12 @@ public class CoinInstance {
 				rpcPort = 9998;
 				break;
 			}
-			case DIGIBYTE: {
-				LOGGER.log(Level.FINER, "[coin] Initializing for Digibyte main network.");
-				networkParameters = new DigibyteNetworkParameters();
-				rpcPort = 14022;
-				break;
-			}
+			// case DIGIBYTE: {
+			// 	LOGGER.log(Level.FINER, "[coin] Initializing for Digibyte main network.");
+			// 	networkParameters = new DigibyteNetworkParameters();
+			// 	rpcPort = 14022;
+			// 	break;
+			// }
 			case DOGECOIN: {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Dogecoin main network.");
 				networkParameters = new DogecoinNetworkParameters();
@@ -386,46 +386,46 @@ public class CoinInstance {
 				rpcPort = 8370;
 				break;
 			}
-			case TREZARCOIN: {
-				networkParameters = new TrezarcoinNetworkParameters();
-				rpcPort = 17299;
-				break;
-			}
-			case BITBAY: {
-				networkParameters = new BitbayNetworkParameters();
-				rpcPort = 19915;
-				break;
-			}
+			// case TREZARCOIN: {
+			// 	networkParameters = new TrezarcoinNetworkParameters();
+			// 	rpcPort = 17299;
+			// 	break;
+			// }
+			// case BITBAY: {
+			// 	networkParameters = new BitbayNetworkParameters();
+			// 	rpcPort = 19915;
+			// 	break;
+			// }
 			case PIVX: {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Pivx main network.");
 				networkParameters = new PivxNetworkParameters();
 				rpcPort = 9951;
 				break;
 			}
-			case ALQOCOIN: {
-				LOGGER.log(Level.FINER, "[coin] Initializing for Alqo main network.");
-				networkParameters = new AlqocoinNetworkParameters();
-				rpcPort = 55000;
-				break;
-			}
-			case POLISCOIN: {
-				LOGGER.log(Level.FINER, "[coin] Initializing for Polis main network.");
-				networkParameters = new PoliscoinNetworkParameters();
-				rpcPort = 24127;
-				break;
-			}
-			case PHORECOIN: {
-				LOGGER.log(Level.FINER, "[coin] Initializing for Phore main network.");
-				networkParameters = new PhorecoinNetworkParameters();
-				rpcPort = 11772;
-				break;
-			}
-			case RAVENCOIN: {
-				LOGGER.log(Level.FINER, "[coin] Initializing for Ravencoin main network.");
-				networkParameters = new RavencoinNetworkParameters();
-				rpcPort = 8766;
-				break;
-			}
+			// case ALQOCOIN: {
+			// 	LOGGER.log(Level.FINER, "[coin] Initializing for Alqo main network.");
+			// 	networkParameters = new AlqocoinNetworkParameters();
+			// 	rpcPort = 55000;
+			// 	break;
+			// }
+			// case POLISCOIN: {
+			// 	LOGGER.log(Level.FINER, "[coin] Initializing for Polis main network.");
+			// 	networkParameters = new PoliscoinNetworkParameters();
+			// 	rpcPort = 24127;
+			// 	break;
+			// }
+			// case PHORECOIN: {
+			// 	LOGGER.log(Level.FINER, "[coin] Initializing for Phore main network.");
+			// 	networkParameters = new PhorecoinNetworkParameters();
+			// 	rpcPort = 11772;
+			// 	break;
+			// }
+			// case RAVENCOIN: {
+			// 	LOGGER.log(Level.FINER, "[coin] Initializing for Ravencoin main network.");
+			// 	networkParameters = new RavencoinNetworkParameters();
+			// 	rpcPort = 8766;
+			// 	break;
+			// }
 			default: {
 				LOGGER.log(Level.FINER, "[coin] ERROR: Invalid/unsupported network: " + ticker.toString());
 				return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);

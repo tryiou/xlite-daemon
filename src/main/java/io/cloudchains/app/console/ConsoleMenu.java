@@ -89,7 +89,7 @@ public class ConsoleMenu {
                         autoGenerateRPCConfig();
                         break;
                     case "--development-endpoint":
-                        App.BASE_URL = "https://plugin-dev.core.cloudchainsinc.com/";
+                        App.BASE_URL = "https://utils.blocknet.org/";
                         break;
                     case "--version":
                         LOGGER.log(Level.INFO, Version.CLIENT_VERSION);
