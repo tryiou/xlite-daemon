@@ -321,7 +321,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     startTime = params.get(0).getAsInt();
                     endTime = params.get(1).getAsInt();
                 }
-                JsonArray transactions = httpClient.getTransactionHistory(coin.getTicker(), startTime, endTime, 60 * 15);
+                JsonArray transactions = httpClient.getHistory(coin.getTicker(), startTime, endTime, 60 * 15);
                 if (transactions == null) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject err = new JsonObject();

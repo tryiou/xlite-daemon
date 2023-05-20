@@ -475,26 +475,29 @@ public class HTTPClient {
         }
 
         List<Transaction> historyList = new ArrayList<>();
-        for (JsonElement element : json) {
-            JsonObject jsonObject = element.getAsJsonObject();
+        for (JsonElement elements : json) {
+            for (JsonElement element : elements.getAsJsonArray()) {
+                //LOGGER.log(Level.WARNING, "*** DEBUG *** [httpclient] getHistory " + element);
+                JsonObject jsonObject = element.getAsJsonObject();
 
-            List<String> fromAddresses = new Gson().fromJson(jsonObject.get("from_addresses"), new TypeToken<List<String>>() {}.getType());
+                List<String> fromAddresses = new Gson().fromJson(jsonObject.get("from_addresses"), new TypeToken<List<String>>() {
+                }.getType());
 
-            Transaction tx = new Transaction(coinTicker,
-                    jsonObject.get("address").getAsString(),
-                    jsonObject.get("txid").getAsString(),
-                    jsonObject.get("blockhash").getAsString(),
-                    jsonObject.get("vout").getAsInt(),
-                    jsonObject.get("amount").getAsDouble(),
-                    jsonObject.get("confirmations").getAsInt(),
-                    jsonObject.get("blocktime").getAsInt(),
-                    fromAddresses);
-            tx.setCategory(jsonObject.get("category").getAsString());
-            tx.setFee(jsonObject.get("fee").getAsDouble());
+                Transaction tx = new Transaction(coinTicker,
+                        jsonObject.get("address").getAsString(),
+                        jsonObject.get("txid").getAsString(),
+                        jsonObject.get("blockhash").getAsString(),
+                        jsonObject.get("vout").getAsInt(),
+                        jsonObject.get("amount").getAsDouble(),
+                        jsonObject.get("confirmations").getAsInt(),
+                        jsonObject.get("blocktime").getAsInt(),
+                        fromAddresses);
+                tx.setCategory(jsonObject.get("category").getAsString());
+                tx.setFee(jsonObject.get("fee").getAsDouble());
 
-            historyList.add(tx);
+                historyList.add(tx);
+            }
         }
-
         coinInstance.processHistoryTxs(historyList);
 
         // Return the latest transaction history
@@ -552,52 +555,24 @@ public class HTTPClient {
         }
 
         List<Transaction> historyList = new ArrayList<>();
-        for (JsonElement element : json) {
-            JsonObject jsonObject = element.getAsJsonObject();
+        for (JsonElement elements : json) {
+            for (JsonElement element : elements.getAsJsonArray()) {
+                //LOGGER.log(Level.WARNING, "*** DEBUG *** [httpclient] getAddressHistory " + element );
+                JsonObject jsonObject = element.getAsJsonObject();
 
-            String txid = jsonObject.get("tx_hash").getAsString();
-            JsonObject rawTransaction = null;
+                String txid = jsonObject.get("tx_hash").getAsString();
+                JsonObject rawTransaction = null;
 
-            int fails = 1;
-            while (fails > 0) {
-                if (fails >= 5)
-                    fails = 0;
-
-                try {
-                    rawTransaction = getRawTransaction(coinTicker, txid, true);
-
-                    if (rawTransaction != null && !rawTransaction.get("result").isJsonNull()) {
-                        rawTransaction = rawTransaction.getAsJsonObject("result");
-                        fails = 0;
-
-                        break;
-                    } else
-                        ++fails;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    ++fails;
-                }
-            }
-
-            if (fails != 0)
-                continue;
-
-            for (JsonElement vin : rawTransaction.get("vin").getAsJsonArray()) {
-                String vinTxid = vin.getAsJsonObject().get("txid").getAsString();
-                int voutInt = vin.getAsJsonObject().get("vout").getAsInt();
-
-                JsonObject voutRawTransaction = null;
-
-                fails = 1;
+                int fails = 1;
                 while (fails > 0) {
                     if (fails >= 5)
                         fails = 0;
 
                     try {
-                        voutRawTransaction = getRawTransaction(coinTicker, vinTxid, true);
+                        rawTransaction = getRawTransaction(coinTicker, txid, true);
 
-                        if (voutRawTransaction != null && !voutRawTransaction.get("result").isJsonNull()) {
-                            voutRawTransaction = voutRawTransaction.getAsJsonObject("result");
+                        if (rawTransaction != null && !rawTransaction.get("result").isJsonNull()) {
+                            rawTransaction = rawTransaction.getAsJsonObject("result");
                             fails = 0;
 
                             break;
@@ -612,77 +587,108 @@ public class HTTPClient {
                 if (fails != 0)
                     continue;
 
-                JsonObject vout = voutRawTransaction.get("vout").getAsJsonArray().get(voutInt).getAsJsonObject();
-                JsonObject scriptPubKey = vout.getAsJsonObject("scriptPubKey");
+                for (JsonElement vin : rawTransaction.get("vin").getAsJsonArray()) {
+                    String vinTxid = vin.getAsJsonObject().get("txid").getAsString();
+                    int voutInt = vin.getAsJsonObject().get("vout").getAsInt();
 
-                if ((scriptPubKey == null || scriptPubKey.isJsonNull()) || scriptPubKey.get("addresses").isJsonNull())
-                    continue;
+                    JsonObject voutRawTransaction = null;
 
-                for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
-                    String address = addressElement.getAsString();
+                    fails = 1;
+                    while (fails > 0) {
+                        if (fails >= 5)
+                            fails = 0;
 
-                    for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
-                        String utxoAddress = addressBalance.getAddress().toBase58();
+                        try {
+                            voutRawTransaction = getRawTransaction(coinTicker, vinTxid, true);
 
-                        if (utxoAddress.equals(address)) {
-                            List<String> fromAddresses = new ArrayList<>();
+                            if (voutRawTransaction != null && !voutRawTransaction.get("result").isJsonNull()) {
+                                voutRawTransaction = voutRawTransaction.getAsJsonObject("result");
+                                fails = 0;
 
-                            Transaction tx = new Transaction(coinTicker,
-                                    address,
-                                    txid,
-                                    rawTransaction.get("blockhash").getAsString(),
-                                    voutInt,
-                                    vout.get("value").getAsDouble(),
-                                    rawTransaction.get("confirmations").getAsInt(),
-                                    rawTransaction.get("blocktime").getAsInt(),
-                                    fromAddresses);
-                            tx.setCategory("send");
-                            tx.setFee(0.0);
+                                break;
+                            } else
+                                ++fails;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            ++fails;
+                        }
+                    }
 
-                            historyList.add(tx);
+                    if (fails != 0)
+                        continue;
+
+                    JsonObject vout = voutRawTransaction.get("vout").getAsJsonArray().get(voutInt).getAsJsonObject();
+                    JsonObject scriptPubKey = vout.getAsJsonObject("scriptPubKey");
+
+                    if ((scriptPubKey == null || scriptPubKey.isJsonNull()) || scriptPubKey.get("addresses").isJsonNull())
+                        continue;
+
+                    for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
+                        String address = addressElement.getAsString();
+
+                        for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
+                            String utxoAddress = addressBalance.getAddress().toBase58();
+
+                            if (utxoAddress.equals(address)) {
+                                List<String> fromAddresses = new ArrayList<>();
+
+                                Transaction tx = new Transaction(coinTicker,
+                                        address,
+                                        txid,
+                                        rawTransaction.get("blockhash").getAsString(),
+                                        voutInt,
+                                        vout.get("value").getAsDouble(),
+                                        rawTransaction.get("confirmations").getAsInt(),
+                                        rawTransaction.get("blocktime").getAsInt(),
+                                        fromAddresses);
+                                tx.setCategory("send");
+                                tx.setFee(0.0);
+
+                                historyList.add(tx);
+                            }
                         }
                     }
                 }
-            }
 
-            for (JsonElement vout : rawTransaction.get("vout").getAsJsonArray()) {
-                JsonObject scriptPubKey = vout.getAsJsonObject().getAsJsonObject("scriptPubKey");
 
-                try {
-                    if (scriptPubKey.isJsonNull() || scriptPubKey.get("addresses").isJsonNull())
+                for (JsonElement vout : rawTransaction.get("vout").getAsJsonArray()) {
+                    JsonObject scriptPubKey = vout.getAsJsonObject().getAsJsonObject("scriptPubKey");
+
+                    try {
+                        if (scriptPubKey.isJsonNull() || scriptPubKey.get("addresses").isJsonNull())
+                            continue;
+                    } catch (Exception e) {
                         continue;
-                } catch (Exception e) {
-                    continue;
-                }
+                    }
 
-                for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
-                    String address = addressElement.getAsString();
+                    for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
+                        String address = addressElement.getAsString();
 
-                    for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
-                        String utxoAddress = addressBalance.getAddress().toBase58();
+                        for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
+                            String utxoAddress = addressBalance.getAddress().toBase58();
 
-                        if (utxoAddress.equals(address)) {
-                            List<String> fromAddresses = new ArrayList<>();
+                            if (utxoAddress.equals(address)) {
+                                List<String> fromAddresses = new ArrayList<>();
 
-                            Transaction tx = new Transaction(coinTicker,
-                                    address,
-                                    txid,
-                                    rawTransaction.get("blockhash").getAsString(),
-                                    vout.getAsJsonObject().get("n").getAsInt(),
-                                    vout.getAsJsonObject().get("value").getAsDouble(),
-                                    rawTransaction.get("confirmations").getAsInt(),
-                                    rawTransaction.get("blocktime").getAsInt(),
-                                    fromAddresses);
-                            tx.setCategory("receive");
-                            tx.setFee(0.0);
+                                Transaction tx = new Transaction(coinTicker,
+                                        address,
+                                        txid,
+                                        rawTransaction.get("blockhash").getAsString(),
+                                        vout.getAsJsonObject().get("n").getAsInt(),
+                                        vout.getAsJsonObject().get("value").getAsDouble(),
+                                        rawTransaction.get("confirmations").getAsInt(),
+                                        rawTransaction.get("blocktime").getAsInt(),
+                                        fromAddresses);
+                                tx.setCategory("receive");
+                                tx.setFee(0.0);
 
-                            historyList.add(tx);
+                                historyList.add(tx);
+                            }
                         }
                     }
                 }
             }
         }
-
         coinInstance.processHistoryTxs(historyList);
 
         // Return the latest transaction history
