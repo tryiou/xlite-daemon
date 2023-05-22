@@ -106,13 +106,8 @@ dependencies {
 	implementation 'com.google.code.findbugs:jsr305:3.0.2'
 	testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
 	testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
-<<<<<<< HEAD
 	compileOnly 'com.oracle.substratevm:svm:19.2.1'
 	compileOnly group: 'org.graalvm.nativeimage', name: 'svm', version: '22.3.0'
-=======
-	compileOnly 'com.oracle.substratevm:svm:19.2.1'\
-	compileOnly group: 'org.graalvm.nativeimage', name: 'svm', version: '19.3.0'
->>>>>>> e137253fa128f38ee56b94c022f73b1fa128a742
 
 //	compile (group: 'io.netty', name: 'netty-all', version: '4.1.63.Final') {
 //		exclude group: "org.slf4j", module: "slf4j-log4j12"
