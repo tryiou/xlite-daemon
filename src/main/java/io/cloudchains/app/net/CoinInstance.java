@@ -469,7 +469,7 @@ public class CoinInstance {
 		wallet = Wallet.fromSeed(networkParameters, seed);
 		if (isBlocknetNetwork()) {
 			String mnemonic = getMnemonic();
-			LOGGER.log(Level.FINE, "[wallet] Mnemonic = " + mnemonic);
+			// LOGGER.log(Level.FINE, "[wallet] Mnemonic = " + mnemonic);
 		}
 
 		// Make sure wallet addresses are available
