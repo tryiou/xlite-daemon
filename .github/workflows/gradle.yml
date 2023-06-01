@@ -3,10 +3,10 @@ name: Build
 on:
   push:
     branches:
-      - main
+      - dev-build-tests-sk
   pull_request:
     branches:
-      - main
+      - dev-build-tests-sk
 
 jobs:
   build:
