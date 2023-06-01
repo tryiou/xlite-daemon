@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup Java
+      uses: actions/setup-java@v2
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'gradle'
+    
+    - name: Grant execute permissions for gradlew
+      run: chmod +x gradlew
+      if: runner.os == 'Linux' || runner.os == 'macOS'
+
+    - name: Build with Gradle
+      run: |
+        ./gradlew clean
+        ./gradlew build
+      shell: bash
+
+    - name: Build Native Image
+      run: |
+        ./gradlew nativeImage
+      shell: bash
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: native-image-${{ runner.os }}
+        path: build/libs/
