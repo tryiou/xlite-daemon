@@ -19,7 +19,7 @@ public class App {
 
 	private static final boolean isLoggingEnabled = false;
 
-	public static String BASE_URL = "https://plugin-api.core.cloudchainsinc.com/";
+	public static String BASE_URL = "http://194.5.152.211:5000/";
 	public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
 	public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
 	public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();

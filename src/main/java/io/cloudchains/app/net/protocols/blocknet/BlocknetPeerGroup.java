@@ -118,7 +118,7 @@ public class BlocknetPeerGroup {
                 blocknetSeed) {};
     }
 
-    @Nullable @GuardedBy("lock")
+    @GuardedBy("lock")
     private void connectTo(InetSocketAddress inetSocketAddress, BlocknetPeer blocknetPeer) {
         checkState(lock.isHeldByCurrentThread());
 
