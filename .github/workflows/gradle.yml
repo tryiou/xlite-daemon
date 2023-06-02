@@ -11,21 +11,10 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            arch: amd64
-          - os: ubuntu-latest
-            arch: aarch64
-          - os: windows-latest
-            arch: amd64
-          - os: macos-latest
-            arch: amd64
-          - os: macos-latest
-            arch: arm64
-    runs-on: ${{ matrix.os }}
-      
+    runs-on: ubuntu-latest
+    env:
+      GRAALVM_VERSION: 22.3.2
+
     steps:
     - uses: actions/checkout@v2
     
@@ -37,52 +26,26 @@ jobs:
         cache: 'gradle'
 
     - name: Install GraalVM
-      env:
-        GRAALVM_VERSION: 22.3.2
-      run: 
-        if [ "${{ runner.os }}" == "Linux" ]; then
-          if [ "${{ matrix.arch }}" == "aarch64" ]; then
-            curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-linux-aarch64-$GRAALVM_VERSION.tar.gz" -o graalvm.tar.gz
-          else
-            curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-linux-amd64-$GRAALVM_VERSION.tar.gz" -o graalvm.tar.gz
-          fi
-          tar -xzf graalvm.tar.gz
-          sudo mv graalvm-ce-java17-$GRAALVM_VERSION /usr/local/graalvm
-          echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
-        elif [ "${{ runner.os }}" == "Windows" ]; then
-          curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-windows-amd64-$GRAALVM_VERSION.zip" -o graalvm.zip
-          Expand-Archive -Path graalvm.zip -DestinationPath .
-          mv graalvm-ce-java17-$GRAALVM_VERSION "C:\graalvm"
-          echo "C:\graalvm\bin" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
-        elif [ "${{ runner.os }}" == "macOS" ]; then
-          if [ "${{ matrix.arch }}" == "arm64" ]; then
-            curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-darwin-amd64-$GRAALVM_VERSION.tar.gz" -o graalvm.tar.gz
-          else
-            curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-darwin-amd64-$GRAALVM_VERSION.tar.gz" -o graalvm.tar.gz
-          fi
-          tar -xzf graalvm.tar.gz
-          sudo mv graalvm-ce-java17-$GRAALVM_VERSION /usr/local/graalvm
-          echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
-        fi
+      run: |
+        curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-linux-amd64-$GRAALVM_VERSION.tar.gz" -o graalvm.tar.gz
+        tar -xzf graalvm.tar.gz
+        sudo mv graalvm-ce-java17-$GRAALVM_VERSION /usr/local/graalvm
+        echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
 
-    
     - name: Grant execute permissions for gradlew
       run: chmod +x gradlew
-      if: runner.os == 'Linux' || runner.os == 'macOS'
 
     - name: Build with Gradle
       run: |
         ./gradlew clean
         ./gradlew build
-      shell: bash
 
     - name: Build Native Image
       run: |
         ./gradlew nativeImage
-      shell: bash
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: native-image-${{ runner.os }}
-        path: build/libs/ 
+        name: native-image-ubuntu-amd64
+        path: build/libs/
