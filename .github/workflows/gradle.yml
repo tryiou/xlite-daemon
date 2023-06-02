@@ -25,6 +25,27 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
         cache: 'gradle'
+
+    - name: Install GraalVM
+      env:
+        GRAALVM_VERSION: 22.3.0
+      run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-linux-amd64-$GRAALVM_VERSION.tar.gz" -o graalvm.tar.gz
+            tar -xzf graalvm.tar.gz
+            sudo mv graalvm-ce-java17-$GRAALVM_VERSION /usr/local/graalvm
+            echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
+          elif [ "${{ runner.os }}" == "Windows" ]; then
+            curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-windows-amd64-$GRAALVM_VERSION.zip" -o graalvm.zip
+            Expand-Archive -Path graalvm.zip -DestinationPath .
+            mv graalvm-ce-java17-$GRAALVM_VERSION "C:\graalvm"
+            echo "C:\graalvm\bin" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+          else
+            curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-$GRAALVM_VERSION/graalvm-ce-java17-aarch64-$GRAALVM_VERSION.tar.gz" -o graalvm.tar.gz
+            tar -xzf graalvm.tar.gz
+            sudo mv graalvm-ce-java17-$GRAALVM_VERSION /usr/local/graalvm
+            echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
+          fi      
     
     - name: Grant execute permissions for gradlew
       run: chmod +x gradlew
