@@ -28,9 +28,12 @@ jobs:
     - name: Install GraalVM
       run: |
         curl -LJ "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-22.3.2/graalvm-ce-java17-linux-amd64-22.3.2.tar.gz" -o graalvm.tar.gz
-        tar -xzf graalvm.tar.gz
+        
         sudo mv graalvm-ce-java17-$GRAALVM_VERSION /usr/local/graalvm
         echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
+
+    - name: Inspect File Type 
+      run: file graalvm.tar.gz
 
     - name: Grant execute permissions for gradlew
       run: chmod +x gradlew
