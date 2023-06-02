@@ -36,9 +36,14 @@ jobs:
     - name: Verify the tar command
       run: |
           tar --version
+          
+    - name: Install GCC
+      run: |
+          gcc -v
+          
     - name: Build Native Image
       run: |
-        ./gradlew nativeImage --scan
+        ./gradlew nativeImage
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
