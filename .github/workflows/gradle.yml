@@ -15,15 +15,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-           arch: amd64
+            arch: amd64
           - os: ubuntu-latest
-           arch: aarch64
+            arch: aarch64
           - os: windows-latest
-           arch: amd64
+            arch: amd64
           - os: macos-latest
-           arch: amd64
+            arch: amd64
           - os: macos-latest
-           arch: arm64
+            arch: arm64
     runs-on: ${{ matrix.os }}
       
     steps:
