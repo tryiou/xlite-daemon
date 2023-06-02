@@ -32,6 +32,9 @@ jobs:
         sudo mv graalvm-ce-java17-$GRAALVM_VERSION /usr/local/graalvm
         echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
 
+    - name: Inspect File Type 
+      run: file graalvm.tar.gz
+        
     - name: Grant execute permissions for gradlew
       run: chmod +x gradlew
 
