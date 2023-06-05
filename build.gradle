@@ -40,12 +40,6 @@ test {
 
 
 graal {
-	// Check if the current operating system is Windows
-	if (System.getProperty('os.name').startsWith('Windows')) {
-		// Set the paths to the Windows SDK components
-		windowsSdkDir = 'C:/Program Files/Microsoft SDKs/Windows/v7.1'
-		windowsSdkVersion = '7.1'
-	}
 	graalVersion '22.3.0'
 	javaVersion '17'
 	mainClass 'io.cloudchains.app.App'
