@@ -41,7 +41,7 @@ jobs:
 
     - name: Build Native Image
       run: |
-        .\gradlew.bat nativeImage --info
+        .\gradlew.bat nativeImage --debug
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
