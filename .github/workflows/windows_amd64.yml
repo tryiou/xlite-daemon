@@ -3,10 +3,10 @@ name: Build
 on:
   push:
     branches:
-      - dev-build-linux-amd64
+      - dev-build-windows-amd64
   pull_request:
     branches:
-      - dev-build-linux-amd64
+      - dev-build-windows-amd64
   workflow_dispatch:
 
 jobs:
@@ -28,7 +28,17 @@ jobs:
 
     - name: Install Windows SDK 7.1
       run: |
-        choco install windows-sdk-7.1 -y
+        $ErrorActionPreference = 'Stop'
+        $ProgressPreference = 'SilentlyContinue'
+        choco install 7zip -y
+        $url = "https://download.microsoft.com/download/F/1/0/F10113F5-B750-4969-A255-274341AC6BCE/GRMSDKX_EN_DVD.iso"
+        $isoFile = "winsdk71.iso"
+        $outputFolder = "winsdk71"
+        Invoke-WebRequest -Uri $url -OutFile $isoFile
+        & "C:\ProgramData\chocolatey\bin\7z.exe" x -o"$outputFolder" "$isoFile"
+        $setupPath = ".\$outputFolder\Setup\SDKSetup.exe"
+        Start-Process -FilePath $setupPath -ArgumentList "/q" -Wait      shell: powershell
+
     - name: Build Native Image
       run: |
         .\gradlew.bat nativeImage --info
