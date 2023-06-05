@@ -3,10 +3,10 @@ name: Build
 on:
   push:
     branches:
-      - dev-build-windows-amd64
+      - dev-build-linux-amd64
   pull_request:
     branches:
-      - dev-build-windows-amd64
+      - dev-build-linux-amd64
   workflow_dispatch:
 
 jobs:
