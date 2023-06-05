@@ -35,7 +35,7 @@ jobs:
           echo "/usr/local/graalvm/bin" >> $GITHUB_PATH
     
     - name: Inspect Tar File Contents
-      run: tar -tvf graalvm.tar.gz
+      run: tar -tvf graalvm-ce-java17-linux-amd64-22.3.0.tar.gz
 
     - name: Grant execute permissions for gradlew
       run: chmod +x gradlew
