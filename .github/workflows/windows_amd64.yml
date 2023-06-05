@@ -41,7 +41,18 @@ jobs:
 
     - name: Build Native Image
       run: |
-        .\gradlew.bat nativeImage --debug
+            # Remove the existing 'run' step and replace it with the modified commands
+            # Set the path to the installed Windows SDK 7.1
+            $sdkPath = "C:\Program Files\Microsoft SDKs\Windows\v7.1"
+            # Add the SDK bin directory to the PATH
+            $env:Path += ";$sdkPath\Bin"
+            # Set the path to the SDK include directory
+            $env:INCLUDE = "$sdkPath\Include;$env:INCLUDE"
+            # Set the path to the SDK lib directory
+            $env:LIB = "$sdkPath\Lib;$env:LIB"
+            # Run the nativeImage task using the installed SDK
+            .\gradlew.bat nativeImage --stacktrace
+
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
