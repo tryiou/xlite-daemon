@@ -1,4 +1,4 @@
-name: Build
+name: Build_windows
 
 on:
   push:
@@ -37,11 +37,12 @@ jobs:
         Invoke-WebRequest -Uri $url -OutFile $isoFile
         & "C:\ProgramData\chocolatey\bin\7z.exe" x -o"$outputFolder" "$isoFile"
         $setupPath = ".\$outputFolder\Setup\SDKSetup.exe"
-        Start-Process -FilePath $setupPath -ArgumentList "/q" -Wait      shell: powershell
+        Start-Process -FilePath $setupPath -ArgumentList "/q" -Wait
 
     - name: Build Native Image
       run: |
         .\gradlew.bat nativeImage --info
+
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
       with:
