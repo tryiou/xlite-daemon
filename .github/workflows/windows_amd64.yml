@@ -26,6 +26,9 @@ jobs:
     - name: Install Visual Studio Build Tools
       uses: ilammy/msvc-dev-cmd@v1
 
+    - name: Install Windows SDK 7.1
+      run: |
+        choco install windows-sdk-7.1 -y
     - name: Build Native Image
       run: |
         .\gradlew.bat nativeImage --info
