@@ -44,6 +44,7 @@ if (isWindows) {
     // Set Windows SDK path
     def windowsSdkDir = "C:\\Program Files (x86)\\Windows Kits\\10"
     ext.windowsSdkDir = windowsSdkDir
+    graal.windowsSdkDir = windowsSdkDir
 }
 
 graal {
