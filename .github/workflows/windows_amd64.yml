@@ -28,6 +28,7 @@ jobs:
 
     - name: Install Windows SDK 8.0
       run: |
+        choco upgrade chocolatey
         choco install windows-sdk-8.0 -y
 
     - name: Build Native Image
