@@ -30,8 +30,7 @@ jobs:
           vs-path: '2019'
 
       - name: Install Windows SDK 10
-        run: |
-          choco install windows-sdk-10 -y
+        run: choco install windows-sdk-10 -y
 
       - name: Create environment file
         run: |
@@ -41,15 +40,7 @@ jobs:
           echo "INCLUDE=$env:SDK_PATH\Include;$env:INCLUDE" >> $GITHUB_ENV
 
       - name: Build Native Image
-        run: |
-          # Run the nativeImage task using the installed SDK
-          ./gradlew.bat nativeImage --stacktrace
-          
-          # Check if the nativeImage task failed
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to build native image."
-            exit $LASTEXITCODE
-          }
+        run: ./gradlew.bat nativeImage --stacktrace
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
