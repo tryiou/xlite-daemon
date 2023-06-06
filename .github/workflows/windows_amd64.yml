@@ -26,15 +26,15 @@ jobs:
     - name: Install Visual Studio Build Tools
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Install Windows SDK 8.0
+    - name: Install Windows SDK 8.1
       run: |
         choco upgrade chocolatey
-        choco install windows-sdk-8.0 -y
+        choco install windows-sdk-8.1 -y
 
     - name: Build Native Image
       run: |
-        # Set the path to the installed Windows SDK 8.0
-        $sdkPath = "C:\Program Files (x86)\Microsoft SDKs\Windows\v8.0A"
+        # Set the path to the installed Windows SDK 8.1
+        $sdkPath = "C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A"
         # Add the SDK bin directory to the PATH
         $env:Path += ";$sdkPath\Bin"
         # Set the path to the SDK include directory
