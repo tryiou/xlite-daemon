@@ -14,111 +14,117 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-      
-    - name: Install Windows SDK 10
-      run: choco install windows-sdk-10 -y
-      
-    - name: Install Visual Studio Build Tools
-      run: choco install -y visualstudio2019-workload-vctools
-      
-    - name: Install OpenJDK
-      run: choco install openjdk --version 17 -y
-      
-    - name: Install vswhere
-      run: choco install -y vswhere
-      
-    - name: Set up Visual Studio Build Tools
-      run: |
-        # Find the path to the latest installed Visual Studio version
-        $vswherePath = choco.exe list --local-only vswhere --exact --all-versions --include-prerelease --limit-output
-        $vsPath = $($vswherePath | ForEach-Object { (choco.exe info --json --no-color "$_") | ConvertFrom-Json | Select-Object -ExpandProperty Installed --Last 1 }).InstallLocation
-        if ($vsPath -eq $null) {
-          Write-Error "Visual Studio Build Tools not found."
-          exit 1
-        }
-        
-        # Set up the environment using vcvars64.bat
-        $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\Auxiliary\Build\vcvars64.bat"
-        if (Test-Path $vcvarsPath) {
-          Write-Host "Setting up Visual Studio Build Tools environment..."
-          cmd.exe /C "$vcvarsPath && set"
-        }
-        else {
-          Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
-          exit 1
-        }
-    
-    - name: Build the project using Gradle
-      run: |
-        call gradlew.bat build
-        call gradlew.bat downloadGraalTooling
-        call gradlew.bat extractGraalTooling 
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-        SET GRAAL_HOME=%USERPROFILE%\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0
-        SET NATIVE_IMAGE=%GRAAL_HOME%\bin\native-image
-        SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.12-all.jar
+      - name: Cache Chocolatey packages
+        uses: actions/cache@v2
+        with:
+          path: C:\ProgramData\chocolatey
+          key: choco-packages-{{ runner.os }}-{{ hashFiles('**/chocolatey.config') }}
 
-        echo GRAAL_HOME=%GRAAL_HOME%
-        echo NATIVE_IMAGE=%NATIVE_IMAGE%
-        echo CC_PACKAGED_JAR=%CC_PACKAGED_JAR%
+      - name: Install Windows SDK 10
+        run: choco install windows-sdk-10 -y
 
-        call %NATIVE_IMAGE% -jar %CC_PACKAGED_JAR% ^
-          -H:Name=Cloudchains-SPV ^
-          -H:Class=io.cloudchains.app.App ^
-          -H:+JNI ^
-          -H:+UseServiceLoaderFeature ^
-          -H:-UseServiceLoaderFeature ^
-          -H:ReflectionConfigurationFiles=contrib/netty-reflection.json ^
-          -H:ResourceConfigurationFiles=contrib/resource-config.json ^
-          -H:IncludeResources='.*/wordlist/english.txt$' ^
-          -H:Log=registerResource ^
-          --no-fallback ^
-          --no-server ^
-          -da ^
-          --enable-url-protocols=http,https ^
-          --initialize-at-build-time=io.netty ^
-          --initialize-at-build-time=com.google.common ^
-          --initialize-at-build-time=org.apache.commons.logging ^
-          --initialize-at-build-time=org.slf4j.LoggerFactory ^
-          --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder ^
-          --initialize-at-build-time=org.slf4j.helpers.NOPLogger ^
-          --initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory ^
-          --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory ^
-          --initialize-at-build-time=org.slf4j.helpers.Util ^
-          --initialize-at-build-time=org.bitcoinj.core.Utils ^
-          --initialize-at-build-time=org.bitcoinj.core.Sha256Hash ^
-          --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode ^
-          --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger ^
-          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder ^
-          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter ^
-          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil ^
-          --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator ^
-          --initialize-at-run-time=io.netty.buffer.ByteBufAllocator ^
-          --initialize-at-run-time=io.netty.buffer.ByteBufUtil ^
-          --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf ^
-          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil ^
-          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec ^
-          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler ^
-          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter ^
-          --initialize-at-run-time=io.netty.util.AbstractReferenceCounted ^
-          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder ^
-          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder ^
-          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder ^
-          --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom ^
-          --allow-incomplete-classpath ^
-          --verbose ^
-          -H:+ReportExceptionStackTraces
-    
-    - name: Create build\nativeImage directory
-      run: mkdir build\nativeImage
-      
-    - name: Move native image file to build\nativeImage directory
-      run: move /y Cloudchains-SPV.exe build\nativeImage
+      - name: Install Visual Studio Build Tools
+        run: choco install -y visualstudio2019-workload-vctools
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-         name: native-image-windows-amd64
-         path: build\nativeImage\
+      - name: Install OpenJDK
+        run: choco install openjdk --version 17 -y
+
+      - name: Install vswhere
+        run: choco install -y vswhere
+
+      - name: Set up Visual Studio Build Tools
+        run: |
+          # Find the path to the latest installed Visual Studio version
+          $vswherePath = choco.exe list --local-only vswhere --exact --all-versions --include-prerelease --limit-output
+          $vsPath = $($vswherePath | ForEach-Object { (choco.exe info --json --no-color "$_") | ConvertFrom-Json | Select-Object -ExpandProperty Installed --Last 1 }).InstallLocation
+          if ($vsPath -eq $null) {
+            Write-Error "Visual Studio Build Tools not found."
+            exit 1
+          }
+
+          # Set up the environment using vcvars64.bat
+          $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $vcvarsPath) {
+            Write-Host "Setting up Visual Studio Build Tools environment..."
+            cmd.exe /C "$vcvarsPath && set"
+          }
+          else {
+            Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
+            exit 1
+          }
+
+      - name: Build the project using Gradle
+        run: |
+          call gradlew.bat build
+          call gradlew.bat downloadGraalTooling
+          call gradlew.bat extractGraalTooling
+
+          SET GRAAL_HOME=%USERPROFILE%\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0
+          SET NATIVE_IMAGE=%GRAAL_HOME%\bin\native-image
+          SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.12-all.jar
+
+          echo GRAAL_HOME=%GRAAL_HOME%
+          echo NATIVE_IMAGE=%NATIVE_IMAGE%
+          echo CC_PACKAGED_JAR=%CC_PACKAGED_JAR%
+
+          call "%NATIVE_IMAGE%" -jar "%CC_PACKAGED_JAR%" ^
+            -H:Name=Cloudchains-SPV ^
+            -H:Class=io.cloudchains.app.App ^
+            -H:+JNI ^
+            -H:+UseServiceLoaderFeature ^
+            -H:-UseServiceLoaderFeature ^
+            -H:ReflectionConfigurationFiles=contrib/netty-reflection.json ^
+            -H:ResourceConfigurationFiles=contrib/resource-config.json ^
+            -H:IncludeResources='.*/wordlist/english.txt$' ^
+            -H:Log=registerResource ^
+            --no-fallback ^
+            --no-server ^
+            -da ^
+            --enable-url-protocols=http,https ^
+            --initialize-at-build-time=io.netty ^
+            --initialize-at-build-time=com.google.common ^
+            --initialize-at-build-time=org.apache.commons.logging ^
+            --initialize-at-build-time=org.slf4j.LoggerFactory ^
+            --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder ^
+            --initialize-at-build-time=org.slf4j.helpers.NOPLogger ^
+            --initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory ^
+            --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory ^
+            --initialize-at-build-time=org.slf4j.helpers.Util ^
+            --initialize-at-build-time=org.bitcoinj.core.Utils ^
+            --initialize-at-build-time=org.bitcoinj.core.Sha256Hash ^
+            --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode ^
+            --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger ^
+            --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder ^
+            --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter ^
+            --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil ^
+            --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator ^
+            --initialize-at-run-time=io.netty.buffer.ByteBufAllocator ^
+            --initialize-at-run-time=io.netty.buffer.ByteBufUtil ^
+            --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf ^
+            --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil ^
+            --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec ^
+            --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler ^
+            --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter ^
+            --initialize-at-run-time=io.netty.util.AbstractReferenceCounted ^
+            --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder ^
+            --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder ^
+            --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder ^
+            --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom ^
+            --allow-incomplete-classpath ^
+            --verbose ^
+            -H:+ReportExceptionStackTraces
+
+      - name: Create build\nativeImage directory
+        run: mkdir build\nativeImage
+
+      - name: Move native image file to build\nativeImage directory
+        run: move /y Cloudchains-SPV.exe build\nativeImage
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: native-image-windows-amd64
+          path: build\nativeImage\
