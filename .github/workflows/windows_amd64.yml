@@ -16,10 +16,11 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-
+      
     - name: Run Batch File
+      working-directory: ./xlite-daemon
       run: |
-        nativeImageWindows.bat
+        call nativeImageWindows.bat
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
