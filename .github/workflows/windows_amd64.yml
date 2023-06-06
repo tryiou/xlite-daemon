@@ -18,7 +18,7 @@ jobs:
       uses: actions/checkout@v2
       
     - name: Run Batch File
-      working-directory: ./xlite-daemon
+      shell: cmd
       run: |
         call nativeImageWindows.bat
 
