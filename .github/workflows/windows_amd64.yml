@@ -26,33 +26,22 @@ jobs:
     - name: Install Visual Studio Build Tools
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Install Windows SDK 7.1
+    - name: Install Windows SDK 8.0
       run: |
-        $ErrorActionPreference = 'Stop'
-        $ProgressPreference = 'SilentlyContinue'
-        choco install 7zip -y
-        $url = "https://download.microsoft.com/download/F/1/0/F10113F5-B750-4969-A255-274341AC6BCE/GRMSDKX_EN_DVD.iso"
-        $isoFile = "winsdk71.iso"
-        $outputFolder = "winsdk71"
-        Invoke-WebRequest -Uri $url -OutFile $isoFile
-        & "C:\ProgramData\chocolatey\bin\7z.exe" x -o"$outputFolder" "$isoFile"
-        $setupPath = ".\$outputFolder\Setup\SDKSetup.exe"
-        Start-Process -FilePath $setupPath -ArgumentList "/q" -Wait
+        choco install windows-sdk-8.0 -y
 
     - name: Build Native Image
       run: |
-            # Remove the existing 'run' step and replace it with the modified commands
-            # Set the path to the installed Windows SDK 7.1
-            $sdkPath = "C:\Program Files\Microsoft SDKs\Windows\v7.1"
-            # Add the SDK bin directory to the PATH
-            $env:Path += ";$sdkPath\Bin"
-            # Set the path to the SDK include directory
-            $env:INCLUDE = "$sdkPath\Include;$env:INCLUDE"
-            # Set the path to the SDK lib directory
-            $env:LIB = "$sdkPath\Lib;$env:LIB"
-            # Run the nativeImage task using the installed SDK
-            .\gradlew.bat nativeImage --stacktrace
-
+        # Set the path to the installed Windows SDK 8.0
+        $sdkPath = "C:\Program Files (x86)\Microsoft SDKs\Windows\v8.0A"
+        # Add the SDK bin directory to the PATH
+        $env:Path += ";$sdkPath\Bin"
+        # Set the path to the SDK include directory
+        $env:INCLUDE = "$sdkPath\Include;$env:INCLUDE"
+        # Set the path to the SDK lib directory
+        $env:LIB = "$sdkPath\Lib;$env:LIB"
+        # Run the nativeImage task using the installed SDK
+        .\gradlew.bat nativeImage --stacktrace
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
