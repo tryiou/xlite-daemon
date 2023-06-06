@@ -14,33 +14,45 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Setup Java
-      uses: actions/setup-java@v2
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        cache: 'gradle'
+      - name: Setup Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
 
-    - name: Install Visual Studio Build Tools
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Visual Studio Build Tools
+        uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Install Windows SDK 10
-      run: |
-        choco install windows-sdk-10 -y
+      - name: Install Windows SDK 10
+        run: |
+          choco install windows-sdk-10 -y
 
-    - name: Build Native Image
-      run: |
-        # Set the path to the installed Windows SDK 10
-        $sdkPath = "C:\Program Files (x86)\Windows Kits\10"
-        # Add the SDK bin directory to the PATH
-        $env:Path += ";$sdkPath\bin"
-        # Run the nativeImage task using the installed SDK
-        .\gradlew.bat nativeImage --stacktrace
+          # Run the SetEnv.cmd script to initialize the SDK environment
+          call "C:\Program Files (x86)\Windows Kits\10\Bin\SetEnv.cmd"
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: native-image-windows-amd64
-        path: build/graal/
+      - name: Build Native Image
+        run: |
+          # Set the path to the installed Windows SDK 10
+          $env:WINDOWS_KITS_10 = "C:\Program Files (x86)\Windows Kits\10"
+
+          # Add the SDK bin directory to the PATH
+          $env:Path += ";$env:WINDOWS_KITS_10\bin"
+
+          # Run the nativeImage task using the installed SDK
+          ./gradlew.bat nativeImage --stacktrace
+          
+          # Check if the nativeImage task failed
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to build native image."
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: native-image-windows-amd64
+          path: build/graal/
