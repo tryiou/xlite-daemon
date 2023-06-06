@@ -65,11 +65,11 @@ echo location of your Java installation.
 goto fail
 
 :setSdkPath
-@rem Set the path to the installed Windows SDK 8.1
-set SDK_PATH=C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A
+@rem Set the path to the installed Windows SDK 10
+set SDK_PATH=C:\Program Files (x86)\Windows Kits\10
 
 @rem Add the SDK bin directory to the PATH
-set PATH=%SDK_PATH%\Bin;%PATH%
+set PATH=%SDK_PATH%\bin;%PATH%
 
 @rem Set the path to the SDK include directory
 set INCLUDE=%SDK_PATH%\Include;%INCLUDE%
@@ -91,4 +91,6 @@ set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
 if "%ERRORLEVEL%"=="0" goto mainEnd
 
 :fail
-rem Set variable GRADLE_EXIT_CONSOLE if
+rem Set variable GRADLE_EXIT_CONSOLE if needed
+if 1 == 0 endlocal
+:end
