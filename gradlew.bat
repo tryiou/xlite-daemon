@@ -32,7 +32,11 @@ jobs:
 
       - name: Set Windows SDK path
         run: |
-          echo "::set-env name=WINDOWS_KITS_10::C:\Program Files (x86)\Windows Kits\10"
+          echo "::set-env name=SDK_PATH::C:\Program Files (x86)\Windows Kits\10"
+          echo "::add-path::$env:SDK_PATH\bin"
+          echo "::add-path::$env:SDK_PATH\Lib"
+          echo "::add-path::$env:SDK_PATH\Include"
+
 
       - name: Build Native Image
         run: |
