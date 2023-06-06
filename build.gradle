@@ -40,6 +40,12 @@ test {
 
 def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
 
+if (isWindows) {
+    // Set Windows SDK path
+    def windowsSdkDir = "C:\\Program Files (x86)\\Windows Kits\\10"
+    ext.windowsSdkDir = windowsSdkDir
+}
+
 graal {
     graalVersion '22.3.0'
     javaVersion '17'
@@ -74,10 +80,6 @@ graal {
     option '--initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil'
     option '--allow-incomplete-classpath'
     option '--verbose'
-
-    if (isWindows) {
-        windowsSdkDir = "C:\\Program Files (x86)\\Windows Kits\\10"
-    }
 }
 
 dependencies {
