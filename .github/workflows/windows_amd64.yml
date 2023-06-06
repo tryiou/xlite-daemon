@@ -26,21 +26,17 @@ jobs:
     - name: Install Visual Studio Build Tools
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Install Windows SDK 8.1
+    - name: Install Windows SDK 10
       run: |
         choco upgrade chocolatey
-        choco install windows-sdk-8.1 -y
+        choco install windows-sdk-10 -y
 
     - name: Build Native Image
       run: |
-        # Set the path to the installed Windows SDK 8.1
-        $sdkPath = "C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A"
+        # Set the path to the installed Windows SDK 10
+        $sdkPath = "C:\Program Files (x86)\Windows Kits\10"
         # Add the SDK bin directory to the PATH
-        $env:Path += ";$sdkPath\Bin"
-        # Set the path to the SDK include directory
-        $env:INCLUDE = "$sdkPath\Include;$env:INCLUDE"
-        # Set the path to the SDK lib directory
-        $env:LIB = "$sdkPath\Lib;$env:LIB"
+        $env:Path += ";$sdkPath\bin"
         # Run the nativeImage task using the installed SDK
         .\gradlew.bat nativeImage --stacktrace
 
