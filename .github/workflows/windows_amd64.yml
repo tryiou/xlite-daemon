@@ -34,6 +34,12 @@ jobs:
       - name: Install Windows SDK 10
         run: choco install windows-sdk-10 -y
 
+      - name: Verify Windows SDK environment variables
+        run: |
+         echo "PATH=$env:PATH"
+         echo "INCLUDE=$env:INCLUDE"
+         echo "LIB=$env:LIB"
+
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
         
@@ -50,7 +56,11 @@ jobs:
             Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
             exit 1
           }
-
+      - name: Verify Visual Studio Build Tools environment variables
+        run: |
+          echo "PATH=$env:PATH"
+          echo "INCLUDE=$env:INCLUDE"
+          echo "LIB=$env:LIB"
         
       - name: Cache Chocolatey packages
         uses: actions/cache@v2
