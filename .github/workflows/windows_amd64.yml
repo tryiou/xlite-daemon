@@ -16,14 +16,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-        
+
       - name: Load Chocolatey cache
         id: choco-cache
         uses: actions/cache@v2
         with:
-         path: C:\ProgramData\chocolatey\lib
-         key: choco-packages-${{ runner.os }}
-         restore-keys: choco-packages-
+          path: C:\ProgramData\chocolatey\lib
+          key: choco-packages-${{ runner.os }}
+          restore-keys: choco-packages-
 
       - name: Set up JDK 17
         uses: actions/setup-java@v2
@@ -34,11 +34,15 @@ jobs:
       - name: Install Windows SDK 10
         run: choco install windows-sdk-10 -y
 
+      - name: Install Visual Studio Build Tools
+        run: choco install -y visualstudio2019-workload-vctools
+
       - name: Set up Windows SDK 10 environment
+        shell: powershell
         run: |
-          $vsPath = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
-          $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\Auxiliary\Build\vcvars64.bat"
-          $windowsSdk10Path = "C:\Program Files (x86)\Windows Kits\10"
+          $vsPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools"
+          $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\\Auxiliary\\Build\\vcvars64.bat"
+          $windowsSdk10Path = "C:\\Program Files (x86)\\Windows Kits\\10"
 
           if (Test-Path $vcvarsPath) {
             Write-Host "Setting up Visual Studio Build Tools environment..."
@@ -51,13 +55,13 @@ jobs:
 
           if (Test-Path $windowsSdk10Path) {
             Write-Host "Setting up Windows SDK 10 environment..."
-            cmd.exe /C "set PATH=%PATH%;""$windowsSdk10Path\bin"""
-            cmd.exe /C "set INCLUDE=%INCLUDE%;""$windowsSdk10Path\include"""
-            cmd.exe /C "set LIB=%LIB%;""$windowsSdk10Path\lib"""
+            cmd.exe /C "set PATH=%PATH%;`"$windowsSdk10Path\\bin`""
+            cmd.exe /C "set INCLUDE=%INCLUDE%;`"$windowsSdk10Path\\include`""
+            cmd.exe /C "set LIB=%LIB%;`"$windowsSdk10Path\\lib`""
           }
           else {
             Write-Error "Windows SDK 10 not found in the default installation directory."
-          exit 1
+            exit 1
           }
 
       - name: Verify Visual Studio Build Tools environment variables
@@ -65,26 +69,28 @@ jobs:
           echo "PATH=$env:PATH"
           echo "INCLUDE=$env:INCLUDE"
           echo "LIB=$env:LIB"
-        
+
       - name: Cache Chocolatey packages
         uses: actions/cache@v2
         with:
-         path: C:\ProgramData\chocolatey\lib
-         key: choco-packages-${{ runner.os }}
-         restore-keys: choco-packages-
+          path: C:\ProgramData\chocolatey\lib
+          key: choco-packages-${{ runner.os }}
+          restore-keys: choco-packages-
 
       - name: Build the project using Gradle
         run: ./gradlew.bat build
+        continue-on-error: false
 
       - name: Download GraalVM Tooling
         run: ./gradlew.bat downloadGraalTooling
+        continue-on-error: false
 
       - name: Extract GraalVM Tooling
         run: ./gradlew.bat extractGraalTooling
+        continue-on-error: false
                
       - name: Build the native Image
         run: |
-
             $env:GRAAL_HOME = "$env:USERPROFILE\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0"
             $env:NATIVE_IMAGE = "$env:GRAAL_HOME\bin\native-image"
             $env:CC_PACKAGED_JAR = "$PWD\build\libs\xlite-daemon-0.5.12-all.jar"
@@ -139,6 +145,7 @@ jobs:
             --allow-incomplete-classpath `
             --verbose `
             -H:+ReportExceptionStackTraces
+        continue-on-error: false
 
       - name: Create build\nativeImage directory
         run: |
