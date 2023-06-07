@@ -21,7 +21,7 @@ jobs:
         id: choco-cache
         uses: actions/cache@v2
         with:
-         path: C:\ProgramData\chocolatey
+         path: C:\ProgramData\chocolatey\lib
          key: choco-packages-${{ runner.os }}
          restore-keys: choco-packages-
 
@@ -41,8 +41,8 @@ jobs:
         uses: actions/cache@v2
         with:
          path: C:\ProgramData\chocolatey\lib
-         key: choco-apps-${{ runner.os }}
-         restore-keys: choco-apps-
+         key: choco-packages-${{ runner.os }}
+         restore-keys: choco-packages-
 
       - name: Build the project using Gradle
         run: ./gradlew.bat build
