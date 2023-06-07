@@ -35,33 +35,6 @@ jobs:
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
 
-      #- name: Install OpenJDK
-      #  run: choco install openjdk --version 17 -y
-
-      - name: Install vswhere
-        run: choco install -y vswhere
-
-      - name: Set up Visual Studio Build Tools
-        run: |
-          # Find the path to the latest installed Visual Studio version
-          $vswherePath = choco.exe list --local-only vswhere --exact --all-versions --include-prerelease --limit-output
-          $vsPath = $($vswherePath | ForEach-Object { (choco.exe info --json --no-color "$_") | ConvertFrom-Json | Select-Object -ExpandProperty Installed --Last 1 }).InstallLocation
-          if ($vsPath -eq $null) {
-            Write-Error "Visual Studio Build Tools not found."
-            exit 1
-          }
-
-          # Set up the environment using vcvars64.bat
-          $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\Auxiliary\Build\vcvars64.bat"
-          if (Test-Path $vcvarsPath) {
-            Write-Host "Setting up Visual Studio Build Tools environment..."
-            cmd.exe /C "$vcvarsPath && set"
-          }
-          else {
-            Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
-            exit 1
-          }
-
       - name: Build the project using Gradle
         run: |
           call gradlew.bat build
@@ -123,8 +96,12 @@ jobs:
             --verbose ^
             -H:+ReportExceptionStackTraces
 
+
       - name: Create build\nativeImage directory
-        run: mkdir build\nativeImage
+        run: |
+            if (-not (Test-Path -Path "build\nativeImage")) {
+              mkdir build\nativeImage
+            }
 
       - name: Move native image file to build\nativeImage directory
         run: move /y Cloudchains-SPV.exe build\nativeImage
@@ -134,3 +111,7 @@ jobs:
         with:
           name: native-image-windows-amd64
           path: build\nativeImage\
+
+
+
+
