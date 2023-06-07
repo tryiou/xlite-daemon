@@ -64,7 +64,7 @@ jobs:
           echo NATIVE_IMAGE=%NATIVE_IMAGE%
           echo CC_PACKAGED_JAR=%CC_PACKAGED_JAR%
 
-          "%NATIVE_IMAGE%" -jar "%CC_PACKAGED_JAR%" `
+          & $NATIVE_IMAGE -jar $CC_PACKAGED_JAR `
             -H:Name=Cloudchains-SPV `
             -H:Class=io.cloudchains.app.App `
             -H:+JNI `
