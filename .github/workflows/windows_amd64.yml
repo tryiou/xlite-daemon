@@ -40,21 +40,38 @@ jobs:
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
 
-      - name: Cache Chocolatey packages
-        uses: actions/cache@v2
-        with:
-          path: |
-            C:\ProgramData\chocolatey
-            C:\ProgramData\chocolatey\lib\windows-sdk-10
-            C:\ProgramData\chocolatey\lib\visualstudio2019-workload-vctools
-          key: choco-packages-${{ runner.os }}
-
       - name: Build the project using Gradle
-        run: |
-          ./gradlew.bat build
-          ./gradlew.bat downloadGraalTooling
-          ./gradlew.bat extractGraalTooling
+        run: ./gradlew.bat build
 
+      - name: Download GraalVM Tooling
+        run: ./gradlew.bat downloadGraalTooling
+
+      - name: Extract GraalVM Tooling
+        run: ./gradlew.bat extractGraalTooling
+        
+      - name: Check Gradle Cache Folder
+        run: |
+          $GRADLE_CACHE = "${USERPROFILE}\\.gradle\\caches"
+          if (Test-Path $GRADLE_CACHE) {
+            echo "Gradle Cache folder exists."
+          } else {
+            echo "Gradle Cache folder does not exist."
+            exit 1
+          }
+          
+      - name: Check Native Image Executable
+        run: |
+         $GRAAL_HOME = "${USERPROFILE}\\.gradle\\caches\\com.palantir.graal\\graalvm-ce-java17-22.3.0"
+         $NATIVE_IMAGE = "$GRAAL_HOME\\bin\\native-image"
+         if (Test-Path -Path $NATIVE_IMAGE -PathType Leaf) {
+            echo "Native Image executable exists."
+         } else {
+            echo "Native Image executable does not exist."
+            exit 1
+         }
+          
+      - name: Build the native Image
+        run: |
           $GRAAL_HOME = "$env:USERPROFILE\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0"
           $NATIVE_IMAGE = "$GRAAL_HOME\bin\native-image"
           $CC_PACKAGED_JAR = "$(Get-Location)\build\libs\xlite-daemon-0.5.12-all.jar"
