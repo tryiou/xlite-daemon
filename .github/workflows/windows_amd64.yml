@@ -44,7 +44,6 @@ jobs:
         run: choco install -y visualstudio2019-workload-vctools
         
       - name: Set up Visual Studio Build Tools environment
-        shell: pwsh
         run: |
           $vsPath = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
           $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\Auxiliary\Build\vcvars64.bat"
@@ -56,6 +55,7 @@ jobs:
             Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
             exit 1
           }
+
       - name: Verify Visual Studio Build Tools environment variables
         run: |
           echo "PATH=$env:PATH"
