@@ -20,13 +20,9 @@ jobs:
       - name: Load Chocolatey cache
         uses: actions/cache@v2
         with:
-          path: |
-            C:\ProgramData\chocolatey
-            C:\ProgramData\chocolatey\lib\windows-sdk-10
-            C:\ProgramData\chocolatey\lib\visualstudio2019-workload-vctools
+          path: C:\ProgramData\chocolatey
           key: choco-packages-${{ runner.os }}
-          restore-keys: |
-            choco-packages-
+          restore-keys: choco-packages-
 
       - name: Set up JDK 17
         uses: actions/setup-java@v2
@@ -39,6 +35,13 @@ jobs:
 
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
+
+      - name: Cache Chocolatey packages
+        uses: actions/cache@v2
+        with:
+          path: C:\ProgramData\chocolatey
+          key: choco-packages-${{ runner.os }}
+
 
       - name: Build the project using Gradle
         run: ./gradlew.bat build
@@ -69,18 +72,19 @@ jobs:
             echo "Native Image executable does not exist."
             exit 1
          }
-          
+        
       - name: Build the native Image
         run: |
-          $GRAAL_HOME = "$env:USERPROFILE\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0"
-          $NATIVE_IMAGE = "$GRAAL_HOME\bin\native-image"
-          $CC_PACKAGED_JAR = "$(Get-Location)\build\libs\xlite-daemon-0.5.12-all.jar"
 
-          Write-Host "GRAAL_HOME=$GRAAL_HOME"
-          Write-Host "NATIVE_IMAGE=$NATIVE_IMAGE"
-          Write-Host "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
+          SET GRAAL_HOME=%USERPROFILE%\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0
+          SET NATIVE_IMAGE=%GRAAL_HOME%\bin\native-image
+          SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.12-all.jar
 
-          & $NATIVE_IMAGE -jar $CC_PACKAGED_JAR `
+          echo GRAAL_HOME=%GRAAL_HOME%
+          echo NATIVE_IMAGE=%NATIVE_IMAGE%
+          echo CC_PACKAGED_JAR=%CC_PACKAGED_JAR%
+
+          call "%NATIVE_IMAGE%" -jar "%CC_PACKAGED_JAR%" `
             -H:Name=Cloudchains-SPV `
             -H:Class=io.cloudchains.app.App `
             -H:+JNI `
