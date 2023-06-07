@@ -37,6 +37,21 @@ jobs:
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
         
+      - name: Set up Visual Studio Build Tools environment
+        shell: pwsh
+        run: |
+          $vsPath = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
+          $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $vcvarsPath) {
+            Write-Host "Setting up Visual Studio Build Tools environment..."
+            cmd.exe /C "$vcvarsPath && set"
+          }
+          else {
+            Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
+            exit 1
+          }
+
+        
       - name: Cache Chocolatey packages
         uses: actions/cache@v2
         with:
