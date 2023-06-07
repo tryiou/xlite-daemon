@@ -28,6 +28,51 @@ jobs:
 
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
+        
+      - name: Set up Windows SDK 10 environment
+        shell: powershell
+        run: |
+          $vsPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools"
+          $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\\Auxiliary\\Build\\vcvars64.bat"
+          $windowsSdk10Path = "C:\\Program Files (x86)\\Windows Kits\\10"
+          
+          if (Test-Path $vcvarsPath) {
+            Write-Host "Setting up Visual Studio Build Tools environment..."
+            cmd.exe /C "`"$vcvarsPath`" && set"
+          }
+          else {
+            Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
+            exit 1
+          }
+          
+          if (Test-Path $windowsSdk10Path) {
+            Write-Host "Setting up Windows SDK 10 environment..."
+            cmd.exe /C "set PATH=%PATH%;`"$windowsSdk10Path\\bin`""
+            cmd.exe /C "set INCLUDE=%INCLUDE%;`"$windowsSdk10Path\\include`""
+            cmd.exe /C "set LIB=%LIB%;`"$windowsSdk10Path\\lib`""
+          
+            $msvcBinPath = Get-ChildItem "$vsPath\\VC\\Tools\\MSVC\\" -Filter "14.*" -Name | Select-Object -Last 1
+            if ($msvcBinPath) {
+              $clPath = Join-Path -Path "$vsPath\\VC\\Tools\\MSVC\\$msvcBinPath\\bin\\Hostx64\\x64" -ChildPath "cl.exe"
+              if (Test-Path $clPath) {
+                Write-Host "Adding cl.exe location to PATH: $clPath"
+                cmd.exe /C "set PATH=%PATH%;`"$clPath`""
+              }
+              else {
+                Write-Error "cl.exe not found in Visual Studio Build Tools installation directory."
+                exit 1
+              }
+            }
+            else {
+              Write-Error "MSVC folder not found in Visual Studio Build Tools installation directory."
+              exit 1
+            }
+          }
+          else {
+            Write-Error "Windows SDK 10 not found in the default installation directory."
+            exit 1
+          }
+
 
       - name: Build the project using Gradle
         run: ./gradlew.bat build
@@ -40,88 +85,63 @@ jobs:
       - name: Extract GraalVM Tooling
         run: ./gradlew.bat extractGraalTooling
         continue-on-error: false
-               
+
       - name: Build the native Image
         run: |
-            $env:GRAAL_HOME = "$env:USERPROFILE\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0"
-            $env:NATIVE_IMAGE = "$env:GRAAL_HOME\bin\native-image"
-            $env:CC_PACKAGED_JAR = "$PWD\build\libs\xlite-daemon-0.5.12-all.jar"
-
-            echo "GRAAL_HOME=$env:GRAAL_HOME"
-            echo "NATIVE_IMAGE=$env:NATIVE_IMAGE"
-            echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
-
-            $vsPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools"
-            $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\\Auxiliary\\Build\\vcvars64.bat"
-            $windowsSdk10Path = "C:\\Program Files (x86)\\Windows Kits\\10"
-
-            if (Test-Path $vcvarsPath) {
-              Write-Host "Setting up Visual Studio Build Tools environment..."
-              cmd.exe /C "`"$vcvarsPath`" && set"
-            }
-            else {
-              Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
-              exit 1  
-            }
-
-            if (Test-Path $windowsSdk10Path) {
-              Write-Host "Setting up Windows SDK 10 environment..."
-              cmd.exe /C "set PATH=%PATH%;`"$windowsSdk10Path\\bin`""
-              cmd.exe /C "set INCLUDE=%INCLUDE%;`"$windowsSdk10Path\\include`""
-              cmd.exe /C "set LIB=%LIB%;`"$windowsSdk10Path\\lib`""
-            }
-            else {
-              Write-Error "Windows SDK 10 not found in the default installation directory."
-              exit 1
-            }
-
-
-            & $env:NATIVE_IMAGE -jar $env:CC_PACKAGED_JAR `
-            -H:Name=Cloudchains-SPV `
-            -H:Class=io.cloudchains.app.App `
-            -H:+JNI `
-            -H:+UseServiceLoaderFeature `
-            -H:-UseServiceLoaderFeature `
-            -H:ReflectionConfigurationFiles=contrib/netty-reflection.json `
-            -H:ResourceConfigurationFiles=contrib/resource-config.json `
-            -H:IncludeResources='.*/wordlist/english.txt$' `
-            -H:Log=registerResource `
-            --no-fallback `
-            --no-server `
-            -da `
-            --enable-url-protocols=http,https `
-            --initialize-at-build-time=io.netty `
-            --initialize-at-build-time=com.google.common `
-            --initialize-at-build-time=org.apache.commons.logging `
-            --initialize-at-build-time=org.slf4j.LoggerFactory `
-            --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder `
-            --initialize-at-build-time=org.slf4j.helpers.NOPLogger `
-            --initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory `
-            --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory `
-            --initialize-at-build-time=org.slf4j.helpers.Util `
-            --initialize-at-build-time=org.bitcoinj.core.Utils `
-            --initialize-at-build-time=org.bitcoinj.core.Sha256Hash `
-            --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode `
-            --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger `
-            --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
-            --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
-            --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
-            --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator `
-            --initialize-at-run-time=io.netty.buffer.ByteBufAllocator `
-            --initialize-at-run-time=io.netty.buffer.ByteBufUtil `
-            --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf `
-            --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
-            --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec `
-            --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler `
-            --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
-            --initialize-at-run-time=io.netty.util.AbstractReferenceCounted `
-            --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
-            --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder `
-            --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder `
-            --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom `
-            --allow-incomplete-classpath `
-            --verbose `
-            -H:+ReportExceptionStackTraces
+          $env:GRAAL_HOME = "$env:USERPROFILE\\.gradle\\caches\\com.palantir.graal\\22.3.0\\17\\graalvm-ce-java17-22.3.0"
+          $env:NATIVE_IMAGE = "$env:GRAAL_HOME\\bin\\native-image"
+          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
+   
+          echo "GRAAL_HOME=$env:GRAAL_HOME"
+          echo "NATIVE_IMAGE=$env:NATIVE_IMAGE"
+          echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"         
+          
+          & $env:NATIVE_IMAGE -jar $env:CC_PACKAGED_JAR `
+          -H:Name=Cloudchains-SPV `
+          -H:Class=io.cloudchains.app.App `
+          -H:+JNI `
+          -H:+UseServiceLoaderFeature `
+          -H:-UseServiceLoaderFeature `
+          -H:ReflectionConfigurationFiles=contrib/netty-reflection.json `
+          -H:ResourceConfigurationFiles=contrib/resource-config.json `
+          -H:IncludeResources='.*/wordlist/english.txt$' `
+          -H:Log=registerResource `
+          --no-fallback `
+          --no-server `
+          -da `
+          --enable-url-protocols=http,https `
+          --initialize-at-build-time=io.netty `
+          --initialize-at-build-time=com.google.common `
+          --initialize-at-build-time=org.apache.commons.logging `
+          --initialize-at-build-time=org.slf4j.LoggerFactory `
+          --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder `
+          --initialize-at-build-time=org.slf4j.helpers.NOPLogger `
+          --initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory `
+          --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory `
+          --initialize-at-build-time=org.slf4j.helpers.Util `
+          --initialize-at-build-time=org.bitcoinj.core.Utils `
+          --initialize-at-build-time=org.bitcoinj.core.Sha256Hash `
+          --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode `
+          --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufUtil `
+          --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.util.AbstractReferenceCounted `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder `
+          --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom `
+          --allow-incomplete-classpath `
+          --verbose `
+          -H:+ReportExceptionStackTraces
         continue-on-error: false
 
       - name: Create build\nativeImage directory
