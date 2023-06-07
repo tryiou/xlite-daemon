@@ -50,28 +50,7 @@ jobs:
 
       - name: Extract GraalVM Tooling
         run: ./gradlew.bat extractGraalTooling
-        
-      - name: Check Gradle Cache Folder
-        run: |
-          $GRADLE_CACHE = "${USERPROFILE}\\.gradle\\caches"
-          if (Test-Path $GRADLE_CACHE) {
-            echo "Gradle Cache folder exists."
-          } else {
-            echo "Gradle Cache folder does not exist."
-            exit 1
-          }
-          
-      - name: Check Native Image Executable
-        run: |
-         $GRAAL_HOME = "${USERPROFILE}\\.gradle\\caches\\com.palantir.graal\\graalvm-ce-java17-22.3.0"
-         $NATIVE_IMAGE = "$GRAAL_HOME\\bin\\native-image"
-         if (Test-Path -Path $NATIVE_IMAGE -PathType Leaf) {
-            echo "Native Image executable exists."
-         } else {
-            echo "Native Image executable does not exist."
-            exit 1
-         }
-        
+               
       - name: Build the native Image
         run: |
 
