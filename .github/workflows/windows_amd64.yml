@@ -23,18 +23,18 @@ jobs:
           java-version: 17
           distribution: 'adopt'
           
-      - name: Cache Chocolatey packages
-        uses: actions/cache@v2
-        with:
-          path: C:\ProgramData\chocolatey
-          key: choco-packages-{{ runner.os }}
-          
       - name: Install Windows SDK 10
         run: choco install windows-sdk-10 -y
 
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
 
+      - name: Cache Chocolatey packages
+        uses: actions/cache@v2
+        with:
+          path: C:\ProgramData\chocolatey
+          key: choco-packages-{{ runner.os }}
+          
       - name: Build the project using Gradle
         run: |
           call gradlew.bat build
@@ -111,7 +111,3 @@ jobs:
         with:
           name: native-image-windows-amd64
           path: build\nativeImage\
-
-
-
-
