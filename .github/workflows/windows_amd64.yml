@@ -51,19 +51,19 @@ jobs:
 
       - name: Build the project using Gradle
         run: |
-          call gradlew.bat build
-          call gradlew.bat downloadGraalTooling
-          call gradlew.bat extractGraalTooling
+          ./gradlew.bat build
+          ./gradlew.bat downloadGraalTooling
+          ./gradlew.bat extractGraalTooling
 
-          SET GRAAL_HOME=%USERPROFILE%\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0
-          SET NATIVE_IMAGE=%GRAAL_HOME%\bin\native-image
-          SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.12-all.jar
+          $GRAAL_HOME = "$env:USERPROFILE\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0"
+          $NATIVE_IMAGE = "$GRAAL_HOME\bin\native-image"
+          $CC_PACKAGED_JAR = "$(Get-Location)\build\libs\xlite-daemon-0.5.12-all.jar"
 
-          echo GRAAL_HOME=%GRAAL_HOME%
-          echo NATIVE_IMAGE=%NATIVE_IMAGE%
-          echo CC_PACKAGED_JAR=%CC_PACKAGED_JAR%
+          Write-Host "GRAAL_HOME=$GRAAL_HOME"
+          Write-Host "NATIVE_IMAGE=$NATIVE_IMAGE"
+          Write-Host "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
 
-          call "%NATIVE_IMAGE%" -jar "%CC_PACKAGED_JAR%" `
+          & $NATIVE_IMAGE -jar $CC_PACKAGED_JAR `
             -H:Name=Cloudchains-SPV `
             -H:Class=io.cloudchains.app.App `
             -H:+JNI `
