@@ -42,7 +42,6 @@ jobs:
           path: C:\ProgramData\chocolatey
           key: choco-packages-${{ runner.os }}
 
-
       - name: Build the project using Gradle
         run: ./gradlew.bat build
 
