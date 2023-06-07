@@ -92,7 +92,7 @@ jobs:
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"         
           
           & $env:NATIVE_IMAGE -jar $env:CC_PACKAGED_JAR `
-          --toolchain:$clPath `
+          --toolchain:"$clPath" `
           -H:Name=Cloudchains-SPV `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
