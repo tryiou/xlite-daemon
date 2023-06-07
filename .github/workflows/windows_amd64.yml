@@ -24,7 +24,7 @@ jobs:
             C:\ProgramData\chocolatey
             C:\ProgramData\chocolatey\lib\windows-sdk-10
             C:\ProgramData\chocolatey\lib\visualstudio2019-workload-vctools
-          key: choco-packages-{{ runner.os }}
+          key: choco-packages-${{ runner.os }}
           restore-keys: |
             choco-packages-
 
@@ -47,7 +47,7 @@ jobs:
             C:\ProgramData\chocolatey
             C:\ProgramData\chocolatey\lib\windows-sdk-10
             C:\ProgramData\chocolatey\lib\visualstudio2019-workload-vctools
-          key: choco-packages-{{ runner.os }}
+          key: choco-packages-${{ runner.os }}
 
       - name: Build the project using Gradle
         run: |
