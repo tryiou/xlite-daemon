@@ -27,10 +27,21 @@ jobs:
         run: choco install windows-sdk-10 -y
 
       - name: Install Visual Studio Build Tools
-        run: choco install -y visualstudio2019-workload-vctools
-        
-      - name: Set up Windows SDK 10 environment
-        shell: powershell
+        run: choco install visualstudio2019-workload-vctools -y
+
+      - name: Build the project using Gradle
+        run: ./gradlew.bat build
+        continue-on-error: false
+
+      - name: Download GraalVM Tooling
+        run: ./gradlew.bat downloadGraalTooling
+        continue-on-error: false
+
+      - name: Extract GraalVM Tooling
+        run: ./gradlew.bat extractGraalTooling
+        continue-on-error: false
+
+      - name: Build the native Image
         run: |
           $vsPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools"
           $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\\Auxiliary\\Build\\vcvars64.bat"
@@ -72,22 +83,6 @@ jobs:
             Write-Error "Windows SDK 10 not found in the default installation directory."
             exit 1
           }
-
-
-      - name: Build the project using Gradle
-        run: ./gradlew.bat build
-        continue-on-error: false
-
-      - name: Download GraalVM Tooling
-        run: ./gradlew.bat downloadGraalTooling
-        continue-on-error: false
-
-      - name: Extract GraalVM Tooling
-        run: ./gradlew.bat extractGraalTooling
-        continue-on-error: false
-
-      - name: Build the native Image
-        run: |
           $env:GRAAL_HOME = "$env:USERPROFILE\\.gradle\\caches\\com.palantir.graal\\22.3.0\\17\\graalvm-ce-java17-22.3.0"
           $env:NATIVE_IMAGE = "$env:GRAAL_HOME\\bin\\native-image"
           $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
