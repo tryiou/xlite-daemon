@@ -34,26 +34,30 @@ jobs:
       - name: Install Windows SDK 10
         run: choco install windows-sdk-10 -y
 
-      - name: Verify Windows SDK environment variables
-        run: |
-         echo "PATH=$env:PATH"
-         echo "INCLUDE=$env:INCLUDE"
-         echo "LIB=$env:LIB"
-
-      - name: Install Visual Studio Build Tools
-        run: choco install -y visualstudio2019-workload-vctools
-        
-      - name: Set up Visual Studio Build Tools environment
+      - name: Set up Windows SDK 10 environment
         run: |
           $vsPath = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
           $vcvarsPath = Join-Path -Path $vsPath -ChildPath "VC\Auxiliary\Build\vcvars64.bat"
+          $windowsSdk10Path = "C:\Program Files (x86)\Windows Kits\10"
+
           if (Test-Path $vcvarsPath) {
             Write-Host "Setting up Visual Studio Build Tools environment..."
-            cmd.exe /C "$vcvarsPath && set"
+            cmd.exe /C "`"$vcvarsPath`" && set"
           }
           else {
             Write-Error "vcvars64.bat not found in Visual Studio Build Tools installation directory."
             exit 1
+          }
+
+          if (Test-Path $windowsSdk10Path) {
+            Write-Host "Setting up Windows SDK 10 environment..."
+            cmd.exe /C "set PATH=%PATH%;""$windowsSdk10Path\bin"""
+            cmd.exe /C "set INCLUDE=%INCLUDE%;""$windowsSdk10Path\include"""
+            cmd.exe /C "set LIB=%LIB%;""$windowsSdk10Path\lib"""
+          }
+          else {
+            Write-Error "Windows SDK 10 not found in the default installation directory."
+          exit 1
           }
 
       - name: Verify Visual Studio Build Tools environment variables
