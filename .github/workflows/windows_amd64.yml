@@ -56,15 +56,15 @@ jobs:
       - name: Build the native Image
         run: |
 
-          SET GRAAL_HOME=%USERPROFILE%\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0
-          SET NATIVE_IMAGE=%GRAAL_HOME%\bin\native-image
-          SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.12-all.jar
+            $env:GRAAL_HOME = "$env:USERPROFILE\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0"
+            $env:NATIVE_IMAGE = "$env:GRAAL_HOME\bin\native-image"
+            $env:CC_PACKAGED_JAR = "$PWD\build\libs\xlite-daemon-0.5.12-all.jar"
 
-          echo GRAAL_HOME=%GRAAL_HOME%
-          echo NATIVE_IMAGE=%NATIVE_IMAGE%
-          echo CC_PACKAGED_JAR=%CC_PACKAGED_JAR%
+            echo "GRAAL_HOME=$env:GRAAL_HOME"
+            echo "NATIVE_IMAGE=$env:NATIVE_IMAGE"
+            echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
 
-          & $NATIVE_IMAGE -jar $CC_PACKAGED_JAR `
+            & $env:NATIVE_IMAGE -jar $env:CC_PACKAGED_JAR `
             -H:Name=Cloudchains-SPV `
             -H:Class=io.cloudchains.app.App `
             -H:+JNI `
