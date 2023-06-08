@@ -3,7 +3,7 @@ name: Build_linux
 on:
   push:
     branches:
-      - dev-build-win-linux-mac
+      - dev-build-linux-amd64
   workflow_dispatch:
 
 jobs:
