@@ -62,7 +62,6 @@ jobs:
           -H:ResourceConfigurationFiles=contrib/resource-config.json `
           -H:IncludeResources='.*/wordlist/english.txt$' `
           -H:Log=registerResource `
-          -J-Dsubstrate.native.compiler="$clDirPath" `
           --no-fallback `
           --no-server `
           -da `
