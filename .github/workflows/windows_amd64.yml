@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev-build-win-linux-mac
+      - dev
   workflow_dispatch:
 
 jobs:
