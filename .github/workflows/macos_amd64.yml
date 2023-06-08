@@ -36,6 +36,7 @@ jobs:
       - name: Build Native Image
         run: |
           ./gradlew nativeImage --info
+          chmod +x build/graal//Cloudchains-SPV
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
