@@ -27,7 +27,7 @@ jobs:
         run: choco install windows-sdk-10 -y
 
       - name: Install Visual Studio Build Tools
-        run: choco install visualstudio2019-workload-vctools -y
+        run: choco install -y visualstudio2019-workload-vctools
 
       - name: Build the project using Gradle
         run: ./gradlew.bat build
@@ -92,7 +92,7 @@ jobs:
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"         
           
           & $env:NATIVE_IMAGE -jar $env:CC_PACKAGED_JAR `
-          --toolchain:"$clPath" `
+          -J-Dsubstrate.native.compiler="$clPath" `
           -H:Name=Cloudchains-SPV `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
