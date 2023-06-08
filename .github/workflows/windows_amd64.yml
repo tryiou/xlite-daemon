@@ -1,10 +1,7 @@
 name: Build_windows
 
 on:
-#  push:
-#    branches:
-#      - dev-build-linux-amd64
-  pull_request:
+  push:
     branches:
       - dev-build-linux-amd64
   workflow_dispatch:
