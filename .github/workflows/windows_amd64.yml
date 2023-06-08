@@ -24,6 +24,7 @@ jobs:
       - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2019-workload-vctools
 
+
       - uses: actions/checkout@v3
       - uses: graalvm/setup-graalvm@v1
         with:
@@ -35,11 +36,22 @@ jobs:
       - name: Build the project using Gradle
         run: ./gradlew.bat build
         continue-on-error: false
+      
+      #      - name: Download GraalVM Tooling
+      #        run: ./gradlew.bat downloadGraalTooling
+      #        continue-on-error: false
+      #
+      #      - name: Extract GraalVM Tooling
+      #        run: ./gradlew.bat extractGraalTooling
+      #        continue-on-error: false
 
       - name: Build the native Image
         run: |
+          
           $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
-          echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"        
+          
+          echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"         
+          
           & native-image -jar $env:CC_PACKAGED_JAR `
           -H:Name=Cloudchains-SPV `
           -H:Class=io.cloudchains.app.App `
@@ -89,14 +101,12 @@ jobs:
           -H:+ReportExceptionStackTraces
         continue-on-error: false
 
-      - name: Create build\nativeImage directory
+      - name: Move native image file to build\nativeImage directory
         run: |
           if (-not (Test-Path -Path "build\nativeImage")) {
-            mkdir build\nativeImage
+           New-Item -ItemType Directory -Path "build\nativeImage"
           }
-
-      - name: Move native image file to build\nativeImage directory
-        run: move /y Cloudchains-SPV.exe build\nativeImage
+           Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\nativeImage" -Force
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
