@@ -64,15 +64,15 @@ jobs:
           
             $msvcBinPath = Get-ChildItem "$vsPath\\VC\\Tools\\MSVC\\" -Filter "14.*" -Name | Select-Object -Last 1
             if ($msvcBinPath) {
-              $clPath = Join-Path -Path "$vsPath\\VC\\Tools\\MSVC\\$msvcBinPath\\bin\\Hostx64\\x64" -ChildPath "cl.exe"
-              if (Test-Path $clPath) {
-                Write-Host "Adding cl.exe location to PATH: $clPath"
-                cmd.exe /C "set PATH=%PATH%;`"$clPath`""
-              }
-              else {
-                Write-Error "cl.exe not found in Visual Studio Build Tools installation directory."
-                exit 1
-              }
+              $clDirPath = Join-Path -Path "$vsPath\\VC\\Tools\\MSVC\\$msvcBinPath\\bin\\Hostx64\\x64" -ChildPath ""
+                  if (Test-Path $clDirPath) {
+                    Write-Host "Adding cl.exe location to PATH: $clDirPath"
+                    cmd.exe /C "set PATH=%PATH%;`"$clDirPath`""
+                  }
+                  else {
+                    Write-Error "cl.exe directory not found in Visual Studio Build Tools installation directory."
+                    exit 1
+                  }
             }
             else {
               Write-Error "MSVC folder not found in Visual Studio Build Tools installation directory."
@@ -92,7 +92,6 @@ jobs:
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"         
           
           & $env:NATIVE_IMAGE -jar $env:CC_PACKAGED_JAR `
-          -J-Dsubstrate.native.compiler="$clPath" `
           -H:Name=Cloudchains-SPV `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
@@ -102,6 +101,7 @@ jobs:
           -H:ResourceConfigurationFiles=contrib/resource-config.json `
           -H:IncludeResources='.*/wordlist/english.txt$' `
           -H:Log=registerResource `
+          -J-Dsubstrate.native.compiler="$clDirPath" `
           --no-fallback `
           --no-server `
           -da `
