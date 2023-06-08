@@ -1,9 +1,9 @@
 name: Build_windows
 
 on:
-  push:
-    branches:
-      - dev-build-linux-amd64
+#  push:
+#    branches:
+#      - dev-build-linux-amd64
   pull_request:
     branches:
       - dev-build-linux-amd64
