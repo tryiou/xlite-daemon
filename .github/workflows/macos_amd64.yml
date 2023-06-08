@@ -3,7 +3,7 @@ name: Build_macOS
 on:
   push:
     branches:
-      - dev-build-linux-amd64
+      - dev-build-win-linux-mac
   workflow_dispatch:
 
 jobs:
