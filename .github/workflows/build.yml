@@ -131,3 +131,29 @@ jobs:
         with:
           name: native-image-${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'ubuntu' }}-amd64
           path: build/graal/
+          
+      - name: Zip artifact
+        if: "!startsWith(matrix.os, 'windows')"
+        run: |
+          cd build/graal/
+          zip -r Cloudchains-SPV.zip Cloudchains-SPV
+        continue-on-error: false
+
+      - name: Zip artifact
+        if: "startsWith(matrix.os, 'windows')"
+        run: |
+          $destination = 'build/graal/Cloudchains-SPV.zip'
+          $source = 'build/graal/Cloudchains-SPV.exe'
+          Compress-Archive -Path $source -DestinationPath $destination
+        continue-on-error: false
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/graal/Cloudchains-SPV.zip
+          tag_name: ${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}
+          release_name: ${{ startsWith(matrix.os, 'macos') && 'MacOS Release' || startsWith(matrix.os, 'windows') && 'Windows Release' || 'Linux Release' }}
+          body: |
+            This release contains the native image artifact for ${{ startsWith(matrix.os, 'macos') && 'macOS' || startsWith(matrix.os, 'windows') && 'Windows' || 'linux' }}.
+
