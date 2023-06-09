@@ -1,35 +1,7 @@
-name: Build_linux
+name: dispatch
 
 on:
 #  push:
 #    branches:
 #      - dev-build-win-linux-mac
   workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: Setup Java
-      uses: actions/setup-java@v2
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        cache: 'gradle'
-
-    - name: Grant execute permissions for gradlew
-      run: chmod +x gradlew
-    
-    - name: Build Native Image
-      run: |
-        ./gradlew nativeImage --info
-        chmod +x build/graal//Cloudchains-SPV
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: native-image-ubuntu-amd64
-        path: build/graal/
