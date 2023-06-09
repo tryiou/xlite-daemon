@@ -1,0 +1,133 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-12, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          
+      ## LINUX / MACOS          
+      - name: Setup Java
+        if: ${{ matrix.os !=  '^windows.*' }}
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permissions for gradlew
+        if: ${{ matrix.os !=  '^windows.*' }}
+        run: chmod +x gradlew
+
+      - name: Build Native Image
+        if: ${{ matrix.os !=  '^windows.*' }}
+        run: |
+          ./gradlew nativeImage --info
+          chmod +x build/graal/Cloudchains-SPV
+          rm -f build/graal/Cloudchains-SPV.build_artifacts.txt
+
+      # WINDOWS
+      - name: Install Windows SDK 10
+        if: ${{ matrix.os ==  '^windows.*' }}      
+        run: choco install windows-sdk-10 -y
+
+      - name: Install Visual Studio Build Tools
+        if: ${{ matrix.os ==  '^windows.*' }}
+        run: choco install -y visualstudio2019-workload-vctools
+        
+      - name: Setup GraalVM (Windows)
+        if: ${{ matrix.os ==  '^windows.*' }}
+        uses: graalvm/setup-graalvm@v1
+        with:
+          version: 'latest'
+          java-version: '17'
+          components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the project using Gradle
+        if: ${{ matrix.os ==  '^windows.*' }}
+        run: ./gradlew.bat build
+        continue-on-error: false
+      
+      - name: Build native Image
+        if: ${{ matrix.os ==  '^windows.*' }}
+        run: |
+          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
+          echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"         
+          
+          & native-image -jar $env:CC_PACKAGED_JAR `
+          -H:Name=Cloudchains-SPV `
+          -H:Class=io.cloudchains.app.App `
+          -H:+JNI `
+          -H:+UseServiceLoaderFeature `
+          -H:-UseServiceLoaderFeature `
+          -H:ReflectionConfigurationFiles=contrib/netty-reflection.json `
+          -H:ResourceConfigurationFiles=contrib/resource-config.json `
+          -H:IncludeResources='.*/wordlist/english.txt$' `
+          -H:Log=registerResource `
+          --no-fallback `
+          --no-server `
+          -da `
+          --enable-url-protocols=http,https `
+          --initialize-at-build-time=io.netty `
+          --initialize-at-build-time=com.google.common `
+          --initialize-at-build-time=org.apache.commons.logging `
+          --initialize-at-build-time=org.slf4j.LoggerFactory `
+          --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder `
+          --initialize-at-build-time=org.slf4j.helpers.NOPLogger `
+          --initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory `
+          --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory `
+          --initialize-at-build-time=org.slf4j.helpers.Util `
+          --initialize-at-build-time=org.bitcoinj.core.Utils `
+          --initialize-at-build-time=org.bitcoinj.core.Sha256Hash `
+          --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode `
+          --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufUtil `
+          --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.util.AbstractReferenceCounted `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder `
+          --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom `
+          --allow-incomplete-classpath `
+          --verbose `
+          -H:+ReportExceptionStackTraces
+        continue-on-error: false
+
+      - name: Move native image file to build\graal directory
+        if: ${{ matrix.os ==  '^windows.*' }}
+        run: |
+          if (-not (Test-Path -Path "build\graal")) {
+            New-Item -ItemType Directory -Path "build\graal"
+          }
+          Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal" -Force  
+        
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: native-image-${{ matrix.os =~ 'macos.*' && 'macos' || matrix.os =~ 'windows.*' && 'windows' || 'ubuntu' }}-amd64
+          path: build/graal/
