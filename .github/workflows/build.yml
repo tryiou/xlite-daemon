@@ -1,4 +1,5 @@
-name: build
+  
+  name: build
 
 on:
   workflow_dispatch:
@@ -23,7 +24,7 @@ jobs:
           
       ## LINUX / MACOS          
       - name: Setup Java
-        if: ${{ matrix.os !=  '^windows.*' }}
+        if: !startsWith(matrix.os, 'windows')
         uses: actions/setup-java@v2
         with:
           distribution: 'temurin'
@@ -31,11 +32,11 @@ jobs:
           cache: 'gradle'
 
       - name: Grant execute permissions for gradlew
-        if: ${{ matrix.os !=  '^windows.*' }}
+        if: !startsWith(matrix.os, 'windows')
         run: chmod +x gradlew
 
       - name: Build Native Image
-        if: ${{ matrix.os !=  '^windows.*' }}
+        if: !startsWith(matrix.os, 'windows')
         run: |
           ./gradlew nativeImage --info
           chmod +x build/graal/Cloudchains-SPV
@@ -43,15 +44,15 @@ jobs:
 
       # WINDOWS
       - name: Install Windows SDK 10
-        if: ${{ matrix.os ==  '^windows.*' }}      
+        if: startsWith(matrix.os, 'windows')      
         run: choco install windows-sdk-10 -y
 
       - name: Install Visual Studio Build Tools
-        if: ${{ matrix.os ==  '^windows.*' }}
+        if: startsWith(matrix.os, 'windows')
         run: choco install -y visualstudio2019-workload-vctools
         
       - name: Setup GraalVM (Windows)
-        if: ${{ matrix.os ==  '^windows.*' }}
+        if: startsWith(matrix.os, 'windows')
         uses: graalvm/setup-graalvm@v1
         with:
           version: 'latest'
@@ -60,12 +61,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build the project using Gradle
-        if: ${{ matrix.os ==  '^windows.*' }}
+        if: startsWith(matrix.os, 'windows')
         run: ./gradlew.bat build
         continue-on-error: false
       
       - name: Build native Image
-        if: ${{ matrix.os ==  '^windows.*' }}
+        if: startsWith(matrix.os, 'windows')
         run: |
           $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"         
@@ -119,7 +120,7 @@ jobs:
         continue-on-error: false
 
       - name: Move native image file to build\graal directory
-        if: ${{ matrix.os ==  '^windows.*' }}
+        if: startsWith(matrix.os, 'windows')
         run: |
           if (-not (Test-Path -Path "build\graal")) {
             New-Item -ItemType Directory -Path "build\graal"
