@@ -15,31 +15,24 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: ${{ github.event.inputs.branch }}
+          
+      - name: Setup Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+      - name: Grant execute permissions for gradlew
+        run: chmod +x gradlew
     
-    steps:
-    - uses: actions/checkout@v2
+      - name: Build Native Image
+        run: |
+          ./gradlew nativeImage --info
+          chmod +x build/graal/Cloudchains-SPV
 
-    - name: Setup Java
-      uses: actions/setup-java@v2
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        cache: 'gradle'
-
-    - name: Grant execute permissions for gradlew
-      run: chmod +x gradlew
-    
-    - name: Build Native Image
-      run: |
-        ./gradlew nativeImage --info
-        chmod +x build/graal//Cloudchains-SPV
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: native-image-ubuntu-amd64
-        path: build/graal/
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: native-image-ubuntu-amd64
+          path: build/graal/
