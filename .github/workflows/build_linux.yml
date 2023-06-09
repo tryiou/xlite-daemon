@@ -3,10 +3,18 @@ name: build_linux
 on:
   workflow_dispatch:
     inputs:
-      target-branch:
-        description: 'Target branch for the workflow run'
+      branch:
+        description: 'Branch to build'
         required: true
-        default: 'main'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.branch }}
 
 jobs:
   build:
