@@ -1,9 +1,0 @@
-name: Main Branch Workflow
-
-on:
-  workflow_dispatch:
-    inputs:
-      target-branch:
-        description: 'Target branch for the workflow run'
-        required: true
-        default: ''
