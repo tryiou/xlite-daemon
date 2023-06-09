@@ -129,5 +129,5 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: native-image-${{ matrix.os =~ 'macos.*' && 'macos' || matrix.os =~ 'windows.*' && 'windows' || 'ubuntu' }}-amd64
+          name: native-image-${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'ubuntu' }}-amd64
           path: build/graal/
