@@ -150,10 +150,12 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            build/graal/Cloudchains-SPV.zip
+          files: build/graal/Cloudchains-SPV.zip
           tag_name: ${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}
           name: ${{ startsWith(matrix.os, 'macos') && 'MacOS Release' || startsWith(matrix.os, 'windows') && 'Windows Release' || 'Linux Release' }}
           body: |
-            This release contains the native image artifact for ${{ startsWith(matrix.os, 'macos') && 'macOS' || startsWith(matrix.os, 'windows') && 'Windows' || 'linux' }}.
+            This release contains the native image artifact for ${{ startsWith(matrix.os, 'macos') && 'macOS' || startsWith(matrix.os, 'windows') && 'Windows' || 'linux' }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
 
