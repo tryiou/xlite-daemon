@@ -57,7 +57,7 @@ jobs:
           version: 'latest'
           java-version: '17'
           components: 'native-image'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_TOKEN }}
 
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
