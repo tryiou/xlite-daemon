@@ -44,7 +44,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v2
         with:
-          name: native-image-${{ matrix.os }}-amd64
+          name: native-image-${{ matrix.os }}-amd64.zip
           path: build/graal/Cloudchains-SPV
 
   create-release:
@@ -53,6 +53,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Sleep for 5 seconds
+        run: sleep 5
+
       - name: Download Artifacts (Ubuntu)
         id: download_artifacts_ubuntu
         uses: actions/download-artifact@v2
@@ -66,6 +70,7 @@ jobs:
         with:
           name: native-image-macos-12-amd64.zip
         continue-on-error: false
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -85,11 +90,9 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_paths: |
-            native-image-ubuntu-latest-amd64.zip
-            native-image-macos-12-amd64.zip
+            ${{ steps.download_artifacts_ubuntu.outputs.artifact_paths }}
+            ${{ steps.download_artifacts_macos.outputs.artifact_paths }}
           asset_name: |
             native-image-ubuntu-latest-amd64.zip
             native-image-macos-12-amd64.zip
           asset_content_type: application/zip
-
-
