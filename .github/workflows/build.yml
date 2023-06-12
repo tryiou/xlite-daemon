@@ -80,6 +80,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: native-image-${{ matrix.os }}-amd64
+          asset_path: ${{ steps.download_artifacts.outputs.artifact_path }}
           asset_name: Cloudchains-SPV-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'macos') && 'macos' || matrix.os }}-amd64.zip
           asset_content_type: application/zip
