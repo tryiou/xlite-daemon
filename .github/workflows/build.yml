@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: native-image-${{ matrix.os }}-amd64
-          path: ${{ startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos') && 'build/graal/Cloudchains-SPV' }}
+          path: ${{ startsWith(matrix.os, 'ubuntu') || (startsWith(matrix.os, 'macos') && 'build/graal/Cloudchains-SPV') }}
 
   create-release:
     runs-on: ubuntu-latest
@@ -80,6 +80,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.download_artifacts.outputs.artifact_path }}
-          asset_name: Cloudchains-SPV-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'macos') && 'macos' || matrix.os }}-amd64.zip
+          asset_paths: |
+            ${{ steps.download_artifacts.outputs.artifact_paths }}
+          asset_name: Cloudchains-SPV-all-artifacts.zip
           asset_content_type: application/zip
