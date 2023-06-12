@@ -144,7 +144,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
-          file: build/graal/Cloudchains-SPV.zip
+          file: build/graal/Cloudchains-SPV-${{ matrix.os }}.zip
           asset_name: Xlite-daemon-${{ matrix.os }}.zip
           overwrite: true
           release_name: Xlite-daemon V5.1.12
