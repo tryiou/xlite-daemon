@@ -55,7 +55,7 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ needs.build.outputs.artifacts != null }}
+    if: ${{ needs.build.outputs.artifacts != '' }}
     steps:
       - name: Download Artifacts
         id: download
