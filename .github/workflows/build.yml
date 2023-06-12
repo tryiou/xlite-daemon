@@ -83,5 +83,6 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ steps.download_artifacts.outputs.artifact_path }}
-          asset_name: Cloudchains-SPV-${{ startsWith(needs.build.outputs.os, 'ubuntu') && 'linux' || startsWith(needs.build.outputs.os, 'macos') && 'macos' || needs.build.outputs.os }}-amd64.zip
+          asset_name: Cloudchains-SPV-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'macos') && 'macos' || matrix.os }}-amd64.zip
           asset_content_type: application/zip
+
