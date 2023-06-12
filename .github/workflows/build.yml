@@ -23,7 +23,7 @@ jobs:
 
       ## LINUX / MACOS
       - name: Setup Java
-        if: "startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')"
+        if: "!startsWith(matrix.os, 'windows')"
         uses: actions/setup-java@v2
         with:
           distribution: 'temurin'
@@ -31,11 +31,11 @@ jobs:
           cache: 'gradle'
 
       - name: Grant execute permissions for gradlew
-        if: "startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')"
+        if: "!startsWith(matrix.os, 'windows')"
         run: chmod +x gradlew
 
       - name: Build Native Image
-        if: "startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')"
+        if: "!startsWith(matrix.os, 'windows')"
         run: |
           ./gradlew nativeImage --info
           chmod +x build/graal/Cloudchains-SPV
