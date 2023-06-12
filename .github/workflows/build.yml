@@ -53,17 +53,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
-      - name: Download Artifacts
-        id: download_artifacts
+      - name: Download Artifacts (Ubuntu)
+        id: download_artifacts_ubuntu
         uses: actions/download-artifact@v2
         with:
-          name: |
-            native-image-ubuntu-latest-amd64.zip
-            native-image-macos-12-amd64.zip
+          name: native-image-ubuntu-latest-amd64.zip
         continue-on-error: false
 
-
+      - name: Download Artifacts (macOS)
+        id: download_artifacts_macos
+        uses: actions/download-artifact@v2
+        with:
+          name: native-image-macos-12-amd64.zip
+        continue-on-error: false
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
