@@ -89,7 +89,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.download_artifacts_ubuntu.outputs.artifact_paths }}
+          asset_path: ./native-image-ubuntu-latest-amd64.zip
           asset_name: native-image-ubuntu-latest-amd64.zip
           asset_content_type: application/zip
 
@@ -100,7 +100,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.download_artifacts_macos.outputs.artifact_paths }}
+          asset_path: ./native-image-macos-12-amd64.zip
           asset_name: native-image-macos-12-amd64.zip
           asset_content_type: application/zip
+
 
