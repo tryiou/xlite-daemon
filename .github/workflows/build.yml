@@ -15,6 +15,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-12, windows-latest]
 
+    outputs:
+      artifacts: ${{ steps.upload.outputs.artifacts }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -117,7 +120,7 @@ jobs:
           --verbose `
           -H:+ReportExceptionStackTraces
         continue-on-error: false
-
+        
       - name: Move native image file to build\graal directory
         if: "startsWith(matrix.os, 'windows')"
         run: |
@@ -127,37 +130,32 @@ jobs:
           Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal" -Force
 
       - name: Upload Artifacts
+        id: upload
         uses: actions/upload-artifact@v2
         with:
           name: native-image-${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'ubuntu' }}-amd64
           path: build/graal/
-          
-      - name: Zip artifact
-        if: "!startsWith(matrix.os, 'windows')"
-        run: |
-          cd build/graal/
-          zip -r Cloudchains-SPV.zip Cloudchains-SPV
-        continue-on-error: false
 
-      - name: Zip artifact
-        if: "startsWith(matrix.os, 'windows')"
-        run: |
-          $destination = 'build/graal/Cloudchains-SPV.zip'
-          $source = 'build/graal/Cloudchains-SPV.exe'
-          Compress-Archive -Path $source -DestinationPath $destination
-        continue-on-error: false
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ needs.build.outputs.artifacts != null }}
+    steps:
+      - name: Download Artifacts
+        id: download
+        uses: actions/download-artifact@v2
+        with:
+          name: native-image-*
+          path: build/graal
 
-      - name: Build and Release
+      - name: Create Release
+        id: release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            build/graal/Cloudchains-SPV-macos.zip
-            build/graal/Cloudchains-SPV-windows.zip
-            build/graal/Cloudchains-SPV-linux.zip
+            build/graal/*
           token: ${{ secrets.GH_TOKEN }}
           tag_name: 5.1.12
           name: xlite-daemon 5.1.12
           body: |
             This release contains the native image artifacts for different operating systems.
-
-
