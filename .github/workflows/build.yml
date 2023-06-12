@@ -70,6 +70,8 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: native-image-${{ startsWith(matrix.os, 'windows') && 'windows' || startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'ubuntu') && 'linux' }}-amd64
+        continue-on-error: true
+
       - name: Upload Release Assets
         id: upload_release_assets
         uses: actions/upload-release-asset@v1
@@ -80,3 +82,5 @@ jobs:
           asset_path: ${{ format('native-image-{0}-amd64', matrix.os) }}
           asset_name: ${{ format('Cloudchains-SPV-{0}.zip', matrix.os) }}
           asset_content_type: application/zip
+        continue-on-error: true
+
