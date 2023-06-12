@@ -58,7 +58,7 @@ jobs:
           version: 'latest'
           java-version: '17'
           components: 'native-image'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_TOKEN }}
 
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
@@ -143,7 +143,7 @@ jobs:
       - name: Upload Artifacts
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GH_TOKEN }}
           file: build/graal/Cloudchains-SPV.zip
           asset_name: Cloudchains-SPV-${{ matrix.os }}.zip
           overwrite: true
