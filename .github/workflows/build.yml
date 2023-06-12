@@ -72,7 +72,6 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: native-image-${{ matrix.os }}-amd64
-          if: "!startsWith(matrix.os, 'windows')"
 
       - name: Upload Release Assets
         id: upload_release_assets
@@ -84,4 +83,3 @@ jobs:
           asset_path: native-image-${{ matrix.os }}-amd64
           asset_name: Cloudchains-SPV-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'macos') && 'macos' || matrix.os }}-amd64.zip
           asset_content_type: application/zip
-          if: "!startsWith(matrix.os, 'windows')"
