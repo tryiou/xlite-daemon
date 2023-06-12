@@ -63,6 +63,7 @@ jobs:
             native-image-macos-12-amd64.zip
         continue-on-error: false
 
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
