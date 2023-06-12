@@ -73,8 +73,6 @@ jobs:
           draft: false
           prerelease: false
 
-
-
       - name: Upload Release Assets
         id: upload_release_assets
         uses: actions/upload-release-asset@v1
@@ -83,6 +81,7 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_paths: |
-            ${{ steps.download_artifacts.outputs.artifact_paths }}
-          asset_name: Cloudchains-SPV-all-artifacts.zip
+            native-image-${{ needs.build.outputs.os }}-amd64.zip
+          asset_name: native-image-${{ needs.build.outputs.os }}-amd64.zip
           asset_content_type: application/zip
+
