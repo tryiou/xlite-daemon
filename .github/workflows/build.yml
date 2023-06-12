@@ -10,13 +10,10 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    outputs:
-      os: ${{ matrix.os }}
 
     strategy:
       matrix:
         os: [ubuntu-latest, macos-12]
-        #windows-latest
 
     steps:
       - name: Checkout repository
@@ -74,6 +71,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: native-image-${{ needs.build.outputs.os }}-amd64
+        continue-on-error: false
 
       - name: Upload Release Assets
         id: upload_release_assets
@@ -85,4 +83,3 @@ jobs:
           asset_path: ${{ steps.download_artifacts.outputs.artifact_path }}
           asset_name: Cloudchains-SPV-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'macos') && 'macos' || matrix.os }}-amd64.zip
           asset_content_type: application/zip
-
