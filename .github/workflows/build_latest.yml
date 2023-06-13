@@ -1,0 +1,185 @@
+name: build_latest
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+      build_type:
+        description: 'Type of build, "release" or "artifacts"'
+        required: true
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-12, windows-latest]
+#, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      ## LINUX / MACOS
+      - name: Setup Java
+        if: "!startsWith(matrix.os, 'windows')"
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permissions for gradlew
+        if: "!startsWith(matrix.os, 'windows')"
+        run: chmod +x gradlew
+
+      - name: Build Native Image
+        if: "!startsWith(matrix.os, 'windows')"
+        run: |
+          ./gradlew nativeImage --info
+          chmod +x build/graal/xlite-daemon
+          rm -f build/graal/xlite-daemon.build_artifacts.txt
+
+      # WINDOWS
+      - name: Install Windows SDK 10
+        if: "startsWith(matrix.os, 'windows')"
+        run: choco install windows-sdk-10 -y
+
+      - name: Install Visual Studio Build Tools
+        if: "startsWith(matrix.os, 'windows')"
+        run: choco install -y visualstudio2019-workload-vctools
+
+      - name: Setup GraalVM (Windows)
+        if: "startsWith(matrix.os, 'windows')"
+        uses: graalvm/setup-graalvm@v1
+        with:
+          version: 'latest'
+          java-version: '17'
+          components: 'native-image'
+          github-token: ${{ secrets.GH_TOKEN }}
+
+      - name: Build the project using Gradle
+        if: "startsWith(matrix.os, 'windows')"
+        run: ./gradlew.bat build
+        continue-on-error: false
+
+      - name: Build Native Image
+        if: "startsWith(matrix.os, 'windows')"
+        run: |
+          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
+          echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
+
+          & native-image -jar $env:CC_PACKAGED_JAR `
+          -H:Name=xlite-daemon `
+          -H:Class=io.cloudchains.app.App `
+          -H:+JNI `
+          -H:+UseServiceLoaderFeature `
+          -H:-UseServiceLoaderFeature `
+          -H:ReflectionConfigurationFiles=contrib/netty-reflection.json `
+          -H:ResourceConfigurationFiles=contrib/resource-config.json `
+          -H:IncludeResources='.*/wordlist/english.txt$' `
+          -H:Log=registerResource `
+          --no-fallback `
+          --no-server `
+          -da `
+          --enable-url-protocols=http,https `
+          --initialize-at-build-time=io.netty `
+          --initialize-at-build-time=com.google.common `
+          --initialize-at-build-time=org.apache.commons.logging `
+          --initialize-at-build-time=org.slf4j.LoggerFactory `
+          --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder `
+          --initialize-at-build-time=org.slf4j.helpers.NOPLogger `
+          --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory `
+          --initialize-at-build-time=org.slf4j.helpers.Util `
+          --initialize-at-build-time=org.bitcoinj.core.Utils `
+          --initialize-at-build-time=org.bitcoinj.core.Sha256Hash `
+          --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode `
+          --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufUtil `
+          --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.util.AbstractReferenceCounted `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder `
+          --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom `
+          --allow-incomplete-classpath `
+          --verbose `
+          -H:+ReportExceptionStackTraces
+        continue-on-error: false
+
+      - name: Move native image file to build\graal directory
+        if: "startsWith(matrix.os, 'windows')"
+        run: |
+          if (-not (Test-Path -Path "build\graal")) {
+            New-Item -ItemType Directory -Path "build\graal"
+          }
+          Move-Item -Path "xlite-daemon.exe" -Destination "build\graal\xlite-daemon.exe" -Force
+
+# RELEASE
+      - name: Zip Artifact
+        if: ${{ github.event.inputs.build_type == 'release' && !startsWith(matrix.os, 'windows') }}
+        run: |
+          cd build/graal
+          zip -r xlite-daemon-${{ matrix.os }}.zip xlite-daemon
+          cd ../..
+
+      - name: Zip Artifact
+        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
+        run: |
+          $destination = "build/graal/xlite-daemon-${{ matrix.os }}.zip"
+          $source = "build/graal/xlite-daemon.exe"
+          Compress-Archive -Path $source -DestinationPath $destination
+          
+      - name: Calculate MD5 checksum (linux)
+        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'ubuntu') }}
+        run: md5sum build/graal/xlite-daemon > build/graal/checksum.txt
+
+      - name: Calculate MD5 checksum (macOS)
+        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'macos') }}
+        run: md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
+
+      - name: Calculate MD5 checksum (Windows)
+        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
+        run: certutil -hashfile build\graal\xlite-daemon.exe MD5 | Select-Object -Index 1 | Out-File -FilePath build\graal\checksum.txt
+
+      - name: Upload ZIP Artifact
+        if: ${{ github.event.inputs.build_type == 'release' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GH_TOKEN }}
+          file: build/graal/xlite-daemon-${{ matrix.os }}.zip
+          asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
+          overwrite: true
+          release_name: xlite-daemon V5.1.12
+
+      - name: Upload Checksum File
+        if: ${{ github.event.inputs.build_type == 'release' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GH_TOKEN }}
+          file: build/graal/checksum.txt
+          asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
+          overwrite: true
+          release_name: xlite-daemon V5.1.12
+
+
+# ARTIFACTS
+      - name: Upload Artifacts
+        if: ${{ github.event.inputs.build_type == 'artifacts' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: native-image-${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}-amd64
+          path: build/graal/
