@@ -125,7 +125,8 @@ jobs:
           if (-not (Test-Path -Path "build\graal")) {
             New-Item -ItemType Directory -Path "build\graal"
           }
-          Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal/Xlite-daemon.exe" -Force
+          Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal\Xlite-daemon.exe" -Force
+
 
       - name: Zip Artifact
         if: "!startsWith(matrix.os, 'windows')"
