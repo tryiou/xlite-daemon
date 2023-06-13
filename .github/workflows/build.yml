@@ -144,11 +144,11 @@ jobs:
       - name: Calculate MD5 checksum
         run: |
           if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            md5sum build/graal/xlite-daemon-${{ matrix.os }}.zip > build/graal/checksum.txt
+            md5sum build/graal/xlite-daemon > build/graal/checksum.txt
           elif [ "${{ matrix.os }}" == "macos-12" ]; then
-            md5 -r build/graal/xlite-daemon-${{ matrix.os }}.zip > build/graal/checksum.txt
+            md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
           elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-            certutil -hashfile build\graal\xlite-daemon-${{ matrix.os }}.zip MD5 | findstr /v "hash" > build\graal\checksum.txt
+            certutil -hashfile build\graal\xlite-daemon.exe MD5 | findstr /v "hash" > build\graal\checksum.txt
           fi
 
       - name: Upload ZIP Artifact
