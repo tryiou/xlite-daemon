@@ -97,7 +97,7 @@ jobs:
         if: "startsWith(matrix.os, 'windows')"
         run: |
           CC_VERSION="${{ github.event.inputs.tag }}"
-          CC_PACKAGED_JAR="$PWD/build/libs/xlite-daemon-$CC_VERSION.jar"
+          CC_PACKAGED_JAR="$PWD/build/libs/xlite-daemon-${CC_VERSION}.jar"
           echo "CC_VERSION=$CC_VERSION"
           echo "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
 
