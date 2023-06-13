@@ -6,7 +6,9 @@ on:
       branch:
         description: 'Branch to build'
         required: true
-
+      build_type:
+        description: 'Type of build, "release" or "artifacts"'
+        required: true
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -126,33 +128,34 @@ jobs:
           }
           Move-Item -Path "xlite-daemon.exe" -Destination "build\graal\xlite-daemon.exe" -Force
 
-
+# RELEASE
       - name: Zip Artifact
-        if: "!startsWith(matrix.os, 'windows')"
+        if: ${{ github.event.inputs.build_type == 'release' && !startsWith(matrix.os, 'windows') }}
         run: |
           cd build/graal
           zip -r xlite-daemon-${{ matrix.os }}.zip xlite-daemon
           cd ../..
 
       - name: Zip Artifact
-        if: "startsWith(matrix.os, 'windows-latest')"
+        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
         run: |
           $destination = "build/graal/xlite-daemon-${{ matrix.os }}.zip"
           $source = "build/graal/xlite-daemon.exe"
           Compress-Archive -Path $source -DestinationPath $destination
           
       - name: Calculate MD5 checksum
+        if: ${{ github.event.inputs.build_type == 'release' }}
         run: |
           if [[ "${{ startsWith(matrix.os, 'ubuntu') }}" == "true" ]]; then
             md5sum build/graal/xlite-daemon > build/graal/checksum.txt
           elif [[ "${{ startsWith(matrix.os, 'macos') }}" == "true" ]]; then
             md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
           elif [[ "${{ startsWith(matrix.os, 'windows') }}" == "true" ]]; then
-            certutil -hashfile build\graal\xlite-daemon.exe MD5 | findstr /v "hash" > build\graal\checksum.txt
+            certutil -hashfile build\graal\xlite-daemon.exe MD5 | findstr /v "hash" > build/graal\checksum.txt
           fi
 
-
       - name: Upload ZIP Artifact
+        if: ${{ github.event.inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
@@ -162,6 +165,7 @@ jobs:
           release_name: xlite-daemon V5.1.12
 
       - name: Upload Checksum File
+        if: ${{ github.event.inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
@@ -170,3 +174,11 @@ jobs:
           overwrite: true
           release_name: xlite-daemon V5.1.12
 
+
+# ARTIFACTS
+      - name: Upload Artifacts
+        if: ${{ github.event.inputs.build_type == 'artifacts' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: native-image-${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}-amd64
+          path: build/graal/
