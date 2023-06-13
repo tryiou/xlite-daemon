@@ -145,6 +145,6 @@ jobs:
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
           file: build/graal/Cloudchains-SPV-${{ matrix.os }}.zip
-          asset_name: Xlite-daemon-${{ matrix.os }}.zip
+          asset_name: Xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           release_name: Xlite-daemon V5.1.12
