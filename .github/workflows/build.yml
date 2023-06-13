@@ -140,12 +140,26 @@ jobs:
           $destination = "build/graal/xlite-daemon-${{ matrix.os }}.zip"
           $source = "build/graal/xlite-daemon.exe"
           Compress-Archive -Path $source -DestinationPath $destination
+          
+      - name: Calculate MD5 checksum
+        run: |
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            md5sum build/graal/xlite-daemon-${{ matrix.os }}.zip > build/graal/checksum.txt
+          elif [ "${{ matrix.os }}" == "macos-12" ]; then
+            md5 -r build/graal/xlite-daemon-${{ matrix.os }}.zip > build/graal/checksum.txt
+          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+            certutil -hashfile build\graal\xlite-daemon-${{ matrix.os }}.zip MD5 | findstr /v "hash" > build\graal\checksum.txt
+          fi
 
       - name: Upload Artifacts
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
-          file: build/graal/xlite-daemon-${{ matrix.os }}.zip
-          asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
+          file: |
+            build/graal/xlite-daemon-${{ matrix.os }}.zip
+            build/graal/checksum.txt
+          asset_name: |
+            xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
+            checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
           release_name: xlite-daemon V5.1.12
