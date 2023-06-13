@@ -77,15 +77,6 @@ jobs:
       - name: Install Visual Studio Build Tools
         if: "startsWith(matrix.os, 'windows')"
         run: choco install -y visualstudio2019-workload-vctools
-
-      - name: Cache Visual Studio and Windows SDK installations
-        if: "startsWith(matrix.os, 'windows') && steps.restore_cache.outputs.cache-hit != 'true'"
-        uses: actions/cache@v2
-        with:
-          path: |
-            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
-            C:\Program Files (x86)\Windows Kits\10
-          key: vscache--${{ matrix.os }}
             
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
