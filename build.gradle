@@ -43,7 +43,7 @@ graal {
     graalVersion '22.3.0'
     javaVersion '17'
     mainClass 'io.cloudchains.app.App'
-    outputName 'Cloudchains-SPV'
+    outputName 'xlite-daemon'
     option '-H:+JNI'
     option '-H:+UseServiceLoaderFeature'
     option '-H:-UseServiceLoaderFeature'
