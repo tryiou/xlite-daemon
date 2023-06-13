@@ -67,6 +67,7 @@ jobs:
           path: |
             C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
             C:\Program Files (x86)\Windows Kits\10
+            C:\ProgramData\chocolatey
           key: vscache--${{ matrix.os }}          
           
       - name: Install Windows SDK 10
@@ -94,10 +95,10 @@ jobs:
       - name: Build Native Image
         if: "startsWith(matrix.os, 'windows')"
         run: |
-          CC_VERSION="${{ github.event.inputs.tag }}"
+          CC_VERSION=${{ github.event.inputs.tag }}
           CC_PACKAGED_JAR="$PWD/build/libs/xlite-daemon-${CC_VERSION}.jar"
-          echo "CC_VERSION=$CC_VERSION"
-          echo "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
+          echo "CC_VERSION=${CC_VERSION}"
+          echo "CC_PACKAGED_JAR=${CC_PACKAGED_JAR}"
 
           & native-image -jar $env:CC_PACKAGED_JAR `
           -H:Name=xlite-daemon `
