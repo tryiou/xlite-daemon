@@ -151,15 +151,21 @@ jobs:
             certutil -hashfile build\graal\xlite-daemon-${{ matrix.os }}.zip MD5 | findstr /v "hash" > build\graal\checksum.txt
           fi
 
-      - name: Upload Artifacts
+      - name: Upload ZIP Artifact
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
-          file: |
-            build/graal/xlite-daemon-${{ matrix.os }}.zip
-            build/graal/checksum.txt
-          asset_name: |
-            xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
-            checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
+          file: build/graal/xlite-daemon-${{ matrix.os }}.zip
+          asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           release_name: xlite-daemon V5.1.12
+
+      - name: Upload Checksum File
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GH_TOKEN }}
+          file: build/graal/checksum.txt
+          asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
+          overwrite: true
+          release_name: xlite-daemon V5.1.12
+
