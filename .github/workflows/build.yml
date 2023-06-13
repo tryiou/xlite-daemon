@@ -86,12 +86,10 @@ jobs:
       - name: Build Native Image
         if: "startsWith(matrix.os, 'windows')"
         run: |
-          CC_VERSION=${{ github.event.inputs.tag }}
-          CC_PACKAGED_JAR="$PWD/build/libs/xlite-daemon-${CC_VERSION}.jar"
-          echo "CC_VERSION=${CC_VERSION}"
+          CC_PACKAGED_JAR="$PWD/build/libs/xlite-daemon-${{ github.event.inputs.tag }}.jar"
           echo "CC_PACKAGED_JAR=${CC_PACKAGED_JAR}"
-
-          & native-image -jar $env:CC_PACKAGED_JAR `
+          
+          & native-image -jar ${CC_PACKAGED_JAR} `
           -H:Name=xlite-daemon `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
