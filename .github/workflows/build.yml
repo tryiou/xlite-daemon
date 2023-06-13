@@ -45,6 +45,13 @@ jobs:
           rm -f build/graal/xlite-daemon.build_artifacts.txt
 
       # WINDOWS
+      - name: Install Windows SDK 10
+        if: "startsWith(matrix.os, 'windows')"
+        run: choco install windows-sdk-10 -y
+
+      - name: Install Visual Studio Build Tools
+        if: "startsWith(matrix.os, 'windows')"
+        run: choco install -y visualstudio2019-workload-vctools
 
       - name: Setup GraalVM (Windows)
         if: "startsWith(matrix.os, 'windows')"
@@ -54,14 +61,6 @@ jobs:
           java-version: '17'
           components: 'native-image'
           github-token: ${{ secrets.GH_TOKEN }}
-          
-      - name: Install Windows SDK 10
-        if: "startsWith(matrix.os, 'windows')"
-        run: choco install windows-sdk-10 -y
-
-      - name: Install Visual Studio Build Tools
-        if: "startsWith(matrix.os, 'windows')"
-        run: choco install -y visualstudio2019-workload-vctools
 
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
