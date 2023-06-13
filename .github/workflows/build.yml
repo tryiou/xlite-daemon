@@ -31,7 +31,7 @@ jobs:
 
       ## LINUX / MACOS
       - name: Setup Java
-        if: !startsWith(matrix.os, 'windows')
+        if: "!startsWith(matrix.os, 'windows')"
         uses: actions/setup-java@v2
         with:
           distribution: 'temurin'
@@ -39,11 +39,11 @@ jobs:
           cache: 'gradle'
 
       - name: Grant execute permissions for gradlew
-        if: !startsWith(matrix.os, 'windows')
+        if: "!startsWith(matrix.os, 'windows')"
         run: chmod +x gradlew
 
       - name: Build Native Image
-        if: !startsWith(matrix.os, 'windows')
+        if: "!startsWith(matrix.os, 'windows')"
         run: |
           ./gradlew nativeImage --info
           chmod +x build/graal/xlite-daemon
@@ -51,7 +51,7 @@ jobs:
           
   # WINDOWS
       - name: Setup GraalVM (Windows)
-        if: startsWith(matrix.os, 'windows')
+        if: "startsWith(matrix.os, 'windows')"
         uses: graalvm/setup-graalvm@v1
         with:
           version: '22.3.1'
@@ -60,7 +60,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Cache Visual Studio and Windows SDK installations
-        if: startsWith(matrix.os, 'windows')
+        if: "startsWith(matrix.os, 'windows')"
         id: restore_cache
         uses: actions/cache@v2
         with:
@@ -71,15 +71,15 @@ jobs:
           restore-keys: vscache-          
           
       - name: Install Windows SDK 10
-        if: startsWith(matrix.os, 'windows')
+        if: "startsWith(matrix.os, 'windows')"
         run: choco install windows-sdk-10 -y
 
       - name: Install Visual Studio Build Tools
-        if: startsWith(matrix.os, 'windows')
+        if: "startsWith(matrix.os, 'windows')"
         run: choco install -y visualstudio2019-workload-vctools
 
       - name: Cache Visual Studio and Windows SDK installations
-        if: startsWith(matrix.os, 'windows') && steps.restore_cache.outputs.cache-hit != 'true'
+        if: "startsWith(matrix.os, 'windows') && steps.restore_cache.outputs.cache-hit != 'true'"
         uses: actions/cache@v2
         with:
           path: |
@@ -89,15 +89,15 @@ jobs:
           restore-keys: vscache-
             
       - name: Build the project using Gradle
-        if: startsWith(matrix.os, 'windows')
+        if: "startsWith(matrix.os, 'windows')"
         run: ./gradlew.bat build
         continue-on-error: false
 
       - name: Build Native Image
-        if: startsWith(matrix.os, 'windows')
+        if: "startsWith(matrix.os, 'windows')"
         run: |
           $env:CC_VERSION = ${{ github.event.inputs.tag }}
-          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-$env:CC_VERSION-all.jar"
+          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-$env:CC_VERSION.jar"
           echo "CC_VERSION=$env:CC_VERSION"
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
 
@@ -149,7 +149,7 @@ jobs:
         continue-on-error: false
 
       - name: Move native image file to build\graal directory
-        if: startsWith(matrix.os, 'windows')
+        if: "startsWith(matrix.os, 'windows')"
         run: |
           if (-not (Test-Path -Path "build\graal")) {
             New-Item -ItemType Directory -Path "build\graal"
