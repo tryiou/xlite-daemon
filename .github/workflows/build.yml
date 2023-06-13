@@ -39,7 +39,6 @@ jobs:
         if: "!startsWith(matrix.os, 'windows')"
         run: |
           ./gradlew nativeImage --info
-          mv build/graal/Cloudchains-SPV build/graal/Xlite-daemon
           chmod +x build/graal/Xlite-daemon
           rm -f build/graal/Cloudchains-SPV.build_artifacts.txt
 
@@ -73,7 +72,7 @@ jobs:
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
 
           & native-image -jar $env:CC_PACKAGED_JAR `
-          -H:Name=Cloudchains-SPV `
+          -H:Name=Xlite-daemon `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
           -H:+UseServiceLoaderFeature `
@@ -125,7 +124,7 @@ jobs:
           if (-not (Test-Path -Path "build\graal")) {
             New-Item -ItemType Directory -Path "build\graal"
           }
-          Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal\Xlite-daemon.exe" -Force
+          Move-Item -Path "Xlite-daemon.exe" -Destination "build\graal\Xlite-daemon.exe" -Force
 
 
       - name: Zip Artifact
