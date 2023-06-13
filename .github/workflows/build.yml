@@ -39,8 +39,8 @@ jobs:
         if: "!startsWith(matrix.os, 'windows')"
         run: |
           ./gradlew nativeImage --info
-          chmod +x build/graal/Xlite-daemon
-          rm -f build/graal/Xlite-daemon.build_artifacts.txt
+          chmod +x build/graal/xlite-daemon
+          rm -f build/graal/xlite-daemon.build_artifacts.txt
 
       # WINDOWS
       - name: Install Windows SDK 10
@@ -72,7 +72,7 @@ jobs:
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
 
           & native-image -jar $env:CC_PACKAGED_JAR `
-          -H:Name=Xlite-daemon `
+          -H:Name=xlite-daemon `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
           -H:+UseServiceLoaderFeature `
@@ -124,28 +124,28 @@ jobs:
           if (-not (Test-Path -Path "build\graal")) {
             New-Item -ItemType Directory -Path "build\graal"
           }
-          Move-Item -Path "Xlite-daemon.exe" -Destination "build\graal\Xlite-daemon.exe" -Force
+          Move-Item -Path "xlite-daemon.exe" -Destination "build\graal\xlite-daemon.exe" -Force
 
 
       - name: Zip Artifact
         if: "!startsWith(matrix.os, 'windows')"
         run: |
           cd build/graal
-          zip -r Xlite-daemon-${{ matrix.os }}.zip Xlite-daemon
+          zip -r xlite-daemon-${{ matrix.os }}.zip xlite-daemon
           cd ../..
 
       - name: Zip Artifact
         if: "startsWith(matrix.os, 'windows-latest')"
         run: |
-          $destination = "build/graal/Xlite-daemon-${{ matrix.os }}.zip"
-          $source = "build/graal/Xlite-daemon.exe"
+          $destination = "build/graal/xlite-daemon-${{ matrix.os }}.zip"
+          $source = "build/graal/xlite-daemon.exe"
           Compress-Archive -Path $source -DestinationPath $destination
 
       - name: Upload Artifacts
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
-          file: build/graal/Xlite-daemon-${{ matrix.os }}.zip
-          asset_name: Xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
+          file: build/graal/xlite-daemon-${{ matrix.os }}.zip
+          asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
-          release_name: Xlite-daemon V5.1.12
+          release_name: xlite-daemon V5.1.12
