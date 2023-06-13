@@ -86,8 +86,9 @@ jobs:
       - name: Build Native Image
         if: "startsWith(matrix.os, 'windows')"
         run: |
-          CC_PACKAGED_JAR="$PWD/build/libs/xlite-daemon-${{ github.event.inputs.tag }}.jar"
-          echo "CC_PACKAGED_JAR=${CC_PACKAGED_JAR}"
+          $currentDir = Get-Location
+          $CC_PACKAGED_JAR = "$currentDir/build/libs/xlite-daemon-${{ github.event.inputs.tag }}.jar"
+          Write-Host "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
           
           & native-image -jar ${CC_PACKAGED_JAR} `
           -H:Name=xlite-daemon `
