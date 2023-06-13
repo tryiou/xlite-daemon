@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-12, windows-latest]
-#, windows-latest]
+        #, windows-latest]
 
     steps:
       - name: Checkout repository
@@ -39,7 +39,8 @@ jobs:
         if: "!startsWith(matrix.os, 'windows')"
         run: |
           ./gradlew nativeImage --info
-          chmod +x build/graal/Cloudchains-SPV
+          mv build/graal/Cloudchains-SPV build/graal/Xlite-daemon
+          chmod +x build/graal/Xlite-daemon
           rm -f build/graal/Cloudchains-SPV.build_artifacts.txt
 
       # WINDOWS
@@ -124,27 +125,27 @@ jobs:
           if (-not (Test-Path -Path "build\graal")) {
             New-Item -ItemType Directory -Path "build\graal"
           }
-          Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal" -Force
+          Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal/Xlite-daemon.exe" -Force
 
       - name: Zip Artifact
         if: "!startsWith(matrix.os, 'windows')"
         run: |
           cd build/graal
-          zip -r Cloudchains-SPV-${{ matrix.os }}.zip Cloudchains-SPV
+          zip -r Xlite-daemon-${{ matrix.os }}.zip Xlite-daemon
           cd ../..
 
       - name: Zip Artifact
         if: "startsWith(matrix.os, 'windows-latest')"
         run: |
-          $destination = "build/graal/Cloudchains-SPV-${{ matrix.os }}.zip"
-          $source = "build/graal/Cloudchains-SPV.exe"
+          $destination = "build/graal/Xlite-daemon-${{ matrix.os }}.zip"
+          $source = "build/graal/Xlite-daemon.exe"
           Compress-Archive -Path $source -DestinationPath $destination
 
       - name: Upload Artifacts
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
-          file: build/graal/Cloudchains-SPV-${{ matrix.os }}.zip
-          asset_name: Xlite-daemon-${{ matrix.os }}.zip
+          file: build/graal/Xlite-daemon-${{ matrix.os }}.zip
+          asset_name: Xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           release_name: Xlite-daemon V5.1.12
