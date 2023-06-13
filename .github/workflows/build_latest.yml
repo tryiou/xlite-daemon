@@ -52,6 +52,7 @@ jobs:
           version: '22.3.0'
           java-version: '17'
           components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Install Windows SDK 10
         if: "startsWith(matrix.os, 'windows')"
