@@ -146,13 +146,17 @@ jobs:
       - name: Calculate MD5 checksum
         if: ${{ github.event.inputs.build_type == 'release' }}
         run: |
-          if [[ "${{ startsWith(matrix.os, 'ubuntu') }}" == "true" ]]; then
-            md5sum build/graal/xlite-daemon > build/graal/checksum.txt
-          elif [[ "${{ startsWith(matrix.os, 'macos') }}" == "true" ]]; then
-            md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
-          elif [[ "${{ startsWith(matrix.os, 'windows') }}" == "true" ]]; then
-            certutil -hashfile build\graal\xlite-daemon.exe MD5 | findstr /v "hash" > build/graal\checksum.txt
-          fi
+          case ${{ matrix.os }} in
+            ubuntu*)
+              md5sum build/graal/xlite-daemon > build/graal/checksum.txt
+              ;;
+            macos*)
+              md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
+              ;;
+            windows*)
+              certutil -hashfile build\graal\xlite-daemon.exe MD5 | findstr /v "hash" > build\graal\checksum.txt
+              ;;
+          esac
 
       - name: Upload ZIP Artifact
         if: ${{ github.event.inputs.build_type == 'release' }}
