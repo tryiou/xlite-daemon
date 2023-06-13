@@ -154,7 +154,7 @@ jobs:
               md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
             }
             "windows-latest" {
-              certutil -hashfile build\graal\xlite-daemon.exe MD5 | Select-String -Pattern "^[^H]" > build\graal\checksum.txt
+              certutil -hashfile build\graal\xlite-daemon.exe MD5 | findstr /v "hash" > build\graal\checksum.txt
             }
           }
 
