@@ -23,10 +23,7 @@ jobs:
 
           
     steps:
-      - name: Set XLITE_DAEMON_VERSION
-        run: |
-          echo "XLITE_DAEMON_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
-          
+    
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
@@ -51,18 +48,8 @@ jobs:
           ./gradlew nativeImage --info
           chmod +x build/graal/xlite-daemon
           rm -f build/graal/xlite-daemon.build_artifacts.txt
-
-# WINDOWS
-      - name: Cache Visual Studio and Windows SDK installations
-        uses: actions/cache@v2
-        with:
-          path: |
-            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
-            C:\Program Files (x86)\Windows Kits\10
-          key: vscache-${{ runner.os }}
-          restore-keys: vscache-
-
           
+  # WINDOWS
       - name: Setup GraalVM (Windows)
         if: "startsWith(matrix.os, 'windows')"
         uses: graalvm/setup-graalvm@v1
@@ -72,6 +59,17 @@ jobs:
           components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           
+      - name: Cache Visual Studio and Windows SDK installations
+        if: "startsWith(matrix.os, 'windows')"
+        id: restore_cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
+            C:\Program Files (x86)\Windows Kits\10
+          key: vscache-${{ runner.os }}
+          restore-keys: vscache-          
+          
       - name: Install Windows SDK 10
         if: "startsWith(matrix.os, 'windows')"
         run: choco install windows-sdk-10 -y
@@ -80,6 +78,16 @@ jobs:
         if: "startsWith(matrix.os, 'windows')"
         run: choco install -y visualstudio2019-workload-vctools
 
+      - name: Cache Visual Studio and Windows SDK installations
+        if: "startsWith(matrix.os, 'windows') && steps.restore_cache.outputs.cache-hit != 'true'"
+        uses: actions/cache@v2
+        with:
+          path: |
+            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
+            C:\Program Files (x86)\Windows Kits\10
+          key: vscache-${{ runner.os }}
+          restore-keys: vscache-
+            
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
         run: ./gradlew.bat build
@@ -88,8 +96,9 @@ jobs:
       - name: Build Native Image
         if: "startsWith(matrix.os, 'windows')"
         run: |
-          $env:CC_VERSION = ${{ env.XLITE_DAEMON_VERSION }}
+          $env:CC_VERSION = ${{ github.event.inputs.tag }}
           $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-$env:CC_VERSION-all.jar"
+          echo "CC_VERSION=$env:CC_VERSION"
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
 
           & native-image -jar $env:CC_PACKAGED_JAR `
@@ -186,7 +195,7 @@ jobs:
           asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           prerelease: true
-          tag: ${{ env.XLITE_DAEMON_VERSION }}
+          tag: ${{ github.event.inputs.tag }}
 
       - name: Upload Checksum File
         if: ${{ github.event.inputs.build_type == 'release' }}
@@ -197,7 +206,7 @@ jobs:
           asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
           prerelease: true
-          tag: ${{ env.XLITE_DAEMON_VERSION }}
+          tag: ${{ github.event.inputs.tag }}
 
 
 # ARTIFACTS
