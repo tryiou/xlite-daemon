@@ -39,8 +39,9 @@ jobs:
         if: "!startsWith(matrix.os, 'windows')"
         run: |
           ./gradlew nativeImage --info
+          mv build/graal/Cloudchains-SPV build/graal/Xlite-daemon
           chmod +x build/graal/Xlite-daemon
-          rm -f build/graal/Xlite-daemon.build_artifacts.txt
+          rm -f build/graal/Cloudchains-SPV.build_artifacts.txt
 
       # WINDOWS
       - name: Install Windows SDK 10
@@ -72,7 +73,7 @@ jobs:
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
 
           & native-image -jar $env:CC_PACKAGED_JAR `
-          -H:Name=Xlite-daemon `
+          -H:Name=Cloudchains-SPV `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
           -H:+UseServiceLoaderFeature `
@@ -118,13 +119,14 @@ jobs:
           -H:+ReportExceptionStackTraces
         continue-on-error: false
 
-      - name: Move native image file to build\graal directory
-        if: "startsWith(matrix.os, 'windows')"
-        run: |
-          if (-not (Test-Path -Path "build\graal")) {
-            New-Item -ItemType Directory -Path "build\graal"
-          }
-          Move-Item -Path "Xlite-daemon.exe" -Destination "build\graal" -Force
+	- name: Move native image file to build\graal directory
+	  if: "startsWith(matrix.os, 'windows')"
+	  run: |
+	    if (-not (Test-Path -Path "build\graal")) {
+	      New-Item -ItemType Directory -Path "build\graal"
+	    }
+	    Move-Item -Path "Cloudchains-SPV.exe" -Destination "build\graal/Xlite-daemon.exe" -Force
+
 
       - name: Zip Artifact
         if: "!startsWith(matrix.os, 'windows')"
@@ -145,7 +147,6 @@ jobs:
         with:
           repo_token: ${{ secrets.GH_TOKEN }}
           file: build/graal/Xlite-daemon-${{ matrix.os }}.zip
-          asset_name: Xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') ? 'linux' : startsWith(matrix.os, 'macos-12') ? 'macos' : startsWith(matrix.os, 'windows-latest') ? 'windows' : 'unknown' }}-amd64.zip
-
+          asset_name: Xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           release_name: Xlite-daemon V5.1.12
