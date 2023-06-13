@@ -40,7 +40,7 @@ jobs:
         run: |
           ./gradlew nativeImage --info
           chmod +x build/graal/Xlite-daemon
-          rm -f build/graal/Cloudchains-SPV.build_artifacts.txt
+          rm -f build/graal/Xlite-daemon.build_artifacts.txt
 
       # WINDOWS
       - name: Install Windows SDK 10
