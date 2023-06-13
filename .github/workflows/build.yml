@@ -57,7 +57,7 @@ jobs:
         if: "startsWith(matrix.os, 'windows')"
         uses: graalvm/setup-graalvm@v1
         with:
-          version: 'latest'
+          version: '22.3.0'
           java-version: '17'
           components: 'native-image'
           github-token: ${{ secrets.GH_TOKEN }}
