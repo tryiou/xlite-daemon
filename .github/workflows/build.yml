@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest,ubuntu-latest-arm64,macos-latest-arm64,windows-latest-arm]
 #, macos-12, windows-latest]
 
     steps:
@@ -44,7 +44,17 @@ jobs:
           chmod +x build/graal/xlite-daemon
           rm -f build/graal/xlite-daemon.build_artifacts.txt
 
-      # WINDOWS
+# WINDOWS
+      - name: Cache Visual Studio and Windows SDK installations
+        uses: actions/cache@v2
+        with:
+          path: |
+            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
+            C:\Program Files (x86)\Windows Kits\10
+          key: vscache-${{ runner.os }}
+          restore-keys: vscache-
+
+          
       - name: Setup GraalVM (Windows)
         if: "startsWith(matrix.os, 'windows')"
         uses: graalvm/setup-graalvm@v1
