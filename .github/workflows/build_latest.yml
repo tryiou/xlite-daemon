@@ -153,8 +153,11 @@ jobs:
 
       - name: Calculate MD5 checksum (Windows)
         if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
-        run: certutil -hashfile build\graal\xlite-daemon.exe MD5 | Select-Object -Index 1 | Out-File -FilePath build\graal\checksum.txt
-
+        run: |
+          $md5Hash = (certutil -hashfile build\graal\xlite-daemon.exe MD5 | Select-Object -Index 1).Trim()
+          $line = "$md5Hash   build/graal/xlite-daemon.exe"
+          $line | Out-File -FilePath build\graal\checksum.txt -Append
+          
       - name: Upload ZIP Artifact
         if: ${{ github.event.inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
