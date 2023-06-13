@@ -45,16 +45,6 @@ jobs:
           rm -f build/graal/xlite-daemon.build_artifacts.txt
 
       # WINDOWS
-
-      - name: Setup GraalVM (Windows)
-        if: "startsWith(matrix.os, 'windows')"
-        uses: graalvm/setup-graalvm@v1
-        with:
-          version: '22.3.0'
-          java-version: '17'
-          components: 'native-image'
-          github-token: ${{ secrets.GH_TOKEN }}      
-      
       - name: Install Windows SDK 10
         if: "startsWith(matrix.os, 'windows')"
         run: choco install windows-sdk-10 -y
@@ -62,6 +52,15 @@ jobs:
       - name: Install Visual Studio Build Tools
         if: "startsWith(matrix.os, 'windows')"
         run: choco install -y visualstudio2019-workload-vctools
+
+      - name: Setup GraalVM (Windows)
+        if: "startsWith(matrix.os, 'windows')"
+        uses: graalvm/setup-graalvm@v1
+        with:
+          version: 'latest'
+          java-version: '17'
+          components: 'native-image'
+          github-token: ${{ secrets.GH_TOKEN }}
 
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
@@ -160,7 +159,7 @@ jobs:
         if: ${{ github.event.inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GH_TOKEN }}
           file: build/graal/xlite-daemon-${{ matrix.os }}.zip
           asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
@@ -170,7 +169,7 @@ jobs:
         if: ${{ github.event.inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GH_TOKEN }}
           file: build/graal/checksum.txt
           asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
