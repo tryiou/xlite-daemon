@@ -148,7 +148,7 @@ jobs:
         run: md5sum build/graal/xlite-daemon > build/graal/checksum.txt
 
       - name: Calculate MD5 checksum (macOS)
-        if: ${{ github.event.inputs.build_type == 'release' && (startsWith(matrix.os, 'macos') }}
+        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'macos') }}
         run: md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
 
       - name: Calculate MD5 checksum (Windows)
