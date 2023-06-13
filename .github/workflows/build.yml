@@ -10,7 +10,7 @@ on:
         description: 'Type of build, "release" or "artifacts"'
         required: true
       tag:
-        description: 'version tag, "0.5.12"'
+        description: 'version tag, must fit with build.gradle daemon version, "0.5.12"'
         required: false
         default: '0.5.12'
 jobs:
