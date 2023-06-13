@@ -60,7 +60,7 @@ jobs:
           version: 'latest'
           java-version: '17'
           components: 'native-image'
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
@@ -159,7 +159,7 @@ jobs:
         if: ${{ github.event.inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GH_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/graal/xlite-daemon-${{ matrix.os }}.zip
           asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
@@ -169,7 +169,7 @@ jobs:
         if: ${{ github.event.inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GH_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/graal/checksum.txt
           asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
