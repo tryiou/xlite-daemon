@@ -9,16 +9,24 @@ on:
       build_type:
         description: 'Type of build, "release" or "artifacts"'
         required: true
+      tag:
+        description: 'version tag, "0.5.12"'
+        required: false
+        default: '0.5.12'
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
+    runs-on: ${{ matrix.os 
+    
     strategy:
       matrix:
-        os: [ubuntu-latest]
-#, macos-12, windows-latest]
+        os: [ubuntu-latest, macos-12, windows-latest]
 
+          
     steps:
+      - name: Set XLITE_DAEMON_VERSION
+        run: |
+          echo "XLITE_DAEMON_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
@@ -80,7 +88,8 @@ jobs:
       - name: Build Native Image
         if: "startsWith(matrix.os, 'windows')"
         run: |
-          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
+          $env:CC_VERSION = ${{ env.XLITE_DAEMON_VERSION }}
+          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-$env:CC_VERSION-all.jar"
           echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
 
           & native-image -jar $env:CC_PACKAGED_JAR `
@@ -177,6 +186,7 @@ jobs:
           asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           prerelease: true
+          tag: ${{ env.XLITE_DAEMON_VERSION }}
 
       - name: Upload Checksum File
         if: ${{ github.event.inputs.build_type == 'release' }}
@@ -187,6 +197,7 @@ jobs:
           asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
           prerelease: true
+          tag: ${{ env.XLITE_DAEMON_VERSION }}
 
 
 # ARTIFACTS
