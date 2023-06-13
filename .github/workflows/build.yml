@@ -195,6 +195,7 @@ jobs:
           asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           prerelease: true
+          release_name: "xlite-daemon ${{ github.event.inputs.tag }}"
           tag: ${{ github.event.inputs.tag }}
           body: "based on branch: ${{ github.event.inputs.branch }}"
 
@@ -207,6 +208,7 @@ jobs:
           asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
           prerelease: true
+          release_name: "xlite-daemon ${{ github.event.inputs.tag }}"
           tag: ${{ github.event.inputs.tag }}
           body: "based on branch: ${{ github.event.inputs.branch }}"
 
