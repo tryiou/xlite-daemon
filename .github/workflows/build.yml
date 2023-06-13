@@ -143,21 +143,17 @@ jobs:
           $source = "build/graal/xlite-daemon.exe"
           Compress-Archive -Path $source -DestinationPath $destination
           
-      - name: Calculate MD5 checksum
-        if: ${{ github.event.inputs.build_type == 'release' }}
-        run: |
-          switch ($env:matrix_os) {
-            "ubuntu-latest" {
-              md5sum build/graal/xlite-daemon > build/graal/checksum.txt
-            }
-            "macos-latest", "macos-12" {
-              md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
-            }
-            "windows-latest" {
-              certutil -hashfile build\graal\xlite-daemon.exe MD5 | findstr /v "hash" > build\graal\checksum.txt
-            }
-          }
+      - name: Calculate MD5 checksum (linux)
+        if: ${{ github.event.inputs.build_type == 'release' && matrix.os == 'ubuntu-latest' }}
+        run: md5sum build/graal/xlite-daemon > build/graal/checksum.txt
 
+      - name: Calculate MD5 checksum (macOS)
+        if: ${{ github.event.inputs.build_type == 'release' && matrix.os == 'macos-latest' }}
+        run: md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
+
+      - name: Calculate MD5 checksum (Windows)
+        if: ${{ github.event.inputs.build_type == 'release' && matrix.os == 'windows-latest' }}
+        run: certutil -hashfile build\graal\xlite-daemon.exe MD5 | Select-Object -Index 1 | Out-File -FilePath build\graal\checksum.txt
 
       - name: Upload ZIP Artifact
         if: ${{ github.event.inputs.build_type == 'release' }}
