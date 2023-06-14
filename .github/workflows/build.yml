@@ -88,9 +88,7 @@ jobs:
         run: |
           $currentDir = Get-Location
           $CC_PACKAGED_JAR = "$currentDir\build\libs\xlite-daemon-${{ github.event.inputs.tag }}-all.jar"
-          $CC_PACKAGED_JAR2 = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
           Write-Host "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
-          Write-Host "CC_PACKAGED_JAR2=$CC_PACKAGED_JAR2"
           
           & native-image -jar ${CC_PACKAGED_JAR} `
           -H:Name=xlite-daemon `
