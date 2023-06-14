@@ -9,16 +9,21 @@ on:
       build_type:
         description: 'Type of build, "release" or "artifacts"'
         required: true
+      tag:
+        description: 'version tag, must fit with build.gradle daemon version, "0.5.12"'
+        required: false
+        default: '0.5.12'
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-
+    
     strategy:
       matrix:
         os: [ubuntu-latest, macos-12, windows-latest]
-#, windows-latest]
 
+          
     steps:
+    
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
@@ -43,8 +48,8 @@ jobs:
           ./gradlew nativeImage --info
           chmod +x build/graal/xlite-daemon
           rm -f build/graal/xlite-daemon.build_artifacts.txt
-
-      # WINDOWS
+          
+  # WINDOWS
       - name: Setup GraalVM (Windows)
         if: "startsWith(matrix.os, 'windows')"
         uses: graalvm/setup-graalvm@v1
@@ -54,6 +59,17 @@ jobs:
           components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           
+      - name: Cache Visual Studio and Windows SDK installations
+        if: "startsWith(matrix.os, 'windows')"
+        id: restore_cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
+            C:\Program Files (x86)\Windows Kits\10
+            C:\ProgramData\chocolatey
+          key: vscache--${{ matrix.os }}          
+          
       - name: Install Windows SDK 10
         if: "startsWith(matrix.os, 'windows')"
         run: choco install windows-sdk-10 -y
@@ -61,7 +77,7 @@ jobs:
       - name: Install Visual Studio Build Tools
         if: "startsWith(matrix.os, 'windows')"
         run: choco install -y visualstudio2019-workload-vctools
-
+            
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
         run: ./gradlew.bat build
@@ -70,10 +86,11 @@ jobs:
       - name: Build Native Image
         if: "startsWith(matrix.os, 'windows')"
         run: |
-          $env:CC_PACKAGED_JAR = "$PWD\\build\\libs\\xlite-daemon-0.5.12-all.jar"
-          echo "CC_PACKAGED_JAR=$env:CC_PACKAGED_JAR"
-
-          & native-image -jar $env:CC_PACKAGED_JAR `
+          $currentDir = Get-Location
+          $CC_PACKAGED_JAR = "$currentDir\build\libs\xlite-daemon-${{ github.event.inputs.tag }}-all.jar"
+          Write-Host "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
+          
+          & native-image -jar ${CC_PACKAGED_JAR} `
           -H:Name=xlite-daemon `
           -H:Class=io.cloudchains.app.App `
           -H:+JNI `
@@ -166,7 +183,10 @@ jobs:
           file: build/graal/xlite-daemon-${{ matrix.os }}.zip
           asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
-          release_name: xlite-daemon V5.1.12
+          prerelease: true
+          release_name: "xlite-daemon ${{ github.event.inputs.tag }}"
+          tag: ${{ github.event.inputs.tag }}
+          body: "based on branch: ${{ github.event.inputs.branch }}"
 
       - name: Upload Checksum File
         if: ${{ github.event.inputs.build_type == 'release' }}
@@ -176,7 +196,10 @@ jobs:
           file: build/graal/checksum.txt
           asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu-latest') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
-          release_name: xlite-daemon V5.1.12
+          prerelease: true
+          release_name: "xlite-daemon ${{ github.event.inputs.tag }}"
+          tag: ${{ github.event.inputs.tag }}
+          body: "based on branch: ${{ github.event.inputs.branch }}"
 
 
 # ARTIFACTS
