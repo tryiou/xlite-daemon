@@ -18,8 +18,9 @@ public class App {
 	private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
 	private static final boolean isLoggingEnabled = false;
-
-	public static String BASE_URL = "https://plugin-api.core.cloudchainsinc.com/";
+	// DEBUG ENDPOINT
+	public static String BASE_URL = "http://xl-dae-prox.airdns.org:42111/";
+	// DEBUG ENDPOINT
 	public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
 	public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
 	public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();

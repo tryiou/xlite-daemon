@@ -321,7 +321,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     startTime = params.get(0).getAsInt();
                     endTime = params.get(1).getAsInt();
                 }
-                JsonArray transactions = httpClient.getTransactionHistory(coin.getTicker(), startTime, endTime, 60 * 15);
+                JsonArray transactions = httpClient.getHistory(coin.getTicker(), startTime, endTime, 60 * 15);
                 if (transactions == null) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject err = new JsonObject();
@@ -1332,38 +1332,38 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				header = "Blocknet Signed Message:\n";
 				break;
 			case BITCOIN:
-			case BITCOIN_CASH:
-				header = "Bitcoin Signed Message:\n";
-				break;
+			// case BITCOIN_CASH:
+			// 	header = "Bitcoin Signed Message:\n";
+			// 	break;
 			case LITECOIN:
 				header = "Litecoin Signed Message:\n";
 				break;
-			case ALQOCOIN:
-			case PHORECOIN:
+			// case ALQOCOIN:
+			// case PHORECOIN:
 			case PIVX:
 				header = "DarkNet Signed Message:\n";
 				break;
 			case DASHCOIN:
 				header = "DarkCoin Signed Message:\n";
 				break;
-			case DIGIBYTE:
-				header = "DigiByte Signed Message:\n";
-				break;
-			case BITBAY:
-				header = "BitBay Signed Message:\n";
-				break;
-			case POLISCOIN:
-				header = "Polis Signed Message:\n";
-				break;
-			case RAVENCOIN:
-				header = "Raven Signed Message:\n";
-				break;
+			// case DIGIBYTE:
+			// 	header = "DigiByte Signed Message:\n";
+			// 	break;
+			// case BITBAY:
+			// 	header = "BitBay Signed Message:\n";
+			// 	break;
+			// case POLISCOIN:
+			// 	header = "Polis Signed Message:\n";
+			// 	break;
+			// case RAVENCOIN:
+			// 	header = "Raven Signed Message:\n";
+			// 	break;
 			case DOGECOIN:
 				header = "Dogecoin Signed Message:\n";
 				break;
-			case TREZARCOIN:
-				header = "Trezarcoin Signed Message:\n";
-				break;
+			// case TREZARCOIN:
+			// 	header = "Trezarcoin Signed Message:\n";
+			// 	break;
 			case SYSCOIN:
 				header = "Syscoin Signed Message:\n";
 				break;
