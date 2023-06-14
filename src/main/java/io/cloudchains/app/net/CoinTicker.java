@@ -32,20 +32,19 @@ public enum CoinTicker {
             BLOCKNET,
             BLOCKNET_TESTNET5,
             BITCOIN,
-            BITCOIN_CASH,
+//            BITCOIN_CASH, - not support on backend
             LITECOIN,
             DASHCOIN,
-            DIGIBYTE,
+//            DIGIBYTE, - not support on backend
             DOGECOIN,
-            TREZARCOIN,
+//           TREZARCOIN, - not support on backend
             SYSCOIN,
-            PIVX,
-            ALQOCOIN,
-            // TODO Polis and Phore are disabled until supported on backend
-//            POLISCOIN,
-//            PHORECOIN,
-            RAVENCOIN,
-            BITBAY
+            PIVX
+//            ALQOCOIN, - not support on backend
+//            POLISCOIN, - not support on backend
+//            PHORECOIN, - not support on backend
+//            RAVENCOIN
+//            BITBAY - not support on backend
         );
     }
 }

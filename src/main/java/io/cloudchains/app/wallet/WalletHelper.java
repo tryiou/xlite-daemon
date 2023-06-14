@@ -8,6 +8,7 @@ import io.cloudchains.app.util.AddressBalance;
 import io.cloudchains.app.util.CloudTransaction;
 import io.cloudchains.app.util.UTXO;
 import org.bitcoinj.core.*;
+import org.bitcoinj.core.Base58;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
@@ -168,7 +169,20 @@ public class WalletHelper {
 		DeterministicKey key = wallet.freshReceiveKey();
 		DumpedPrivateKey privateKey = key.getPrivateKeyEncoded(params);
 
-		Address address = new Address(params, key.getPubKeyHash());
+		Address address = new Address(params, key.getPubKeyHash()) {
+			public byte[] getHash() {
+				return new byte[0];
+			}
+
+			public Script.ScriptType getOutputScriptType() {
+				return null;
+			}
+
+
+			public int compareTo(Address o) {
+				return 0;
+			}
+		};
 
 		return new AddressBalance(address, privateKey);
 	}
@@ -179,7 +193,20 @@ public class WalletHelper {
 		ECKey key = DumpedPrivateKey.fromBase58(params, privKey).getKey();
 		DumpedPrivateKey privateKey = key.getPrivateKeyEncoded(params);
 
-		Address address = new Address(params, key.getPubKeyHash());
+		Address address = new Address(params, key.getPubKeyHash()) {
+			public byte[] getHash() {
+				return new byte[0];
+			}
+
+			public Script.ScriptType getOutputScriptType() {
+				return null;
+			}
+
+
+			public int compareTo(Address o) {
+				return 0;
+			}
+		};
 
 		return new AddressBalance(address, privateKey);
 	}
@@ -201,7 +228,6 @@ public class WalletHelper {
 		double totalSpending = amount + fee;
 		double totalAvailable = walletHelper.getSpendBalance(totalSpending);
 		double changeAmt = (totalAvailable - amount) - fee;
-
 		Address toAddress = Address.fromBase58(params, address);
 		Coin sendAmount = Coin.valueOf((long) Math.floor(amount * Coin.COIN.value));
 		Coin changeAmount = Coin.valueOf((long) Math.floor(changeAmt * Coin.COIN.value));

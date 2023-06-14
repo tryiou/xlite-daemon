@@ -1,7 +1,7 @@
 plugins {
-	id 'application'
-	id 'com.palantir.graal' version '0.6.0'
-	id 'com.github.johnrengelman.shadow' version '5.2.0'
+    id 'application'
+    id 'com.palantir.graal' version '0.12.0'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 project.version = "0.5.12"
@@ -11,19 +11,20 @@ apply plugin: 'com.github.johnrengelman.shadow'
 group 'io.cloudchains'
 
 repositories {
-	mavenCentral()
+    mavenCentral()
+    gradlePluginPortal()
 }
 
 run {
-	if (project.hasProperty('args')) {
-		args project.args.split("=")
-	}
+    if (project.hasProperty('args')) {
+        args project.args.split("=")
+    }
 
-	standardInput = System.in
+    standardInput = System.in
 }
 
 shadowJar {
-//    mergeServiceFiles()
+    // mergeServiceFiles()
 }
 
 sourceSets {
@@ -37,64 +38,61 @@ test {
     useJUnitPlatform()
 }
 
-graal {
-	// Temporary workaround
-	downloadBaseUrl('https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-19.3.0/graalvm-ce-java8-linux-amd64-19.3.0.tar.gz?')
 
-	graalVersion '19.3.0'
-	mainClass 'io.cloudchains.app.App'
-	outputName 'Cloudchains-SPV'
-	option '-H:+JNI'
-	option '-H:+UseServiceLoaderFeature'
-	option '-H:-UseServiceLoaderFeature'
-	option '-H:ReflectionConfigurationFiles=contrib/netty-reflection.json'
-	option '-H:ResourceConfigurationFiles=contrib/resource-config.json'
-	option '-H:IncludeResources=.*/wordlist/english.txt$'
-	option '-H:Log=registerResource'
-	option '--no-fallback'
-	option '--no-server'
-	option '-da' // Disables assertions
-	option '--enable-url-protocols=http,https'
-	option '--initialize-at-build-time=io.netty'
-	option '--initialize-at-build-time=com.google.common'
-	option '--initialize-at-build-time=org.apache.commons.logging'
-	option '--initialize-at-build-time=org.slf4j.LoggerFactory'
-	option '--initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder'
-	option '--initialize-at-build-time=org.slf4j.helpers.NOPLogger'
-	option '--initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory'
-	option '--initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory'
-	option '--initialize-at-build-time=org.slf4j.helpers.Util'
-	option '--initialize-at-build-time=org.bitcoinj.core.Utils'
-	option '--initialize-at-build-time=org.bitcoinj.core.Sha256Hash'
-	option '--initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode'
-	option '--initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger'
-	option '--initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder'
-	option '--initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter'
-	option '--initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil'
-	option '--allow-incomplete-classpath'
-	option '--verbose'
+graal {
+    graalVersion '22.3.0'
+    javaVersion '17'
+    mainClass 'io.cloudchains.app.App'
+    outputName 'xlite-daemon'
+    option '-H:+JNI'
+    option '-H:+UseServiceLoaderFeature'
+    option '-H:-UseServiceLoaderFeature'
+    option '-H:ReflectionConfigurationFiles=contrib/netty-reflection.json'
+    option '-H:ResourceConfigurationFiles=contrib/resource-config.json'
+    option '-H:IncludeResources=.*/wordlist/english.txt$'
+    option '-H:Log=registerResource'
+    option '--no-fallback'
+    option '--no-server'
+    option '-da' // Disables assertions
+    option '--enable-url-protocols=http,https'
+    option '--initialize-at-build-time=io.netty'
+    option '--initialize-at-build-time=com.google.common'
+    option '--initialize-at-build-time=org.apache.commons.logging'
+    option '--initialize-at-build-time=org.slf4j.LoggerFactory'
+    option '--initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder'
+    option '--initialize-at-build-time=org.slf4j.helpers.NOPLogger'
+    option '--initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory'
+    option '--initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory'
+    option '--initialize-at-build-time=org.slf4j.helpers.Util'
+    option '--initialize-at-build-time=org.bitcoinj.core.Utils'
+    option '--initialize-at-build-time=org.bitcoinj.core.Sha256Hash'
+    option '--initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode'
+    option '--initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger'
+    option '--initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder'
+    option '--initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter'
+    option '--initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil'
+    option '--allow-incomplete-classpath'
+    option '--verbose'
 }
 
 dependencies {
-	implementation group: 'org.bitcoinj', name: 'bitcoinj-core', version: '0.16'
-	implementation group: 'org.bitcoinj', name: 'orchid', version: '1.2.1'
-	implementation group: 'net.jcip', name: 'jcip-annotations', version: '1.0'
-//	implementation 'org.bitcoinj:bitcoinj-core:0.16'
-	implementation 'org.json:json:20180813'
-	implementation 'org.apache.httpcomponents:httpclient:4.5.9'
-	implementation 'org.apache.logging.log4j:log4j:2.12.1'
-	implementation group: 'com.google.code.gson', name: 'gson', version: '2.8.5'
-	implementation group: 'commons-logging', name: 'commons-logging', version: '1.2'
-	implementation group: 'org.slf4j', name: 'slf4j-nop', version: '1.7.29'
-	implementation group: 'io.netty', name: 'netty-all', version: '4.1.63.Final'
-	testImplementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
-	testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
-	compileOnly 'com.oracle.substratevm:svm:19.2.0'
-
-//	compile (group: 'io.netty', name: 'netty-all', version: '4.1.63.Final') {
-//		exclude group: "org.slf4j", module: "slf4j-log4j12"
-//		exclude group: "log4j", module: "log4j"
-//	}
+    implementation group: 'org.bitcoinj', name: 'bitcoinj-core', version: '0.14.7'
+    implementation group: 'org.bitcoinj', name: 'orchid', version: '1.2.1'
+    implementation group: 'net.jcip', name: 'jcip-annotations', version: '1.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+    testImplementation 'org.junit.platform:junit-platform-engine:1.9.2'
+    implementation 'org.json:json:20210307'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    implementation 'org.apache.logging.log4j:log4j:2.20.0'
+    implementation group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+    implementation group: 'commons-logging', name: 'commons-logging', version: '1.2'
+    implementation group: 'org.slf4j', name: 'slf4j-nop', version: '2.0.7'
+    implementation group: 'io.netty', name: 'netty-all', version: '4.1.92.Final'
+    implementation 'com.google.code.findbugs:jsr305:3.0.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
+    compileOnly 'com.oracle.substratevm:svm:19.2.1'
+    compileOnly group: 'org.graalvm.nativeimage', name: 'svm', version: '22.3.0'
 }
 
 mainClassName = 'io.cloudchains.app.App'

@@ -145,7 +145,7 @@ public class BackgroundTimerThread implements Runnable {
 				continue;
 
 			new Thread(() -> {
-				App.feeUpdateHttpClient.getTransactionHistory(coinInstance.getTicker(), 0, (int) System.currentTimeMillis(), 30000);
+				App.feeUpdateHttpClient.getHistory(coinInstance.getTicker(), 0, (int) System.currentTimeMillis(), 30000);
 			}).start();
 		}
 		
