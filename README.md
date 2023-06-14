@@ -49,4 +49,3 @@ Explain how others can contribute to the Xlite Wallet Backend project. Describe 
 ## License
 
 Specify the license under which the Xlite Wallet Backend project is released. Choose an appropriate license that suits your project's requirements. If you're not sure, consult with your team or a legal professional.
-
