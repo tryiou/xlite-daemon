@@ -59,16 +59,16 @@ jobs:
           components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Cache Visual Studio and Windows SDK installations
-        if: "startsWith(matrix.os, 'windows')"
-        id: restore_cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
-            C:\Program Files (x86)\Windows Kits\10
-            C:\ProgramData\chocolatey
-          key: vscache--${{ matrix.os }}          
+#      - name: Cache Visual Studio and Windows SDK installations
+#        if: "startsWith(matrix.os, 'windows')"
+#        id: restore_cache
+#        uses: actions/cache@v2
+#        with:
+#          path: |
+#            C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
+#            C:\Program Files (x86)\Windows Kits\10
+#            C:\ProgramData\chocolatey
+#          key: vscache--${{ matrix.os }}          
           
       - name: Install Windows SDK 10
         if: "startsWith(matrix.os, 'windows')"
