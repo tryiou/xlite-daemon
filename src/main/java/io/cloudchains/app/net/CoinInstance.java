@@ -82,7 +82,7 @@ public class CoinInstance {
 
 	private static final int MINIMUM_UTXO_UPDATE_INTERVAL = 500;
 
-	private static final int FORWARD_ADDRESS_COUNT = 20;
+	private static final int FORWARD_ADDRESS_COUNT = 0;
 
 	private static ArrayList<CoinInstance> coinInstances = new ArrayList<>();
 	private static CoinInstance activeCurrency;
