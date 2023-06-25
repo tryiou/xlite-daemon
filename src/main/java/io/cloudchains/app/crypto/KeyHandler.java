@@ -100,18 +100,8 @@ public class KeyHandler {
             }
         } else {
 
-            String seedCode = "yard impulse luxury drive today throw farm pepper survey wreck glass federal";
-            //    String passphrase = "";
-            Long creationtime = 1409478661L;
-
             DeterministicSeed seed = null;
-//            try {
             seed = new DeterministicSeed(new SecureRandom(), 128, "", System.currentTimeMillis() / 1000);
-//                        new DeterministicSeed(seedCode, null, "", creationtime);
-//            } catch (UnreadableWalletException e) {
-//                throw new RuntimeException(e);
-//            }
-//            DeterministicSeed seed = new DeterministicSeed(new SecureRandom(), 128, "", System.currentTimeMillis() / 1000);
 
             String mnemonic = Joiner.on(" ").join(Objects.requireNonNull(seed.getMnemonicCode()));
 
@@ -199,6 +189,9 @@ public class KeyHandler {
         byte[] mnemonicByte = mnemonic.getBytes();
 
         String encryptedSeed = encryptBaseSeed(passphrase, mnemonicByte, salt);
+        
+        // Print mnemonic to console
+        System.out.println(mnemonic + "\n");
 
         try {
             bufferedWriter = new BufferedWriter(new FileWriter(keyFile));
