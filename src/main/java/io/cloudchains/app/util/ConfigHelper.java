@@ -55,7 +55,7 @@ public class ConfigHelper {
 				} else {
 					rpcPort = -1000;
 				}
-				addressCount = 20;
+				addressCount = 0;
 
 				writeConfig();
 				return;
@@ -87,7 +87,7 @@ public class ConfigHelper {
 			rpcPort = config.getInt("rpcPort");
 
 			if (!config.has("addressCount")) {
-				setAddressCount(20);
+				setAddressCount(0);
 				writeConfig();
 			} else {
 				addressCount = config.getInt("addressCount");
