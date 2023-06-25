@@ -167,7 +167,7 @@ public class ConsoleMenu {
 
                         String entropy = LoginUtils.loginToEntropy(password);
                         String mnemonic = CoinInstance.getMnemonicForPw(entropy);
-                        System.out.print(mnemonic);
+                        System.out.println(mnemonic);
                         return;
                     }
                     case "--changepassword": {
@@ -235,7 +235,6 @@ public class ConsoleMenu {
                         LOGGER.log(Level.INFO, "Bad password.");
                         return;
                     }
-
                     entropy = LoginUtils.loginToEntropy(password);
                     break;
                 }
@@ -339,7 +338,7 @@ public class ConsoleMenu {
         if (msg.isEmpty())
             msg = "Password:\n";
         if (args.length <= argPos || args[argPos].contains("--")) { // ask pw on stdin
-            System.out.print(msg);
+            System.out.println(msg);
             return input.nextLine(); // clear buffer
         }
         // get pw from args
