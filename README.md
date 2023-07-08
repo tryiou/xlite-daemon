@@ -37,6 +37,8 @@ Provide step-by-step instructions on how to set up and run the Xlite Wallet Back
 
 Explain how to use the Xlite Wallet Backend. Provide information on available APIs, endpoints, or functionalities. Include any code snippets or examples to demonstrate usage patterns.
 
+https://docs.blocknet.org/xlite/access-coin-daemons-via-rpc/
+
 Runtime Environment Variables:
 ```
 WALLET_MNEMONIC
@@ -77,6 +79,18 @@ sendrawtransaction <rawtx> - Broadcast a signed raw transaction to the network
 ## Configuration
 
 Describe any configuration options available for the Xlite Wallet Backend. Explain the purpose of each configuration file or setting and how to modify them as needed. Include instructions on any environment variables or external configurations required for proper functioning.
+
+one file per coin,
+xlite-daemon (Backend) Configuration Files:
+
+Windows
+%appdata%\CloudChains\settings\config-*.json
+
+MacOS
+~/Library/Application Support/CloudChains/settings/config-*.json
+
+Linux
+~/.config/CloudChains/settings/config-*.json
 
 ## Contributing
 
