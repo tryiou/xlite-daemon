@@ -37,6 +37,43 @@ Provide step-by-step instructions on how to set up and run the Xlite Wallet Back
 
 Explain how to use the Xlite Wallet Backend. Provide information on available APIs, endpoints, or functionalities. Include any code snippets or examples to demonstrate usage patterns.
 
+Runtime Environment Variables:
+```
+WALLET_MNEMONIC
+WALLET_PASSWORD
+```
+
+Supported RPC calls
+```
+Calls requiring XRouter calls: getblockhash, getblock, gettransaction, sendrawtransaction
+help - This command help.
+stop - Shutdown the server
+=====Blockchain=====
+gettxout <txid> <vout> - Get info about an unspent transaction output
+=====Network=====
+getinfo - Get information such as balances, protocol version, and more
+getnetworkinfo - Get network information
+getrawmempool - Get raw mempool
+getblockchaininfo - Get blockchain info
+getblockhash <height> - Get the hash of a block at a given height
+getblock <hash> - Get a block's JSON representation given its hash
+=====Wallet=====
+listunspent - Get all UTXOs in the wallet
+getnewaddress - Generate a new address
+gettransaction <txid> - Get a transaction given its TXID
+getaddressesbyaccount <account> - Get addresses belonging to a given account. The only account available is 'main' which contains all addresses
+importprivkey <privkey> - Import an address given it's privkey
+dumpprivkey <address> - Dump an addresses private key
+=====Utilities=====
+signmessage <address> <message> - Sign a message with a given address' private key
+verifymessage <address> <signature> <message> - Verify a signature for a message signed by a given address
+=====Raw Transactions=====
+createrawtransaction <inputs> <outputs> - Create a raw transaction given inputs and outputs in JSON format. For more info, run createrawtransaction with no arguments.
+decoderawtransaction <rawtx> - Get a raw transaction's JSON representation
+signrawtransaction <rawtx> - Sign a raw transaction
+sendrawtransaction <rawtx> - Broadcast a signed raw transaction to the network
+```
+
 ## Configuration
 
 Describe any configuration options available for the Xlite Wallet Backend. Explain the purpose of each configuration file or setting and how to modify them as needed. Include instructions on any environment variables or external configurations required for proper functioning.
@@ -49,3 +86,4 @@ Explain how others can contribute to the Xlite Wallet Backend project. Describe 
 ## License
 
 Specify the license under which the Xlite Wallet Backend project is released. Choose an appropriate license that suits your project's requirements. If you're not sure, consult with your team or a legal professional.
+
