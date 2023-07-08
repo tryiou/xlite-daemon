@@ -83,6 +83,7 @@ Describe any configuration options available for the Xlite Wallet Backend. Expla
 one file per coin,
 xlite-daemon (Backend) Configuration Files:
 
+```
 Windows
 %appdata%\CloudChains\settings\config-*.json
 
@@ -91,6 +92,7 @@ MacOS
 
 Linux
 ~/.config/CloudChains/settings/config-*.json
+```
 
 ## Contributing
 
