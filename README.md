@@ -26,22 +26,26 @@ List the prerequisites required to set up and run the Xlite Wallet Backend. Incl
 
 Provide step-by-step instructions on how to set up and run the Xlite Wallet Backend locally. Include the following:
 
-1. Clone the repository: 
+1. Clone the repository:
+```
 git clone https://github.com/blocknetdx/xlite-daemon
-
-3. Build the project:
+```
+2. Build the project:
+```
 cd xlite-daemon
 # mac/linux:
 chmod +x gradlew
 ./gradlew nativeImage
-# windows
-nativeImageWindows.bat
 
+# windows:
+nativeImageWindows.bat
+```
 3. Configuration: If any configuration files or settings need to be modified, provide instructions on how to set them up.
 
 4. Run the application: 
+```
 binary to find in build/graal/ folder
-
+```
 ## Usage
 
 Explain how to use the Xlite Wallet Backend. Provide information on available APIs, endpoints, or functionalities. Include any code snippets or examples to demonstrate usage patterns.
