@@ -33,6 +33,7 @@ git clone https://github.com/blocknetdx/xlite-daemon
 2. Build the project:
 ```
 cd xlite-daemon
+
 # mac/linux:
 chmod +x gradlew
 ./gradlew nativeImage
