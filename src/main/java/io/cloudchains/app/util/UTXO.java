@@ -68,7 +68,7 @@ public class UTXO {
 		Script scriptForUTXO = ScriptBuilder.createOutputScript(address);
 
 		Sha256Hash sha256Hash = Sha256Hash.wrap(getTxid());
-		return new org.bitcoinj.core.UTXO(sha256Hash, getVout(), Coin.valueOf(getValue()), getHeight(), true, scriptForUTXO, getAddress());
+		return new org.bitcoinj.core.UTXO(sha256Hash, getVout(), Coin.valueOf(getValue()), getHeight(), false, scriptForUTXO, getAddress());
 	}
 
 	public String toString() {
