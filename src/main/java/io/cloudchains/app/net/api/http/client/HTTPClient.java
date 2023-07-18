@@ -6,6 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+import com.subgraph.orchid.encoders.Hex;
 import io.cloudchains.app.App;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
@@ -31,6 +32,9 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
+import org.bitcoinj.core.Address;
+import org.bitcoinj.script.Script;
+import org.bitcoinj.script.ScriptBuilder;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -170,6 +174,79 @@ public class HTTPClient {
         }
 
         return res;
+    }
+
+    /**
+     * Returns all utxos for a list of addresses.
+     * Note: This method does neither use nor update any caches!
+     * 
+     * @param coinTicker Fetch utxos from this coin
+     * @param address    Fetch utxos from this address
+     * @return JsonArray or null on error
+     */
+    public JsonArray getUtxosUncached(CoinTicker coinTicker, String[] addresses) {
+        CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
+
+        JsonArray innerParams = new JsonArray();
+        innerParams.add(CoinTickerUtils.tickerToString(coinTicker));
+        innerParams.add(new Gson().toJsonTree(addresses).getAsJsonArray());
+
+        JsonObject params = new JsonObject();
+        params.addProperty("method", "getutxos");
+        params.add("params", innerParams);
+
+        String res = doPost("/", params);
+        LOGGER.log(Level.FINER, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " " + res);
+
+        if (res == null) {
+            LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null post result");
+            return null;
+        }
+
+        JSONObject jsonObject = null;
+        JSONArray utxoArr = null;
+        try {
+            jsonObject = new JSONObject(res);
+            utxoArr = jsonObject.getJSONArray("utxos");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (jsonObject == null || utxoArr == null) {
+            if (jsonObject == null)
+                LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null jsonObject");
+            if (utxoArr == null)
+                LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null utxoArr");
+            return null;
+        }
+
+        JsonArray utxoList = new JsonArray();
+        for (int i = 0; i < utxoArr.length(); i++) {
+            JsonObject utxoJSON = new JsonObject();
+            utxoJSON.addProperty("txid", utxoArr.getJSONObject(i).getString("txhash"));
+            utxoJSON.addProperty("vout", utxoArr.getJSONObject(i).getInt("vout"));
+            utxoJSON.addProperty("value", utxoArr.getJSONObject(i).getDouble("value"));
+            utxoJSON.addProperty("spendable", true);
+
+            String address = utxoArr.getJSONObject(i).getString("address");
+            utxoJSON.addProperty("address", address);
+
+            Address addr = Address.fromBase58(coinInstance.getNetworkParameters(), address);
+            Script script = ScriptBuilder.createOutputScript(addr);
+            utxoJSON.addProperty("scriptPubKey", new String(Hex.encode(script.getProgram())));
+
+            int height = utxoArr.getJSONObject(i).getInt("block_number");
+            int currentHeight = CoinInstance.getBlockCountByTicker(coinTicker);
+            int confirmations = (currentHeight - height) + 1;
+            if (height == 0)
+                confirmations = 0;
+
+            utxoJSON.addProperty("confirmations", confirmations);
+
+            utxoList.add(utxoJSON);
+        }
+
+        return utxoList;
     }
 
     /**
