@@ -1,6 +1,9 @@
 name: build_latest
 
 on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
   workflow_dispatch:
     inputs:
       branch:
@@ -10,9 +13,9 @@ on:
         description: 'Type of build, "release" or "artifacts"'
         required: true
       tag:
-        description: 'version tag, must fit with build.gradle daemon version, "0.5.12"'
+        description: 'version tag, must fit with build.gradle daemon version, "0.5.13"'
         required: false
-        default: '0.5.12'
+        default: '0.5.13'
 jobs:
   build:
     runs-on: ${{ matrix.os }}
