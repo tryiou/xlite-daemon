@@ -20,7 +20,7 @@ jobs:
 
       - name: Extract Version
         id: extract_version
-        run: echo "version=$(grep -oP 'project.version = \"\\K[^"]+' build.gradle)" >> $GITHUB_OUTPUT
+        run: echo "version=$(grep -oP 'project.version = \"\\K[^"]+' build.gradle)" >> "$GITHUB_OUTPUT"
 
       - name: Build
         uses: ./.github/workflows/build_latest.yml
