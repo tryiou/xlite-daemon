@@ -12,19 +12,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout 
-        uses: actions/checkout@v3
-
-      - name: Extract Version
-        id: extract_version
-        run: echo "version=$(grep -oP 'project.version = \"\\K[^"]+' build.gradle)" >> "$GITHUB_OUTPUT"
-
-      - name: Build
-        uses: ./.github/workflows/build_latest.yml
-        with:
-          branch: ${{ github.ref }}
-          build_type: "artifacts"
-          tag: ${{ steps.extract_version.outputs.version }}
+    uses: ./.github/workflows/build_latest.yml
+    with:
+      branch: ${{ github.ref }}
+      build_type: "artifacts"
