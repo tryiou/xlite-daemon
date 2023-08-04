@@ -16,3 +16,4 @@ jobs:
     with:
       branch: ${{ github.ref }}
       build_type: "artifacts"
+      tag: "0.5.13"
