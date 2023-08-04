@@ -22,7 +22,7 @@ jobs:
           echo "::set-output name=version::$version" >> $GITHUB_ENV
 
       - name: Build
-        uses: .github/workflows/build_latest.yml@master
+        uses: ./.github/workflows/build_latest.yml
         with:
           branch: ${{ github.ref }}
           build_type: "artifacts"
