@@ -1,0 +1,29 @@
+name: build_ci
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+    branches:
+      - master
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract Version
+        id: extract_version
+        run: |
+          version=$(grep -oP 'project.version = \"\\K[^"]+' build.gradle)
+          echo "::set-output name=version::$version" >> $GITHUB_ENV
+
+      - name: Build
+        uses: .github/workflows/build_latest.yml@latest
+        with:
+          branch: ${{ github.ref }}
+          build_type: "artifacts"
+          tag: ${{ steps.extract_version.outputs.version }}
