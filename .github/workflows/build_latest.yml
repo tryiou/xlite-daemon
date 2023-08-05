@@ -96,7 +96,6 @@ jobs:
       - name: Build the project using Gradle
         if: "startsWith(matrix.os, 'windows')"
         run: ./gradlew.bat build
-        continue-on-error: false
 
       - name: Build Native Image
         if: "startsWith(matrix.os, 'windows')"
@@ -150,7 +149,6 @@ jobs:
           --allow-incomplete-classpath `
           --verbose `
           -H:+ReportExceptionStackTraces
-        continue-on-error: false
 
       - name: Move native image file to build\graal directory
         if: "startsWith(matrix.os, 'windows')"
