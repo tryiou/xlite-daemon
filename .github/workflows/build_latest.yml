@@ -38,16 +38,22 @@ jobs:
 
           
     steps:
+
+      - name: displays params
+        run: |
+          echo "Branch: ${{ inputs.branch }}"
+          echo "Build Type: ${{ inputs.build_type }}"
+          echo "Tag: ${{ inputs.tag }}"
     
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ inputs.branch }}
 
       ## LINUX / MACOS
       - name: Setup Java
         if: "!startsWith(matrix.os, 'windows')"
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -161,36 +167,36 @@ jobs:
 
 # RELEASE
       - name: Zip Artifact
-        if: ${{ github.event.inputs.build_type == 'release' && !startsWith(matrix.os, 'windows') }}
+        if: ${{ inputs.build_type == 'release' && !startsWith(matrix.os, 'windows') }}
         run: |
           cd build/graal
           zip -r xlite-daemon-${{ matrix.os }}.zip xlite-daemon
           cd ../..
 
       - name: Zip Artifact
-        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
+        if: ${{ inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
         run: |
           $destination = "build/graal/xlite-daemon-${{ matrix.os }}.zip"
           $source = "build/graal/xlite-daemon.exe"
           Compress-Archive -Path $source -DestinationPath $destination
           
       - name: Calculate MD5 checksum (linux)
-        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'ubuntu') }}
+        if: ${{ inputs.build_type == 'release' && startsWith(matrix.os, 'ubuntu') }}
         run: md5sum build/graal/xlite-daemon > build/graal/checksum.txt
 
       - name: Calculate MD5 checksum (macOS)
-        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'macos') }}
+        if: ${{ inputs.build_type == 'release' && startsWith(matrix.os, 'macos') }}
         run: md5 -r build/graal/xlite-daemon > build/graal/checksum.txt
 
       - name: Calculate MD5 checksum (Windows)
-        if: ${{ github.event.inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
+        if: ${{ inputs.build_type == 'release' && startsWith(matrix.os, 'windows') }}
         run: |
           $md5Hash = (certutil -hashfile build\graal\xlite-daemon.exe MD5 | Select-Object -Index 1).Trim()
           $line = "$md5Hash   build/graal/xlite-daemon.exe"
           $line | Out-File -FilePath build\graal\checksum.txt -Append
           
       - name: Upload ZIP Artifact
-        if: ${{ github.event.inputs.build_type == 'release' }}
+        if: ${{ inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -198,12 +204,12 @@ jobs:
           asset_name: xlite-daemon-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}-amd64.zip
           overwrite: true
           prerelease: true
-          release_name: "xlite-daemon ${{ github.event.inputs.tag }}"
-          tag: ${{ github.event.inputs.tag }}
-          body: "based on branch: ${{ github.event.inputs.branch }}"
+          release_name: "xlite-daemon ${{ inputs.tag }}"
+          tag: ${{ inputs.tag }}
+          body: "based on branch: ${{ inputs.branch }}"
 
       - name: Upload Checksum File
-        if: ${{ github.event.inputs.build_type == 'release' }}
+        if: ${{ inputs.build_type == 'release' }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -211,15 +217,15 @@ jobs:
           asset_name: md5-checksum-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'macos-12') && 'macos' || startsWith(matrix.os, 'windows-latest') && 'windows' || 'unknown' }}.txt
           overwrite: true
           prerelease: true
-          release_name: "xlite-daemon ${{ github.event.inputs.tag }}"
-          tag: ${{ github.event.inputs.tag }}
-          body: "based on branch: ${{ github.event.inputs.branch }}"
+          release_name: "xlite-daemon ${{ inputs.tag }}"
+          tag: ${{ inputs.tag }}
+          body: "based on branch: ${{ inputs.branch }}"
 
 
 # ARTIFACTS
       - name: Upload Artifacts
-        if: ${{ github.event.inputs.build_type == 'artifacts' }}
-        uses: actions/upload-artifact@v2
+        if: ${{ inputs.build_type == 'artifacts' }}
+        uses: actions/upload-artifact@v3
         with:
           name: native-image-${{ startsWith(matrix.os, 'macos') && 'macos' || startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}-amd64
           path: build/graal/
