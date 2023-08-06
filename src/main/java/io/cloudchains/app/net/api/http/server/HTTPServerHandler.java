@@ -1079,30 +1079,30 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 						break;
 					}
 
-					// ensure UTXO is unspent
-					// Note: this request is expensive
-					boolean unspent = false;
-					String address = addresses.asList().get(0).getAsString();
-					JsonArray utxos = httpClient.getUtxosUncached(coin.getTicker(), new String[] { address });
-					for (JsonElement utxo : utxos.asList()) {
-						String newtxid = utxo.getAsJsonObject().get("txid").getAsString();
-						int newvout = utxo.getAsJsonObject().get("vout").getAsInt();
-						if (newtxid.equals(txid) && newvout == n) {
-							unspent = true;
-							break;
-						}
-					}
+					// // ensure UTXO is unspent
+					// // Note: this request is expensive
+					// boolean unspent = false;
+					// String address = addresses.asList().get(0).getAsString();
+					// JsonArray utxos = httpClient.getUtxosUncached(coin.getTicker(), new String[] { address });
+					// for (JsonElement utxo : utxos.asList()) {
+					// 	String newtxid = utxo.getAsJsonObject().get("txid").getAsString();
+					// 	int newvout = utxo.getAsJsonObject().get("vout").getAsInt();
+					// 	if (newtxid.equals(txid) && newvout == n) {
+					// 		unspent = true;
+					// 		break;
+					// 	}
+					// }
 
-					if (!unspent) {
-						LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client requested UTXO that was already spent!");
-						response.add("result", JsonNull.INSTANCE);
-						JsonObject errorJSON = new JsonObject();
+					// if (!unspent) {
+					// 	LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client requested UTXO that was already spent!");
+					// 	response.add("result", JsonNull.INSTANCE);
+					// 	JsonObject errorJSON = new JsonObject();
 
-						errorJSON.addProperty("code", -5);
-						errorJSON.addProperty("message", "Invalid or non-wallet transaction ID");
-						response.add("error", errorJSON);
-						break;
-					}
+					// 	errorJSON.addProperty("code", -5);
+					// 	errorJSON.addProperty("message", "Invalid or non-wallet transaction ID");
+					// 	response.add("error", errorJSON);
+					// 	break;
+					// }
 
 					// assemble result
 					int count = 0;
