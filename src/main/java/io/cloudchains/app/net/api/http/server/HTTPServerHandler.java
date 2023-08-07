@@ -1011,7 +1011,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					JsonObject errorJSON = new JsonObject();
 
 					errorJSON.addProperty("code", -5);
-					errorJSON.addProperty("message", "Invalid or non-wallet transaction ID");
+					errorJSON.addProperty("message", "Invalid or non-wallet transaction ID (not ours)");
 					response.add("error", errorJSON);
 					break;
 				}
@@ -1050,21 +1050,37 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					JsonObject result = transaction.getAsJsonObject("result");
 					JsonElement confirmations = result.get("confirmations");
 					JsonArray vout = result.getAsJsonArray("vout");
+
+					if (vout.size() <= n) {
+						response.add("result", JsonNull.INSTANCE);
+						JsonObject errorJSON = new JsonObject();
+
+						errorJSON.addProperty("code", -5);
+						errorJSON.addProperty("message", "Invalid transaction output index");
+						response.add("error", errorJSON);
+						break;
+					}
+
 					JsonObject entry = vout.get(n).getAsJsonObject();
 					JsonElement value = entry.get("value");
 					JsonObject scriptPubKey = entry.getAsJsonObject("scriptPubKey");
+					JsonElement addr = scriptPubKey.get("address");
 					JsonArray addresses = scriptPubKey.getAsJsonArray("addresses");
+
+					String address = null;
+					if(addr != null) {
+						address = addr.getAsString();
+					} else {
+						address = addresses.asList().get(0).getAsString();
+					}
 
 					// ensure address belongs to our wallet
 					boolean isOurs = false;
 					for (AddressBalance addressBalance : coin.getAddressKeyPairs()) {
-						String address = addressBalance.getAddress().toString();
-						for (JsonElement element : addresses.asList()) {
-							String addressOther = element.getAsString();
-							if (address.equals(addressOther)) {
-								isOurs = true;
-								break;
-							}
+						String addressCheck = addressBalance.getAddress().toString();
+						if (address.equals(addressCheck)) {
+							isOurs = true;
+							break;
 						}
 					}
 
@@ -1074,7 +1090,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 						JsonObject errorJSON = new JsonObject();
 
 						errorJSON.addProperty("code", -5);
-						errorJSON.addProperty("message", "Invalid or non-wallet transaction ID");
+						errorJSON.addProperty("message", "Invalid or non-wallet transaction ID (cannot be ours)");
 						response.add("error", errorJSON);
 						break;
 					}
@@ -1092,7 +1108,6 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					if (count > 0) {
 						// Note: this request is expensive
 						boolean unspent = false;
-						String address = addresses.asList().get(0).getAsString();
 						JsonArray utxos = httpClient.getUtxosUncached(coin.getTicker(), new String[] { address });
 						for (JsonElement utxo : utxos.asList()) {
 							String newtxid = utxo.getAsJsonObject().get("txid").getAsString();
@@ -1109,7 +1124,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 							JsonObject errorJSON = new JsonObject();
 
 							errorJSON.addProperty("code", -5);
-							errorJSON.addProperty("message", "Invalid or non-wallet transaction ID");
+							errorJSON.addProperty("message", "Invalid or non-wallet transaction ID (already spent)");
 							response.add("error", errorJSON);
 							break;
 						}
@@ -1126,6 +1141,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					response.add("error", JsonNull.INSTANCE);
 				} catch (Exception e) {
 					LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing transaction!");
+					e.printStackTrace();
 
 					response.add("result", JsonNull.INSTANCE);
 					JsonObject errorJSON = new JsonObject();
