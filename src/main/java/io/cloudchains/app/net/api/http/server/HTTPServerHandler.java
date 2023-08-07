@@ -1079,37 +1079,43 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 						break;
 					}
 
-					// // ensure UTXO is unspent
-					// // Note: this request is expensive
-					// boolean unspent = false;
-					// String address = addresses.asList().get(0).getAsString();
-					// JsonArray utxos = httpClient.getUtxosUncached(coin.getTicker(), new String[] { address });
-					// for (JsonElement utxo : utxos.asList()) {
-					// 	String newtxid = utxo.getAsJsonObject().get("txid").getAsString();
-					// 	int newvout = utxo.getAsJsonObject().get("vout").getAsInt();
-					// 	if (newtxid.equals(txid) && newvout == n) {
-					// 		unspent = true;
-					// 		break;
-					// 	}
-					// }
-
-					// if (!unspent) {
-					// 	LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client requested UTXO that was already spent!");
-					// 	response.add("result", JsonNull.INSTANCE);
-					// 	JsonObject errorJSON = new JsonObject();
-
-					// 	errorJSON.addProperty("code", -5);
-					// 	errorJSON.addProperty("message", "Invalid or non-wallet transaction ID");
-					// 	response.add("error", errorJSON);
-					// 	break;
-					// }
-
-					// assemble result
 					int count = 0;
 					if (confirmations != null) {
 						count = confirmations.getAsInt();
 					}
 
+					// ensure UTXO is unspent
+					// Caution: Beware of race conditions; the backend might return results for 'getTransaction'
+					// before updating entries for 'getUtxos'. As a result, we only check confirmed transactions. 
+					// Note that unconfirmed UTXOs spent in the memory pool will still be returned, leading to 
+					// a slightly different behavior compared to a core wallet.
+					if (count > 0) {
+						// Note: this request is expensive
+						boolean unspent = false;
+						String address = addresses.asList().get(0).getAsString();
+						JsonArray utxos = httpClient.getUtxosUncached(coin.getTicker(), new String[] { address });
+						for (JsonElement utxo : utxos.asList()) {
+							String newtxid = utxo.getAsJsonObject().get("txid").getAsString();
+							int newvout = utxo.getAsJsonObject().get("vout").getAsInt();
+							if (newtxid.equals(txid) && newvout == n) {
+								unspent = true;
+								break;
+							}
+						}
+
+						if (!unspent) {
+							LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client requested UTXO that was already spent!");
+							response.add("result", JsonNull.INSTANCE);
+							JsonObject errorJSON = new JsonObject();
+
+							errorJSON.addProperty("code", -5);
+							errorJSON.addProperty("message", "Invalid or non-wallet transaction ID");
+							response.add("error", errorJSON);
+							break;
+						}
+					}
+
+					// assemble result
 					JsonObject resultJSON = new JsonObject();
 					resultJSON.addProperty("confirmations", count);
 					resultJSON.add("value", value);
