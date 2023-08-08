@@ -1,0 +1,166 @@
+name: build-all
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    tags:
+      - "v**"
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        if: github.event.pull_request.draft == false
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - run: chmod +x gradlew
+      - run: ./gradlew nativeImage --info
+      - run: chmod +x build/graal/xlite-daemon
+      - run: mv build/graal/xlite-daemon build/graal/xlite-daemon-linux64
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifacts-linux
+          path: |
+            build/graal/xlite-daemon-linux64
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: XLite Daemon ${{ github.ref_name}}
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            build/graal/xlite-daemon-linux64
+
+  build_mac:
+    runs-on: macos-12
+    steps:
+      - uses: actions/checkout@v3
+        if: github.event.pull_request.draft == false
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - run: chmod +x gradlew
+      - run: ./gradlew nativeImage --info
+      - run: chmod +x build/graal/xlite-daemon
+      - run: mv build/graal/xlite-daemon build/graal/xlite-daemon-osx64
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifacts-mac
+          path: |
+            build/graal/xlite-daemon-osx64
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: XLite Daemon ${{ github.ref_name}}
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            build/graal/xlite-daemon-osx64
+
+  build_win:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v3
+        if: github.event.pull_request.draft == false
+
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          version: "22.3.1"
+          java-version: "17"
+          components: "native-image"
+          github-token: ${{ github.token }}
+
+      - run: choco install -y windows-sdk-10
+      - run: choco install -y visualstudio2019-workload-vctools
+
+      - run: ./gradlew.bat build
+      - run: |
+          $currentDir = Get-Location
+          $pattern = "xlite-daemon-*-all.jar"
+          $CC_PACKAGED_JAR = Get-ChildItem -Path "$currentDir\build\libs\" -Filter $pattern | Select-Object -First 1
+          Write-Host "CC_PACKAGED_JAR=$CC_PACKAGED_JAR"
+
+          & native-image -jar ${CC_PACKAGED_JAR} `
+          -H:Name=xlite-daemon `
+          -H:Class=io.cloudchains.app.App `
+          -H:+JNI `
+          -H:+UseServiceLoaderFeature `
+          -H:-UseServiceLoaderFeature `
+          -H:ReflectionConfigurationFiles=contrib/netty-reflection.json `
+          -H:ResourceConfigurationFiles=contrib/resource-config.json `
+          -H:IncludeResources='.*/wordlist/english.txt$' `
+          -H:Log=registerResource `
+          --no-fallback `
+          --no-server `
+          -da `
+          --enable-url-protocols=http,https `
+          --initialize-at-build-time=io.netty `
+          --initialize-at-build-time=com.google.common `
+          --initialize-at-build-time=org.apache.commons.logging `
+          --initialize-at-build-time=org.slf4j.LoggerFactory `
+          --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder `
+          --initialize-at-build-time=org.slf4j.helpers.NOPLogger `
+          --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory `
+          --initialize-at-build-time=org.slf4j.helpers.Util `
+          --initialize-at-build-time=org.bitcoinj.core.Utils `
+          --initialize-at-build-time=org.bitcoinj.core.Sha256Hash `
+          --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode `
+          --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufAllocator `
+          --initialize-at-run-time=io.netty.buffer.ByteBufUtil `
+          --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec `
+          --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler `
+          --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter `
+          --initialize-at-run-time=io.netty.util.AbstractReferenceCounted `
+          --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder `
+          --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder `
+          --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom `
+          --allow-incomplete-classpath `
+          --verbose `
+          -H:+ReportExceptionStackTraces
+      - run: ren xlite-daemon.exe xlite-daemon-win64.exe
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifacts-win
+          path: |
+            xlite-daemon-win64.exe
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: XLite Daemon ${{ github.ref_name}}
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            xlite-daemon-win64.exe
