@@ -44,7 +44,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
           files: |
             build/graal/xlite-daemon-linux64
@@ -76,7 +76,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
           files: |
             build/graal/xlite-daemon-osx64
@@ -160,7 +160,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
           files: |
             xlite-daemon-win64.exe
