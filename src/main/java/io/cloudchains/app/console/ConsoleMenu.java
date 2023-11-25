@@ -363,20 +363,16 @@ public class ConsoleMenu {
         System.out.println("Options:");
         System.out.println("  --enablerpcandconfigure    Enable and configure RPC");
         System.out.println("  --development-endpoint     Set a custom development endpoint");
-        System.out.println("                             Example: --development-endpoint https://my.url.org/");
+        System.out.println("                             Example: --development-endpoint <https://url.endpoint.org/>");
         System.out.println("  --version                  Display the version");
         System.out.println("  --createdefaultwallet     Create a default wallet");
-        System.out.println("                           Example: --createdefaultwallet");
         System.out.println("  --createwalletmnemonic    Create a wallet with a mnemonic");
-        System.out.println("                           Example: --createwalletmnemonic");
         System.out.println("  --xliterpc                Increment RPC port by 1");
-        System.out.println("                           Example: --xliterpc");
         System.out.println("  --password                Set password without prompt");
         System.out.println("                           Example: --password <your_password>");
         System.out.println("  --getmnemonic             Retrieve mnemonic for a password");
         System.out.println("                           Example: --getmnemonic <your_password>");
         System.out.println("  --changepassword          Change wallet password");
         System.out.println("                           Example: --changepassword <current_password> <new_password>");
-        // Add more options as needed
     }
 }
