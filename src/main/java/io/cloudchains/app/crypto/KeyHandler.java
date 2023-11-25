@@ -191,7 +191,7 @@ public class KeyHandler {
         String encryptedSeed = encryptBaseSeed(passphrase, mnemonicByte, salt);
         
         // Print mnemonic to console
-        System.out.println(mnemonic + "\n");
+        // System.out.println(mnemonic + "\n");
 
         try {
             bufferedWriter = new BufferedWriter(new FileWriter(keyFile));
