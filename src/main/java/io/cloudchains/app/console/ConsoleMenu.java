@@ -350,8 +350,8 @@ public class ConsoleMenu {
         if (msg.isEmpty())
             msg = "Password:\n";
         if (args.length <= argPos || args[argPos].contains("--")) { // ask pw on stdin
-            System.out.print(msg);
-            return new String(System.console().readPassword());
+            System.out.println(msg);
+            return input.nextLine(); // clear buffer
         }
         // get pw from args
         return args[argPos];
