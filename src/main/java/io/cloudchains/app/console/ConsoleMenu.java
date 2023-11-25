@@ -371,7 +371,7 @@ public class ConsoleMenu {
         System.out.println("                           Example: --createwalletmnemonic");
         System.out.println("  --xliterpc                Increment RPC port by 1");
         System.out.println("                           Example: --xliterpc");
-        System.out.println("  --password                Set or prompt for a password");
+        System.out.println("  --password                Set password without prompt");
         System.out.println("                           Example: --password <your_password>");
         System.out.println("  --getmnemonic             Retrieve mnemonic for a password");
         System.out.println("                           Example: --getmnemonic <your_password>");
