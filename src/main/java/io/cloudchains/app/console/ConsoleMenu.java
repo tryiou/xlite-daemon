@@ -88,9 +88,18 @@ public class ConsoleMenu {
                     case "--enablerpcandconfigure":
                         autoGenerateRPCConfig();
                         break;
-                    case "--development-endpoint":
-                        App.BASE_URL = "https://utils.blocknet.org/";
+                    case "--development-endpoint": {
+                        // sample endpoint url: "https://utils.blocknet.org/"
+                        if (i + 1 < arguments.length) {
+                            // Check if there is another argument after "--development-endpoint"
+                            String customEndpoint = arguments[i + 1];
+                            App.BASE_URL = customEndpoint;
+                            i++; // Increment i to skip the next argument (custom endpoint)
+                        } else {
+                            LOGGER.log(Level.WARNING, "Missing custom endpoint after '--development-endpoint'");
+                        }
                         break;
+                    }
                     case "--version":
                         LOGGER.log(Level.INFO, Version.CLIENT_VERSION);
                         return;
