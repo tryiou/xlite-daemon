@@ -359,7 +359,7 @@ public class ConsoleMenu {
 
     // Function to display help information
     private static void displayHelp() {
-        System.out.println("Usage: myapp [options]");
+        System.out.println("Usage: xlite-daemon [options]");
         System.out.println("Options:");
         System.out.println("  --enablerpcandconfigure    Enable and configure RPC");
         System.out.println("  --development-endpoint     Set a custom development endpoint");
