@@ -201,7 +201,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				String method = jsonReq.get("method").getAsString();
 				JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-				LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + method + " PARAMS: " + params.size());
+				LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + coin.getTicker()+ " " + method + " PARAMS: " + params.size());
 				for (int i = 0; i < params.size(); i++) {
 					LOGGER.log(Level.INFO, "[http-server-handler] PARAM " + i + ": " + params.get(i).toString());
 				}
