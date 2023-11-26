@@ -28,7 +28,7 @@ public class ConsoleMenu {
 
     public ConsoleMenu(String[] args) {
         this.arguments = args;
-        LOGGER.setLevel(Level.FINEST);
+        LOGGER.setLevel(Level.INFO);
     }
 
     public void logBadPassword(String msg) {

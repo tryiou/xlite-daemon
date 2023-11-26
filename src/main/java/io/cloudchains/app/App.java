@@ -29,7 +29,7 @@ public class App {
 
 	public static void main(String[] args) {
 		CCLogger.setLogging(isLoggingEnabled);
-		LOGGER.setLevel(Level.FINEST);
+		LOGGER.setLevel(Level.INFO);
 		LOGGER.setUseParentHandlers(false);
 
         Runtime.getRuntime().addShutdownHook(new Thread(App::shutdown));
