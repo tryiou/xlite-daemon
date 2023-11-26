@@ -55,6 +55,10 @@ public class JSONRPCMasterServer extends Thread {
 		stopping = true;
 		LOGGER.log(Level.FINER, "[json-rpc-server] Interrupting server.");
 
-		channel.close();
+		if (channel != null && channel.isOpen()) {
+			channel.close();
+		} else {
+			LOGGER.log(Level.FINER, "[json-rpc-server] Channel is null or not open during deinitialization.");
+		}
 	}
 }
