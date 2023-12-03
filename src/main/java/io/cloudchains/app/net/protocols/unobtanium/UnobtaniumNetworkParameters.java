@@ -11,20 +11,19 @@ public class UnobtaniumNetworkParameters extends NetworkParameters {
         super();
     }
 
-    @Override
-    public String getPaymentProtocolId() {
-        return PAYMENT_PROTOCOL_ID_MAINNET;
-    }
+	@Override
+	public String getPaymentProtocolId() {
+		return "main";
+	}
 
-    @Override
-    public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {
-        // Adapt this method if needed for UNO
-    }
+	@Override
+	public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {}
 
-    @Override
-    public Coin getMaxMoney() {
-        return MAX_MONEY;
-    }
+
+	@Override
+	public Coin getMaxMoney() {
+		return Coin.valueOf(250000 * Coin.COIN.value);
+	}
 
     @Override
     public Coin getMinNonDustOutput() {
@@ -93,7 +92,7 @@ public class UnobtaniumNetworkParameters extends NetworkParameters {
 
     @Override
     public int getInterval() {
-        return INTERVAL;
+        return 60;
     }
 
     @Override
