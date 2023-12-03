@@ -53,7 +53,7 @@ public class UnobtaniumNetworkParameters extends NetworkParameters {
 
     @Override
     public int getProtocolVersionNum(final ProtocolVersion version) {
-        return version.getBitcoinProtocolVersion();
+        return 70002;
     }
 
     @Override
