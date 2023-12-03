@@ -68,6 +68,7 @@ public class CoinTickerUtils {
 //                CoinTicker.PHORECOIN,
 				CoinTicker.TREZARCOIN,
 				CoinTicker.BITBAY,
+				CoinTicker.UNOBTANIUM
 		};
 	}
 
