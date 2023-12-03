@@ -1506,6 +1506,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			case SYSCOIN:
 				header = "Syscoin Signed Message:\n";
 				break;
+			case UNOBTANIUM:
+				header = "Unobtanium Signed Message:\n";
+				break;
+				
 			default:
 				LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Unsupported coin. This should never happen.");
 				break;

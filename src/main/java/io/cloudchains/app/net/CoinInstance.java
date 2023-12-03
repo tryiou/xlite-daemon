@@ -24,6 +24,7 @@ import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
 //import io.cloudchains.app.net.protocols.poliscoin.PoliscoinNetworkParameters;
 //import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
 import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParameters;
+import io.cloudchains.app.net.protocols.unobtanium.UnobtaniumNetworkParameters;
 //import io.cloudchains.app.net.protocols.trezarcoin.TrezarcoinNetworkParameters;
 import io.cloudchains.app.net.xrouter.XRouterMessage;
 import io.cloudchains.app.net.xrouter.XRouterMessageSerializer;
@@ -426,6 +427,12 @@ public class CoinInstance {
 			// 	rpcPort = 8766;
 			// 	break;
 			// }
+			case UNOBTANIUM: {
+				LOGGER.log(Level.FINER, "[coin] Initializing for Unobtanium main network.");
+				networkParameters = new UnobtaniumNetworkParameters();
+				rpcPort = 65535;
+				break;
+			}
 			default: {
 				LOGGER.log(Level.FINER, "[coin] ERROR: Invalid/unsupported network: " + ticker.toString());
 				return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
