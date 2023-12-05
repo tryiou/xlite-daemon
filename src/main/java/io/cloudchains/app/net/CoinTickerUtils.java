@@ -33,7 +33,7 @@ public class CoinTickerUtils {
 		tickers.put(CoinTicker.TREZARCOIN, "TZC");
 		tickers.put(CoinTicker.BITBAY, "BAY");
 		tickers.put(CoinTicker.UNOBTANIUM, "UNO");
-	}
+	
 	}
 
 	public static String tickerToString(CoinTicker ticker) {
