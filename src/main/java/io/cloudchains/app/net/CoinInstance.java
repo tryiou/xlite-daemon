@@ -24,6 +24,7 @@ import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
 //import io.cloudchains.app.net.protocols.poliscoin.PoliscoinNetworkParameters;
 //import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
 import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParameters;
+import io.cloudchains.app.net.protocols.unobtanium.UnobtaniumNetworkParameters;
 //import io.cloudchains.app.net.protocols.trezarcoin.TrezarcoinNetworkParameters;
 import io.cloudchains.app.net.xrouter.XRouterMessage;
 import io.cloudchains.app.net.xrouter.XRouterMessageSerializer;
@@ -400,6 +401,12 @@ public class CoinInstance {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Pivx main network.");
 				networkParameters = new PivxNetworkParameters();
 				rpcPort = 9951;
+				break;
+			}
+			case UNOBTANIUM: {
+				LOGGER.log(Level.FINER, "[coin] Initializing for Unobtanium main network.");
+				networkParameters = new UnobtaniumNetworkParameters();
+				rpcPort = 65111;
 				break;
 			}
 			// case ALQOCOIN: {
