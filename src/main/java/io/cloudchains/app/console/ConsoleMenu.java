@@ -28,7 +28,7 @@ public class ConsoleMenu {
 
     public ConsoleMenu(String[] args) {
         this.arguments = args;
-        LOGGER.setLevel(Level.FINEST);
+        LOGGER.setLevel(Level.INFO);
     }
 
     public void logBadPassword(String msg) {
@@ -252,7 +252,7 @@ public class ConsoleMenu {
                 }
                 case 2: {
                     LOGGER.log(Level.INFO, "Enter password: ");
-                    String password = input.next();
+                    String password = new String(System.console().readPassword());
                     int strength = KeyHandler.calculatePasswordStrength(password);
 
                     if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
