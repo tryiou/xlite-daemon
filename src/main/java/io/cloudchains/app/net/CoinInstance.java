@@ -430,7 +430,7 @@ public class CoinInstance {
 			case UNOBTANIUM: {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Unobtanium main network.");
 				networkParameters = new UnobtaniumNetworkParameters();
-				rpcPort = 9951;
+				rpcPort = 65535;
 				break;
 			}
 			default: {
