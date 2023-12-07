@@ -4,7 +4,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-project.version = "0.5.13"
+project.version = "0.5.14"
 
 apply plugin: 'java'
 apply plugin: 'com.github.johnrengelman.shadow'
