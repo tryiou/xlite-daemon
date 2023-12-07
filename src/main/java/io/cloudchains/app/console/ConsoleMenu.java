@@ -28,7 +28,7 @@ public class ConsoleMenu {
 
     public ConsoleMenu(String[] args) {
         this.arguments = args;
-        LOGGER.setLevel(Level.FINEST);
+        LOGGER.setLevel(Level.INFO);
     }
 
     public void logBadPassword(String msg) {
@@ -88,9 +88,18 @@ public class ConsoleMenu {
                     case "--enablerpcandconfigure":
                         autoGenerateRPCConfig();
                         break;
-                    case "--development-endpoint":
-                        App.BASE_URL = "https://utils.blocknet.org/";
+                    case "--development-endpoint": {
+                        // sample endpoint url: "https://utils.blocknet.org/"
+                        if (i + 1 < arguments.length) {
+                            // Check if there is another argument after "--development-endpoint"
+                            String customEndpoint = arguments[i + 1];
+                            App.BASE_URL = customEndpoint;
+                            i++; // Increment i to skip the next argument (custom endpoint)
+                        } else {
+                            LOGGER.log(Level.WARNING, "Missing custom endpoint after '--development-endpoint'");
+                        }
                         break;
+                    }
                     case "--version":
                         LOGGER.log(Level.INFO, Version.CLIENT_VERSION);
                         return;
@@ -203,7 +212,10 @@ public class ConsoleMenu {
 
                         return;
                     }
-                }
+                    case "--help":
+                        displayHelp();
+                        return; // Exit after displaying help
+                }      
             }
         }
 
@@ -240,7 +252,7 @@ public class ConsoleMenu {
                 }
                 case 2: {
                     LOGGER.log(Level.INFO, "Enter password: ");
-                    String password = input.next();
+                    String password = new String(System.console().readPassword());
                     int strength = KeyHandler.calculatePasswordStrength(password);
 
                     if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
@@ -343,5 +355,24 @@ public class ConsoleMenu {
         }
         // get pw from args
         return args[argPos];
+    }
+
+    // Function to display help information
+    private static void displayHelp() {
+        System.out.println("Usage: xlite-daemon [options]");
+        System.out.println("Options:");
+        System.out.println("  --enablerpcandconfigure    Enable and configure RPC");
+        System.out.println("  --development-endpoint     Set a custom development endpoint");
+        System.out.println("                             Example: --development-endpoint <https://url.endpoint.org/>");
+        System.out.println("  --version                  Display the version");
+        System.out.println("  --createdefaultwallet     Create a default wallet");
+        System.out.println("  --createwalletmnemonic    Create a wallet with a mnemonic");
+        System.out.println("  --xliterpc                Increment RPC port by 1");
+        System.out.println("  --password                Set password without prompt");
+        System.out.println("                           Example: --password <your_password>");
+        System.out.println("  --getmnemonic             Retrieve mnemonic for a password");
+        System.out.println("                           Example: --getmnemonic <your_password>");
+        System.out.println("  --changepassword          Change wallet password");
+        System.out.println("                           Example: --changepassword <current_password> <new_password>");
     }
 }

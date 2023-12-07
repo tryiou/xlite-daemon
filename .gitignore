@@ -3,3 +3,7 @@
 /bin/
 /build/
 /builds/
+.classpath
+.history/
+.vscode/
+.gradle/

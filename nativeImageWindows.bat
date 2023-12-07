@@ -18,7 +18,7 @@ call gradlew.bat extractGraalTooling
 
 SET GRAAL_HOME=%USERPROFILE%\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0
 SET NATIVE_IMAGE=%GRAAL_HOME%\bin\native-image
-SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.13-all.jar
+SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.14-all.jar
 
 REM Load the Build Tools environment
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"

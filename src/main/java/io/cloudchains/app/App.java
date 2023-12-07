@@ -29,7 +29,7 @@ public class App {
 
 	public static void main(String[] args) {
 		CCLogger.setLogging(isLoggingEnabled);
-		LOGGER.setLevel(Level.FINEST);
+		LOGGER.setLevel(Level.INFO);
 		LOGGER.setUseParentHandlers(false);
 
         Runtime.getRuntime().addShutdownHook(new Thread(App::shutdown));
@@ -94,19 +94,30 @@ public class App {
 		console.init();
 	}
 
-    public static void shutdown() {
-	    if (masterRPC.isAlive()) {
-            LOGGER.info("Shutting down...");
-            System.out.println("Shutting down...");
-        }
-        feeUpdateHttpClient.close();
-        heightUpdateHttpClient.close();
-        masterRPC.deinit();
-        if (console != null)
-            console.deinit();
-        for (Handler handler : LOGGER.getHandlers()) {
-            LOGGER.removeHandler(handler);
-            handler.close();
-        }
-    }
+	public static void shutdown() {
+		if (masterRPC.isAlive()) {
+			System.out.println("Shutting down...");
+		}
+
+		if (feeUpdateHttpClient != null) {
+			feeUpdateHttpClient.close();
+		}
+
+		if (heightUpdateHttpClient != null) {
+			heightUpdateHttpClient.close();
+		}
+
+		if (masterRPC != null) {
+			masterRPC.deinit();
+		}
+
+		if (console != null) {
+			console.deinit();
+		}
+
+		for (Handler handler : LOGGER.getHandlers()) {
+			LOGGER.removeHandler(handler);
+			handler.close();
+		}
+	}
 }

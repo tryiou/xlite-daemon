@@ -201,14 +201,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				String method = jsonReq.get("method").getAsString();
 				JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-				LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + method);
-				LOGGER.log(Level.INFO, "[http-server-handler] PARAMS: " + params.size());
+				LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + coin.getTicker()+ " " + method + " PARAMS: " + params.size());
 				for (int i = 0; i < params.size(); i++) {
 					LOGGER.log(Level.INFO, "[http-server-handler] PARAM " + i + ": " + params.get(i).toString());
 				}
 
 				response = getResponse(method, params);
-				LOGGER.log(Level.INFO, response.toString());
+				LOGGER.log(Level.FINER, response.toString());
 			} else {
 				ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
 				FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
@@ -1486,6 +1485,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			case DASHCOIN:
 				header = "DarkCoin Signed Message:\n";
 				break;
+			case UNOBTANIUM:
+				header = "Unobtanium Signed Message:\n";
+				break;				
 			// case DIGIBYTE:
 			// 	header = "DigiByte Signed Message:\n";
 			// 	break;
