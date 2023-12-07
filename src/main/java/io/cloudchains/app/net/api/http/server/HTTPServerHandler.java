@@ -1485,6 +1485,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			case DASHCOIN:
 				header = "DarkCoin Signed Message:\n";
 				break;
+			case UNOBTANIUM:
+				header = "Unobtanium Signed Message:\n";
+				break;				
 			// case DIGIBYTE:
 			// 	header = "DigiByte Signed Message:\n";
 			// 	break;

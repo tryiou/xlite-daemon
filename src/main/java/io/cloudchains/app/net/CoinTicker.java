@@ -20,7 +20,8 @@ public enum CoinTicker {
     POLISCOIN,
     PHORECOIN,
     RAVENCOIN,
-	BITBAY
+	BITBAY,
+    UNOBTANIUM
     ;
 
     /**
@@ -39,7 +40,8 @@ public enum CoinTicker {
             DOGECOIN,
 //           TREZARCOIN, - not support on backend
             SYSCOIN,
-            PIVX
+            PIVX,
+            UNOBTANIUM
 //            ALQOCOIN, - not support on backend
 //            POLISCOIN, - not support on backend
 //            PHORECOIN, - not support on backend
