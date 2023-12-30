@@ -19,7 +19,7 @@ public class App {
 
 	private static final boolean isLoggingEnabled = false;
 	// DEBUG ENDPOINT
-	public static String BASE_URL = "https://xliterevp.mywire.org/";
+	public static String BASE_URL = "http://127.0.0.1:11111/"; // xlite-reverse-proxy local endpoint
 	// "http://xl-dae-prox.airdns.org:42111/";
 	// DEBUG ENDPOINT
 	public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
