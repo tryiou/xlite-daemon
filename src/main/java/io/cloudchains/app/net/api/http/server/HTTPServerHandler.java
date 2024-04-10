@@ -207,7 +207,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				}
 
 				response = getResponse(method, params);
-				LOGGER.log(Level.FINER, response.toString());
+				// LOGGER.log(Level.FINER, response.toString());
 			} else {
 				ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
 				FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
