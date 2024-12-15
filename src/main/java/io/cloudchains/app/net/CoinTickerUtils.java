@@ -22,9 +22,9 @@ public class CoinTickerUtils {
 		tickers.put(CoinTicker.PIVX, "PIVX");
 
         // TODO Temporarily disable until supported
-//		tickers.put(CoinTicker.DIGIBYTE, "DGB");
+		tickers.put(CoinTicker.DIGIBYTE, "DGB");
 //		tickers.put(CoinTicker.BITCOIN_CASH, "BCH");
-//      tickers.put(CoinTicker.RAVENCOIN, "RVN");
+        tickers.put(CoinTicker.RAVENCOIN, "RVN");
 
         tickers.put(CoinTicker.ALQOCOIN, "XLQ");
         // TODO Temporarily disable PHORE and POLIS until supported
