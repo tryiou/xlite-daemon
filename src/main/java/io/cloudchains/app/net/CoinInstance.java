@@ -16,13 +16,13 @@ import io.cloudchains.app.net.api.JSONRPCServer;
 //import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParameters;
 import io.cloudchains.app.net.protocols.blocknet.*;
 import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParameters;
-//import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
+import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
 import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParameters;
 //import io.cloudchains.app.net.protocols.phorecoin.PhorecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
 //import io.cloudchains.app.net.protocols.poliscoin.PoliscoinNetworkParameters;
-//import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
+import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
 import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParameters;
 import io.cloudchains.app.net.protocols.unobtanium.UnobtaniumNetworkParameters;
 //import io.cloudchains.app.net.protocols.trezarcoin.TrezarcoinNetworkParameters;
@@ -369,12 +369,12 @@ public class CoinInstance {
 				rpcPort = 9998;
 				break;
 			}
-			// case DIGIBYTE: {
-			// 	LOGGER.log(Level.FINER, "[coin] Initializing for Digibyte main network.");
-			// 	networkParameters = new DigibyteNetworkParameters();
-			// 	rpcPort = 14022;
-			// 	break;
-			// }
+			case DIGIBYTE: {
+				LOGGER.log(Level.FINER, "[coin] Initializing for Digibyte main network.");
+			 	networkParameters = new DigibyteNetworkParameters();
+			 	rpcPort = 14022;
+			 	break;
+			}
 			case DOGECOIN: {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Dogecoin main network.");
 				networkParameters = new DogecoinNetworkParameters();
@@ -427,12 +427,12 @@ public class CoinInstance {
 			// 	rpcPort = 11772;
 			// 	break;
 			// }
-			// case RAVENCOIN: {
-			// 	LOGGER.log(Level.FINER, "[coin] Initializing for Ravencoin main network.");
-			// 	networkParameters = new RavencoinNetworkParameters();
-			// 	rpcPort = 8766;
-			// 	break;
-			// }
+			case RAVENCOIN: {
+			 	LOGGER.log(Level.FINER, "[coin] Initializing for Ravencoin main network.");
+			 	networkParameters = new RavencoinNetworkParameters();
+			 	rpcPort = 8766;
+			 	break;
+			 }
 			default: {
 				LOGGER.log(Level.FINER, "[coin] ERROR: Invalid/unsupported network: " + ticker.toString());
 				return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);

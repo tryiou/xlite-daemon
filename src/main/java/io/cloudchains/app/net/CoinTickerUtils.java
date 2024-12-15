@@ -59,9 +59,9 @@ public class CoinTickerUtils {
 				CoinTicker.PIVX,
 
                 // TODO Temporarily disable until supported
-//				CoinTicker.DIGIBYTE,
+				CoinTicker.DIGIBYTE,
 //				CoinTicker.BITCOIN_CASH,
-//              CoinTicker.RAVENCOIN,
+                CoinTicker.RAVENCOIN,
 
                 CoinTicker.ALQOCOIN,
                 // TODO Temporarily disable PHORE and POLIS until supported

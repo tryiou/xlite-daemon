@@ -1488,18 +1488,18 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			case UNOBTANIUM:
 				header = "Unobtanium Signed Message:\n";
 				break;				
-			// case DIGIBYTE:
-			// 	header = "DigiByte Signed Message:\n";
-			// 	break;
+			case DIGIBYTE:
+			 	header = "DigiByte Signed Message:\n";
+			 	break;
 			// case BITBAY:
 			// 	header = "BitBay Signed Message:\n";
 			// 	break;
 			// case POLISCOIN:
 			// 	header = "Polis Signed Message:\n";
 			// 	break;
-			// case RAVENCOIN:
-			// 	header = "Raven Signed Message:\n";
-			// 	break;
+			case RAVENCOIN:
+			 	header = "Raven Signed Message:\n";
+			 	break;
 			case DOGECOIN:
 				header = "Dogecoin Signed Message:\n";
 				break;
