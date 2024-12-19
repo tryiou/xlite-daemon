@@ -557,18 +557,19 @@ public class HTTPClient {
                 //LOGGER.log(Level.WARNING, "*** DEBUG *** [httpclient] getHistory " + element);
                 JsonObject jsonObject = element.getAsJsonObject();
 
-                List<String> fromAddresses = new Gson().fromJson(jsonObject.get("from_addresses"), new TypeToken<List<String>>() {
-                }.getType());
+               // List<String> fromAddresses = new Gson().fromJson(jsonObject.get("from_addresses"), new TypeToken<List<String>>() {
+               // }.getType());
 
                 Transaction tx = new Transaction(coinTicker,
-                        jsonObject.get("address").getAsString(),
+//                        jsonObject.get("address").getAsString(),
                         jsonObject.get("txid").getAsString(),
                         jsonObject.get("blockhash").getAsString(),
-                        jsonObject.get("vout").getAsInt(),
+//                        jsonObject.get("vout").getAsInt(),
                         jsonObject.get("amount").getAsDouble(),
                         jsonObject.get("confirmations").getAsInt(),
                         jsonObject.get("blocktime").getAsInt(),
-                        fromAddresses);
+//                        fromAddresses
+                                                );
                 tx.setCategory(jsonObject.get("category").getAsString());
                 tx.setFee(jsonObject.get("fee").getAsDouble());
 
