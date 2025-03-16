@@ -33,13 +33,26 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.SignatureException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+
+// Define a helper class for output entries
+class OutputEntry {
+	public String address;
+	public double amount;
+
+	public OutputEntry(String address, double amount) {
+		this.address = address;
+		this.amount = amount;
+	}
+}
 
 public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 	private final static LogManager LOGMANAGER = LogManager.getLogManager();
@@ -645,14 +658,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					response.add("result", JsonNull.INSTANCE);
 					JsonObject errorJSON = new JsonObject();
 					errorJSON.addProperty("code", -1);
-					errorJSON.addProperty("message", "Usage: createrawtransaction inputs outputs\n\ninputs (string, required) - InaddPropertys in JSON format\nexample: [{\"txid\": \"id\", \"vout\": n}, ...]\n\noutputs (string, required) - OutaddPropertys in JSON format\nexample: {\"data\": \"<message>\", \"address1\": amount1, \"address2\": amount2, ...}");
-
+					errorJSON.addProperty("message",
+							"Usage: createrawtransaction inputs outputs\n\ninputs (string, required) - Inputs in JSON format\nexample: [{\"txid\": \"id\", \"vout\": n}, ...]\n\noutputs (string, required) - Outputs in JSON format\nexample (legacy): {\"address1\": amount1, \"address2\": amount2, ...}\nexample (new): [{\"address\": \"address1\", \"amount\": amount1}, {\"address\": \"address1\", \"amount\": amount2}, ...]");
 					response.add("error", errorJSON);
 					break;
 				}
 
 				JsonArray inputs;
-				JsonObject outputs;
+				// Instead of using a JsonObject for outputs, we’ll parse outputs into a list of
+				// OutputEntry.
+				List<OutputEntry> outputEntries = new ArrayList<>();
 				long locktime = 0;
 
 				if (params.size() >= 3)
@@ -662,21 +677,40 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					inputs = params.get(0).getAsJsonArray();
 					for (int i = 0; i < inputs.size(); i++) {
 						JsonObject input = inputs.get(i).getAsJsonObject();
-
 						if (!input.has("txid") || !input.has("vout"))
 							throw new JsonParseException("Bad transaction input.");
 					}
 
-					outputs = params.get(1).getAsJsonObject();
+					JsonElement outputsElem = params.get(1);
+					if (outputsElem.isJsonArray()) {
+						// New array format: allows duplicate outputs with same address.
+						JsonArray outputsArray = outputsElem.getAsJsonArray();
+						for (JsonElement elem : outputsArray) {
+							JsonObject obj = elem.getAsJsonObject();
+							if (!obj.has("address") || !obj.has("amount"))
+								throw new JsonParseException("Output entry must have 'address' and 'amount'");
+							String addr = obj.get("address").getAsString();
+							double amt = obj.get("amount").getAsDouble();
+							outputEntries.add(new OutputEntry(addr, amt));
+						}
+					} else if (outputsElem.isJsonObject()) {
+						// Legacy format: keys are addresses.
+						JsonObject outputsObject = outputsElem.getAsJsonObject();
+						for (String addr : outputsObject.keySet()) {
+							double amt = outputsObject.get(addr).getAsDouble();
+							outputEntries.add(new OutputEntry(addr, amt));
+						}
+					} else {
+						throw new JsonParseException("Invalid outputs format");
+					}
 				} catch (JsonParseException e) {
-					LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing JSON for createrawtransaction!");
-
+					LOGGER.log(Level.FINER,
+							"[http-server-handler] ERROR: Error while parsing JSON for createrawtransaction!");
 					response.add("result", JsonNull.INSTANCE);
 					JsonObject errorJSON = new JsonObject();
 					errorJSON.addProperty("code", -2);
 					errorJSON.addProperty("message", "Error parsing JSON");
 					response.add("error", errorJSON);
-
 					break;
 				}
 
@@ -686,72 +720,56 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				}
 
 				boolean inputSuccess = true;
-
 				for (int i = 0; i < inputs.size(); i++) {
 					JsonObject input = inputs.get(i).getAsJsonObject();
-
 					try {
 						String txid = input.get("txid").getAsString();
 						int vout = input.get("vout").getAsInt();
-
 						tx.addInput(Sha256Hash.wrap(txid), vout, ScriptBuilder.createInputScript(null));
 					} catch (Exception e) {
-						LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while constructing transaction (input phase)!");
+						LOGGER.log(Level.FINER,
+								"[http-server-handler] ERROR: Error while constructing transaction (input phase)!");
 						txConstructionError(response, e, "Error while constructing transaction (input phase)");
-
 						inputSuccess = false;
 						break;
 					}
 				}
-
 				if (!inputSuccess)
 					break;
 
 				boolean outputSuccess = true;
 
-
-				// loop twice to ensure that p2sh outputs have vout priority
-				for (String addr : outputs.keySet()) {
+				// First, add P2SH outputs.
+				for (OutputEntry entry : outputEntries) {
 					try {
-						Address address = Address.fromBase58(coin.getNetworkParameters(), addr);
-						Coin outputValue = Coin.valueOf((long) Math.floor(outputs.get(addr).getAsDouble() * Coin.COIN.value));
-
-						if (isP2SHAddress(addr)) {
-							LOGGER.log(Level.FINER, "[http-server-handler] P2SH Address Found: " + addr);
-							LOGGER.log(Level.FINER, "[http-server-handler] Testing if Bitcoinj Recognized: " + address.isP2SHAddress());
-
+						Address address = Address.fromBase58(coin.getNetworkParameters(), entry.address);
+						Coin outputValue = Coin.valueOf((long) Math.floor(entry.amount * Coin.COIN.value));
+						if (isP2SHAddress(entry.address)) {
+							LOGGER.log(Level.FINER, "[http-server-handler] P2SH Address Found: " + entry.address);
 							Script p2shScript = ScriptBuilder.createP2SHOutputScript(address.getHash160());
-
-							Address addrs = p2shScript.getToAddress(coin.getNetworkParameters(), false);
-
-							LOGGER.log(Level.FINER, "Addr: " + addrs.toString() + " is recognized? " + addrs.isP2SHAddress());
-
-							LOGGER.log(Level.FINER, "Script Type: " + p2shScript.getScriptType());
-
 							tx.addOutput(outputValue, p2shScript);
 						}
 					} catch (Exception e) {
-						LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
+						LOGGER.log(Level.FINER,
+								"[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
 						e.printStackTrace();
 						txConstructionError(response, e, "Error while constructing transaction (output phase)");
-
 						outputSuccess = false;
 					}
 				}
-
-				for (String addr : outputs.keySet()) {
+				// Then, add non-P2SH outputs.
+				for (OutputEntry entry : outputEntries) {
 					try {
-						Address address	= Address.fromBase58(coin.getNetworkParameters(), addr);
-						Coin outputValue = Coin.valueOf((long) Math.floor(outputs.get(addr).getAsDouble() * Coin.COIN.value));
-
-						if (!isP2SHAddress(addr)) {
+						Address address = Address.fromBase58(coin.getNetworkParameters(), entry.address);
+						Coin outputValue = Coin.valueOf((long) Math.floor(entry.amount * Coin.COIN.value));
+						if (!isP2SHAddress(entry.address)) {
 							tx.addOutput(outputValue, address);
 						}
 					} catch (Exception e) {
-						LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
+						LOGGER.log(Level.FINER,
+								"[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
 						e.printStackTrace();
 						txConstructionError(response, e, "Error while constructing transaction (output phase)");
-
 						outputSuccess = false;
 					}
 				}
@@ -760,9 +778,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					break;
 
 				String hexTx = new String(Hex.encode(tx.bitcoinSerialize()));
-
 				LOGGER.log(Level.FINER, "[http-server-handler] DEBUG: Raw transaction = " + hexTx);
-
 				response.addProperty("result", hexTx);
 				response.add("error", JsonNull.INSTANCE);
 				break;
