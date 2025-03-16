@@ -50,7 +50,7 @@ jobs:
             build/graal/xlite-daemon-linux64
 
   build_mac:
-    runs-on: macos-12
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v3
         if: github.event.pull_request.draft == false
@@ -94,7 +94,7 @@ jobs:
           components: "native-image"
           github-token: ${{ github.token }}
 
-      - run: choco install -y windows-sdk-10
+      - run: choco install -y windows-sdk-10.0
       - run: choco install -y visualstudio2019-workload-vctools
 
       - run: ./gradlew.bat build
