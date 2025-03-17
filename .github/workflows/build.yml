@@ -34,7 +34,7 @@ jobs:
       - run: chmod +x build/graal/xlite-daemon
       - run: mv build/graal/xlite-daemon build/graal/xlite-daemon-linux64
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: artifacts-linux
           path: |
@@ -50,7 +50,7 @@ jobs:
             build/graal/xlite-daemon-linux64
 
   build_mac:
-    runs-on: macos-12
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v3
         if: github.event.pull_request.draft == false
@@ -66,7 +66,7 @@ jobs:
       - run: chmod +x build/graal/xlite-daemon
       - run: mv build/graal/xlite-daemon build/graal/xlite-daemon-osx64
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: artifacts-mac
           path: |
@@ -94,7 +94,7 @@ jobs:
           components: "native-image"
           github-token: ${{ github.token }}
 
-      - run: choco install -y windows-sdk-10
+      - run: choco install -y windows-sdk-10.0
       - run: choco install -y visualstudio2019-workload-vctools
 
       - run: ./gradlew.bat build
@@ -150,7 +150,7 @@ jobs:
           --verbose `
           -H:+ReportExceptionStackTraces
       - run: ren xlite-daemon.exe xlite-daemon-win64.exe
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: artifacts-win
           path: |

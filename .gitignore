@@ -7,3 +7,6 @@
 .history/
 .vscode/
 .gradle/
+.env
+.aider*
+.idea*
