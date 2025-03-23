@@ -1503,7 +1503,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				break;
 			case UNOBTANIUM:
 				header = "Unobtanium Signed Message:\n";
-				break;				
+				break;			
+			case PKOIN:
+				header = "Pocketcoin Signed Message:\n";
+				break;			
 			// case DIGIBYTE:
 			// 	header = "DigiByte Signed Message:\n";
 			// 	break;
