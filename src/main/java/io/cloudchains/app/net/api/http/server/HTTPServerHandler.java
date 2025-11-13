@@ -24,6 +24,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 import org.bitcoinj.core.*;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 
@@ -642,7 +643,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				if (account.equals("main")) {
 					JsonArray addresses = new JsonArray();
 					for (AddressBalance addressBalance : coin.getAddressKeyPairs()) {
-						addresses.add(addressBalance.getAddress().toBase58());
+						addresses.add(addressBalance.getAddress().toString());
 					}
 
 					response.add("result", addresses);
@@ -742,11 +743,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				// First, add P2SH outputs.
 				for (OutputEntry entry : outputEntries) {
 					try {
-						Address address = Address.fromBase58(coin.getNetworkParameters(), entry.address);
+						Address address = LegacyAddress.fromBase58(coin.getNetworkParameters(), entry.address);
 						Coin outputValue = Coin.valueOf((long) Math.floor(entry.amount * Coin.COIN.value));
 						if (isP2SHAddress(entry.address)) {
 							LOGGER.log(Level.FINER, "[http-server-handler] P2SH Address Found: " + entry.address);
-							Script p2shScript = ScriptBuilder.createP2SHOutputScript(address.getHash160());
+							Script p2shScript = ScriptBuilder.createP2SHOutputScript(address.getHash());
 							tx.addOutput(outputValue, p2shScript);
 						}
 					} catch (Exception e) {
@@ -760,7 +761,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				// Then, add non-P2SH outputs.
 				for (OutputEntry entry : outputEntries) {
 					try {
-						Address address = Address.fromBase58(coin.getNetworkParameters(), entry.address);
+						Address address = LegacyAddress.fromBase58(coin.getNetworkParameters(), entry.address);
 						Coin outputValue = Coin.valueOf((long) Math.floor(entry.amount * Coin.COIN.value));
 						if (!isP2SHAddress(entry.address)) {
 							tx.addOutput(outputValue, address);
@@ -871,7 +872,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 						getScriptType(scriptPubKey, type);
 
 						JsonArray addresses = new JsonArray();
-						addresses.add(output.getScriptPubKey().getToAddress(coin.getNetworkParameters()).toBase58());
+						addresses.add(output.getScriptPubKey().getToAddress(coin.getNetworkParameters()).toString());
 
 						scriptPubKey.add("addresses", addresses);
 						thisVout.add("scriptPubKey", scriptPubKey);
@@ -1180,7 +1181,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				}
 
 				AddressBalance newAddress = coin.generateAddress(true);
-				response.addProperty("result", newAddress.getAddress().toBase58());
+				response.addProperty("result", newAddress.getAddress().toString());
 				response.add("error", JsonNull.INSTANCE);
 				break;
 			}
@@ -1224,7 +1225,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					break;
 				}
 
-				response.addProperty("result", addressBalance.getPrivateKey().toBase58());
+				response.addProperty("result", addressBalance.getPrivateKey().toString());
 				response.add("error", JsonNull.INSTANCE);
 				break;
 			}
@@ -1283,7 +1284,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 					if (!verified)
 						throw new SignatureException("Signature was not verified.");
 
-					String derivedAddr = key.toAddress(coin.getNetworkParameters()).toBase58();
+					String derivedAddr = new LegacyAddress(coin.getNetworkParameters(), key.getPubKeyHash()).toString();
 					if (!addr.equals(derivedAddr)) {
 						LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Addresses do not match! Failing.");
 						verified = false;
@@ -1397,7 +1398,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 				boolean isP2SH = false;
 				String scriptPubKey = "";
 				if (isValidAddress) {
-					Address toAddress = Address.fromBase58(coin.getNetworkParameters(), address);
+					Address toAddress = LegacyAddress.fromBase58(coin.getNetworkParameters(), address);
 					if (isP2SHAddress(address)) {
 						isP2SH = true;
 
@@ -1625,16 +1626,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 		byte[] versionAndDataBytes = Base58.decodeChecked(address);
 		int version = versionAndDataBytes[0] & 0xFF;
 
-		if (coin.getNetworkParameters().getAcceptableAddressCodes().length > 2) {
-			LOGGER.log(Level.FINER, "[http-server-handler] Coin has more than 2 acceptable address codes");
-
-			for (int t : coin.getNetworkParameters().getAcceptableAddressCodes()) {
-				if (coin.getNetworkParameters().getAddressHeader() != t && t == version) {
-					return true;
-				}
-			}
-		}
-
+		// Direct check for P2SH address using the network's P2SH header
 		return coin.getNetworkParameters().getP2SHHeader() == version;
 	}
 

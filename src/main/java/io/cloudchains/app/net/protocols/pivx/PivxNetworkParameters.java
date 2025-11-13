@@ -69,22 +69,18 @@ public class PivxNetworkParameters extends NetworkParameters {
 		return 212;
 	}
 
-	@Override
 	public int[] getAcceptableAddressCodes() {
 		return new int[] {getAddressHeader(), getP2SHHeader()};
 	}
 
-	@Override
 	public int getBip32HeaderPriv() {
 		return 0x0221312B;
 	}
 
-	@Override
 	public int getBip32HeaderPub() {
 		return 0x022D2533;
 	}
 
-	@Override
 	public int getSubsidyDecreaseBlockCount() {
 		return 210240;
 	}

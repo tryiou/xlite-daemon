@@ -99,7 +99,7 @@ public class BlocknetSerializer extends BitcoinSerializer {
 			case "getheaders":
 				return new GetHeadersMessage(params, payloadBytes);
 			case "tx":
-				return new Transaction(params, payloadBytes, 0, null, this, blocknetPacketHeader.getLength());
+				return new Transaction(params, payloadBytes);
 			case "addr":
 				return makeAddressMessage(payloadBytes, blocknetPacketHeader.getLength());
 			case "alert":
@@ -185,7 +185,7 @@ public class BlocknetSerializer extends BitcoinSerializer {
 
 	@Override
 	public Transaction makeTransaction(byte[] payloadBytes, int offset, int length, byte[] hash) throws ProtocolException, UnsupportedOperationException {
-		return new Transaction(params, payloadBytes, offset, null, this, length);
+		return new Transaction(params, payloadBytes);
 	}
 
 	@Override

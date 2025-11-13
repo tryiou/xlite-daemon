@@ -188,7 +188,7 @@ public class CoinInstance {
 
 	public AddressBalance getAddress(String addressB58) {
 		for (AddressBalance address : addressKeyPairs) {
-			if (address.getAddress().toBase58().equals(addressB58))
+			if (address.getAddress().toString().equals(addressB58))
 				return address;
 		}
 
@@ -200,7 +200,7 @@ public class CoinInstance {
 		Address address = addressKeyPair.getAddress();
 		DumpedPrivateKey privateKey = addressKeyPair.getPrivateKey();
 		addressKeyPairs.add(addressKeyPair);
-		LOGGER.log(Level.FINER, "[wallet] DEBUG: Generated new address, have " + addressKeyPairs.size() + ": " + address.toBase58() + ", private key: " + privateKey.toBase58() + " (hex: " + privateKey.getKey().getPrivateKeyAsHex() + ")");
+		LOGGER.log(Level.FINER, "[wallet] DEBUG: Generated new address, have " + addressKeyPairs.size() + ": " + address.toString() + ", private key: " + privateKey.toString() + " (hex: " + privateKey.getKey().getPrivateKeyAsHex() + ")");
 
 		if (updateConfig) {
 			configHelper.setAddressCount(configHelper.getAddressCount() + 1);
@@ -474,6 +474,7 @@ public class CoinInstance {
 		// In-memory wallet only
 		DeterministicSeed seed = new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
 		wallet = Wallet.fromSeed(networkParameters, seed);
+		
 		if (isBlocknetNetwork()) {
 			String mnemonic = getMnemonic();
 			// LOGGER.log(Level.FINE, "[wallet] Mnemonic = " + mnemonic);
@@ -847,7 +848,7 @@ public class CoinInstance {
 
 		JSONArray utxoAddresses = new JSONArray();
 		for (AddressBalance addressBalance : getAddressKeyPairs()) {
-			utxoAddresses.put(addressBalance.getAddress().toBase58());
+			utxoAddresses.put(addressBalance.getAddress().toString());
 		}
 
 		params.add(utxoAddresses.toString());
@@ -857,7 +858,7 @@ public class CoinInstance {
 
 	public AddressBalance getAddressBalance(String address) {
 		for (AddressBalance addressBalance : getAddressKeyPairs()) {
-			if (addressBalance.getAddress().toBase58().equals(address)) {
+			if (addressBalance.getAddress().toString().equals(address)) {
 				return addressBalance;
 			}
 		}

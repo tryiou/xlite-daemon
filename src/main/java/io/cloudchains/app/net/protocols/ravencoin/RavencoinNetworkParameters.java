@@ -69,22 +69,18 @@ public class RavencoinNetworkParameters extends NetworkParameters {
 		return 128;
 	}
 
-	@Override
 	public int[] getAcceptableAddressCodes() {
 		return new int[] {getAddressHeader(), getP2SHHeader()};
 	}
 
-	@Override
 	public int getBip32HeaderPriv() {
 		return 0x0488ADE4;
 	}
 
-	@Override
 	public int getBip32HeaderPub() {
 		return 0x0488B21E;
 	}
 
-	@Override
 	public int getSubsidyDecreaseBlockCount() {
 		return 210240;
 	}

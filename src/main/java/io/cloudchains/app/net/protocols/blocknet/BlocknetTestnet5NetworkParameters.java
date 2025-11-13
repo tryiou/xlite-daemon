@@ -24,7 +24,6 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
 
 	}
 
-	@Override
 	public int[] getAcceptableAddressCodes() {
 		return new int[] {getAddressHeader(), getP2SHHeader()};
 	}
@@ -73,7 +72,6 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
 		return 70712;
 	}
 
-	@Override
 	public int getSubsidyDecreaseBlockCount() {
 		return 210000;
 	}
@@ -83,12 +81,10 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
 		return Hex.decode("000010e83b2703ccf322f7dbd62dd5855ac7c10bd055814ce121ba32607d573b8810c02c0582aed05b4deb9c4b77b26d92428c61256cd42774babea0a073b2ed0c9");
 	}
 
-	@Override
 	public int getMajorityEnforceBlockUpgrade() {
 		return 51;
 	}
 
-	@Override
 	public int getMajorityRejectBlockOutdated() {
 		return 75;
 	}
@@ -133,12 +129,10 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
 		return 239;
 	}
 
-	@Override
 	public int getBip32HeaderPub() {
 		return 0x3A8061A0;
 	}
 
-	@Override
 	public int getBip32HeaderPriv() {
 		return 0x3A805837;
 	}

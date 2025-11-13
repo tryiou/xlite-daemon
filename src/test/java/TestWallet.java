@@ -29,7 +29,7 @@ class TestWallet {
             ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses) {
-                actual.add(address.getAddress().toBase58());
+                actual.add(address.getAddress().toString());
 //                System.out.println("\""+actual.get(actual.size()-1)+"\",");
             }
             assertEquals(ADDRESS_COUNT, actual.size());
@@ -62,7 +62,7 @@ class TestWallet {
             ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses)
-                actual.add(address.getAddress().toBase58());
+                actual.add(address.getAddress().toString());
             assertEquals(ADDRESS_COUNT, actual.size());
             assertTrue(noDups(actual));
 
@@ -92,7 +92,7 @@ class TestWallet {
             ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses)
-                actual.add(address.getAddress().toBase58());
+                actual.add(address.getAddress().toString());
             assertEquals(ADDRESS_COUNT, actual.size());
             assertTrue(noDups(actual));
 
@@ -122,7 +122,7 @@ class TestWallet {
             ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses)
-                actual.add(address.getAddress().toBase58());
+                actual.add(address.getAddress().toString());
             assertEquals(idx, actual.size());
             assertTrue(noDups(actual));
 

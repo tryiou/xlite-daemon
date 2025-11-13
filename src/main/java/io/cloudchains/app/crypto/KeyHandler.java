@@ -101,7 +101,7 @@ public class KeyHandler {
         } else {
 
             DeterministicSeed seed = null;
-            seed = new DeterministicSeed(new SecureRandom(), 128, "", System.currentTimeMillis() / 1000);
+            seed = new DeterministicSeed((List<String>) null, null, "", System.currentTimeMillis() / 1000);
 
             String mnemonic = Joiner.on(" ").join(Objects.requireNonNull(seed.getMnemonicCode()));
 
@@ -125,7 +125,8 @@ public class KeyHandler {
             return false;
         }
 
-        DeterministicSeed seed = new DeterministicSeed(entropy , "", System.currentTimeMillis() / 1000);
+        // Use the provided mnemonic list instead of null in bitcoinj 0.15.10
+        DeterministicSeed seed = new DeterministicSeed(mnemonicList, entropy, "", System.currentTimeMillis() / 1000);
 
         String mnemonic = Joiner.on(" ").join(Objects.requireNonNull(seed.getMnemonicCode()));
 

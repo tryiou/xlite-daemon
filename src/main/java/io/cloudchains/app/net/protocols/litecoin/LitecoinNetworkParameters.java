@@ -73,22 +73,18 @@ public class LitecoinNetworkParameters extends NetworkParameters {
 		return 176;
 	}
 
-	@Override
 	public int[] getAcceptableAddressCodes() {
 		return new int[] {getAddressHeader(), getP2SHHeader(), getP2SHLegacyHeader()};
 	}
 
-	@Override
 	public int getBip32HeaderPriv() {
 		return 0x0488B21E;
 	}
 
-	@Override
 	public int getBip32HeaderPub() {
 		return 0x0488ADE4;
 	}
 
-	@Override
 	public int getSubsidyDecreaseBlockCount() {
 		return 840000;
 	}

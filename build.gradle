@@ -76,7 +76,7 @@ graal {
 }
 
 dependencies {
-    implementation group: 'org.bitcoinj', name: 'bitcoinj-core', version: '0.14.7'
+    implementation group: 'org.bitcoinj', name: 'bitcoinj-core', version: '0.15.10'
     implementation group: 'org.bitcoinj', name: 'orchid', version: '1.2.1'
     implementation group: 'net.jcip', name: 'jcip-annotations', version: '1.0'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'

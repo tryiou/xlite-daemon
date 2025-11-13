@@ -2,6 +2,7 @@ package io.cloudchains.app.net.protocols.blocknet;
 
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -253,7 +254,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 	}
 
 	@Override
-	public void sendMessage(Message message) throws NotYetConnectedException {
+	public ListenableFuture<Void> sendMessage(Message message) throws NotYetConnectedException {
 		lock.lock();
 		try {
 			if (writeTarget == null) {
@@ -264,28 +265,34 @@ public class BlocknetPeer extends PeerSocketHandler {
 			lock.unlock();
 		}
 
-		if (message instanceof XRouterMessage) {
-			try {
+		try {
+			if (message instanceof XRouterMessage) {
 				ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 				xRouterMessageSerializer.serialize(message, outputStream);
 				LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding network header) is " + (outputStream.size() - BlocknetPacketHeader.HEADER_LENGTH - 4) + " bytes.");
-				writeTarget.writeBytes(outputStream.toByteArray());
-
+				
+				// Handle both void and CompletableFuture return types
+				Object result = writeTarget.writeBytes(outputStream.toByteArray());
+				ListenableFuture<Void> future = (result instanceof ListenableFuture) ?
+					((ListenableFuture<Void>) result) : Futures.immediateFuture(null);
+				
 				messagesPendingReply.add((XRouterMessage) message);
 				LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Added UUID " + ((XRouterMessage) message).getXRouterHeader().getUUID() + " to pending reply list.");
-			} catch (IOException e) {
-				LOGGER.log(Level.FINER, "[blocknet-peer] Error while serializing XRouter message!");
-				e.printStackTrace();
-			}
-		} else {
-			try {
+				
+				return future;
+			} else {
 				ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 				serializer.serialize(message, outputStream);
-				writeTarget.writeBytes(outputStream.toByteArray());
-			} catch (IOException e) {
-				LOGGER.log(Level.FINER, "[blocknet-peer] Error while serializing/sending non-XRouter message!");
-				e.printStackTrace();
+				
+				// Handle both void and CompletableFuture return types
+				Object result = writeTarget.writeBytes(outputStream.toByteArray());
+				return (result instanceof ListenableFuture) ?
+					((ListenableFuture<Void>) result) : Futures.immediateFuture(null);
 			}
+		} catch (IOException e) {
+			LOGGER.log(Level.FINER, "[blocknet-peer] Error while serializing/sending message!");
+			e.printStackTrace();
+			return Futures.immediateFailedFuture(e);
 		}
 	}
 
@@ -348,8 +355,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
 		LOGGER.log(Level.FINER, "[blocknet-peer] Received version message: " + peerVersionMessage.subVer
 				+ ", version " + peerVersionMessage.clientVersion
-				+ ", blocks=" + peerVersionMessage.bestHeight
-				+ ", us=" + peerVersionMessage.theirAddr);
+				+ ", blocks=" + peerVersionMessage.bestHeight);
 
 		if (!peerVersionMessage.hasBlockChain() || (!params.allowEmptyPeerChain() && peerVersionMessage.bestHeight == 0)) {
 			LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Peer has an empty blockchain while this network does not allow empty blockchains. Disconnecting.");
@@ -470,7 +476,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 			throw new IllegalStateException("Lock is not held by current thread.");
 		}
 
-		List<Sha256Hash> blockLocator = new ArrayList<>(51);
+		List<Sha256Hash> blockLocatorHashes = new ArrayList<>(51);
 
 		if (blockChain == null) {
 			throw new NullPointerException("Blockchain object is null.");
@@ -494,7 +500,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
 		StoredBlock cursor = chainHead;
 		for (int i = 100; cursor != null && i > 0; i--) {
-			blockLocator.add(cursor.getHeader().getHash());
+			blockLocatorHashes.add(cursor.getHeader().getHash());
 			try {
 				cursor = cursor.getPrev(blockStore);
 			} catch (BlockStoreException e) {
@@ -504,10 +510,13 @@ public class BlocknetPeer extends PeerSocketHandler {
 		}
 
 		if (cursor != null)
-			blockLocator.add(params.getGenesisBlockHash());
+			blockLocatorHashes.add(params.getGenesisBlockHash());
 
 		lastGetBlocksBegin = chainHeadHash;
 		lastGetBlocksEnd = toHash;
+
+		// Create BlockLocator from the list of hashes
+		BlockLocator blockLocator = new BlockLocator(ImmutableList.copyOf(blockLocatorHashes));
 
 		if (downloadBlockBodies) {
 			GetBlocksMessage getBlocksMessage = new GetBlocksMessage(params, blockLocator, toHash);

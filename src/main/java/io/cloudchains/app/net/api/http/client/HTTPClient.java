@@ -33,6 +33,7 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
 import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 import org.json.JSONArray;
@@ -231,7 +232,7 @@ public class HTTPClient {
             String address = utxoArr.getJSONObject(i).getString("address");
             utxoJSON.addProperty("address", address);
 
-            Address addr = Address.fromBase58(coinInstance.getNetworkParameters(), address);
+            Address addr = LegacyAddress.fromBase58(coinInstance.getNetworkParameters(), address);
             Script script = ScriptBuilder.createOutputScript(addr);
             utxoJSON.addProperty("scriptPubKey", new String(Hex.encode(script.getProgram())));
 
@@ -704,7 +705,7 @@ public class HTTPClient {
                         String address = addressElement.getAsString();
 
                         for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
-                            String utxoAddress = addressBalance.getAddress().toBase58();
+                            String utxoAddress = addressBalance.getAddress().toString();
 
                             if (utxoAddress.equals(address)) {
                                 List<String> fromAddresses = new ArrayList<>();
@@ -742,7 +743,7 @@ public class HTTPClient {
                         String address = addressElement.getAsString();
 
                         for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
-                            String utxoAddress = addressBalance.getAddress().toBase58();
+                            String utxoAddress = addressBalance.getAddress().toString();
 
                             if (utxoAddress.equals(address)) {
                                 List<String> fromAddresses = new ArrayList<>();

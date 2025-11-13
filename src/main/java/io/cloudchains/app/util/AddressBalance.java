@@ -20,7 +20,7 @@ public class AddressBalance {
 	public AddressBalance(Address address, DumpedPrivateKey privateKey) {
 		this.address = address;
 		this.privateKey = privateKey;
-		setAddrProp(address.toBase58());
+		setAddrProp(address.toString());
 	}
 
 	public Address getAddress() {

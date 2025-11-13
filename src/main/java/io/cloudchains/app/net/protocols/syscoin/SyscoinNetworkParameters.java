@@ -11,7 +11,6 @@ public class SyscoinNetworkParameters extends NetworkParameters {
 		super();
 	}
 
-	@Override
 	public int[] getAcceptableAddressCodes() {
 		return new int[] {getAddressHeader(), getP2SHHeader()};
 	}
@@ -74,17 +73,14 @@ public class SyscoinNetworkParameters extends NetworkParameters {
 		return 128;
 	}
 
-	@Override
 	public int getBip32HeaderPriv() {
 		return 0x0488ADE4;
 	}
 
-	@Override
 	public int getBip32HeaderPub() {
 		return 0x0488B21E;
 	}
 
-	@Override
 	public int getSubsidyDecreaseBlockCount() {
 		return 525600;
 	}

@@ -1,5 +1,7 @@
 package io.cloudchains.app.net.protocols.blocknet;
 
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.net.MessageWriteTarget;
@@ -105,11 +107,12 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
 	}
 
 	@Override
-	public synchronized void writeBytes(byte[] bytes) throws IOException {
+	public synchronized ListenableFuture<Void> writeBytes(byte[] bytes) throws IOException {
 		try {
 			OutputStream out = socket.getOutputStream();
 			out.write(bytes);
 			out.flush();
+			return Futures.immediateFuture(null);
 		} catch (IOException e) {
 			LOGGER.log(Level.FINER, "[blocknet-blocking-client] Error while writing bytes to socket!");
 			e.printStackTrace();

@@ -69,22 +69,18 @@ public class PoliscoinNetworkParameters extends NetworkParameters {
 		return 60;
 	}
 
-	@Override
 	public int[] getAcceptableAddressCodes() {
 		return new int[] {getAddressHeader(), getP2SHHeader()};
 	}
 
-	@Override
 	public int getBip32HeaderPriv() {
 		return 0x03E25945;
 	}
 
-	@Override
 	public int getBip32HeaderPub() {
 		return 0x03E25D7E;
 	}
 
-	@Override
 	public int getSubsidyDecreaseBlockCount() {
 		return 210240;
 	}

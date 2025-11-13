@@ -69,22 +69,18 @@ public class DogecoinNetworkParameters extends NetworkParameters {
 		return 158;
 	}
 
-	@Override
 	public int[] getAcceptableAddressCodes() {
 		return new int[] {getAddressHeader(), getP2SHHeader()};
 	}
 
-	@Override
 	public int getBip32HeaderPriv() {
 		return 0x02fac398;
 	}
 
-	@Override
 	public int getBip32HeaderPub() {
 		return 0x02facafd;
 	}
 
-	@Override
 	public int getSubsidyDecreaseBlockCount() {
 		return 100000;
 	}
