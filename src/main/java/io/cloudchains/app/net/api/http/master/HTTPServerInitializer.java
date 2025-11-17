@@ -23,7 +23,6 @@ public class HTTPServerInitializer extends ChannelInitializer<SocketChannel> {
 		pipeline.addLast(new HttpResponseEncoder());
 		pipeline.addLast(new HttpObjectAggregator(100000000));
 		pipeline.addLast(new HTTPServerHandler());
-		pipeline.addLast(new ExceptionHandler());
 	}
 
 }

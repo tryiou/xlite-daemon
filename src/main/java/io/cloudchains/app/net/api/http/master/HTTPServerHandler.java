@@ -10,6 +10,7 @@ import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
+import io.cloudchains.app.net.api.http.HttpErrorUtils;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetPeer;
 import io.cloudchains.app.util.AddressBalance;
 import io.cloudchains.app.util.ConfigHelper;
@@ -99,7 +100,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			HttpHeaders httpHeaders = request.headers();
 
 			if (HttpUtil.is100ContinueExpected(request)) {
-				send100Continue(ctx);
+				HttpErrorUtils.send100Continue(ctx);
 			}
 
 			String headerUser;
@@ -124,34 +125,27 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			}
 
 			if (!request.uri().equals("/")) {
-				JsonObject onlyServerRootJSON = new JsonObject();
-				onlyServerRootJSON.addProperty("code", -1002);
-				onlyServerRootJSON.addProperty("message", "Only the server root ('/') is being served.");
-
-				response.add("error", onlyServerRootJSON);
-				response.add("result", JsonNull.INSTANCE);
-				status = HttpResponseStatus.BAD_REQUEST;
+				HttpErrorUtils.writeErrorResponse(ctx, 
+					HttpErrorUtils.ErrorCodes.ONLY_ROOT, 
+					HttpErrorUtils.ErrorCodes.MESSAGE_ONLY_ROOT, 
+					HttpResponseStatus.BAD_REQUEST);
+				return;
 			}
 
 			if (request.method() != HttpMethod.POST) {
-				JsonObject onlyPostAllowedJSON = new JsonObject();
-
-				onlyPostAllowedJSON.addProperty("code", -1003);
-				onlyPostAllowedJSON.addProperty("message", "Only HTTP POST is accepted.");
-
-				response.add("error", onlyPostAllowedJSON);
-				response.add("result", JsonNull.INSTANCE);
-				status = HttpResponseStatus.BAD_REQUEST;
+				HttpErrorUtils.writeErrorResponse(ctx, 
+					HttpErrorUtils.ErrorCodes.ONLY_POST, 
+					HttpErrorUtils.ErrorCodes.MESSAGE_ONLY_POST, 
+					HttpResponseStatus.BAD_REQUEST);
+				return;
 			}
 
 			if (!successfulAuth) {
-				JsonObject onlyServerRootJSON = new JsonObject();
-				onlyServerRootJSON.addProperty("code", -1111);
-				onlyServerRootJSON.addProperty("message", "Unauthorized!");
-
-				response.add("error", onlyServerRootJSON);
-				response.add("result", JsonNull.INSTANCE);
-				status = HttpResponseStatus.FORBIDDEN;
+				HttpErrorUtils.writeErrorResponse(ctx, 
+					HttpErrorUtils.ErrorCodes.UNAUTHORIZED, 
+					HttpErrorUtils.ErrorCodes.MESSAGE_UNAUTHORIZED, 
+					HttpResponseStatus.FORBIDDEN);
+				return;
 			}
 		}
 
@@ -180,18 +174,18 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			} catch (Exception e) {
 				LOGGER.log(Level.INFO, "Failed Content: " + content);
 				e.printStackTrace();
-				JsonObject errorParsingJSON = new JsonObject();
-				errorParsingJSON.addProperty("code", -1001);
-				errorParsingJSON.addProperty("message", "Error parsing JSON.");
-
-				response.add("error", errorParsingJSON);
-				response.add("result", JsonNull.INSTANCE);
+				
 				if (e instanceof IllegalArgumentException) {
 					LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
 				} else {
 					LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client sent invalid JSON!");
 				}
-				status = HttpResponseStatus.BAD_REQUEST;
+				
+				HttpErrorUtils.writeErrorResponse(ctx, 
+					HttpErrorUtils.ErrorCodes.BAD_PARSE, 
+					HttpErrorUtils.ErrorCodes.MESSAGE_BAD_PARSE, 
+					HttpResponseStatus.BAD_REQUEST);
+				return;
 			}
 
 			if (status == HttpResponseStatus.OK) {
@@ -308,8 +302,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 			}
 			default: {
 				JsonObject methodNotFound = new JsonObject();
-				methodNotFound.addProperty("code", -32601);
-				methodNotFound.addProperty("message", "Method not found.");
+				methodNotFound.addProperty("code", HttpErrorUtils.ErrorCodes.METHOD_NOT_FOUND);
+				methodNotFound.addProperty("message", HttpErrorUtils.ErrorCodes.MESSAGE_METHOD_NOT_FOUND);
 				response.add("error", methodNotFound);
 				response.add("result", JsonNull.INSTANCE);
 				break;
@@ -339,10 +333,5 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 		ctx.write(httpResponse);
 
 		return keepAlive;
-	}
-
-	private static void send100Continue(ChannelHandlerContext ctx) {
-		FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE);
-		ctx.write(response);
 	}
 }
