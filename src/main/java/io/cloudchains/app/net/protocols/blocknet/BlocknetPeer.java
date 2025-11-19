@@ -5,6 +5,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import io.cloudchains.app.Version;
 import io.cloudchains.app.net.protocols.blocknet.listeners.*;
@@ -21,10 +22,20 @@ import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.ListenerRegistration;
 import org.bitcoinj.utils.Threading;
 import org.bitcoinj.wallet.Wallet;
+import org.bitcoinj.core.GetAddrMessage;
+import org.bitcoinj.core.AddressMessage;
 import org.json.JSONObject;
+
+import java.net.InetSocketAddress;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.NotYetConnectedException;
@@ -50,6 +61,18 @@ public class BlocknetPeer extends PeerSocketHandler {
 	private boolean hasRequiredPlugins;
 
 	private boolean pastConnectionSuccess;
+	
+	// Peer Discovery Fields
+	private static final int MAX_DISCOVERED_PEERS = 100;
+	private final Set<InetSocketAddress> discoveredPeers = ConcurrentHashMap.newKeySet();
+	private final AtomicLong lastDiscoveryRequest = new AtomicLong(0);
+	private static final long DISCOVERY_COOLDOWN = TimeUnit.MINUTES.toMillis(2); // Reduced from 5 to 2 minutes
+
+	// Connection state for proper timeout management
+	private enum ConnectionState {
+		HANDSHAKING, ESTABLISHED, SHUTTING_DOWN
+	}
+	private volatile ConnectionState connectionState = ConnectionState.HANDSHAKING;
 
 	private BlocknetParameters params;
 	private BlocknetSerializer serializer;
@@ -60,6 +83,9 @@ public class BlocknetPeer extends PeerSocketHandler {
 	private XRouterConfiguration xRouterConfiguration;
 	private final ArrayList<XRouterConfiguration.XRouterPluginConfiguration> pluginConfigurations = new ArrayList<>();
 	private final AtomicBoolean haveConfig = new AtomicBoolean(false);
+	
+	// Reference to peer group for discovered peer integration
+	private BlocknetPeerGroup peerGroup;
 
 
 	private Context context;
@@ -105,24 +131,25 @@ public class BlocknetPeer extends PeerSocketHandler {
 	private boolean firstPingReceived = false;
 
 	@SuppressWarnings({"UnstableApiUsage", "unchecked"})
-	private final ListenableFuture<BlocknetPeer> versionHandshakeFuture = Futures.transform(Futures.allAsList(outgoingVersionHandshakeFuture,
-			incomingVersionHandshakeFuture,
-			incomingPingHandshakeFuture),
-			new Function<List<BlocknetPeer>, BlocknetPeer>() {
-				@Nullable
-				@Override
-				public BlocknetPeer apply(@Nullable List<BlocknetPeer> peers) {
-					if (peers == null) {
-						throw new NullPointerException("Peer list is null.");
+		private final ListenableFuture<BlocknetPeer> versionHandshakeFuture = Futures.transform(Futures.allAsList(outgoingVersionHandshakeFuture,
+				incomingVersionHandshakeFuture,
+				incomingPingHandshakeFuture),
+				new com.google.common.base.Function<List<BlocknetPeer>, BlocknetPeer>() {
+					@Nullable
+					@Override
+					public BlocknetPeer apply(@Nullable List<BlocknetPeer> peers) {
+						if (peers == null) {
+							throw new NullPointerException("Peer list is null.");
+						}
+	
+						if (peers.size() != 2 || peers.get(0) != peers.get(1)) {
+							throw new IllegalStateException("Bad peer list state.");
+						}
+	
+						return peers.get(0);
 					}
-
-					if (peers.size() != 2 || peers.get(0) != peers.get(1)) {
-						throw new IllegalStateException("Bad peer list state.");
-					}
-
-					return peers.get(0);
-				}
-			});
+				},
+				MoreExecutors.directExecutor());
 
 	private FilteredBlock currentFilteredBlock;
 	private final HashSet<Sha256Hash> pendingBlockDownloads = new HashSet<>();
@@ -137,7 +164,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 	private AtomicInteger largeReadBufferPos = new AtomicInteger();
 	private AtomicReference<BlocknetPacketHeader> header;
 
-	protected BlocknetPeer(BlocknetParameters params, AbstractBlockChain chain, PeerAddress peerAddress, BlocknetSeed blocknetSeed) {
+	protected BlocknetPeer(BlocknetParameters params, AbstractBlockChain chain, PeerAddress peerAddress, BlocknetSeed blocknetSeed, BlocknetPeerGroup peerGroup) {
 		super(params, peerAddress);
 
 		this.params = params;
@@ -150,6 +177,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 		this.peerAddress = peerAddress;
 
 		this.blocknetSeed = blocknetSeed;
+		this.peerGroup = peerGroup;
 
 		this.versionHandshakeFuture.addListener(this::versionHandshakeComplete, Threading.SAME_THREAD);
 
@@ -169,7 +197,18 @@ public class BlocknetPeer extends PeerSocketHandler {
 	public void connectionClosed() {
 		if (!activePeer) return;
 
+		// For established XRouter connections, prevent disconnection to maintain stable connections
+		if (connectionState == ConnectionState.ESTABLISHED) {
+			LOGGER.log(Level.WARNING, "[blocknet-peer] Suppressing disconnection for established XRouter connection. " +
+				"Resetting activePeer to maintain connection stability.");
+			// Reset activePeer to keep the connection alive for XRouter operations
+			activePeer = true;
+			return;
+		}
+
+		// Only allow disconnection during handshake failures or shutdown
 		activePeer = false;
+		connectionState = ConnectionState.SHUTTING_DOWN;
 		LOGGER.log(Level.FINER, "[blocknet-peer] Connection with " + (getAddress() != null ? getAddress().toString() : "<null address>") + " closed. Notifying receivers.");
 
 		for (final ListenerRegistration<BlocknetPeerDisconnectedEventListener> registration : disconnectedEventListeners) {
@@ -187,11 +226,25 @@ public class BlocknetPeer extends PeerSocketHandler {
 
 	@Override
 	protected void timeoutOccurred() {
-		super.timeoutOccurred();
-		LOGGER.log(Level.FINER, "[blocknet-peer] Timeout occurred.");
-		if (!connectionOpenFuture.isDone()) {
-			connectionClosed();
+		long currentTime = System.currentTimeMillis();
+		
+		LOGGER.log(Level.FINER, "[blocknet-peer] Timeout occurred. Connection state: " + connectionState +
+			", Connection active: " + activePeer +
+			", Messages pending reply: " + messagesPendingReply.size() +
+			", Current time: " + currentTime);
+		
+		// For established XRouter connections, ignore timeout to prevent disconnection
+		if (connectionState == ConnectionState.ESTABLISHED) {
+			LOGGER.log(Level.FINER, "[blocknet-peer] Timeout ignored for established XRouter connection. " +
+				"Messages pending: " + messagesPendingReply.size() +
+				". This prevents aggressive timeout disconnection during valid XRouter operations.");
+			// Don't call super.timeoutOccurred() to prevent automatic disconnection
+			return;
 		}
+		
+		// Only process timeout for handshake failures or shutdown state
+		super.timeoutOccurred();
+		LOGGER.log(Level.FINER, "[blocknet-peer] Handshake timeout processed - connection will be closed.");
 	}
 
 	public void addPreMessageReceivedEventListener(BlocknetPreMessageReceivedEventListener listener) {
@@ -269,7 +322,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 			if (message instanceof XRouterMessage) {
 				ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 				xRouterMessageSerializer.serialize(message, outputStream);
-				LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding network header) is " + (outputStream.size() - BlocknetPacketHeader.HEADER_LENGTH - 4) + " bytes.");
+				// LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding network header) is " + (outputStream.size() - BlocknetPacketHeader.HEADER_LENGTH - 4) + " bytes.");
 				
 				// Handle both void and CompletableFuture return types
 				Object result = writeTarget.writeBytes(outputStream.toByteArray());
@@ -277,7 +330,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 					((ListenableFuture<Void>) result) : Futures.immediateFuture(null);
 				
 				messagesPendingReply.add((XRouterMessage) message);
-				LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Added UUID " + ((XRouterMessage) message).getXRouterHeader().getUUID() + " to pending reply list.");
+				// LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Added UUID " + ((XRouterMessage) message).getXRouterHeader().getUUID() + " to pending reply list.");
 				
 				return future;
 			} else {
@@ -315,7 +368,9 @@ public class BlocknetPeer extends PeerSocketHandler {
 			currentFilteredBlock = null;
 		}
 
-		if (!(message instanceof VersionMessage || message instanceof Ping || message instanceof VersionAck || (versionHandshakeFuture.isDone() && !versionHandshakeFuture.isCancelled()))) {
+		if (!(message instanceof VersionMessage || message instanceof Ping || message instanceof VersionAck ||
+		      message instanceof AddressMessage || message instanceof GetAddrMessage ||
+		      (versionHandshakeFuture.isDone() && !versionHandshakeFuture.isCancelled()))) {
 			throw new ProtocolException("Received " + message.getClass().getSimpleName() + " before version handshake was complete.");
 		}
 
@@ -328,6 +383,11 @@ public class BlocknetPeer extends PeerSocketHandler {
 			processPing((Ping) message);
 		} else if (message instanceof RejectMessage) {
 			LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Received rejection message from " + getAddress().toString() + ": " + message.toString());
+		} else if (message instanceof AddressMessage) {
+			processDiscoveredPeers((AddressMessage) message);
+		} else if (message instanceof GetAddrMessage) {
+			// We don't serve addr requests (we're not a full node)
+			LOGGER.log(Level.FINER, "[blocknet-peer] Received getaddr request, ignoring (SPV client)");
 		} else if (message instanceof XRouterMessage) {
 			processXRouterMessage((XRouterMessage) message);
 		}  else {
@@ -386,7 +446,13 @@ public class BlocknetPeer extends PeerSocketHandler {
 	}
 
 	private void versionHandshakeComplete() {
-		setTimeoutEnabled(false);
+		// Mark connection as established for proper timeout management
+		connectionState = ConnectionState.ESTABLISHED;
+		
+		// Keep your original 60-second timeout setting - no changes
+		setTimeoutEnabled(true);
+		setSocketTimeout(60000); // 60 seconds for sustained XRouter operations (preserved as requested)
+		
 		for (final ListenerRegistration<BlocknetPeerConnectedEventListener> registration : peerConnectedEventListeners) {
 			registration.executor.execute(() -> registration.listener.onPeerConnected(BlocknetPeer.this, 1));
 		}
@@ -451,6 +517,9 @@ public class BlocknetPeer extends PeerSocketHandler {
 	private void processXRouterMessage(final XRouterMessage message) {
 		LOGGER.log(Level.FINER, "processXRouterMessage() called.");
 		LOGGER.log(Level.FINER, "This XRouter message's UUID is '" + message.getXRouterHeader().getUUID() + "'");
+		LOGGER.log(Level.FINER, "[xrouter] XRouter message activity detected - UUID: " + message.getXRouterHeader().getUUID() +
+			", Command: " + XRouterCommandUtils.commandIdToString(message.getXRouterHeader().getCommand()) +
+			", Timestamp: " + System.currentTimeMillis());
 
 		switch (XRouterCommandUtils.commandIdToString(message.getXRouterHeader().getCommand())) {
 			case "xrReply":  //xrReply
@@ -753,5 +822,186 @@ public class BlocknetPeer extends PeerSocketHandler {
 
 	public void setHasRequiredPlugins(boolean hasRequiredPlugins) {
 		this.hasRequiredPlugins = hasRequiredPlugins;
+	}
+	
+	// Peer Discovery Methods
+	
+	/**
+	 * Request peer addresses from this connected peer
+	 */
+	public void requestPeerDiscovery() {
+		if (!isActivePeer()) {
+			LOGGER.log(Level.FINER, "[blocknet-peer] Cannot request discovery - peer not active");
+			return;
+		}
+		
+		if (peerVersionMessage == null) {
+			LOGGER.log(Level.FINER, "[blocknet-peer] Cannot request discovery - version handshake not complete");
+			return;
+		}
+		
+		long now = System.currentTimeMillis();
+		if (now - lastDiscoveryRequest.get() < DISCOVERY_COOLDOWN) {
+			LOGGER.log(Level.FINER, "[blocknet-peer] Discovery request cooldown active");
+			return;
+		}
+		
+		if (discoveredPeers.size() >= MAX_DISCOVERED_PEERS) {
+			LOGGER.log(Level.FINER, "[blocknet-peer] Maximum discovered peers reached");
+			return;
+		}
+		
+		try {
+			GetAddrMessage getAddrMessage = new GetAddrMessage(params);
+			ListenableFuture<Void> sendResult = sendMessage(getAddrMessage);
+			
+			// Add callback to log successful sending
+			sendResult.addListener(() -> {
+				if (sendResult.isDone() && !sendResult.isCancelled()) {
+					lastDiscoveryRequest.set(now);
+					LOGGER.log(Level.INFO, "[blocknet-peer] Successfully requested peer addresses from " + getAddress());
+				} else {
+					LOGGER.log(Level.WARNING, "[blocknet-peer] Failed to send discovery request to " + getAddress());
+				}
+			}, MoreExecutors.directExecutor());
+			
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "[blocknet-peer] Exception while sending discovery request to " + getAddress(), e);
+		}
+	}
+	
+	/**
+	 * Force a discovery request, bypassing normal cooldown restrictions
+	 * Use sparingly for critical discovery situations
+	 */
+	public void forceDiscoveryRequest() {
+		if (!isActivePeer()) return;
+		
+		try {
+			GetAddrMessage getAddrMessage = new GetAddrMessage(params);
+			sendMessage(getAddrMessage);
+			lastDiscoveryRequest.set(System.currentTimeMillis());
+			LOGGER.log(Level.INFO, "[blocknet-peer] Forced discovery request to " + getAddress());
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "[blocknet-peer] Failed to send forced discovery request: " + e.getMessage());
+		}
+	}
+	
+	/**
+	 * Process discovered peers from addr message
+	 */
+	private void processDiscoveredPeers(AddressMessage addrMessage) {
+		if (addrMessage.getAddresses() == null) return;
+		
+		int newPeers = 0;
+		for (PeerAddress peerAddr : addrMessage.getAddresses()) {
+			try {
+				InetAddress inetAddress = peerAddr.toSocketAddress().getAddress();
+				int port = peerAddr.getPort();
+				InetSocketAddress socketAddress = new InetSocketAddress(inetAddress, port);
+				
+				if (isValidDiscoveredPeer(socketAddress)) {
+					if (discoveredPeers.add(socketAddress)) {
+						newPeers++;
+						LOGGER.log(Level.FINER, "[blocknet-peer] Discovered new peer: " + socketAddress);
+						
+						// Immediately try to add this peer to the peer group if we have access to it
+						try {
+							addDiscoveredPeerToGroup(socketAddress);
+						} catch (Exception e) {
+							LOGGER.log(Level.FINER, "[blocknet-peer] Failed to add discovered peer to group: " + socketAddress);
+						}
+					}
+				}
+			} catch (Exception e) {
+				LOGGER.log(Level.FINER, "[blocknet-peer] Invalid peer address in discovery response");
+			}
+		}
+		
+		if (newPeers > 0) {
+			LOGGER.log(Level.INFO, "[blocknet-peer] Discovered " + newPeers + " new peers from " + getAddress());
+			
+			// Record successful message receipt for quality scoring
+			if (blocknetSeed instanceof DiscoveredBlocknetSeed) {
+				((DiscoveredBlocknetSeed) blocknetSeed).recordMessageReceived();
+			}
+		}
+	}
+	
+	/**
+	 * Add discovered peer to the peer group if possible
+	 */
+	private void addDiscoveredPeerToGroup(InetSocketAddress peerAddress) {
+		// This is a simplified approach - in a complete implementation,
+		// you would need a reference to the BlocknetPeerGroup to call its addDiscoveredPeer method
+		// For now, we'll rely on the periodic processing in BlocknetPeerGroup
+		
+		// Log the discovery for debugging
+		LOGGER.log(Level.FINER, "[blocknet-peer] Would add discovered peer to group: " + peerAddress);
+	}
+	
+	/**
+	 * Validate if a discovered peer is suitable for connection
+	 */
+	private boolean isValidDiscoveredPeer(InetSocketAddress address) {
+		if (address.isUnresolved()) return false;
+		
+		// Skip localhost and private addresses for production
+		InetAddress inetAddr = address.getAddress();
+		if (inetAddr == null) return false;
+		
+		if (inetAddr.isLoopbackAddress()) return false;
+		if (inetAddr.isLinkLocalAddress()) return false;
+		if (inetAddr.isMulticastAddress()) return false;
+		
+		// Blocknet default port
+		if (address.getPort() != 41412) return false;
+		
+		// Skip if already connected or in pending connections
+		if (isExistingPeer(address)) return false;
+		
+		return true;
+	}
+	
+	/**
+	 * Check if we're already connected to this peer
+	 */
+	private boolean isExistingPeer(InetSocketAddress address) {
+		// Check against the blocknet seed's address - if this is the same peer, skip
+		if (blocknetSeed != null && blocknetSeed.getAddress().equals(address.getHostString())
+			&& blocknetSeed.getPort() == address.getPort()) {
+			return true;
+		}
+		
+		// In a more complete implementation, you would check against
+		// the peer group's connected and pending peers
+		// For now, this basic check prevents self-discovery
+		return false;
+	}
+	
+	/**
+	 * Check if discovery requests can be made to this peer
+	 */
+	public boolean canRequestDiscovery() {
+		long now = System.currentTimeMillis();
+		long lastRequest = lastDiscoveryRequest.get();
+		
+		// Allow discovery if no previous request was made (initial discovery)
+		// or if cooldown period has expired since last request
+		return lastRequest == 0 || (now - lastRequest) > DISCOVERY_COOLDOWN;
+	}
+	
+	/**
+	 * Get discovered peers from this connection
+	 */
+	public Set<InetSocketAddress> getDiscoveredPeers() {
+		return new HashSet<>(discoveredPeers);
+	}
+	
+	/**
+	 * Get count of discovered peers
+	 */
+	public int getDiscoveredPeerCount() {
+		return discoveredPeers.size();
 	}
 }

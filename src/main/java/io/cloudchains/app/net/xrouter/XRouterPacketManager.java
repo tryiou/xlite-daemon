@@ -20,7 +20,7 @@ public class XRouterPacketManager {
 	private final static LogManager LOGMANAGER = LogManager.getLogManager();
 	private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-	private static final int XROUTER_PACKET_VERSION = 0xff000023;
+	private static final int XROUTER_PACKET_VERSION = 50;
 
 	private final XRouterMessageSerializer xRouterMessageSerializer;
 	private final BlocknetParameters blocknetNetworkParameters;
@@ -35,9 +35,9 @@ public class XRouterPacketManager {
 	}
 
 	private byte[] signPacket(byte[] packetBytes, ECKey ecPrivateKey) {
-		LOGGER.log(Level.FINER, "[xrouter] DEBUG: Packet bytes: " + new String(Hex.encode(packetBytes)));
+		// LOGGER.log(Level.FINER, "[xrouter] DEBUG: Packet bytes: " + new String(Hex.encode(packetBytes)));
 		Sha256Hash packetHash = Sha256Hash.wrap(Sha256Hash.hash(packetBytes));
-		LOGGER.log(Level.FINER, "[xrouter] DEBUG: Packet byte hash: " + packetHash.toString());
+		// LOGGER.log(Level.FINER, "[xrouter] DEBUG: Packet byte hash: " + packetHash.toString());
 		ECKey.ECDSASignature rawSignature = ecPrivateKey.sign(packetHash).toCanonicalised();
 
 		byte[] r = rawSignature.r.toByteArray();

@@ -164,11 +164,11 @@ public class HTTPClient {
             return result;
             
         } catch (SocketTimeoutException e) {
-            logError(method, endpoint, e, 0, "Request timeout");
+            logError(method, endpoint, e, 0, "Connection timeout to " + App.BASE_URL);
         } catch (UnknownHostException e) {
-            logError(method, endpoint, e, 0, "Unknown host");
+            logError(method, endpoint, e, 0, "Unknown host: " + App.BASE_URL);
         } catch (org.apache.http.client.ClientProtocolException e) {
-            logError(method, endpoint, e, 0, "Protocol error");
+            logError(method, endpoint, e, 0, "HTTP protocol error");
         } catch (IOException e) {
             logError(method, endpoint, e, 0, "IO error: " + e.getMessage());
         } catch (Exception e) {
@@ -382,9 +382,14 @@ public class HTTPClient {
     }
 
     public void getAllFees() {
+        LOGGER.log(Level.INFO, "[HTTP] Requesting fees from BASEURL: " + App.BASE_URL);
+        
         String res = doGet("/fees");
 
-        if (res == null) return;
+        if (res == null) {
+            LOGGER.log(Level.WARNING, "[HTTP] ERROR: Failed to fetch fees from BASEURL");
+            return;
+        }
 
         JSONObject jsonObject = parseJsonObject(res, "getAllFees", "/fees");
         if (jsonObject == null) {
@@ -398,6 +403,7 @@ public class HTTPClient {
             return;
         }
 
+        int successCount = 0;
         for (CoinTicker coinTicker : CoinTicker.coins()) {
             CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
             String ticker = CoinTickerUtils.tickerToString(coinTicker);
@@ -409,19 +415,17 @@ public class HTTPClient {
                 }
 
                 double fee = fees.getDouble(ticker);
-
                 coinInstance.addRelayFee(coinTicker, fee);
+                successCount++;
 
-                if (logCount % 30 == 0)
-                    LOGGER.log(Level.INFO, "[httpclient] Got relayfee for currency " + ticker + " - " + fee);
-                else
-                    LOGGER.log(Level.FINER, "[httpclient] Got relayfee for currency " + ticker + " - " + fee);
+                LOGGER.log(Level.FINER, "[HTTP] Received fee for " + ticker + ": " + fee);
             } catch (Exception e) {
                 logError("getAllFees", "/fees", e, 0, "Failed to process fee for " + ticker);
                 coinInstance.incrementUpdateFailures();
             }
         }
-        logCount += 1;
+        
+        LOGGER.log(Level.INFO, "[HTTP] SUCCESS: Received fees for " + successCount + " currencies via BASEURL");
     }
 
     public JsonObject getRawTransaction(CoinTicker coinTicker, String txid, boolean verbose) {
@@ -505,9 +509,14 @@ public class HTTPClient {
     }
 
     public void getAllBlockCounts() {
+        LOGGER.log(Level.INFO, "[HTTP] Requesting block counts from BASEURL: " + App.BASE_URL);
+        
         String res = doGet("/height");
 
-        if (res == null) return;
+        if (res == null) {
+            LOGGER.log(Level.WARNING, "[HTTP] ERROR: Failed to fetch block counts from BASEURL");
+            return;
+        }
 
         JSONObject jsonObject = parseJsonObject(res, "getAllBlockCounts", "/height");
         if (jsonObject == null) {
@@ -521,6 +530,7 @@ public class HTTPClient {
             return;
         }
 
+        int successCount = 0;
         for (CoinTicker coinTicker : CoinTicker.coins()) {
             CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
             String ticker = CoinTickerUtils.tickerToString(coinTicker);
@@ -532,16 +542,18 @@ public class HTTPClient {
                 }
 
                 int blockCount = blockCounts.getInt(ticker);
-
                 coinInstance.addBlockCount(coinTicker, blockCount);
                 coinInstance.resetUpdateFailures();
+                successCount++;
 
-                LOGGER.log(Level.FINER, "[httpclient] Got blockcount for currency " + ticker + " - " + blockCount);
+                LOGGER.log(Level.FINER, "[HTTP] Received block count for " + ticker + ": " + blockCount);
             } catch (Exception e) {
                 logError("getAllBlockCounts", "/height", e, 0, "Failed to process block count for " + ticker);
                 coinInstance.incrementUpdateFailures();
             }
         }
+        
+        LOGGER.log(Level.INFO, "[HTTP] SUCCESS: Received block counts for " + successCount + " currencies via BASEURL");
     }
 
     public JsonObject getBlock(CoinTicker coinTicker, String hash, boolean verbose) {
@@ -668,7 +680,7 @@ public class HTTPClient {
         params.add("params", innerParams);
 
         String res = doPost("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
+        // LOGGER.log(Level.FINER, "[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
             logWarning("getHistory", coinInstance.getTicker().toString(), "null post result");
             return null;

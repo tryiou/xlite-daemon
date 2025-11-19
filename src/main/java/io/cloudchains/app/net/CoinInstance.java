@@ -164,6 +164,14 @@ public class CoinInstance {
 		return getTicker() == CoinTicker.BLOCKNET || getTicker() == CoinTicker.BLOCKNET_TESTNET5;
 	}
 
+	public boolean isBitcoinNetwork() {
+		return getTicker() == CoinTicker.BITCOIN;
+	}
+
+	public boolean isLitecoinNetwork() {
+		return getTicker() == CoinTicker.LITECOIN;
+	}
+
 	public static void setActiveCurrency(CoinInstance newActiveCurrency) {
 		activeCurrency = newActiveCurrency;
 
@@ -200,7 +208,7 @@ public class CoinInstance {
 		Address address = addressKeyPair.getAddress();
 		DumpedPrivateKey privateKey = addressKeyPair.getPrivateKey();
 		addressKeyPairs.add(addressKeyPair);
-		LOGGER.log(Level.FINER, "[wallet] DEBUG: Generated new address, have " + addressKeyPairs.size() + ": " + address.toString() + ", private key: " + privateKey.toString() + " (hex: " + privateKey.getKey().getPrivateKeyAsHex() + ")");
+		// LOGGER.log(Level.FINER, "[wallet] DEBUG: Generated new address, have " + addressKeyPairs.size() + ": " + address.toString() + ", private key: " + privateKey.toString() + " (hex: " + privateKey.getKey().getPrivateKeyAsHex() + ")");
 
 		if (updateConfig) {
 			configHelper.setAddressCount(configHelper.getAddressCount() + 1);
@@ -349,6 +357,7 @@ public class CoinInstance {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Bitcoin main network.");
 				networkParameters = MainNetParams.get();
 				rpcPort = 8332;
+				hasXRouter = true;  // ENABLE XROUTER FOR BITCOIN
 				break;
 			}
 			// case BITCOIN_CASH: {
@@ -361,6 +370,7 @@ public class CoinInstance {
 				LOGGER.log(Level.FINER, "[coin] Initializing for Litecoin main network.");
 				networkParameters = new LitecoinNetworkParameters();
 				rpcPort = 9332;
+				hasXRouter = true;  // ENABLE XROUTER FOR LITECOIN
 				break;
 			}
 			case DASHCOIN: {
@@ -500,47 +510,63 @@ public class CoinInstance {
 			coinRPCServer.start();
 		}
 
-		// Blocknet Network / XRouter not used (Dec 10)
-//		if (isBlocknetNetwork() && hasXRouter()) {
-//			XRouterMessageSerializer xRouterMessageSerializer = (getBlocknetNetworkParameters()).getXRouterMessageSerializer(false);
-//			xRouterPacketManager = new XRouterPacketManager(xRouterMessageSerializer, blocknetNetworkParameters);
-//			LOGGER.log(Level.FINER, "[coin] This network is a Blocknet network and supports XRouter. Our packet version is " + Integer.toString(XRouterPacketManager.getXRouterPacketVersion(), 16));
-//		} else {
-//			LOGGER.log(Level.FINER, "[coin] WARNING: This network (" + CoinTickerUtils.tickerToString(getTicker()) + ") does not support XRouter.");
-//		}
-//
-//		if (isBlocknetNetwork()) {
-//			String userHome = ConfigHelper.getLocalDataDirectory();
-//			Preconditions.checkNotNull(userHome);
-//
-//			File spvDat = new File(userHome,"spv-" + CoinTickerUtils.tickerToString(getTicker()) + ".dat");
-//			try {
-//				chain = new BlockChain(networkParameters, getWallet(), new SPVBlockStore(networkParameters, spvDat));
-//			} catch (BlockStoreException e) {
-//				try {
-//					chain = new BlockChain(networkParameters, getWallet(), new SPVBlockStore(networkParameters, spvDat));
-//				} catch (BlockStoreException ex) {
-//					LOGGER.log(Level.FINER, "Error while initializing blockchain object!");
-//					ex.printStackTrace();
-//					return false;
-//				}
-//			}
-//
-//			LOGGER.log(Level.INFO, "[coin] Connecting to the (" + getTicker().toString() + ") network.");
-//
-//			if (getAddressKeyPairs().size() == 0) {
-//				LOGGER.log(Level.FINER, "[peer] Have no addresses. Generating forward addresses.");
-//
-//				generateForwardAddresses(true);
-//			}
-//
-//			AddressBalance blockProofAddress = getAddressKeyPairs().get(0);
-//
-//			keyHandler = new KeyHandler(blockProofAddress.getPrivateKey().getKey());
-//
-//			blocknetPeerGroup = new BlocknetPeerGroup(this, (BlocknetNetworkParameters) blocknetNetworkParameters, chain);
-//			connectToBlocknetNetwork();
-//		}
+		// XRouter enabled for Blocknet, Bitcoin, and Litecoin
+		if ((isBlocknetNetwork() || isBitcoinNetwork() || isLitecoinNetwork()) && hasXRouter()) {
+			if (isBlocknetNetwork()) {
+				// Blocknet - use its own XRouter infrastructure
+				XRouterMessageSerializer xRouterMessageSerializer = (getBlocknetNetworkParameters()).getXRouterMessageSerializer(false);
+				xRouterPacketManager = new XRouterPacketManager(xRouterMessageSerializer, blocknetNetworkParameters);
+				LOGGER.log(Level.FINER, "[coin] This network is a Blocknet network and supports XRouter. Our packet version is " + Integer.toString(XRouterPacketManager.getXRouterPacketVersion(), 16));
+			} else {
+				// Bitcoin/Litecoin - use Blocknet's XRouter infrastructure
+				CoinInstance blocknetInstance = getInstance(activeBlocknetNetwork);
+				if (blocknetInstance != null && blocknetInstance.getXRouterPacketManager() != null) {
+					xRouterPacketManager = blocknetInstance.getXRouterPacketManager();
+					LOGGER.log(Level.FINER, "[coin] This network (" + CoinTickerUtils.tickerToString(getTicker()) + ") supports XRouter via active Blocknet network.");
+				} else {
+					LOGGER.log(Level.FINER, "[coin] WARNING: XRouter requested for " + CoinTickerUtils.tickerToString(getTicker()) + " but no active Blocknet network available.");
+				}
+			}
+		} else {
+			LOGGER.log(Level.FINER, "[coin] WARNING: This network (" + CoinTickerUtils.tickerToString(getTicker()) + ") does not support XRouter.");
+		}
+
+		if (isBlocknetNetwork()) {
+			String userHome = ConfigHelper.getLocalDataDirectory();
+			Preconditions.checkNotNull(userHome);
+
+			File spvDat = new File(userHome,"spv-" + CoinTickerUtils.tickerToString(getTicker()) + ".dat");
+			try {
+				chain = new BlockChain(networkParameters, getWallet(), new SPVBlockStore(networkParameters, spvDat));
+			} catch (BlockStoreException e) {
+				try {
+					chain = new BlockChain(networkParameters, getWallet(), new SPVBlockStore(networkParameters, spvDat));
+				} catch (BlockStoreException ex) {
+					LOGGER.log(Level.FINER, "Error while initializing blockchain object!");
+					ex.printStackTrace();
+					return null;
+				}
+			}
+
+			LOGGER.log(Level.INFO, "[coin] Connecting to the (" + getTicker().toString() + ") network.");
+
+			if (getAddressKeyPairs().size() == 0) {
+				LOGGER.log(Level.FINER, "[peer] Have no addresses. Generating forward addresses.");
+
+				generateForwardAddresses(true);
+			}
+
+			AddressBalance blockProofAddress = getAddressKeyPairs().get(0);
+
+			keyHandler = new KeyHandler(blockProofAddress.getPrivateKey().getKey());
+
+			blocknetPeerGroup = new BlocknetPeerGroup(this, (BlocknetNetworkParameters) blocknetNetworkParameters, chain);
+			
+			// Add manual peer for connection
+			blocknetPeerGroup.addManualPeer("exrproxy1.airdns.org", 42111);
+			
+			connectToBlocknetNetwork();
+		}
 
 		return null;
 	}
@@ -620,28 +646,39 @@ public class CoinInstance {
 	}
 
 	public void sendXrGetBlockCount(BlocknetPeer blocknetPeer) {
-		String currentCurrency = CoinTickerUtils.tickerToString(getTicker());
+		String currency = CoinTickerUtils.tickerToString(getTicker());
 
 		HashMap<String, Object> body = new HashMap<>();
-		body.put("currency", currentCurrency);
+		body.put("currency", currency);
 
-		getInstance(activeBlocknetNetwork).sendXrMessage(blocknetPeer, "xrGetBlockCount", body);
+		String uuid = getInstance(activeBlocknetNetwork).sendXrMessage(blocknetPeer, "xrGetBlockCount", body);
+		if (uuid != null) {
+			LOGGER.log(Level.FINER, "[XR] Requesting " + currency + " block count via XRouter (UUID: " + uuid + ")");
+		} else {
+			LOGGER.log(Level.WARNING, "[XR] FAILED: Failed to send block count request for " + currency + " via XRouter");
+		}
 	}
 
 	public void sendXrGetUtxos(BlocknetPeer blocknetPeer) {
 		if (System.currentTimeMillis() - lastUtxoUpdate < MINIMUM_UTXO_UPDATE_INTERVAL) {
-			LOGGER.log(Level.FINER, "[coin] Aborting UTXO checking as the list was updated less than 1 second ago.");
+			LOGGER.log(Level.FINER, "[XR] Aborting UTXO checking as the list was updated less than " +
+			           (MINIMUM_UTXO_UPDATE_INTERVAL / 1000) + " seconds ago.");
 			return;
 		}
 
-		String currentCurrency = CoinTickerUtils.tickerToString(getTicker());
+		String currency = CoinTickerUtils.tickerToString(getTicker());
 
 		HashMap<String, Object> body = new HashMap<>();
-		body.put("currency", currentCurrency);
+		body.put("currency", currency);
 		body.put("command", "xrmgetutxos");
-		body.put("params", getInstance(CoinTickerUtils.stringToTicker(currentCurrency)).getUTXOParams());
+		body.put("params", getInstance(CoinTickerUtils.stringToTicker(currency)).getUTXOParams());
 
-		getInstance(activeBlocknetNetwork).sendXrMessage(blocknetPeer, "xrService", body);
+		String uuid = getInstance(activeBlocknetNetwork).sendXrMessage(blocknetPeer, "xrService", body);
+		if (uuid != null) {
+			LOGGER.log(Level.FINER, "[XR] Requesting " + currency + " UTXOs via XRouter (UUID: " + uuid + ")");
+		} else {
+			LOGGER.log(Level.WARNING, "[XR] FAILED: Failed to send UTXO request for " + currency + " via XRouter");
+		}
 	}
 
 	public String sendXrMessage(BlocknetPeer blocknetPeer, String command, HashMap<String, Object> params) {
@@ -651,8 +688,13 @@ public class CoinInstance {
 	public String sendXrMessage(BlocknetPeer blocknetPeer, String uuid, String command, HashMap<String, Object> params) {
 		XRouterMessage message = null;
 
-		if (blocknetPeer == null || !blocknetPeer.getHaveConfig().get()) {
-			LOGGER.log(Level.FINER, "[sendXrMessage] Config not received yet");
+		if (blocknetPeer == null) {
+			LOGGER.log(Level.WARNING, "[XR] FAILED: BlocknetPeer is null for command " + command);
+			return null;
+		}
+
+		if (!blocknetPeer.getHaveConfig().get()) {
+			LOGGER.log(Level.FINER, "[XR] Config not received yet from peer " + blocknetPeer.getAddress());
 			return null;
 		}
 
@@ -666,6 +708,11 @@ public class CoinInstance {
 						currency,
 						keyHandler.getBaseECKey(),
 						keyHandler.getPublicKey());
+				
+				if (message != null) {
+					blocknetPeerGroup.sendMessage(blocknetPeer, message);
+					LOGGER.log(Level.FINER, "[XR] Sent block count request for " + currency + " to peer " + blocknetPeer.getAddress());
+				}
 				break;
 			}
 			case "xrService": {
@@ -680,6 +727,12 @@ public class CoinInstance {
 						paramsList,
 						keyHandler.getBaseECKey(),
 						keyHandler.getPublicKey());
+				
+				if (message != null) {
+					blocknetPeerGroup.sendMessage(blocknetPeer, message);
+					LOGGER.log(Level.FINER, "[XR] Sent service request (" + xrCustomCmd + ") for " +
+					           params.get("currency") + " to peer " + blocknetPeer.getAddress());
+				}
 				break;
 			}
 			case "xrSendTransaction": {
@@ -695,6 +748,11 @@ public class CoinInstance {
 						transaction,
 						keyHandler.getBaseECKey(),
 						keyHandler.getPublicKey());
+				
+				if (message != null) {
+					blocknetPeerGroup.sendMessage(blocknetPeer, message);
+					LOGGER.log(Level.FINER, "[XR] Sent transaction for " + currency + " to peer " + blocknetPeer.getAddress());
+				}
 				break;
 			}
 			case "xrGetBlockHash": {
@@ -710,6 +768,11 @@ public class CoinInstance {
 						blockIndex,
 						keyHandler.getBaseECKey(),
 						keyHandler.getPublicKey());
+				
+				if (message != null) {
+					blocknetPeerGroup.sendMessage(blocknetPeer, message);
+					LOGGER.log(Level.FINER, "[XR] Sent block hash request for " + currency + " to peer " + blocknetPeer.getAddress());
+				}
 				break;
 			}
 			case "xrGetBlock": {
@@ -725,6 +788,11 @@ public class CoinInstance {
 						blockHash,
 						keyHandler.getBaseECKey(),
 						keyHandler.getPublicKey());
+				
+				if (message != null) {
+					blocknetPeerGroup.sendMessage(blocknetPeer, message);
+					LOGGER.log(Level.FINER, "[XR] Sent block request for " + currency + " to peer " + blocknetPeer.getAddress());
+				}
 				break;
 			}
 			case "xrGetTransaction": {
@@ -738,6 +806,11 @@ public class CoinInstance {
 						txid,
 						keyHandler.getBaseECKey(),
 						keyHandler.getPublicKey());
+				
+				if (message != null) {
+					blocknetPeerGroup.sendMessage(blocknetPeer, message);
+					LOGGER.log(Level.FINER, "[XR] Sent transaction request for " + currency + " to peer " + blocknetPeer.getAddress());
+				}
 				break;
 			}
 			case "xrGetConfig": {
@@ -747,19 +820,20 @@ public class CoinInstance {
 						"self",
 						keyHandler.getBaseECKey(),
 						keyHandler.getPublicKey());
+				
+				if (message != null) {
+					blocknetPeerGroup.sendMessage(blocknetPeer, message);
+					LOGGER.log(Level.FINER, "[XR] Sent config request to peer " + blocknetPeer.getAddress());
+				}
 				break;
 			}
 			default: {
-				LOGGER.log(Level.FINER, "[coin] ERROR: Unknown XRouter Message! Command: " + command);
-				uuid = null;
-				break;
+				LOGGER.log(Level.WARNING, "[XR] FAILED: Unknown XRouter command: " + command);
+				return null;
 			}
 		}
 
-		if (message != null)
-			blocknetPeerGroup.sendMessage(blocknetPeer, message);
-
-		return uuid;
+		return message != null ? uuid : null;
 	}
 
 	public JsonArray getAllUTXOS() {

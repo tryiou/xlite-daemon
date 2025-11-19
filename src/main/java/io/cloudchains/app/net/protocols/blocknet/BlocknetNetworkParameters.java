@@ -113,7 +113,7 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 		String[] dnsSeeds = new String[nodeCount];
 
 		for (int i = 0; i < nodeCount; i++)
-			dnsSeeds[i] = "node-" + i + ".cloudchainsinc.com";
+			dnsSeeds[i] = "seednode" + (i + 1) + ".blocknet.org";
 
 		return dnsSeeds;
 	}

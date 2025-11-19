@@ -128,7 +128,7 @@ public class XRouterMessage extends Message {
 				break;
 			}
 			case "xrGetReply": {
-				LOGGER.log(Level.FINER, "[xrouter-message] DEBUG: Fetching reply for packet " + xRouterHeader.getUUID());
+				// LOGGER.log(Level.FINER, "[xrouter-message] DEBUG: Fetching reply for packet " + xRouterHeader.getUUID());
 				break;
 			}
 			case "xrGetConfig": {

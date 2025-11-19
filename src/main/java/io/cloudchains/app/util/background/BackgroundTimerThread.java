@@ -19,7 +19,7 @@ public class BackgroundTimerThread implements Runnable {
 	private final static LogManager LOGMANAGER = LogManager.getLogManager();
 	private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-	public static final boolean HTTP_BLOCK_COUNT_UPDATES = true;
+	public static final boolean HTTP_BLOCK_COUNT_UPDATES = false;
 	public static final boolean HTTP_BALANCE_UPDATES = true;
 
 	private static final int KEEPALIVE_INTERVAL = 10000;
@@ -76,27 +76,36 @@ public class BackgroundTimerThread implements Runnable {
 		if (elapsed < KEEPALIVE_INTERVAL && lastKeepAliveTime != 0)
 			return;
 
+		// Network selection logging with standardized format
 		if (HTTP_BLOCK_COUNT_UPDATES) {
+			LOGGER.log(Level.INFO, "[NETWORK] Using BASEURL endpoint for data: " + App.BASE_URL);
 			heightUpdateHttpClient.getAllBlockCounts();
 			feeUpdateHttpClient.getAllFees();
 		} else if (!blocknetPeerGroup.getConnectedPeers().isEmpty()) {
-			for (BlocknetPeer blocknetPeer : blocknetPeerGroup.getConnectedPeers()) {
-				XRouterConfiguration xRouterConfiguration = blocknetPeer.getxRouterConfiguration();
-				if (xRouterConfiguration == null)
+			LOGGER.log(Level.INFO, "[NETWORK] Using XRouter P2P network for data (" +
+			           blocknetPeerGroup.getActiveConnectionCount() + " peers connected)");
+			
+			// XRouter operations with individual currency logging
+			for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
+				if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker()))
 					continue;
-
-				for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-					if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker()))
-						continue;
-					else if (!blocknetPeer.getxRouterConfiguration().getSupportedWallets().contains(coinInstance.getNetworkParameters().getId()))
-						continue;
-
-					coinInstance.sendXrGetBlockCount(blocknetPeer);
-					LOGGER.log(Level.FINER, "[BackgroundTimer] Sent keepalive message: " + coinInstance.getNetworkParameters().getId());
+				
+				BlocknetPeer blocknetPeer = blocknetPeerGroup.getBestBlocknetPeer(
+					CoinTickerUtils.tickerToString(coinInstance.getTicker()));
+				if (blocknetPeer == null) {
+					LOGGER.log(Level.WARNING, "[XR] FAILED: No XRouter peer available for " +
+					           CoinTickerUtils.tickerToString(coinInstance.getTicker()) + ", skipping update");
+					continue;
 				}
+				
+				String currency = CoinTickerUtils.tickerToString(coinInstance.getTicker());
+				LOGGER.log(Level.INFO, "[NETWORK] Requesting " + currency + " data via XRouter");
+				coinInstance.sendXrGetBlockCount(blocknetPeer);
 			}
 		} else {
-			return;
+			LOGGER.log(Level.WARNING, "[NETWORK] No XRouter peers available, falling back to BASEURL: " + App.BASE_URL);
+			heightUpdateHttpClient.getAllBlockCounts();
+			feeUpdateHttpClient.getAllFees();
 		}
 
 		lastKeepAliveTime = System.currentTimeMillis();
@@ -123,14 +132,16 @@ public class BackgroundTimerThread implements Runnable {
 				return;
 			}
 
-			BlocknetPeer blocknetPeer = blocknetPeerGroup.getBestBlocknetPeer(coinInstance.getNetworkParameters().getId());
+			BlocknetPeer blocknetPeer = blocknetPeerGroup.getBestBlocknetPeer(CoinTickerUtils.tickerToString(coinInstance.getTicker()));
 			if (blocknetPeer == null) {
-				LOGGER.log(Level.FINER, "[BackgroundTimer] Peer was not found for currency " + coinInstance.getNetworkParameters().getId());
+				LOGGER.log(Level.WARNING, "[XR] FAILED: No XRouter peer available for " +
+				           CoinTickerUtils.tickerToString(coinInstance.getTicker()) + ", skipping UTXO update");
 				continue;
 			}
 
+			String currency = CoinTickerUtils.tickerToString(coinInstance.getTicker());
+			LOGGER.log(Level.INFO, "[XR] Requesting " + currency + " UTXOs via XRouter");
 			coinInstance.sendXrGetUtxos(blocknetPeer);
-			LOGGER.log(Level.FINER, "[BackgroundTimer] Sent GetUtxos message: " + coinInstance.getNetworkParameters().getId());
 		}
 
 		lastBalanceUpdateTime = System.currentTimeMillis();

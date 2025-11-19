@@ -19,6 +19,12 @@ public class XRouterFeeUtils {
 	private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
 	public static String getXRouterFeeTx(BlocknetPeer blocknetPeer, String xRouterCommand) {
+		// TEMPORARILY DISABLED: XRouter fee service is not yet available
+		// TODO: Re-enable when XRouter fee service becomes available
+		LOGGER.log(Level.WARNING, "[xrouter-fee-utils] getXRouterFeeTx temporarily disabled - returning nohash;nofee for command: " + xRouterCommand);
+		return "nohash;nofee";
+		
+		/* ORIGINAL CODE - COMMENTED OUT FOR TEMPORARY DISABLE
 		CoinInstance blocknetCoin = CoinInstance.getInstance(CoinInstance.getActiveBlocknetNetwork());
 		WalletHelper blocknetWalletHelper = blocknetCoin.getWalletHelper();
 		NetworkParameters params = blocknetCoin.getNetworkParameters();
@@ -76,6 +82,7 @@ public class XRouterFeeUtils {
 		LOGGER.log(Level.FINER, xRouterFeeTx.toString());
 		LOGGER.log(Level.FINER, "[xrouter-fee-utils] DEBUG: Feetx: " + feetx);
 		return feetx;
+		*/
 	}
 
 	public static TransactionOutput createXrSendTransactionFeeOutput(BlocknetPeer blocknetPeer) {

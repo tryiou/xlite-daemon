@@ -31,22 +31,22 @@ public enum CoinTicker {
     public static List<CoinTicker> coins() {
         return Arrays.asList(
             BLOCKNET,
-            BLOCKNET_TESTNET5,
+            // BLOCKNET_TESTNET5,
             BITCOIN,
-//            BITCOIN_CASH, - not support on backend
             LITECOIN,
             DASHCOIN,
-//            DIGIBYTE, - not support on backend
             DOGECOIN,
-//           TREZARCOIN, - not support on backend
             SYSCOIN,
             PIVX,
             UNOBTANIUM
-//            ALQOCOIN, - not support on backend
-//            POLISCOIN, - not support on backend
-//            PHORECOIN, - not support on backend
-//            RAVENCOIN
-//            BITBAY - not support on backend
+            // BITCOIN_CASH, - not support on backend
+            // DIGIBYTE, - not support on backend
+            // TREZARCOIN, - not support on backend
+            // ALQOCOIN, - not support on backend
+            // POLISCOIN, - not support on backend
+            // PHORECOIN, - not support on backend
+            // RAVENCOIN
+            // BITBAY - not support on backend
         );
     }
 }

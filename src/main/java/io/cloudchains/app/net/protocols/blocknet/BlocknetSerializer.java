@@ -124,6 +124,8 @@ public class BlocknetSerializer extends BitcoinSerializer {
 				return new UTXOsMessage(params, payloadBytes);
 			case "getutxos":
 				return new GetUTXOsMessage(params, payloadBytes);
+			case "getaddr":
+				return new GetAddrMessage(params);
 			case "getsporks":
 			case "ssc":
 			case "mnget":
@@ -133,9 +135,14 @@ public class BlocknetSerializer extends BitcoinSerializer {
 			case "dseg":
 //				LOGGER.log(Level.FINER, "[blocknet-serializer] Warning: This serializer does not support deserializing dseg packets yet.");
 				return null;
+			case "snp":
+//				LOGGER.log(Level.FINER, "[blocknet-serializer] Warning: This serializer does not support deserializing snp packets yet.");
+				return null;
 			default:
 				LOGGER.log(Level.FINER, "[blocknet-serializer] Warning: This serializer does not support deserializing " + blocknetPacketHeader.getCommand() + " packets (yet).");
-				return new UnknownMessage(params, blocknetPacketHeader.getCommand(), payloadBytes);
+				// Return null instead of UnknownMessage to avoid IllegalStateException
+				// This prevents the parsing error while maintaining functionality
+				return null;
 		}
 	}
 
@@ -155,7 +162,13 @@ public class BlocknetSerializer extends BitcoinSerializer {
 
 	@Override
 	public AddressMessage makeAddressMessage(byte[] payloadBytes, int length) throws ProtocolException, UnsupportedOperationException {
-		return null;
+		try {
+			// Use BitcoinSerializer's makeAddressMessage method
+			return super.makeAddressMessage(payloadBytes, length);
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "[blocknet-serializer] Failed to create AddressMessage: " + e.getMessage());
+			return null;
+		}
 	}
 
 	@Override

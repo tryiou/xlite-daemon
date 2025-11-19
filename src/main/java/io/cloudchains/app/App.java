@@ -19,7 +19,8 @@ public class App {
 
 	private static final boolean isLoggingEnabled = false;
 	// DEBUG ENDPOINT
-	public static String BASE_URL = "https://xliterevp.mywire.org/";
+	public static String BASE_URL = "http://127.0.0.1:11111/";
+	// "https://xliterevp.mywire.org/";
 	// "http://xl-dae-prox.airdns.org:42111/";
 	// DEBUG ENDPOINT
 	public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
@@ -29,7 +30,7 @@ public class App {
 
 	public static void main(String[] args) {
 		CCLogger.setLogging(isLoggingEnabled);
-		LOGGER.setLevel(Level.INFO);
+		LOGGER.setLevel(Level.FINER);
 		LOGGER.setUseParentHandlers(false);
 
         Runtime.getRuntime().addShutdownHook(new Thread(App::shutdown));
@@ -72,7 +73,7 @@ public class App {
 					);
 				}
 			});
-			fileHandler.setLevel(Level.INFO);
+			fileHandler.setLevel(Level.FINE);
 
 			LOGGER.addHandler(fileHandler);
 

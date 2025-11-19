@@ -51,21 +51,21 @@ public class XRouterPacketHeader {
 		System.arraycopy(rawHeader, cursor, compactSizeBytes, 0, compactSizeBytes.length);
 		cursor += compactSizeBytes.length;
 
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved compact size: " + new String(Hex.encode(new byte[]{compactSize})));
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved compact size bytes: " + new String(Hex.encode(compactSizeBytes)));
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved compact size: " + new String(Hex.encode(new byte[]{compactSize})));
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved compact size bytes: " + new String(Hex.encode(compactSizeBytes)));
 
 		version = (int) Utils.readUint32(rawHeader, cursor);
 		cursor += 4;
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved version: " + version);
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved version: " + version);
 		command = (int) Utils.readUint32(rawHeader, cursor);
 		cursor += 4;
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved command: " + command);
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved command: " + command);
 		timestamp = (int) Utils.readUint32(rawHeader, cursor);
 		cursor += 4;
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved timestamp: " + timestamp);
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved timestamp: " + timestamp);
 		size = (int) Utils.readUint32(rawHeader, cursor);
 		cursor += 4;
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved size: " + size);
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved size: " + size);
 
 		//reserved header fields
 		//we don't use these fields, so we skip them
@@ -76,21 +76,21 @@ public class XRouterPacketHeader {
 		cursor += 36;
 
 		uuid = new String(uuidArr);
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved UUID: " + uuid);
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved UUID: " + uuid);
 
 		byte[] pubkeyArr = new byte[33];
 		System.arraycopy(rawHeader, cursor, pubkeyArr, 0, pubkeyArr.length);
 		cursor += 33;
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved pubkey: " + new String(Hex.encode(pubkeyArr)));
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved pubkey: " + new String(Hex.encode(pubkeyArr)));
 		pubkey = pubkeyArr;
 
 		byte[] sigArr = new byte[64];
 		System.arraycopy(rawHeader, cursor, sigArr, 0, sigArr.length);
 		cursor += 64;
-		LOGGER.log(Level.FINER, "[xrouter] Retrieved signature: " + new String(Hex.encode(sigArr)));
+		// LOGGER.log(Level.FINER, "[xrouter] Retrieved signature: " + new String(Hex.encode(sigArr)));
 		signature = sigArr;
 
-		LOGGER.log(Level.FINER, "[xrouter] XRouter header read complete, at position: " + cursor);
+		// LOGGER.log(Level.FINER, "[xrouter] XRouter header read complete, at position: " + cursor);
 		headerLength = cursor;
 		//should have read 157 bytes at this point (excluding compact size)
 	}

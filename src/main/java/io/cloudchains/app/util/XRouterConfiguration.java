@@ -143,16 +143,38 @@ public class XRouterConfiguration {
 
 		LOGGER.log(Level.FINER, "[xrouter-config-parser] DEBUG: Properties: " + properties.toString());
 
-		supportedWallets.addAll(Arrays.asList(((String) properties.get("Main").get("wallets")).split(",")));
-		timeout = Integer.parseInt((String) properties.get("Main").get("timeout"));
-		blockLimit = Integer.parseInt((String) properties.get("Main").get("blocklimit"));
-		feeAddress = (String) properties.get("Main").get("paymentaddress");
+		// Parse wallets
+		if (properties.get("Main") != null && properties.get("Main").get("wallets") != null) {
+			supportedWallets.addAll(Arrays.asList(((String) properties.get("Main").get("wallets")).split(",")));
+		}
 
+		// Parse timeout with null check
+		if (properties.get("Main") != null && properties.get("Main").get("timeout") != null) {
+			timeout = Integer.parseInt((String) properties.get("Main").get("timeout"));
+		} else {
+			timeout = 30; // Default timeout
+		}
+
+		// Parse blocklimit with null check and default value
+		if (properties.get("Main") != null && properties.get("Main").get("blocklimit") != null) {
+			blockLimit = Integer.parseInt((String) properties.get("Main").get("blocklimit"));
+		} else {
+			blockLimit = 100; // Default block limit
+		}
+
+		// Parse payment address
+		if (properties.get("Main") != null) {
+			feeAddress = (String) properties.get("Main").get("paymentaddress");
+		}
+
+		// Parse fees for xr commands
 		for (String key : properties.keySet()) {
 			if (key.startsWith("xr")) {
 				Properties xRouterPropertySet = properties.get(key);
-				double fee = Double.parseDouble((String) xRouterPropertySet.get("fee"));
-				feeMap.put(key, fee);
+				if (xRouterPropertySet != null && xRouterPropertySet.get("fee") != null) {
+					double fee = Double.parseDouble((String) xRouterPropertySet.get("fee"));
+					feeMap.put(key, fee);
+				}
 			}
 		}
 
