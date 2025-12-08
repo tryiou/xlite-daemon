@@ -4,6 +4,8 @@ import io.cloudchains.app.console.*;
 import io.cloudchains.app.net.api.JSONRPCController;
 import io.cloudchains.app.net.api.JSONRPCMasterServer;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
+import io.cloudchains.app.net.api.http.client.EXRWrapper;
+import io.cloudchains.app.net.api.http.client.EXRServerPool;
 import io.cloudchains.app.util.CCLogger;
 
 import java.io.File;
@@ -22,10 +24,22 @@ public class App {
 	public static String BASE_URL = "https://xliterevp.mywire.org/";
 	// "http://xl-dae-prox.airdns.org:42111/";
 	// DEBUG ENDPOINT
+	public static String EXR_ENDPOINT = null;
+	public static EXRServerPool exrServerPool = null;
 	public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
 	public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
 	public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();
 	public static ConsoleMenu console = null;
+
+	static {
+		// Check for EXR_ENDPOINT environment variable
+		String exrEndpoint = System.getenv("EXR_ENDPOINT");
+		if (exrEndpoint != null && !exrEndpoint.isEmpty()) {
+		    EXR_ENDPOINT = exrEndpoint;
+		    exrServerPool = new EXRServerPool(EXR_ENDPOINT);
+		    LOGGER.log(Level.INFO, "[app] EXR mode enabled with " + exrServerPool.getServerCount() + " servers: " + EXR_ENDPOINT);
+		}
+	}
 
 	public static void main(String[] args) {
 		CCLogger.setLogging(isLoggingEnabled);
@@ -105,6 +119,10 @@ public class App {
 
 		if (heightUpdateHttpClient != null) {
 			heightUpdateHttpClient.close();
+		}
+
+		if (exrServerPool != null) {
+			exrServerPool.close();
 		}
 
 		if (masterRPC != null) {

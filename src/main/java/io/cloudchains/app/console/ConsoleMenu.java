@@ -7,6 +7,8 @@ import io.cloudchains.app.crypto.LoginUtils;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
+import io.cloudchains.app.net.api.http.client.EXRWrapper;
+import io.cloudchains.app.net.api.http.client.EXRServerPool;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetNetworkParameters;
 import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.background.BackgroundTimerThread;
@@ -97,6 +99,28 @@ public class ConsoleMenu {
                             i++; // Increment i to skip the next argument (custom endpoint)
                         } else {
                             LOGGER.log(Level.WARNING, "Missing custom endpoint after '--development-endpoint'");
+                        }
+                        break;
+                    }
+                    case "--exr-endpoint": {
+                        if (i + 1 < arguments.length) {
+                            // Check if there is another argument after "--exr-endpoint"
+                            String exrEndpoint = arguments[i + 1];
+                            App.EXR_ENDPOINT = exrEndpoint;
+                            App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
+                            LOGGER.log(Level.INFO, "[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
+                            // Start capability probing in background
+                            new Thread(() -> {
+                                try {
+                                    Thread.sleep(1000); // Wait 1 second before starting probe
+                                    App.exrServerPool.probeAllCapabilities();
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }, "EXR-Capability-Prober").start();
+                            i++; // Increment i to skip the next argument (EXR endpoint)
+                        } else {
+                            LOGGER.log(Level.WARNING, "Missing EXR endpoint after '--exr-endpoint'");
                         }
                         break;
                     }
@@ -316,6 +340,11 @@ public class ConsoleMenu {
         App.masterRPC.start();
         backgroundTimerThread = new BackgroundTimerThread();
         (new Thread(backgroundTimerThread)).start();
+        
+        // Start EXR capability probing after wallet is decrypted
+        if (App.exrServerPool != null) {
+            App.exrServerPool.probeAllCapabilities();
+        }
     }
 
     private void autoGenerateRPCConfig() {
@@ -364,6 +393,8 @@ public class ConsoleMenu {
         System.out.println("  --enablerpcandconfigure    Enable and configure RPC");
         System.out.println("  --development-endpoint     Set a custom development endpoint");
         System.out.println("                             Example: --development-endpoint <https://url.endpoint.org/>");
+        System.out.println("  --exr-endpoint             Set EXR endpoint for EXR server");
+        System.out.println("                             Example: --exr-endpoint <http://exrproxy1.airdns.org:42114>");
         System.out.println("  --version                  Display the version");
         System.out.println("  --createdefaultwallet     Create a default wallet");
         System.out.println("  --createwalletmnemonic    Create a wallet with a mnemonic");
