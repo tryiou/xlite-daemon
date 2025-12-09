@@ -30,6 +30,7 @@ import io.cloudchains.app.net.xrouter.XRouterMessage;
 import io.cloudchains.app.net.xrouter.XRouterMessageSerializer;
 import io.cloudchains.app.net.xrouter.XRouterPacketManager;
 import io.cloudchains.app.util.AddressBalance;
+import io.cloudchains.app.util.AddressDiscoveryService;
 import io.cloudchains.app.util.CloudTransaction;
 import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.UTXO;
@@ -112,6 +113,7 @@ public class CoinInstance {
 	private long lastUtxoUpdate = 0;
 	private int updateFailures = 0;
 	private int generatedAddressCount;
+	private AddressDiscoveryService discoveryService = null;
 
 	private CoinInstance(CoinTicker ticker) {
 		this.ticker = ticker;
@@ -478,6 +480,11 @@ public class CoinInstance {
 			String mnemonic = getMnemonic();
 			// LOGGER.log(Level.FINE, "[wallet] Mnemonic = " + mnemonic);
 		}
+
+		// RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
+		// This ensures discovery runs once at wallet startup in ANY case
+		LOGGER.log(Level.INFO, "[coin] Running address discovery");
+		runAddressDiscovery();
 
 		// Make sure wallet addresses are available
 		generateForwardAddresses(true);
@@ -1015,6 +1022,33 @@ public class CoinInstance {
 
 	public void resetUpdateFailures() {
 		updateFailures = 0;
+	}
+
+	public void runAddressDiscovery() {
+		String currency = CoinTickerUtils.tickerToString(this.getTicker());
+		
+		if (discoveryService == null) {
+			discoveryService = new AddressDiscoveryService(this);
+			LOGGER.log(Level.INFO, "[coin-" + currency + "] AddressDiscoveryService created");
+		}
+		
+		int discoveredCount = discoveryService.discoverAddressCount();
+		int currentCount = configHelper.getAddressCount();
+		
+		if (discoveredCount > currentCount) {
+			LOGGER.log(Level.INFO, "[coin-" + currency + "] Address discovery found " +
+					  discoveredCount + " addresses (was " + currentCount + ")");
+			
+			// Update config and generate missing addresses
+			configHelper.setAddressCount(discoveredCount);
+			configHelper.writeConfig();
+			
+			LOGGER.log(Level.INFO, "[coin-" + currency + "] Updated address count to " +
+					  discoveredCount);
+		} else {
+			LOGGER.log(Level.INFO, "[coin-" + currency + "] No new addresses discovered, " +
+					  "keeping current count: " + currentCount);
+		}
 	}
 
 	public boolean isInstanceRunning() {
