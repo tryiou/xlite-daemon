@@ -141,6 +141,8 @@ class TestWallet {
     void beforeEach() {
         ConfigHelper.CONFIG_DIR = ".";
         clean();
+        // Disable address discovery during tests to prevent interference with deterministic address generation
+        CoinInstance.setAddressDiscoveryEnabled(false);
     }
 
     @AfterAll

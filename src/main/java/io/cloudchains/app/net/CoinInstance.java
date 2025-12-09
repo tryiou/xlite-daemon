@@ -114,6 +114,7 @@ public class CoinInstance {
 	private int updateFailures = 0;
 	private int generatedAddressCount;
 	private AddressDiscoveryService discoveryService = null;
+	private static boolean addressDiscoveryEnabled = true;
 
 	private CoinInstance(CoinTicker ticker) {
 		this.ticker = ticker;
@@ -483,8 +484,12 @@ public class CoinInstance {
 
 		// RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
 		// This ensures discovery runs once at wallet startup in ANY case
-		LOGGER.log(Level.INFO, "[coin] Running address discovery");
-		runAddressDiscovery();
+		if (addressDiscoveryEnabled) {
+			LOGGER.log(Level.INFO, "[coin] Running address discovery");
+			runAddressDiscovery();
+		} else {
+			LOGGER.log(Level.INFO, "[coin] Address discovery disabled");
+		}
 
 		// Make sure wallet addresses are available
 		generateForwardAddresses(true);
@@ -1053,5 +1058,13 @@ public class CoinInstance {
 
 	public boolean isInstanceRunning() {
 		return updateFailures < 5;
+	}
+	
+	public static void setAddressDiscoveryEnabled(boolean enabled) {
+		addressDiscoveryEnabled = enabled;
+	}
+	
+	public static boolean isAddressDiscoveryEnabled() {
+		return addressDiscoveryEnabled;
 	}
 }
