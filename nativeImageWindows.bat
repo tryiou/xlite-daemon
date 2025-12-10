@@ -1,5 +1,4 @@
 @echo off
-setlocal enabledelayedexpansion
 
 REM Check if Chocolatey is installed, if not install it
 where /q choco
@@ -14,90 +13,82 @@ choco install -y visualstudio2022-workload-vctools
 
 REM Define GraalVM installation path
 set "GRAALVM_BASE=C:\Program Files\GraalVM"
-set "GRAALVM_JDK_DIR="
 
 REM Find the GraalVM JDK directory dynamically (wildcard for version)
 echo   - Searching for existing GraalVM installation...
-set "GRAALVM_NOT_FOUND=1"
+
+REM Check if GraalVM directory exists
+if not exist "%GRAALVM_BASE%" mkdir "%GRAALVM_BASE%"
+
+REM Look for existing GraalVM installation
+set "GRAALVM_FOUND=0"
 for /d %%D in ("%GRAALVM_BASE%\graalvm-community-openjdk-21*") do (
-    echo     Found: %%~nxD
+    echo     Found existing installation: %%~nxD
     set "GRAALVM_JDK_DIR=%%~nxD"
-    set "GRAALVM_NOT_FOUND=0"
-    goto :found_graalvm_dir
+    set "GRAALVM_FOUND=1"
+    goto :found_graalvm
 )
 
-:found_graalvm_dir
+:not_found
+echo Error: No GraalVM JDK 21.x directory found in %GRAALVM_BASE%
+REM Download and install GraalVM JDK 21 directly
+echo Downloading GraalVM JDK 21...
 
-REM Check if wildcard found a match
-if "%GRAALVM_NOT_FOUND%"=="1" (
-    echo Error: No GraalVM JDK 21.x directory found in %GRAALVM_BASE%
-    REM Download and install GraalVM JDK 21 directly
-    echo Downloading GraalVM JDK 21...
+REM Check if graalvm.zip already exists to avoid re-downloading
+if exist "graalvm.zip" (
+    echo GraalVM zip file already exists, skipping download.
+) else (
+    curl -L --location --retry 3 -o graalvm.zip "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-21.0.2/graalvm-community-jdk-21.0.2_windows-x64_bin.zip"
     
-    REM Check if graalvm.zip already exists to avoid re-downloading
-    if exist "graalvm.zip" (
-        echo GraalVM zip file already exists, skipping download.
-    ) else (
-        curl -L -o graalvm.zip "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-21.0.2/graalvm-community-jdk-21.0.2_windows-x64_bin.zip" --location --retry 3 --fail --show-error
-
-        if %ERRORLEVEL% NEQ 0 (
-            echo Failed to download GraalVM. Please check your internet connection.
-            exit /b %ERRORLEVEL%
-        )
-    )
-
-    echo Extracting GraalVM...
-    echo   - Removing old GraalVM directory...
-    rmdir /s /q "C:\Program Files\GraalVM" 2>nul
-    echo   - Creating GraalVM directory...
-    mkdir "C:\Program Files\GraalVM"
-    echo   - Extracting archive to C:\Program Files\GraalVM...
-    powershell -Command "Expand-Archive -Path graalvm.zip -DestinationPath 'C:\Program Files\GraalVM' -Force"
-
-    if %ERRORLEVEL% NEQ 0 (
-        echo Failed to extract GraalVM archive.
-        exit /b %ERRORLEVEL%
-    )
-
-    REM Find the GraalVM JDK directory dynamically (wildcard for version) immediately after extraction
-    echo   - Searching for extracted GraalVM directory...
-    set "GRAALVM_JDK_DIR="
-    for /d %%D in ("%GRAALVM_BASE%\graalvm-community-openjdk-21*") do (
-        echo     Found: %%~nxD
-        set "GRAALVM_JDK_DIR=%%~nxD"
-        goto :found_extracted_dir
-    )
-
-    :found_extracted_dir
-
-    if "%GRAALVM_JDK_DIR%"=="" (
-        echo Failed to find extracted GraalVM directory
-        echo   - Available directories in %GRAALVM_BASE%:
-        dir "%GRAALVM_BASE%" /b /ad
+    if not exist graalvm.zip (
+        echo Failed to download GraalVM. Please check your internet connection.
         exit /b 1
     )
-
-    set "GRAALVM_PATH=%GRAALVM_BASE%\%GRAALVM_JDK_DIR%"
-
-    REM Verify extraction succeeded
-    if not exist "%GRAALVM_PATH%" (
-        echo Failed to extract GraalVM to %GRAALVM_PATH%
-        exit /b 1
-    )
-
-    set "GRAALVM_NOT_FOUND=0"
+    echo Download successful.
 )
 
+echo Extracting GraalVM...
+echo   - Removing old GraalVM directory...
+rmdir /s /q "%GRAALVM_BASE%" 2>nul
+echo   - Creating GraalVM directory...
+mkdir "%GRAALVM_BASE%"
+echo   - Checking if graalvm.zip exists and is readable...
+if not exist "graalvm.zip" (
+    echo Error: graalvm.zip file not found!
+    exit /b 1
+)
+echo   - File size:
+for %%F in (graalvm.zip) do echo     %%~zF bytes
+echo   - Extracting archive to %GRAALVM_BASE%...
+powershell -Command "Expand-Archive -Path graalvm.zip -DestinationPath '%GRAALVM_BASE%' -Force"
+
+echo   - Verifying extraction...
+timeout /t 2 /nobreak >nul
+
+REM Find the extracted directory
+set "GRAALVM_FOUND=0"
+for /d %%D in ("%GRAALVM_BASE%\graalvm-community-openjdk-21*") do (
+    echo     Found extracted directory: %%~nxD
+    set "GRAALVM_JDK_DIR=%%~nxD"
+    set "GRAALVM_FOUND=1"
+    goto :found_graalvm
+)
+
+echo Failed to extract GraalVM - no directory found after extraction
+echo   - Available directories in %GRAALVM_BASE%:
+dir "%GRAALVM_BASE%" /b /ad
+exit /b 1
+
+:found_graalvm
 set "GRAALVM_PATH=%GRAALVM_BASE%\%GRAALVM_JDK_DIR%"
 set "GRAALVM_BIN=%GRAALVM_PATH%\bin"
 
 echo   - Checking GraalVM JDK directory...
 if exist "%GRAALVM_PATH%" (
-    echo     ✓ GraalVM JDK directory exists at: %GRAALVM_PATH%
-    echo     ✓ Using wildcard-matched directory: %GRAALVM_JDK_DIR%
-    dir "%GRAALVM_PATH%" /b
+    echo     GraalVM JDK directory exists at: %GRAALVM_PATH%
+    echo     Using directory: %GRAALVM_JDK_DIR%
 ) else (
-    echo     ✗ GraalVM JDK directory NOT found at: %GRAALVM_PATH%
+    echo     GraalVM JDK directory NOT found at: %GRAALVM_PATH%
     exit /b 1
 )
 
@@ -149,15 +140,15 @@ echo Building XLite Daemon with nativeCompile...
 REM Build the project using Gradle nativeCompile task
 gradlew.bat clean nativeCompile --info
 
+if %ERRORLEVEL% NEQ 0 (
+    echo Build failed!
+    exit /b %ERRORLEVEL%
+)
+
 REM Additional check for build output
 if not exist build\native\nativeCompile\xlite-daemon.exe (
     echo Build completed but native image not found at expected location
     exit /b 1
-)
-
-if %ERRORLEVEL% NEQ 0 (
-    echo Build failed!
-    exit /b %ERRORLEVEL%
 )
 
 echo Build completed successfully!

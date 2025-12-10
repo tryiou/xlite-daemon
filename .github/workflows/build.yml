@@ -20,7 +20,8 @@ jobs:
   build_linux:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         if: github.event.pull_request.draft == false
 
       # - name: Setup GraalVM JDK 21 via SDKMAN (FOR LOCAL TESTING WITH ACT)
@@ -32,29 +33,38 @@ jobs:
       #     echo "JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.2-graalce" >> $GITHUB_ENV
       #     echo "$HOME/.sdkman/candidates/java/21.0.2-graalce/bin" >> $GITHUB_PATH
           
-      - uses: graalvm/setup-graalvm@v1
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
           distribution: 'graalvm-community'   
-          components: native-image
 
-      - name: Verify Java Installation
+      - name: Verify Java installation
         run: |
           java -version
           native-image --version          
 
-      - run: chmod +x gradlew
-      - run: ./gradlew nativeCompile --info
-      - run: chmod +x build/native/nativeCompile/xlite-daemon
-      - run: mv build/native/nativeCompile/xlite-daemon build/native/nativeCompile/xlite-daemon-linux64
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
-      - uses: actions/upload-artifact@v4
+      - name: Build native image
+        run: ./gradlew nativeCompile --info
+
+      - name: Make daemon executable
+        run: chmod +x build/native/nativeCompile/xlite-daemon
+
+      - name: Rename executable
+        run: mv build/native/nativeCompile/xlite-daemon build/native/nativeCompile/xlite-daemon-linux64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: artifacts-linux
           path: |
             build/native/nativeCompile/xlite-daemon-linux64
 
-      - uses: softprops/action-gh-release@v1
+      - name: Create release
+        uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
@@ -66,32 +76,42 @@ jobs:
   build_mac:
     runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         if: github.event.pull_request.draft == false
 
-      - uses: graalvm/setup-graalvm@v1
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
           distribution: 'graalvm-community'   
-          components: native-image
 
-      - name: Verify Java Installation
+      - name: Verify Java installation
         run: |
           java -version
           native-image --version      
 
-      - run: chmod +x gradlew
-      - run: ./gradlew nativeCompile --info
-      - run: chmod +x build/native/nativeCompile/xlite-daemon
-      - run: mv build/native/nativeCompile/xlite-daemon build/native/nativeCompile/xlite-daemon-osx64
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
-      - uses: actions/upload-artifact@v4
+      - name: Build native image
+        run: ./gradlew nativeCompile --info
+
+      - name: Make daemon executable
+        run: chmod +x build/native/nativeCompile/xlite-daemon
+
+      - name: Rename executable
+        run: mv build/native/nativeCompile/xlite-daemon build/native/nativeCompile/xlite-daemon-osx64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: artifacts-mac
           path: |
             build/native/nativeCompile/xlite-daemon-osx64
 
-      - uses: softprops/action-gh-release@v1
+      - name: Create release
+        uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
@@ -103,54 +123,42 @@ jobs:
   build_win:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         if: github.event.pull_request.draft == false
 
-      - uses: graalvm/setup-graalvm@v1
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
           distribution: 'graalvm-community'   
-          components: native-image
 
-      - name: Verify Java Installation
+      - name: Verify Java installation
         run: |
           java -version
           native-image --version
 
-      - name: Install Windows SDK and Visual Studio Build Tools
-        run: |
-          choco install -y windows-sdk-10.0
-          choco install -y visualstudio2022-workload-vctools
+      - name: Install Windows SDK
+        run: choco install -y windows-sdk-10.0
 
-      - name: Setup Visual Studio Build Environment
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-          echo "Visual Studio environment loaded"
+      - name: Install Visual Studio Build Tools & sdk
+        run: choco install -y visualstudio2022-workload-vctools windows-sdk-10.0
 
-      - name: Setup Windows SDK Environment
-        run: |
-          $sdkVersion = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*" -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          $sdkBinPath = "$($sdkVersion.FullName)\x64"
-          $sdkIncludePath = "$($sdkVersion.Parent.FullName)\include\$($sdkVersion.Name)\shared;$($sdkVersion.Parent.FullName)\include\$($sdkVersion.Name)\um;$($sdkVersion.Parent.FullName)\include\$($sdkVersion.Name)\ucrt"
-          $sdkLibPath = "$($sdkVersion.Parent.FullName)\lib\$($sdkVersion.Name)\um\x64"
-          
-          echo "SDK_BIN_PATH=$sdkBinPath" >> $env:GITHUB_ENV
-          echo "SDK_INCLUDE_PATH=$sdkIncludePath" >> $env:GITHUB_ENV
-          echo "SDK_LIB_PATH=$sdkLibPath" >> $env:GITHUB_ENV
-          
-          $env:PATH = "$sdkBinPath;$env:PATH"
-          $env:INCLUDE = "$sdkIncludePath;$env:INCLUDE"
-          $env:LIB = "$sdkLibPath;$env:LIB"
+      - name: Build native image
+        run: ./gradlew.bat nativeCompile --info
 
-      - run: ./gradlew.bat nativeCompile --info
-      - run: ren build\native\nativeCompile\xlite-daemon.exe xlite-daemon-win64.exe
-      - uses: actions/upload-artifact@v4
+      - name: Rename executable
+        run: ren build\native\nativeCompile\xlite-daemon.exe xlite-daemon-win64.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: artifacts-win
           path: |
             build\native\nativeCompile\xlite-daemon-win64.exe
 
-      - uses: softprops/action-gh-release@v1
+      - name: Create release
+        uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
