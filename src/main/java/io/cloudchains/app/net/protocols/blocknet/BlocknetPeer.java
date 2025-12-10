@@ -121,7 +121,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
 					return peers.get(0);
 				}
-			});
+			}, Threading.SAME_THREAD);
 
 	private FilteredBlock currentFilteredBlock;
 	private final HashSet<Sha256Hash> pendingBlockDownloads = new HashSet<>();

@@ -1,91 +1,174 @@
 @echo off
+setlocal enabledelayedexpansion
 
-REM INSTALL CHOCO ?
-REM @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-
-REM Install Needed packages
-choco install windows-sdk-10 -y
-REM # ? choco install visualstudio2019buildtools -y --package-parameters "--includeRecommended --includeOptional"
-choco install -y visualstudio2019-workload-vctools
-choco install openjdk --version 17 -y
-
-call refreshenv
-
-REM Build the project using Gradle
-call gradlew.bat clean build
-call gradlew.bat downloadGraalTooling
-call gradlew.bat extractGraalTooling 
-
-SET GRAAL_HOME=%USERPROFILE%\.gradle\caches\com.palantir.graal\22.3.0\17\graalvm-ce-java17-22.3.0
-SET NATIVE_IMAGE=%GRAAL_HOME%\bin\native-image
-SET CC_PACKAGED_JAR=%cd%\build\libs\xlite-daemon-0.5.14-all.jar
-
-REM Load the Build Tools environment
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-
-REM Set environment variables for Windows SDK 10
-for /f "delims=" %%a in ('dir /b /ad /o-n "%ProgramFiles(x86)%\Windows Kits\10\bin\*"') do (
-    SET "SDK_VERSION=%%a"
-    goto :next
+REM Check if Chocolatey is installed, if not install it
+where /q choco
+if %ERRORLEVEL% NEQ 0 (
+    echo Chocolatey not found. Installing Chocolatey...
+    powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"
 )
 
-:next
+REM Install Needed packages
+choco install windows-sdk-10.0 -y
+choco install -y visualstudio2022-workload-vctools
+
+REM Define GraalVM installation path
+set "GRAALVM_BASE=C:\Program Files\GraalVM"
+set "GRAALVM_JDK_DIR="
+
+REM Find the GraalVM JDK directory dynamically (wildcard for version)
+echo   - Searching for existing GraalVM installation...
+set "GRAALVM_NOT_FOUND=1"
+for /d %%D in ("%GRAALVM_BASE%\graalvm-community-openjdk-21*") do (
+    echo     Found: %%~nxD
+    set "GRAALVM_JDK_DIR=%%~nxD"
+    set "GRAALVM_NOT_FOUND=0"
+    goto :found_graalvm_dir
+)
+
+:found_graalvm_dir
+
+REM Check if wildcard found a match
+if "%GRAALVM_NOT_FOUND%"=="1" (
+    echo Error: No GraalVM JDK 21.x directory found in %GRAALVM_BASE%
+    REM Download and install GraalVM JDK 21 directly
+    echo Downloading GraalVM JDK 21...
+    
+    REM Check if graalvm.zip already exists to avoid re-downloading
+    if exist "graalvm.zip" (
+        echo GraalVM zip file already exists, skipping download.
+    ) else (
+        curl -L -o graalvm.zip "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-21.0.2/graalvm-community-jdk-21.0.2_windows-x64_bin.zip" --location --retry 3 --fail --show-error
+
+        if %ERRORLEVEL% NEQ 0 (
+            echo Failed to download GraalVM. Please check your internet connection.
+            exit /b %ERRORLEVEL%
+        )
+    )
+
+    echo Extracting GraalVM...
+    echo   - Removing old GraalVM directory...
+    rmdir /s /q "C:\Program Files\GraalVM" 2>nul
+    echo   - Creating GraalVM directory...
+    mkdir "C:\Program Files\GraalVM"
+    echo   - Extracting archive to C:\Program Files\GraalVM...
+    powershell -Command "Expand-Archive -Path graalvm.zip -DestinationPath 'C:\Program Files\GraalVM' -Force"
+
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to extract GraalVM archive.
+        exit /b %ERRORLEVEL%
+    )
+
+    REM Find the GraalVM JDK directory dynamically (wildcard for version) immediately after extraction
+    echo   - Searching for extracted GraalVM directory...
+    set "GRAALVM_JDK_DIR="
+    for /d %%D in ("%GRAALVM_BASE%\graalvm-community-openjdk-21*") do (
+        echo     Found: %%~nxD
+        set "GRAALVM_JDK_DIR=%%~nxD"
+        goto :found_extracted_dir
+    )
+
+    :found_extracted_dir
+
+    if "%GRAALVM_JDK_DIR%"=="" (
+        echo Failed to find extracted GraalVM directory
+        echo   - Available directories in %GRAALVM_BASE%:
+        dir "%GRAALVM_BASE%" /b /ad
+        exit /b 1
+    )
+
+    set "GRAALVM_PATH=%GRAALVM_BASE%\%GRAALVM_JDK_DIR%"
+
+    REM Verify extraction succeeded
+    if not exist "%GRAALVM_PATH%" (
+        echo Failed to extract GraalVM to %GRAALVM_PATH%
+        exit /b 1
+    )
+
+    set "GRAALVM_NOT_FOUND=0"
+)
+
+set "GRAALVM_PATH=%GRAALVM_BASE%\%GRAALVM_JDK_DIR%"
+set "GRAALVM_BIN=%GRAALVM_PATH%\bin"
+
+echo   - Checking GraalVM JDK directory...
+if exist "%GRAALVM_PATH%" (
+    echo     ✓ GraalVM JDK directory exists at: %GRAALVM_PATH%
+    echo     ✓ Using wildcard-matched directory: %GRAALVM_JDK_DIR%
+    dir "%GRAALVM_PATH%" /b
+) else (
+    echo     ✗ GraalVM JDK directory NOT found at: %GRAALVM_PATH%
+    exit /b 1
+)
+
+echo Setting environment variables...
+setx JAVA_HOME "%GRAALVM_PATH%"
+setx PATH "%GRAALVM_BIN%;%PATH%"
+
+REM Set environment variables for current session
+set "JAVA_HOME=%GRAALVM_PATH%"
+set "PATH=%GRAALVM_BIN%;%PATH%"
+
+REM Load the Build Tools environment
+if not exist "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" (
+    echo Visual Studio 2022 Build Tools not found at expected location.
+    exit /b 1
+)
+
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to load Visual Studio Build Tools environment.
+    exit /b %ERRORLEVEL%
+)
+
+REM Set environment variables for Windows SDK 10
+set "SDK_VERSION="
+for /f "delims=" %%a in ('dir /b /ad /o-n "%ProgramFiles(x86)%\Windows Kits\10\bin\*" 2^>nul') do (
+    SET "SDK_VERSION=%%a"
+    goto :found_sdk
+)
+
+:found_sdk
+if "%SDK_VERSION%"=="" (
+    echo Windows SDK not found
+    exit /b 1
+)
+
 SET "SDK_BIN_PATH=%ProgramFiles(x86)%\Windows Kits\10\bin\%SDK_VERSION%\x64"
 SET "SDK_INCLUDE_PATH=%ProgramFiles(x86)%\Windows Kits\10\include\%SDK_VERSION%\shared;%ProgramFiles(x86)%\Windows Kits\10\include\%SDK_VERSION%\um;%ProgramFiles(x86)%\Windows Kits\10\include\%SDK_VERSION%\ucrt"
 SET "SDK_LIB_PATH=%ProgramFiles(x86)%\Windows Kits\10\lib\%SDK_VERSION%\um\x64;%LIB%"
 
-REM Update environment variables
+REM Update environment variables for current session
 SET "PATH=%SDK_BIN_PATH%;%PATH%"
 SET "INCLUDE=%SDK_INCLUDE_PATH%;%INCLUDE%"
 SET "LIB=%SDK_LIB_PATH%;%LIB%"
 
-echo GRAAL_HOME=%GRAAL_HOME%
-echo NATIVE_IMAGE=%NATIVE_IMAGE%
-echo CC_PACKAGED_JAR=%CC_PACKAGED_JAR%
+echo Building XLite Daemon with nativeCompile...
 
-call %NATIVE_IMAGE% -jar %CC_PACKAGED_JAR% ^
-    -H:Name=Cloudchains-SPV ^
-    -H:Class=io.cloudchains.app.App ^
-    -H:+JNI ^
-    -H:+UseServiceLoaderFeature ^
-    -H:-UseServiceLoaderFeature ^
-    -H:ReflectionConfigurationFiles=contrib/netty-reflection.json ^
-    -H:ResourceConfigurationFiles=contrib/resource-config.json ^
-    -H:IncludeResources='.*/wordlist/english.txt$' ^
-    -H:Log=registerResource ^
-    --no-fallback ^
-    --no-server ^
-    -da ^
-    --enable-url-protocols=http,https ^
-    --initialize-at-build-time=io.netty ^
-    --initialize-at-build-time=com.google.common ^
-    --initialize-at-build-time=org.apache.commons.logging ^
-    --initialize-at-build-time=org.slf4j.LoggerFactory ^
-    --initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder ^
-    --initialize-at-build-time=org.slf4j.helpers.NOPLogger ^
-    --initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory ^
-    --initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory ^
-    --initialize-at-build-time=org.slf4j.helpers.Util ^
-    --initialize-at-build-time=org.bitcoinj.core.Utils ^
-    --initialize-at-build-time=org.bitcoinj.core.Sha256Hash ^
-    --initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode ^
-    --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger ^
-    --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder ^
-    --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter ^
-    --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil ^
-    --initialize-at-run-time=io.netty.buffer.PooledByteBufAllocator ^
-    --initialize-at-run-time=io.netty.buffer.ByteBufAllocator ^
-    --initialize-at-run-time=io.netty.buffer.ByteBufUtil ^
-    --initialize-at-run-time=io.netty.buffer.AbstractReferenceCountedByteBuf ^
-    --initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil ^
-    --initialize-at-run-time=io.netty.handler.codec.http2.Http2ClientUpgradeCodec ^
-    --initialize-at-run-time=io.netty.handler.codec.http2.Http2ConnectionHandler ^
-    --initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter ^
-    --initialize-at-run-time=io.netty.util.AbstractReferenceCounted ^
-    --initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder ^
-    --initialize-at-run-time=io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder ^
-    --initialize-at-run-time=io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder ^
-    --initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom ^
-    --allow-incomplete-classpath ^
-    --verbose ^
-    -H:+ReportExceptionStackTraces
+REM Build the project using Gradle nativeCompile task
+gradlew.bat clean nativeCompile --info
+
+REM Additional check for build output
+if not exist build\native\nativeCompile\xlite-daemon.exe (
+    echo Build completed but native image not found at expected location
+    exit /b 1
+)
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Build failed!
+    exit /b %ERRORLEVEL%
+)
+
+echo Build completed successfully!
+
+REM Rename the output file
+if exist build\native\nativeCompile\xlite-daemon.exe (
+    ren build\native\nativeCompile\xlite-daemon.exe xlite-daemon-win64.exe
+    echo Native image created: build\native\nativeCompile\xlite-daemon-win64.exe
+) else (
+    echo Error: Native image not found at expected location
+    exit /b 1
+)
+
+echo Native compilation complete!

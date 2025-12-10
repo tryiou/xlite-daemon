@@ -1,14 +1,29 @@
 plugins {
     id 'application'
-    id 'com.palantir.graal' version '0.12.0'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'org.graalvm.buildtools.native' version '0.11.1'
+    id 'com.gradleup.shadow' version '9.3.0'
 }
 
-project.version = "0.5.14"
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 
-apply plugin: 'java'
-apply plugin: 'com.github.johnrengelman.shadow'
-group 'io.cloudchains'
+application {
+    mainClass = 'io.cloudchains.app.App'
+}
+
+ext {
+    bitcoinjVersion = '0.14.7'
+    nettyVersion = '4.1.115.Final'
+    junitVersion = '5.11.3'
+    slf4jVersion = '2.0.16'
+    gsonVersion = '2.13.2'
+}
+
+version = "0.5.14"
+group = 'io.cloudchains'
 
 repositories {
     mavenCentral()
@@ -19,7 +34,6 @@ run {
     if (project.hasProperty('args')) {
         args project.args.split("=")
     }
-
     standardInput = System.in
 }
 
@@ -27,72 +41,77 @@ shadowJar {
     // mergeServiceFiles()
 }
 
-sourceSets {
-    main {
-        resources {
-        }
-    }
-}
-
 test {
     useJUnitPlatform()
 }
 
 
-graal {
-    graalVersion '22.3.0'
-    javaVersion '17'
-    mainClass 'io.cloudchains.app.App'
-    outputName 'xlite-daemon'
-    option '-H:+JNI'
-    option '-H:+UseServiceLoaderFeature'
-    option '-H:-UseServiceLoaderFeature'
-    option '-H:ReflectionConfigurationFiles=contrib/netty-reflection.json'
-    option '-H:ResourceConfigurationFiles=contrib/resource-config.json'
-    option '-H:IncludeResources=.*/wordlist/english.txt$'
-    option '-H:Log=registerResource'
-    option '--no-fallback'
-    option '--no-server'
-    option '-da' // Disables assertions
-    option '--enable-url-protocols=http,https'
-    option '--initialize-at-build-time=io.netty'
-    option '--initialize-at-build-time=com.google.common'
-    option '--initialize-at-build-time=org.apache.commons.logging'
-    option '--initialize-at-build-time=org.slf4j.LoggerFactory'
-    option '--initialize-at-build-time=org.slf4j.impl.StaticLoggerBinder'
-    option '--initialize-at-build-time=org.slf4j.helpers.NOPLogger'
-    option '--initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory'
-    option '--initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory'
-    option '--initialize-at-build-time=org.slf4j.helpers.Util'
-    option '--initialize-at-build-time=org.bitcoinj.core.Utils'
-    option '--initialize-at-build-time=org.bitcoinj.core.Sha256Hash'
-    option '--initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode'
-    option '--initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger'
-    option '--initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder'
-    option '--initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter'
-    option '--initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil'
-    option '--allow-incomplete-classpath'
-    option '--verbose'
+graalvmNative {
+    binaries {
+        main {
+            imageName = 'xlite-daemon'
+            mainClass = 'io.cloudchains.app.App'
+            buildArgs.addAll([
+                '--enable-native-access=ALL-UNNAMED',
+                '--enable-url-protocols=http,https',
+                '--features=com.oracle.svm.thirdparty.gson.GsonFeature',
+                '--features=com.oracle.svm.polyglot.groovy.GroovyIndyInterfaceFeature',
+                '--allow-incomplete-classpath',
+                '--verbose',
+                '--no-fallback',
+                '--no-server'
+            ])
+            
+            // Build-time initialization
+            buildArgs.addAll([
+                '--initialize-at-build-time=com.google.common.base.Charsets',
+                '--initialize-at-build-time=com.google.common.math.IntMath$1',
+                '--initialize-at-build-time=com.google.common.math.IntMath',
+                '--initialize-at-build-time=com.google.common.base.Charsets$1',
+                '--initialize-at-build-time=com.google.common.base.StandardCharsets',
+                '--initialize-at-build-time=io.netty,org.apache.commons.logging,org.slf4j',
+                '--initialize-at-build-time=org.slf4j.helpers.NOPLogger',
+                '--initialize-at-build-time=org.slf4j.helpers.NOPLoggerFactory',
+                '--initialize-at-build-time=org.slf4j.helpers.SubstituteLoggerFactory',
+                '--initialize-at-build-time=org.slf4j.helpers.Util',
+                '--initialize-at-build-time=org.slf4j.helpers.NOP_FallbackServiceProvider',
+                '--initialize-at-build-time=org.slf4j.nop.NOPServiceProvider',
+                '--initialize-at-build-time=org.slf4j.helpers.SubstituteServiceProvider',
+                '--initialize-at-build-time=org.bitcoinj.core.Utils',
+                '--initialize-at-build-time=org.bitcoinj.core.Sha256Hash',
+                '--initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode',
+                '--initialize-at-build-time=com.google.common.io.BaseEncoding',
+                '--initialize-at-build-time=com.google.common.io.BaseEncoding$Base16Encoding',
+                '--initialize-at-build-time=com.google.common.io.BaseEncoding$Alphabet'
+            ])
+            
+            // Runtime initialization
+            buildArgs.addAll([
+                '--initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger',
+                '--initialize-at-run-time=io.netty.handler.codec.http.HttpObjectEncoder',
+                '--initialize-at-run-time=io.netty.handler.codec.http2.DefaultHttp2FrameWriter',
+                '--initialize-at-run-time=io.netty.handler.codec.http2.Http2CodecUtil'
+            ])
+        }
+    }
 }
 
 dependencies {
-    implementation group: 'org.bitcoinj', name: 'bitcoinj-core', version: '0.14.7'
-    implementation group: 'org.bitcoinj', name: 'orchid', version: '1.2.1'
-    implementation group: 'net.jcip', name: 'jcip-annotations', version: '1.0'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
-    testImplementation 'org.junit.platform:junit-platform-engine:1.9.2'
-    implementation 'org.json:json:20210307'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
-    implementation 'org.apache.logging.log4j:log4j:2.20.0'
-    implementation group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
-    implementation group: 'commons-logging', name: 'commons-logging', version: '1.2'
-    implementation group: 'org.slf4j', name: 'slf4j-nop', version: '2.0.7'
-    implementation group: 'io.netty', name: 'netty-all', version: '4.1.92.Final'
-    implementation 'com.google.code.findbugs:jsr305:3.0.2'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
-    compileOnly 'com.oracle.substratevm:svm:19.2.1'
-    compileOnly group: 'org.graalvm.nativeimage', name: 'svm', version: '22.3.0'
+    implementation "org.bitcoinj:bitcoinj-core:${bitcoinjVersion}"
+    implementation "org.bitcoinj:orchid:1.2.1"
+    implementation 'net.jcip:jcip-annotations:1.0'
+    implementation "org.json:json:20250517"
+    implementation "org.apache.httpcomponents:httpclient:4.5.14"
+    implementation "com.google.code.gson:gson:${gsonVersion}"
+    implementation "commons-logging:commons-logging:1.2"
+    implementation "org.slf4j:slf4j-nop:${slf4jVersion}"
+    implementation "io.netty:netty-all:${nettyVersion}"
+    implementation "com.google.code.findbugs:jsr305:3.0.2"
+    compileOnly "org.graalvm.nativeimage:svm:21.+"
+    
+    testImplementation platform("org.junit:junit-bom:${junitVersion}")
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
+    testImplementation "org.junit.platform:junit-platform-launcher"
 }
-
-mainClassName = 'io.cloudchains.app.App'

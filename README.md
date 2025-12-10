@@ -1,6 +1,6 @@
 # Xlite Wallet Backend
 
-The Xlite Wallet Backend is a Java-based project that serves as the backend infrastructure for the Xlite wallet application. It is built using Java with JDK version 17 and utilizes Gradle for build automation. The project incorporates the org.bitcoinj library version 0.14.7 for Bitcoin-related functionality.
+The Xlite Wallet Backend is a Java-based project that serves as the backend infrastructure for the Xlite wallet application. It is built using Java with JDK version 21 and utilizes Gradle for build automation. The project incorporates the org.bitcoinj library version 0.14.7 for Bitcoin-related functionality.
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@ Provide a brief description of the Xlite Wallet Backend project. Explain its pur
 
 List the prerequisites required to set up and run the Xlite Wallet Backend. Include the following:
 
-- JDK 17: Install the Java Development Kit version 17 or a compatible version.
+- JDK 21: Install the Java Development Kit version 21 or a compatible version.
 
 ## Getting Started
 
