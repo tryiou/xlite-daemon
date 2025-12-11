@@ -1,12 +1,41 @@
+# Lock files and build artifacts
 .lock/
-.gradle/
 /bin/
 /build/
 /builds/
 .classpath
 .history/
 .vscode/
-.gradle/
 .env
 .aider*
 .idea*
+
+# Maven-specific ignores
+target/
+dependency-reduced-pom.xml
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Compiled class files
+*.class
+
+# Log files
+logs/
+*.log
+log/
+
+# IDE output directories
+out/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*~

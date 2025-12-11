@@ -5,6 +5,6 @@ import org.bitcoinj.core.Message;
 
 public interface BlocknetPreMessageReceivedEventListener {
 
-	Message onPreMessageReceived(BlocknetPeer peer, Message message);
+    Message onPreMessageReceived(BlocknetPeer peer, Message message);
 
 }

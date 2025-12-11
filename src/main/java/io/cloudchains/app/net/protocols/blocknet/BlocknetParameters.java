@@ -6,10 +6,10 @@ import org.bitcoinj.core.Sha256Hash;
 
 public abstract class BlocknetParameters extends NetworkParameters {
 
-	public abstract XRouterMessageSerializer getXRouterMessageSerializer(boolean parseRetain);
+    public abstract XRouterMessageSerializer getXRouterMessageSerializer(boolean parseRetain);
 
-	public abstract Sha256Hash getGenesisBlockHash();
+    public abstract Sha256Hash getGenesisBlockHash();
 
-	@Override
-	public abstract BlocknetSerializer getSerializer(boolean parseRetain);
+    @Override
+    public abstract BlocknetSerializer getSerializer(boolean parseRetain);
 }

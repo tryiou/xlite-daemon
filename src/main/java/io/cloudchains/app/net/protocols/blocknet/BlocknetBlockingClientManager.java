@@ -45,7 +45,8 @@ public class BlocknetBlockingClientManager extends AbstractIdleService implement
     }
 
     @Override
-    protected void startUp() throws Exception { }
+    protected void startUp() throws Exception {
+    }
 
     @Override
     protected void shutDown() throws Exception {

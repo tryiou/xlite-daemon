@@ -12,23 +12,23 @@ import io.netty.handler.timeout.WriteTimeoutHandler;
 
 public class HTTPServerInitializer extends ChannelInitializer<SocketChannel> {
 
-	private CoinInstance coin;
+    private CoinInstance coin;
 
-	public HTTPServerInitializer(CoinInstance coin) {
-		this.coin = coin;
-	}
+    public HTTPServerInitializer(CoinInstance coin) {
+        this.coin = coin;
+    }
 
-	@Override
-	protected void initChannel(SocketChannel ch) {
-		ChannelPipeline pipeline = ch.pipeline();
+    @Override
+    protected void initChannel(SocketChannel ch) {
+        ChannelPipeline pipeline = ch.pipeline();
 
-		pipeline.addLast(new WriteTimeoutHandler(30));
-		pipeline.addLast(new ReadTimeoutHandler(30));
-		pipeline.addLast(new HttpRequestDecoder());
-		pipeline.addLast(new HttpResponseEncoder());
-		pipeline.addLast(new HttpObjectAggregator(100000000));
-		pipeline.addLast(new HTTPServerHandler(coin));
-		pipeline.addLast(new ExceptionHandler());
-	}
+        pipeline.addLast(new WriteTimeoutHandler(30));
+        pipeline.addLast(new ReadTimeoutHandler(30));
+        pipeline.addLast(new HttpRequestDecoder());
+        pipeline.addLast(new HttpResponseEncoder());
+        pipeline.addLast(new HttpObjectAggregator(100000000));
+        pipeline.addLast(new HTTPServerHandler(coin));
+        pipeline.addLast(new ExceptionHandler());
+    }
 
 }

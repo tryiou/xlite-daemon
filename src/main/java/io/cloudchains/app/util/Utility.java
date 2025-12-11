@@ -9,7 +9,7 @@ public class Utility {
         try {
             Address.fromBase58(params, address);
             return true;
-        } catch(AddressFormatException e) {
+        } catch (AddressFormatException e) {
             return false;
         }
     }

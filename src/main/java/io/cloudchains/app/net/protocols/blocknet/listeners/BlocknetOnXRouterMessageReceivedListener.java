@@ -4,6 +4,6 @@ import io.cloudchains.app.net.xrouter.XRouterMessage;
 
 public interface BlocknetOnXRouterMessageReceivedListener {
 
-	void onXRouterMessageReceived(XRouterMessage message, XRouterMessage original);
+    void onXRouterMessageReceived(XRouterMessage message, XRouterMessage original);
 
 }

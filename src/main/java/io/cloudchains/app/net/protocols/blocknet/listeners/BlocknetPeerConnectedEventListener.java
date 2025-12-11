@@ -4,5 +4,5 @@ import io.cloudchains.app.net.protocols.blocknet.BlocknetPeer;
 
 public interface BlocknetPeerConnectedEventListener {
 
-	void onPeerConnected(BlocknetPeer peer, int peerCount);
+    void onPeerConnected(BlocknetPeer peer, int peerCount);
 }

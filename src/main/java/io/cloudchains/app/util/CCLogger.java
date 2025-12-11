@@ -1,7 +1,5 @@
 package io.cloudchains.app.util;
 
-import java.io.*;
-
 public class CCLogger {
     private static boolean isLogging;
 

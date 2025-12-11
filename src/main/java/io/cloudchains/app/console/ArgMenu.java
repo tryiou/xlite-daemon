@@ -69,7 +69,7 @@ public class ArgMenu {
                 System.out.println("Exiting...");
                 System.exit(0);
             }
-            break;
+                break;
             default:
                 throw new IllegalStateException("Unexpected value: " + selection);
         }

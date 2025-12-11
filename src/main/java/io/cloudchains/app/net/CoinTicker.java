@@ -4,44 +4,44 @@ import java.util.Arrays;
 import java.util.List;
 
 public enum CoinTicker {
-	BLOCKNET,
-	BLOCKNET_TESTNET5,
+    BLOCKNET,
+    BLOCKNET_TESTNET5,
 
-	BITCOIN,
-	BITCOIN_CASH,
-	LITECOIN,
-	DASHCOIN,
-	DIGIBYTE,
-	DOGECOIN,
-	TREZARCOIN,
-	SYSCOIN,
-	PIVX,
+    BITCOIN,
+    BITCOIN_CASH,
+    LITECOIN,
+    DASHCOIN,
+    DIGIBYTE,
+    DOGECOIN,
+    TREZARCOIN,
+    SYSCOIN,
+    PIVX,
     ALQOCOIN,
     POLISCOIN,
     PHORECOIN,
     RAVENCOIN,
-	BITBAY,
+    BITBAY,
     UNOBTANIUM
     ;
 
     /**
-     * List of supported coins.
-     * @return Supported coins
-     */
+    * List of supported coins.
+    * @return Supported coins
+    */
     public static List<CoinTicker> coins() {
         return Arrays.asList(
-            BLOCKNET,
-            BLOCKNET_TESTNET5,
-            BITCOIN,
+                BLOCKNET,
+                BLOCKNET_TESTNET5,
+                BITCOIN,
 //            BITCOIN_CASH, - not support on backend
-            LITECOIN,
-            DASHCOIN,
+                LITECOIN,
+                DASHCOIN,
 //            DIGIBYTE, - not support on backend
-            DOGECOIN,
+                DOGECOIN,
 //           TREZARCOIN, - not support on backend
-            SYSCOIN,
-            PIVX,
-            UNOBTANIUM
+                SYSCOIN,
+                PIVX,
+                UNOBTANIUM
 //            ALQOCOIN, - not support on backend
 //            POLISCOIN, - not support on backend
 //            PHORECOIN, - not support on backend

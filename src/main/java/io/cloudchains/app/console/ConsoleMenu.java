@@ -7,12 +7,9 @@ import io.cloudchains.app.crypto.LoginUtils;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
-import io.cloudchains.app.net.api.http.client.EXRWrapper;
 import io.cloudchains.app.net.api.http.client.EXRServerPool;
-import io.cloudchains.app.net.protocols.blocknet.BlocknetNetworkParameters;
 import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.background.BackgroundTimerThread;
-import org.bitcoinj.core.Context;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -239,7 +236,7 @@ public class ConsoleMenu {
                     case "--help":
                         displayHelp();
                         return; // Exit after displaying help
-                }      
+                }
             }
         }
 
@@ -340,7 +337,6 @@ public class ConsoleMenu {
         App.masterRPC.start();
         backgroundTimerThread = new BackgroundTimerThread();
         (new Thread(backgroundTimerThread)).start();
-        
         // Start EXR capability probing after wallet is decrypted
         if (App.exrServerPool != null) {
             App.exrServerPool.probeAllCapabilities();
@@ -368,13 +364,13 @@ public class ConsoleMenu {
     }
 
     /**
-     * Reads the password from args or from stdin if password is not specified.
-     * @param input Stdin
-     * @param args Program arguments
-     * @param argPos Current arg position
-     * @param msg Message to display on stdin
-     * @return Password
-     */
+    * Reads the password from args or from stdin if password is not specified.
+    * @param input Stdin
+    * @param args Program arguments
+    * @param argPos Current arg position
+    * @param msg Message to display on stdin
+    * @return Password
+    */
     private String readPassword(Scanner input, String[] args, int argPos, String msg) {
         if (msg.isEmpty())
             msg = "Password:\n";

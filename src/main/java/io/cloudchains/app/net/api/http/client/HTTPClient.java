@@ -5,13 +5,13 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.google.gson.reflect.TypeToken;
 import com.subgraph.orchid.encoders.Hex;
 import io.cloudchains.app.App;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
-import io.cloudchains.app.net.api.http.client.EXRWrapper;
 import io.cloudchains.app.util.AddressBalance;
 import io.cloudchains.app.util.UTXO;
 import io.cloudchains.app.util.history.Transaction;
@@ -20,7 +20,10 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.*;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
@@ -61,7 +64,7 @@ public class HTTPClient {
     private CloseableHttpClient client;
     private ConcurrentHashMap<String, Long> lastFetchTimes;
     private int logCount = 0;
-    
+
     /**
      * Helper method to wait for EXR capabilities to be probed with a timeout.
      * @param timeoutMs Maximum time to wait in milliseconds
@@ -71,13 +74,13 @@ public class HTTPClient {
         if (!useEXR()) {
             return false;
         }
-        
+
         if (App.exrServerPool.isCapabilitiesProbed()) {
             return true;
         }
-        
+
         LOGGER.log(Level.FINE, "[httpclient] Waiting for EXR capabilities to be probed (timeout: " + timeoutMs + "ms)");
-        
+
         int waitTime = 0;
         while (!App.exrServerPool.isCapabilitiesProbed() && waitTime < timeoutMs) {
             try {
@@ -89,12 +92,12 @@ public class HTTPClient {
                 return false;
             }
         }
-        
+
         boolean probed = App.exrServerPool.isCapabilitiesProbed();
         LOGGER.log(Level.FINE, "[httpclient] EXR capabilities " +
-            (probed ? "probed successfully" : "still not probed") +
-            " after waiting " + waitTime + "ms");
-        
+                (probed ? "probed successfully" : "still not probed") +
+                " after waiting " + waitTime + "ms");
+
         return probed;
     }
 
@@ -113,8 +116,8 @@ public class HTTPClient {
      */
     private boolean shouldUseEXR(String endpoint) {
         return useEXR() && (endpoint.equals("/fees") ||
-                           endpoint.equals("/height") ||
-                           endpoint.equals("/"));
+                endpoint.equals("/height") ||
+                endpoint.equals("/"));
     }
 
     /**
@@ -124,17 +127,17 @@ public class HTTPClient {
     private EXRServer getEXRServer() {
         return useEXR() ? App.exrServerPool.selectServer() : null;
     }
-    
+
     /**
      * Convert JsonArray to List<Object> for EXR execution
      * @param exrParams JsonArray of parameters
      * @return List of parameters
      */
-    private java.util.List<Object> convertParams(com.google.gson.JsonArray exrParams) {
-        java.util.List<Object> paramList = new java.util.ArrayList<>();
-        for (com.google.gson.JsonElement element : exrParams) {
+    private List<Object> convertParams(JsonArray exrParams) {
+        List<Object> paramList = new ArrayList<>();
+        for (JsonElement element : exrParams) {
             if (element.isJsonPrimitive()) {
-                com.google.gson.JsonPrimitive primitive = element.getAsJsonPrimitive();
+                JsonPrimitive primitive = element.getAsJsonPrimitive();
                 if (primitive.isString()) {
                     paramList.add(primitive.getAsString());
                 } else if (primitive.isNumber()) {
@@ -166,7 +169,7 @@ public class HTTPClient {
                 return result;
             }
             return null;
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             LOGGER.log(Level.WARNING, "HTTP request failed: " + e.toString());
             return null;
         } finally {
@@ -174,7 +177,7 @@ public class HTTPClient {
             if (response != null) {
                 try {
                     response.close();
-                } catch (java.io.IOException e) {
+                } catch (IOException e) {
                     LOGGER.log(Level.WARNING, "Failed to close response: " + e.toString());
                 }
             }
@@ -197,12 +200,12 @@ public class HTTPClient {
      * @param params The parameters to POST
      * @return Response string or null on error
      */
-    private String executePostRequest(String endpoint, com.google.gson.JsonObject params) {
+    private String executePostRequest(String endpoint, JsonObject params) {
         HttpPost httpPost = new HttpPost();
-        httpPost.setURI(java.net.URI.create(App.BASE_URL + endpoint));
+        httpPost.setURI(URI.create(App.BASE_URL + endpoint));
         try {
             httpPost.setEntity(new StringEntity(params.toString()));
-        } catch (java.io.UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             LOGGER.log(Level.WARNING, "executePostRequest failed to set entity " + endpoint + " err: " + e.toString());
             httpPost.reset();
             return null;
@@ -265,21 +268,21 @@ public class HTTPClient {
      */
     private String aggregateEXRResponse(String method) {
         // Aggregate from ALL EXR servers
-        com.google.gson.JsonObject aggregatedResult = new com.google.gson.JsonObject();
-        com.google.gson.JsonArray aggregatedErrors = new com.google.gson.JsonArray();
-        
+        JsonObject aggregatedResult = new JsonObject();
+        JsonArray aggregatedErrors = new JsonArray();
+
         for (EXRServer server : App.exrServerPool.getServers()) {
             if (!server.isHealthy()) {
                 continue;
             }
-            
+
             try {
-                com.google.gson.JsonObject result = server.executeGet(method);
+                JsonObject result = server.executeGet(method);
                 if (result != null && result.has("result")) {
-                    com.google.gson.JsonElement serverResult = result.get("result");
-                    
+                    JsonElement serverResult = result.get("result");
+
                     if (serverResult.isJsonObject()) {
-                        com.google.gson.JsonObject serverObj = serverResult.getAsJsonObject();
+                        JsonObject serverObj = serverResult.getAsJsonObject();
                         for (String key : serverObj.keySet()) {
                             if (!aggregatedResult.has(key)) {
                                 aggregatedResult.add(key, serverObj.get(key));
@@ -292,11 +295,11 @@ public class HTTPClient {
                 aggregatedErrors.add("Failed " + method + " from " + server.getEndpoint());
             }
         }
-        
-        com.google.gson.JsonObject finalResult = new com.google.gson.JsonObject();
+
+        JsonObject finalResult = new JsonObject();
         finalResult.add("result", aggregatedResult);
         finalResult.add("errors", aggregatedErrors);
-        
+
         return finalResult.toString();
     }
 
@@ -316,56 +319,55 @@ public class HTTPClient {
      * @param params The parameters to POST
      * @return Response from appropriate EXR server
      */
-    private String executeEXRPost(String endpoint, com.google.gson.JsonObject params) {
+    private String executeEXRPost(String endpoint, JsonObject params) {
         if (params.has("method") && params.has("params")) {
             String method = params.get("method").getAsString();
-            com.google.gson.JsonArray exrParams = params.getAsJsonArray("params");
-            
+            JsonArray exrParams = params.getAsJsonArray("params");
+
             // Extract coin from first parameter
-            io.cloudchains.app.net.CoinTicker coin = null;
+            CoinTicker coin = null;
             if (exrParams.size() > 0) {
                 String coinString = exrParams.get(0).getAsString();
-                coin = io.cloudchains.app.net.CoinTickerUtils.stringToTicker(coinString);
+                coin = CoinTickerUtils.stringToTicker(coinString);
                 if (coin == null) {
                     // Log the failed coin extraction for debugging
                     LOGGER.log(Level.WARNING, "[httpclient] Failed to extract coin from parameter: " + coinString);
                     // Not a coin-specific request
                 }
             }
-            
+
             EXRServer server = null;
-            
+
             // Route ONLY to EXR servers that support this coin
             if (coin != null) {
                 // Wait for capabilities to be probed if not already done
                 if (!App.exrServerPool.isCapabilitiesProbed()) {
                     LOGGER.log(Level.FINE, "[httpclient] Waiting for EXR capabilities to be probed for coin: " +
-                        io.cloudchains.app.net.CoinTickerUtils.tickerToString(coin));
+                            CoinTickerUtils.tickerToString(coin));
                     if (!waitForCapabilities(10000)) { // Wait up to 10 seconds
                         LOGGER.log(Level.WARNING, "[httpclient] EXR capabilities not probed yet for coin: " +
-                            io.cloudchains.app.net.CoinTickerUtils.tickerToString(coin));
+                                CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     }
                 }
-                
                 if (App.exrServerPool.isCapabilitiesProbed()) {
                     server = App.exrServerPool.selectServerForCoin(coin);
                     // LOGGER.log(Level.INFO, "[httpclient] DEBUG: selectServerForCoin returned: " +
                     //     (server != null ? server.getEndpoint() : "null"));
-                    
+                        
                     if (server == null) {
                         LOGGER.log(Level.SEVERE, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
-                            io.cloudchains.app.net.CoinTickerUtils.tickerToString(coin));
+                                CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     } else {
                         LOGGER.log(Level.INFO, "[httpclient] DEBUG: Selected server " + server.getEndpoint() +
-                            " for coin " + io.cloudchains.app.net.CoinTickerUtils.tickerToString(coin) +
-                            ", method: " + method);
+                                " for coin " + CoinTickerUtils.tickerToString(coin) +
+                                ", method: " + method);
                     }
                 } else {
                     // Capabilities still not probed after waiting
                     LOGGER.log(Level.WARNING, "[httpclient] EXR capabilities not probed yet for coin: " +
-                        io.cloudchains.app.net.CoinTickerUtils.tickerToString(coin));
+                            CoinTickerUtils.tickerToString(coin));
                     return null; // FAIL - NO FALLBACK TO BASE_URL
                 }
             } else {
@@ -375,7 +377,7 @@ public class HTTPClient {
                     server = App.exrServerPool.selectServerForCoin(coin);
                     if (server == null) {
                         LOGGER.log(Level.SEVERE, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
-                            io.cloudchains.app.net.CoinTickerUtils.tickerToString(coin));
+                                CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     }
                 } else {
@@ -384,15 +386,15 @@ public class HTTPClient {
                     return null; // FAIL instead of using wrong server
                 }
             }
-            
+
             if (server != null) {
-                java.util.List<Object> paramList = convertParams(exrParams);
-                com.google.gson.JsonObject result = server.execute(method, paramList);
+                List<Object> paramList = convertParams(exrParams);
+                JsonObject result = server.execute(method, paramList);
                 if (result != null) {
                     // Handle wrapped responses from EXR wrapper
                     // If the result has a "result" field, extract it to maintain backward compatibility
                     if (result.has("result")) {
-                        com.google.gson.JsonElement resultElement = result.get("result");
+                        JsonElement resultElement = result.get("result");
                         if (!resultElement.isJsonNull()) {
                             return resultElement.toString();
                         }
@@ -410,7 +412,7 @@ public class HTTPClient {
      * @param params Parameters for POST requests, null for GET
      * @return Response string or null on error
      */
-    private String executeRequest(String endpoint, com.google.gson.JsonObject params) {
+    private String executeRequest(String endpoint, JsonObject params) {
         // When EXR is configured, ONLY use EXR - NO fallback to BASE_URL
         if (shouldUseEXR(endpoint)) {
             if (params == null) {
@@ -421,7 +423,7 @@ public class HTTPClient {
                 return executeEXRPost(endpoint, params);
             }
         }
-        
+
         // ONLY fall back to BASE_URL when EXR is NOT configured
         if (!useEXR()) {
             if (params == null) {
@@ -432,7 +434,7 @@ public class HTTPClient {
                 return executePostRequest(endpoint, params);
             }
         }
-        
+
         return null; // EXR configured but no valid response
     }
 
@@ -440,7 +442,7 @@ public class HTTPClient {
         return executeRequest(endpoint, null);
     }
 
-    private String doPost(String endpoint, com.google.gson.JsonObject params) {
+    private String doPost(String endpoint, JsonObject params) {
         return executeRequest(endpoint, params);
     }
 

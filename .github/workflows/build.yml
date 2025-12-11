@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         if: github.event.pull_request.draft == false
 
-      # - name: Setup GraalVM JDK 21 via SDKMAN (FOR LOCAL TESTING WITH ACT)
+      # - name: Setup GraalVM JDK 21 via SDKMAN (FOR TESTING WITH ACT)
       #   shell: bash
       #   run: |
       #     curl -s "https://get.sdkman.io" | bash
@@ -37,41 +37,41 @@ jobs:
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
-          distribution: 'graalvm-community'   
+          distribution: 'graalvm-community'
 
       - name: Verify Java installation
         run: |
           java -version
-          native-image --version          
+          native-image --version
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
 
       - name: Build native image
-        run: ./gradlew nativeCompile --info
+        run: ./mvnw clean package -Pnative -DskipTests
 
       - name: Make daemon executable
-        run: chmod +x build/native/nativeCompile/xlite-daemon
+        run: chmod +x target/xlite-daemon
 
       - name: Rename executable
-        run: mv build/native/nativeCompile/xlite-daemon build/native/nativeCompile/xlite-daemon-linux64
+        run: mv target/xlite-daemon target/xlite-daemon-linux64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-linux
           path: |
-            build/native/nativeCompile/xlite-daemon-linux64
+            target/xlite-daemon-linux64
 
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
           files: |
-            build/native/nativeCompile/xlite-daemon-linux64
+            target/xlite-daemon-linux64
 
   build_mac:
     runs-on: macos-15-intel
@@ -84,41 +84,41 @@ jobs:
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
-          distribution: 'graalvm-community'   
+          distribution: 'graalvm-community'
 
       - name: Verify Java installation
         run: |
           java -version
-          native-image --version      
+          native-image --version
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
 
       - name: Build native image
-        run: ./gradlew nativeCompile --info
+        run: ./mvnw clean package -Pnative -DskipTests
 
       - name: Make daemon executable
-        run: chmod +x build/native/nativeCompile/xlite-daemon
+        run: chmod +x target/xlite-daemon
 
       - name: Rename executable
-        run: mv build/native/nativeCompile/xlite-daemon build/native/nativeCompile/xlite-daemon-osx64
+        run: mv target/xlite-daemon target/xlite-daemon-osx64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-mac
           path: |
-            build/native/nativeCompile/xlite-daemon-osx64
+            target/xlite-daemon-osx64
 
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
           files: |
-            build/native/nativeCompile/xlite-daemon-osx64
+            target/xlite-daemon-osx64
 
   build_win:
     runs-on: windows-2022
@@ -131,7 +131,7 @@ jobs:
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
-          distribution: 'graalvm-community'   
+          distribution: 'graalvm-community'
 
       - name: Verify Java installation
         run: |
@@ -142,27 +142,27 @@ jobs:
         run: choco install -y windows-sdk-10.0
 
       - name: Install Visual Studio Build Tools & sdk
-        run: choco install -y visualstudio2022-workload-vctools windows-sdk-10.0
+        run: choco install -y visualstudio2022-workload-vctools
 
       - name: Build native image
-        run: ./gradlew.bat nativeCompile --info
+        run: mvnw.cmd clean package -Pnative -DskipTests
 
       - name: Rename executable
-        run: ren build\native\nativeCompile\xlite-daemon.exe xlite-daemon-win64.exe
+        run: Rename-Item target/xlite-daemon.exe xlite-daemon-win64.exe
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-win
           path: |
-            build\native\nativeCompile\xlite-daemon-win64.exe
+            target\xlite-daemon-win64.exe
 
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: XLite Daemon ${{ github.ref_name}}
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
           files: |
-            build\native\nativeCompile\xlite-daemon-win64.exe
+            target\xlite-daemon-win64.exe

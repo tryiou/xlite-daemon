@@ -115,7 +115,8 @@ public class BlocknetPeerGroup {
         return new BlocknetPeer(blocknetNetworkParameters,
                 chain,
                 peerAddress,
-                blocknetSeed) {};
+                blocknetSeed) {
+        };
     }
 
     @GuardedBy("lock")
@@ -166,7 +167,7 @@ public class BlocknetPeerGroup {
         threadPool.submit(new BackgroundTimerThread());
     }
 
-    private ListenableFuture startAsync() {
+    private ListenableFuture<Void> startAsync() {
         executorStartupLatch.countDown();
 
         return executor.submit(() -> {
@@ -183,6 +184,7 @@ public class BlocknetPeerGroup {
             } catch (Throwable e) {
                 e.printStackTrace();
             }
+            return null;
         });
     }
 
@@ -591,14 +593,13 @@ public class BlocknetPeerGroup {
     private boolean waitForConnection(BlocknetPeer blocknetPeer, int maxWaitSeconds) {
         long startTime = System.currentTimeMillis();
 
-        while((System.currentTimeMillis() - startTime) <  (maxWaitSeconds * 1000)) {
+        while ((System.currentTimeMillis() - startTime) < (maxWaitSeconds * 1000)) {
             BlocknetPeer filteredPeer = getConnectedPeers().stream().filter(
                     e -> (e.getHaveConfig().get() && e.getAddress().getAddr() == blocknetPeer.getAddress().getAddr())
             ).findFirst().orElse(null);
 
             if (filteredPeer != null)
-                return true;
-            else {
+                return true;else {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {

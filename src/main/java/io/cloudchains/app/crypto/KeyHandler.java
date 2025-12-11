@@ -7,7 +7,6 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bitcoinj.wallet.DeterministicSeed;
-import org.bitcoinj.wallet.UnreadableWalletException;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -17,8 +16,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -125,7 +122,7 @@ public class KeyHandler {
             return false;
         }
 
-        DeterministicSeed seed = new DeterministicSeed(entropy , "", System.currentTimeMillis() / 1000);
+        DeterministicSeed seed = new DeterministicSeed(entropy, "", System.currentTimeMillis() / 1000);
 
         String mnemonic = Joiner.on(" ").join(Objects.requireNonNull(seed.getMnemonicCode()));
 
@@ -189,7 +186,6 @@ public class KeyHandler {
         byte[] mnemonicByte = mnemonic.getBytes();
 
         String encryptedSeed = encryptBaseSeed(passphrase, mnemonicByte, salt);
-        
         // Print mnemonic to console
         // System.out.println(mnemonic + "\n");
 
@@ -214,32 +210,31 @@ public class KeyHandler {
         return Arrays.asList(mnemonic.split(" "));
     }
 
-    public static int calculatePasswordStrength(String password){
+    public static int calculatePasswordStrength(String password) {
         // Password must be greater than 8 characters, contain at least one digit, one lowercase letter, one uppercase letter and one special character.
 
         int totalScore = 0;
 
-        if( password.length() < 8 )
-            return 0;
-        else if( password.length() >= 10 )
+        if (password.length() < 8)
+            return 0;else if (password.length() >= 10)
             totalScore += 2;
         else
             totalScore += 1;
 
         //if it contains one digit, add 2 to total score
-        if( password.matches("(?=.*[0-9]).*") )
+        if (password.matches("(?=.*[0-9]).*"))
             totalScore += 2;
 
         //if it contains one lower case letter, add 2 to total score
-        if( password.matches("(?=.*[a-z]).*") )
+        if (password.matches("(?=.*[a-z]).*"))
             totalScore += 2;
 
         //if it contains one upper case letter, add 2 to total score
-        if( password.matches("(?=.*[A-Z]).*") )
+        if (password.matches("(?=.*[A-Z]).*"))
             totalScore += 2;
 
         //if it contains one special character, add 2 to total score
-        if( password.matches("(?=.*[~!@#$%^&*()_-]).*") )
+        if (password.matches("(?=.*[~!@#$%^&*()_-]).*"))
             totalScore += 2;
 
         return totalScore;
