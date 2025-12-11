@@ -145,17 +145,16 @@ jobs:
         run: choco install -y visualstudio2022-workload-vctools
 
       - name: Build native image
-        run: mvnw.cmd clean package -Pnative -DskipTests
+        run: .\mvnw.cmd clean package -Pnative -DskipTests
 
       - name: Rename executable
-        run: Rename-Item target/xlite-daemon.exe xlite-daemon-win64.exe
+        run: Rename-Item target\xlite-daemon.exe xlite-daemon-win64.exe
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-win
-          path: |
-            target\xlite-daemon-win64.exe
+          path: target\xlite-daemon-win64.exe
 
       - name: Create release
         uses: softprops/action-gh-release@v2
@@ -164,5 +163,4 @@ jobs:
           name: XLite Daemon ${{ github.ref_name}}
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
-          files: |
-            target\xlite-daemon-win64.exe
+          files: target\xlite-daemon-win64.exe
