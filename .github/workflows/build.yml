@@ -141,7 +141,7 @@ jobs:
       - name: Install Windows SDK
         run: choco install -y windows-sdk-10.0
 
-      - name: Install Visual Studio Build Tools & sdk
+      - name: Install Visual Studio Build Tools
         run: choco install -y visualstudio2022-workload-vctools
 
       - name: Build native image
