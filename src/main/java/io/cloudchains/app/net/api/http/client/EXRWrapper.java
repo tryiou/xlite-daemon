@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
@@ -47,12 +48,13 @@ public class EXRWrapper {
 
     /**
      * Execute an HTTP request and return the response body.
+     * Uses the same resource cleanup pattern as HTTPClient.executeHttpRequest()
      * @param request The HTTP request to execute
      * @param operation Description of the operation for logging
      * @return Response body string or null on error
      */
     private String executeHttpRequest(HttpRequestBase request, String operation) {
-        HttpResponse response = null;
+        CloseableHttpResponse response = null;
         try {
             response = client.execute(request);
             if (validateResponse(response)) {
@@ -69,7 +71,13 @@ public class EXRWrapper {
             return null;
         } finally {
             request.reset();
-
+            if (response != null) {
+                try {
+                    response.close();
+                } catch (IOException e) {
+                    LOGGER.log(Level.WARNING, LOG_TAG + " Failed to close HTTP response", e);
+                }
+            }
         }
     }
 
