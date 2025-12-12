@@ -6,13 +6,15 @@ import io.cloudchains.app.net.api.JSONRPCMasterServer;
 import io.cloudchains.app.net.api.http.client.EXRServerPool;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
 import io.cloudchains.app.util.CCLogger;
+import io.cloudchains.app.util.ConsoleFormatter;
+import io.cloudchains.app.util.FileFormatter;
+import io.cloudchains.app.util.LogRotationUtil;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.logging.*;
 
 public class App {
@@ -46,6 +48,9 @@ public class App {
         LOGGER.setLevel(Level.INFO);
         LOGGER.setUseParentHandlers(false);
 
+        // Perform log rotation before initializing other components
+        LogRotationUtil.performLogRotation();
+
         Runtime.getRuntime().addShutdownHook(new Thread(App::shutdown));
 
         try {
@@ -74,18 +79,7 @@ public class App {
                     true
             );
 
-            fileHandler.setFormatter(new SimpleFormatter() {
-                private static final String format = "[%1$tF %1$tT] [%2$-7s] %3$s %n";
-
-                @Override
-                public synchronized String format(LogRecord lr) {
-                    return String.format(format,
-                            new Date(lr.getMillis()),
-                            lr.getLevel().getLocalizedName(),
-                            lr.getMessage()
-                    );
-                }
-            });
+            fileHandler.setFormatter(new FileFormatter());
             fileHandler.setLevel(Level.INFO);
 
             LOGGER.addHandler(fileHandler);
@@ -100,6 +94,7 @@ public class App {
                 super.setOutputStream(System.out);
             }
         };
+        consoleHandler.setFormatter(new ConsoleFormatter());
         consoleHandler.setLevel(Level.FINE);
 
         LOGGER.addHandler(consoleHandler);

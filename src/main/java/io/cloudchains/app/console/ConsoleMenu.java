@@ -322,7 +322,6 @@ public class ConsoleMenu {
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.log(Level.SEVERE, msg);
-            System.out.println(msg);
             System.exit(0);
         }
 

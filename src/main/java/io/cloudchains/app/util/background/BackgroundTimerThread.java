@@ -6,10 +6,15 @@ import io.cloudchains.app.net.CoinTickerUtils;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetPeer;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetPeerGroup;
+import io.cloudchains.app.util.LogRotationUtil;
 import io.cloudchains.app.util.XRouterConfiguration;
 
+import java.time.Duration;
+import java.time.LocalTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -36,6 +41,11 @@ public class BackgroundTimerThread implements Runnable {
     private long lastOut;
     private boolean shutdownRequested = false;
 
+    // Log rotation scheduler fields
+    private ScheduledExecutorService logRotationScheduler;
+    private static final int DAILY_ROTATION_HOUR = 2; // 2:00 AM
+    private static final int DAILY_ROTATION_MINUTE = 0;
+
     public BackgroundTimerThread() {
         blocknetPeerGroup = CoinInstance.getInstance(CoinInstance.getActiveBlocknetNetwork()).getBlocknetPeerGroup();
         feeUpdateHttpClient = App.feeUpdateHttpClient;
@@ -45,10 +55,70 @@ public class BackgroundTimerThread implements Runnable {
         lastBalanceUpdateTime = 0;
 
         lastOut = 0;
+
+        // Initialize log rotation scheduler
+        initializeLogRotationScheduler();
+    }
+
+    /**
+     * Initializes the log rotation scheduler to run daily at 2:00 AM.
+     */
+    private void initializeLogRotationScheduler() {
+        logRotationScheduler = Executors.newSingleThreadScheduledExecutor();
+        long initialDelay = calculateInitialDelay();
+        logRotationScheduler.scheduleAtFixedRate(
+                this::performDailyLogRotation,
+                initialDelay,
+                24, TimeUnit.HOURS
+        );
+        LOGGER.log(Level.INFO, "[BackgroundTimer] Scheduled daily log rotation at {0:02d}:{1:02d}",
+                new Object[]{DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE});
+    }
+
+    /**
+     * Calculates the initial delay until the next scheduled log rotation at 2:00 AM.
+     *
+     * @return Delay in milliseconds until next 2:00 AM
+     */
+    private long calculateInitialDelay() {
+        LocalTime now = LocalTime.now();
+        LocalTime targetTime = LocalTime.of(DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE);
+        long delay;
+        if (now.isBefore(targetTime)) {
+            delay = Duration.between(now, targetTime).toMillis();
+        } else {
+            delay = Duration.between(now, targetTime.plusHours(24)).toMillis();
+        }
+        return Math.max(delay, 0);
+    }
+
+    /**
+     * Performs the daily log rotation task.
+     * Called by the scheduler every 24 hours at 2:00 AM.
+     */
+    private void performDailyLogRotation() {
+        try {
+            LOGGER.log(Level.INFO, "[BackgroundTimer] Starting scheduled daily log rotation");
+            LogRotationUtil.performLogRotation();
+            LOGGER.log(Level.INFO, "[BackgroundTimer] Daily log rotation completed successfully");
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[BackgroundTimer] Failed to perform daily log rotation", e);
+        }
     }
 
     public void stop() {
         shutdownRequested = true;
+        if (logRotationScheduler != null && !logRotationScheduler.isShutdown()) {
+            logRotationScheduler.shutdown();
+            try {
+                if (!logRotationScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    logRotationScheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                logRotationScheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private void outputAvailableCurrencies() {
