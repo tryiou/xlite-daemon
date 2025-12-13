@@ -21,9 +21,9 @@ public class EXRServer {
     private long lastHealthCheck;
     private final Set<CoinTicker> supportedCoins;
     private volatile boolean capabilitiesProbed;
-    // Add constants for configuration
-    private static final int HEALTH_CHECK_INTERVAL_MS = 5000;
-    private static final int CAPABILITY_PROBE_TIMEOUT_MS = 30000;
+    // Use centralized configuration constants
+    private static final int HEALTH_CHECK_INTERVAL_MS = HttpClientConfig.HEALTH_CHECK_INTERVAL_MS;
+    private static final int CAPABILITY_PROBE_TIMEOUT_MS = HttpClientConfig.CAPABILITY_PROBE_TIMEOUT_MS;
 
     public EXRServer(String endpoint) {
         // Store endpoint with trailing slash for consistency

@@ -16,11 +16,8 @@ import io.cloudchains.app.util.AddressBalance;
 import io.cloudchains.app.util.UTXO;
 import io.cloudchains.app.util.history.Transaction;
 import org.apache.http.Header;
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
-import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
@@ -35,7 +32,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.http.util.EntityUtils;
 import org.bitcoinj.core.Address;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
@@ -84,8 +80,8 @@ public class HTTPClient {
         int waitTime = 0;
         while (!App.exrServerPool.isCapabilitiesProbed() && waitTime < timeoutMs) {
             try {
-                Thread.sleep(100);
-                waitTime += 100;
+                Thread.sleep(HttpClientConfig.CAPABILITY_PROBE_WAIT_INTERVAL_MS);
+                waitTime += HttpClientConfig.CAPABILITY_PROBE_WAIT_INTERVAL_MS;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 LOGGER.log(Level.WARNING, "[httpclient] Waiting for capabilities was interrupted");
@@ -159,29 +155,7 @@ public class HTTPClient {
      * @return Response string or null on error
      */
     private <T extends HttpRequestBase> String executeHttpRequest(T request) {
-        CloseableHttpResponse response = null;
-        try {
-            response = client.execute(request);
-            if (validateResponse(response)) {
-                HttpEntity entity = response.getEntity();
-                String result = EntityUtils.toString(entity);
-                EntityUtils.consume(entity);
-                return result;
-            }
-            return null;
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "HTTP request failed: " + e.toString());
-            return null;
-        } finally {
-            request.reset();
-            if (response != null) {
-                try {
-                    response.close();
-                } catch (IOException e) {
-                    LOGGER.log(Level.WARNING, "Failed to close response: " + e.toString());
-                }
-            }
-        }
+        return HttpUtils.executeHttpRequest(client, request, "HTTP request");
     }
 
     /**
@@ -191,7 +165,7 @@ public class HTTPClient {
      */
     private String executeGetRequest(String endpoint) {
         HttpGet httpGet = new HttpGet(App.BASE_URL + endpoint);
-        return executeHttpRequest(httpGet);
+        return HttpUtils.executeHttpRequest(client, httpGet, "GET " + endpoint);
     }
 
     /**
@@ -210,7 +184,7 @@ public class HTTPClient {
             httpPost.reset();
             return null;
         }
-        return executeHttpRequest(httpPost);
+        return HttpUtils.executeHttpRequest(client, httpPost, "POST " + endpoint);
     }
 
     public HTTPClient(int maximumSockets) {
@@ -229,9 +203,9 @@ public class HTTPClient {
         List<Header> headers = Lists.newArrayList(header);
 
         RequestConfig.Builder requestBuilder = RequestConfig.custom();
-        requestBuilder.setConnectTimeout(30000);
-        requestBuilder.setConnectionRequestTimeout(30000);
-        requestBuilder.setSocketTimeout(30000);
+        requestBuilder.setConnectTimeout(HttpClientConfig.HTTP_TIMEOUT_MS);
+        requestBuilder.setConnectionRequestTimeout(HttpClientConfig.HTTP_TIMEOUT_MS);
+        requestBuilder.setSocketTimeout(HttpClientConfig.HTTP_TIMEOUT_MS);
 
         assert sslContext != null;
         PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(
@@ -344,7 +318,7 @@ public class HTTPClient {
                 if (!App.exrServerPool.isCapabilitiesProbed()) {
                     LOGGER.log(Level.FINE, "[httpclient] Waiting for EXR capabilities to be probed for coin: " +
                             CoinTickerUtils.tickerToString(coin));
-                    if (!waitForCapabilities(10000)) { // Wait up to 10 seconds
+                    if (!waitForCapabilities(HttpClientConfig.CAPABILITY_PROBE_WAIT_TIMEOUT_MS)) { // Wait up to 10 seconds
                         LOGGER.log(Level.WARNING, "[httpclient] EXR capabilities not probed yet for coin: " +
                                 CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
@@ -438,14 +412,6 @@ public class HTTPClient {
         return null; // EXR configured but no valid response
     }
 
-    private String doGet(String endpoint) {
-        return executeRequest(endpoint, null);
-    }
-
-    private String doPost(String endpoint, JsonObject params) {
-        return executeRequest(endpoint, params);
-    }
-
     /**
      * Returns all utxos for a list of addresses.
      * Note: This method does neither use nor update any caches!
@@ -464,9 +430,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getutxos");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " " + res);
+
 
         if (res == null) {
             LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null post result");
@@ -543,9 +509,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getutxos");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getUtxos " + coinInstance.getTicker() + " " + res);
+
 
         if (res == null) {
             LOGGER.log(Level.WARNING, "[httpclient] getUtxos " + coinInstance.getTicker() + " null post result");
@@ -589,7 +555,7 @@ public class HTTPClient {
     }
 
     public void getAllFees() {
-        String res = doGet("/fees");
+        String res = executeGetRequest("/fees");
 
         if (res == null) return;
 
@@ -609,7 +575,7 @@ public class HTTPClient {
 
             coinInstance.addRelayFee(coinTicker, fee);
 
-            if (logCount % 30 == 0)
+            if (logCount % HttpClientConfig.LOG_COUNT_MODULO == 0)
                 LOGGER.log(Level.INFO, "[httpclient] Got relayfee for currency " + ticker + " - " + fee);
             else
                 LOGGER.log(Level.FINER, "[httpclient] Got relayfee for currency " + ticker + " - " + fee);
@@ -628,9 +594,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getrawtransaction");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getRawTransaction " + res);
+
 
         if (res == null) return null;
 
@@ -647,9 +613,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getrawmempool");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getRawMempool " + res);
+
 
         if (res == null) return null;
 
@@ -667,7 +633,7 @@ public class HTTPClient {
         params.addProperty("method", "getblockcount");
         params.add("params", innerParams);
 
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
 
         if (res == null) return;
 
@@ -680,7 +646,7 @@ public class HTTPClient {
     }
 
     public void getAllBlockCounts() {
-        String res = doGet("/height");
+        String res = executeGetRequest("/height");
 
         if (res == null) return;
 
@@ -716,9 +682,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getblock");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getBlock " + res);
+
 
         if (res == null) return null;
 
@@ -733,9 +699,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getblockhash");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getBlockHash " + res);
+
 
         if (res == null) return null;
 
@@ -753,9 +719,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "gettransaction");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getTransaction " + res);
+
 
         if (res == null) return null;
 
@@ -772,9 +738,9 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "sendrawtransaction");
         params.add("params", innerParams);
-
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] sendRawTransaction " + res);
+
 
         if (res == null) return null;
 
@@ -808,7 +774,7 @@ public class HTTPClient {
         params.addProperty("method", "gethistory");
         params.add("params", innerParams);
 
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
             LOGGER.log(Level.WARNING, "[httpclient] getHistory " + coinInstance.getTicker() + " null post result");
@@ -888,7 +854,7 @@ public class HTTPClient {
         params.addProperty("method", "getaddresshistory");
         params.add("params", innerParams);
 
-        String res = doPost("/", params);
+        String res = executePostRequest("/", params);
         LOGGER.log(Level.FINER, "[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
             LOGGER.log(Level.WARNING, "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null post result");
@@ -1050,10 +1016,6 @@ public class HTTPClient {
 
         // Filter txs by time if time frame requested
         return filterHistory(txs, startTime, endTime);
-    }
-
-    private boolean validateResponse(HttpResponse response) {
-        return response.getStatusLine().getStatusCode() == 200 && response.getEntity().getContentLength() != 0;
     }
 
     /**

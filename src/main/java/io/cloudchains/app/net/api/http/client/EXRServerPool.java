@@ -21,17 +21,34 @@ public class EXRServerPool {
     private volatile boolean capabilitiesProbed;
     // Add synchronization lock for thread-safe map updates
     private final Object mapUpdateLock = new Object();
+    // Server selector interface for dependency injection
+    private final ServerSelector serverSelector;
 
-    public EXRServerPool(String endpoints) {
+    /**
+     * Constructor with dependency injection for flexible server selection.
+     * @param endpoints Comma-separated list of server endpoints
+     * @param serverSelector Server selection strategy implementation
+     */
+    public EXRServerPool(String endpoints, ServerSelector serverSelector) {
         this.servers = new CopyOnWriteArrayList<>();
         this.currentIndex = new AtomicInteger(0);
         this.coinToServersMap = new ConcurrentHashMap<>();
         this.endpointToServerMap = new ConcurrentHashMap<>();
         this.capabilitiesProbed = false;
+        // Initialize server selector with dependency injection
+        this.serverSelector = serverSelector;
         initializeServers(endpoints);
     }
-    // Add constants for configuration
-    private static final int CAPABILITY_PROBE_TIMEOUT_MS = 30000;
+
+    /**
+     * Backward compatibility constructor using default round-robin selection.
+     * @param endpoints Comma-separated list of server endpoints
+     */
+    public EXRServerPool(String endpoints) {
+        this(endpoints, new EXRServerSelectorImpl(new AtomicInteger(0)));
+    }
+    // Use centralized configuration constants
+    private static final int CAPABILITY_PROBE_TIMEOUT_MS = HttpClientConfig.CAPABILITY_PROBE_TIMEOUT_MS;
 
     public void startCapabilityProbing() {
         if (capabilitiesProbed || servers.isEmpty()) {
@@ -124,80 +141,24 @@ public class EXRServerPool {
     }
 
     public EXRServer selectServer() {
-        if (servers.isEmpty()) {
-            LOGGER.log(Level.WARNING, "[exr-pool] No servers available for selection");
-            return null;
-        }
-        // Try round-robin through healthy servers
-        int start = currentIndex.getAndIncrement() % servers.size();
-        for (int i = 0; i < servers.size(); i++) {
-            int index = (start + i) % servers.size();
-            EXRServer server = servers.get(index);
-            if (server.isHealthy()) {
-                LOGGER.log(Level.FINE, "[exr-pool] Selected server: " + server.getEndpoint());
-                return server;
-            }
-        }
-        LOGGER.log(Level.WARNING, "[exr-pool] No healthy servers available");
-        return null; // All servers unhealthy
+        return serverSelector.selectHealthyServer(servers);
     }
 
     /**
-     * Extract health filtering logic
-     * @param supportingServers List of servers that support the coin
-     * @return List of healthy servers that support the coin
+     * Select a server for a specific coin with proper error handling
+     * @param coin The coin to select a server for
+     * @return Selected server or null if none available
+     * @throws IllegalArgumentException if coin is null
      */
-    private List<EXRServer> getHealthySupportingServers(List<EXRServer> supportingServers) {
-        List<EXRServer> healthyServers = new ArrayList<>();
-        for (EXRServer server : supportingServers) {
-            if (server.isHealthy()) {
-                healthyServers.add(server);
-            }
-        }
-        return healthyServers;
-    }
-
-    /**
-    * Extract server selection logic
-    * @param healthyServers List of healthy servers
-    * @param coin The coin to select a server for
-    * @return Selected server or null if none available
-    */
-    private EXRServer selectFromHealthyServers(List<EXRServer> healthyServers, CoinTicker coin) {
-        if (healthyServers.isEmpty()) {
-            LOGGER.log(Level.SEVERE, "[exr-pool] NO HEALTHY EXR SERVERS FOR COIN: " +
-                    CoinTickerUtils.tickerToString(coin));
-            return null;
-        }
-        int index = currentIndex.getAndIncrement() % healthyServers.size();
-        EXRServer selectedServer = healthyServers.get(index);
-        // Double-check that the selected server actually supports the coin
-        if (!selectedServer.hasCapability(coin)) {
-            LOGGER.log(Level.SEVERE, "[exr-pool] CRITICAL ERROR: Selected server " +
-                    selectedServer.getEndpoint() + " does NOT support coin " +
-                    CoinTickerUtils.tickerToString(coin));
-            return null;
-        }
-        return selectedServer;
-    }
-
-    /**
-    * Select a server for a specific coin with proper error handling
-    * @param coin The coin to select a server for
-    * @return Selected server or null if none available
-    */
     public EXRServer selectServerForCoin(CoinTicker coin) {
+        if (coin == null) {
+            throw new IllegalArgumentException("Coin cannot be null");
+        }
         if (!capabilitiesProbed) {
             return null; // Wait for probing to complete
         }
         List<EXRServer> supportingServers = coinToServersMap.get(coin);
-        if (supportingServers == null || supportingServers.isEmpty()) {
-            LOGGER.log(Level.SEVERE, "[exr-pool] NO EXR SERVERS SUPPORT COIN: " +
-                    CoinTickerUtils.tickerToString(coin));
-            return null; // FAIL - NO FALLBACK TO BASE_URL
-        }
-        List<EXRServer> healthyServers = getHealthySupportingServers(supportingServers);
-        return selectFromHealthyServers(healthyServers, coin);
+        return serverSelector.selectServerForCoin(supportingServers, coin);
     }
 
     public Set<CoinTicker> getSupportedCoins() {

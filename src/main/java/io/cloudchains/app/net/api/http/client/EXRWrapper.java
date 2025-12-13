@@ -3,17 +3,13 @@ package io.cloudchains.app.net.api.http.client;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
 import java.net.URI;
@@ -29,17 +25,16 @@ public class EXRWrapper {
     private final CloseableHttpClient client;
     private final Gson gson;
     // Constants for configuration
-    private static final int HTTP_TIMEOUT_MS = 30000;
-    private static final String LOG_TAG = "[exr]";
+    private static final String LOG_TAG = HttpClientConfig.LOG_TAG;
 
     public EXRWrapper(String exrEndpoint) {
         this.exrEndpoint = exrEndpoint;
         this.gson = new Gson();
         // Configure HTTP client with timeouts
         RequestConfig config = RequestConfig.custom()
-                .setConnectTimeout(30000)
-                .setConnectionRequestTimeout(30000)
-                .setSocketTimeout(30000)
+                .setConnectTimeout(HttpClientConfig.HTTP_TIMEOUT_MS)
+                .setConnectionRequestTimeout(HttpClientConfig.HTTP_TIMEOUT_MS)
+                .setSocketTimeout(HttpClientConfig.HTTP_TIMEOUT_MS)
                 .build();
         this.client = HttpClients.custom()
                 .setDefaultRequestConfig(config)
@@ -54,31 +49,7 @@ public class EXRWrapper {
      * @return Response body string or null on error
      */
     private String executeHttpRequest(HttpRequestBase request, String operation) {
-        CloseableHttpResponse response = null;
-        try {
-            response = client.execute(request);
-            if (validateResponse(response)) {
-                HttpEntity entity = response.getEntity();
-                String responseBody = EntityUtils.toString(entity);
-                EntityUtils.consume(entity);
-                return responseBody;
-            } else {
-                LOGGER.log(Level.WARNING, LOG_TAG + " " + operation + " failed for endpoint: " + exrEndpoint);
-                return null;
-            }
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, LOG_TAG + " " + operation + " failed for endpoint: " + exrEndpoint, e);
-            return null;
-        } finally {
-            request.reset();
-            if (response != null) {
-                try {
-                    response.close();
-                } catch (IOException e) {
-                    LOGGER.log(Level.WARNING, LOG_TAG + " Failed to close HTTP response", e);
-                }
-            }
-        }
+        return HttpUtils.executeHttpRequest(client, request, operation);
     }
 
     /**
@@ -151,9 +122,4 @@ public class EXRWrapper {
         }
     }
 
-    private boolean validateResponse(HttpResponse response) {
-        return response.getStatusLine().getStatusCode() == 200 &&
-                response.getEntity() != null &&
-                response.getEntity().getContentLength() != 0;
-    }
 }
