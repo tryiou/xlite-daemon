@@ -484,7 +484,7 @@ public class CoinInstance {
             LOGGER.log(Level.INFO, "[coin] Running address discovery");
             runAddressDiscovery();
         } else {
-            LOGGER.log(Level.INFO, "[coin] Address discovery disabled");
+            LOGGER.log(Level.FINE, "[coin] Address discovery disabled");
         }
 
         // Make sure wallet addresses are available

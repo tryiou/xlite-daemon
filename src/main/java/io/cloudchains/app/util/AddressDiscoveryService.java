@@ -22,7 +22,7 @@ public class AddressDiscoveryService {
     private static final int GAP_LIMIT = 25;
     private static final int BATCH_SIZE = 100;
     private static final int MAX_DISCOVERY_DEPTH = 10000;
-    private static final int DISCOVERY_TIMEOUT_MS = 30000; // 30 seconds max
+    private static int DISCOVERY_TIMEOUT_MS = 30000; // 30 seconds timeout - made non-final for testing
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
     private final CoinInstance coinInstance;
     private final HTTPClient httpClient;
@@ -34,12 +34,29 @@ public class AddressDiscoveryService {
         return "[discovery-" + currencyString + "]";
     }
 
+    /**
+     * Constructor for production use - creates its own HTTPClient
+     */
     public AddressDiscoveryService(CoinInstance coinInstance) {
+        this(coinInstance, new HTTPClient(5));
+    }
+
+    /**
+     * Constructor for testing - accepts HTTPClient as parameter for dependency injection
+     */
+    public AddressDiscoveryService(CoinInstance coinInstance, HTTPClient httpClient) {
         this.coinInstance = coinInstance;
-        this.httpClient = new HTTPClient(5);
+        this.httpClient = httpClient;
         this.configHelper = coinInstance.getConfigHelper();
         this.currencyString = CoinTickerUtils.tickerToString(coinInstance.getTicker());
         LOGGER.log(Level.INFO, getLogPrefix() + " AddressDiscoveryService initialized for " + currencyString);
+    }
+
+    /**
+     * Setter for timeout - for testing purposes only
+     */
+    public static void setDiscoveryTimeoutMs(int timeoutMs) {
+        DISCOVERY_TIMEOUT_MS = timeoutMs;
     }
 
     /**
@@ -174,8 +191,9 @@ public class AddressDiscoveryService {
         try {
             utxoResponse = httpClient.getUtxosUncached(coinInstance.getTicker(), addresses);
         } catch (Exception e) {
+            // Log without stack trace to avoid bloated output in tests
             LOGGER.log(Level.SEVERE, getLogPrefix() + " HTTP request failed for addresses " +
-                    addresses[0] + "..." + addresses[addresses.length - 1], e);
+                    addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage());
             return null; // Signal failure to caller
         }
         if (utxoResponse == null || utxoResponse.size() == 0) {
@@ -185,17 +203,33 @@ public class AddressDiscoveryService {
         for (JsonElement element : utxoResponse) {
             try {
                 JsonObject utxoJson = element.getAsJsonObject();
+
+                // Validate required fields exist and are not null
+                JsonElement addressElement = utxoJson.get("address");
+                JsonElement txidElement = utxoJson.get("txid");
+                JsonElement voutElement = utxoJson.get("vout");
+                JsonElement confirmationsElement = utxoJson.get("confirmations");
+                JsonElement valueElement = utxoJson.get("value");
+
+                if (addressElement == null || txidElement == null || voutElement == null ||
+                        confirmationsElement == null || valueElement == null ||
+                        addressElement.isJsonNull() || txidElement.isJsonNull() || voutElement.isJsonNull() ||
+                        confirmationsElement.isJsonNull() || valueElement.isJsonNull()) {
+                    LOGGER.log(Level.WARNING, getLogPrefix() + " Skipping invalid UTXO - missing required fields");
+                    continue;
+                }
+
                 UTXO utxo = new UTXO(
                         coinInstance.getTicker(),
-                        utxoJson.get("address").getAsString(),
-                        utxoJson.get("txid").getAsString(),
-                        utxoJson.get("vout").getAsInt(),
-                        utxoJson.get("confirmations").getAsInt(),
-                        (long) (utxoJson.get("value").getAsDouble() * 100000000.0)
+                        addressElement.getAsString(),
+                        txidElement.getAsString(),
+                        voutElement.getAsInt(),
+                        confirmationsElement.getAsInt(),
+                        (long) (valueElement.getAsDouble() * 100000000.0)
                 );
                 utxos.add(utxo);
             } catch (Exception e) {
-                LOGGER.log(Level.WARNING, getLogPrefix() + " Failed to parse UTXO response element", e);
+                LOGGER.log(Level.WARNING, getLogPrefix() + " Failed to parse UTXO response element: " + e.getMessage());
                 // Continue processing other UTXOs instead of failing completely
             }
         }
