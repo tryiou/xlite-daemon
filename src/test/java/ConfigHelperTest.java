@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Test class for ConfigHelper functionality.
  * Tests configuration file operations, address count management, and directory handling.
  */
-class TestConfigHelper extends TestHelper {
+class ConfigHelperTest extends TestHelper {
 
     private ConfigHelper configHelper;
 

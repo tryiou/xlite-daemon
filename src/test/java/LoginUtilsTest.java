@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Test class for LoginUtils functionality.
  * Tests password hashing and entropy generation.
  */
-class TestLoginUtils {
+class LoginUtilsTest {
 
     @Test
     void testLoginToEntropy_ValidPassword() {

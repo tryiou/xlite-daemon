@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Comprehensive unit tests for KeyHandler security improvements
  */
-public class TestKeyHandler {
+public class KeyHandlerTest {
 
     private static final String TEST_PASSPHRASE = "testPassphrase123!";
     private static final String TEST_MNEMONIC = "one two three cake neutral benefit quick hip level mother fine burst";

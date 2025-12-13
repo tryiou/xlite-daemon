@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
  * Tests address discovery functionality including timeout handling, circuit breaker patterns,
  * batch processing, and various edge cases.
  */
-class TestAddressDiscoveryService extends TestHelper {
+class AddressDiscoveryServiceTest extends TestHelper {
 
     private CoinInstance coinInstance;
     private AddressDiscoveryService discoveryService;

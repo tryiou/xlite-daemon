@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Test class for CoinInstance functionality.
  * Tests address generation, wallet initialization, and deterministic address creation.
  */
-class TestCoinInstance extends TestHelper {
+class CoinInstanceTest extends TestHelper {
 
     @Test
     void deterministicAddresses_fromMnemonic() {
