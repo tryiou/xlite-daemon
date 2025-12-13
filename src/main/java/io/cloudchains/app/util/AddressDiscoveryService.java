@@ -49,7 +49,7 @@ public class AddressDiscoveryService {
         this.httpClient = httpClient;
         this.configHelper = coinInstance.getConfigHelper();
         this.currencyString = CoinTickerUtils.tickerToString(coinInstance.getTicker());
-        LOGGER.log(Level.INFO, getLogPrefix() + " AddressDiscoveryService initialized for " + currencyString);
+        LOGGER.log(Level.FINER, getLogPrefix() + " AddressDiscoveryService initialized for " + currencyString);
     }
 
     /**
@@ -63,14 +63,14 @@ public class AddressDiscoveryService {
      * Main discovery method - determines correct addressCount based on last used address with funds + 1
      */
     public int discoverAddressCount() {
-        LOGGER.log(Level.INFO, getLogPrefix() + " Starting address discovery for " + currencyString);
+        LOGGER.log(Level.FINE, getLogPrefix() + " Starting address discovery for " + currencyString);
         long discoveryStartTime = System.currentTimeMillis();
         int consecutiveFailures = 0;
         int lastUsedIndex = -1;
         int consecutiveEmpty = 0;
         int currentAddressCount = configHelper.getAddressCount();
         int batchStart = currentAddressCount;
-        LOGGER.log(Level.INFO, getLogPrefix() + " Starting discovery from address index: " + currentAddressCount);
+        LOGGER.log(Level.FINE, getLogPrefix() + " Starting discovery from address index: " + currentAddressCount);
         try {
             while (consecutiveEmpty < GAP_LIMIT && batchStart < MAX_DISCOVERY_DEPTH) {
                 // Check for discovery timeout
@@ -118,7 +118,7 @@ public class AddressDiscoveryService {
                             (batchStart + BATCH_SIZE - 1));
                 } else {
                     consecutiveEmpty += BATCH_SIZE;
-                    LOGGER.log(Level.INFO, getLogPrefix() + " Empty batch (addresses " + batchStart + "-" +
+                    LOGGER.log(Level.FINE, getLogPrefix() + " Empty batch (addresses " + batchStart + "-" +
                             (batchStart + BATCH_SIZE - 1) + "), consecutive empty: " + consecutiveEmpty);
                 }
                 batchStart += BATCH_SIZE;
@@ -138,7 +138,7 @@ public class AddressDiscoveryService {
             } else {
                 // No used addresses found, keep current config value
                 finalCount = configHelper.getAddressCount();
-                LOGGER.log(Level.INFO, getLogPrefix() + " No used addresses found, keeping current address count: " + finalCount);
+                LOGGER.log(Level.FINE, getLogPrefix() + " No used addresses found, keeping current address count: " + finalCount);
             }
 
             LOGGER.log(Level.INFO, getLogPrefix() + " Discovery complete for " + currencyString +
@@ -166,7 +166,7 @@ public class AddressDiscoveryService {
                 AddressBalance addr = coinInstance.generateAddress(false);
                 // Don't add to batch here - we'll extract the correct slice below
             }
-            LOGGER.log(Level.INFO, getLogPrefix() + " Generated " + (needed - currentGenerated) +
+            LOGGER.log(Level.FINE, getLogPrefix() + " Generated " + (needed - currentGenerated) +
                     " new addresses for " + currencyString);
         }
         // Always extract the batch from the correct startIndex range

@@ -31,14 +31,7 @@ public class FileFormatter extends Formatter {
         sb.append(" ");
 
         // Format class and method information
-        if (record.getSourceClassName() != null) {
-            sb.append(record.getSourceClassName());
-            if (record.getSourceMethodName() != null) {
-                sb.append(".");
-                sb.append(record.getSourceMethodName());
-            }
-            sb.append(": ");
-        }
+        // Removed class and method information from log output
 
         // Format level and message
         sb.append(record.getLevel().getName());

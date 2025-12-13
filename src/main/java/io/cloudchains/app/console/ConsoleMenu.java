@@ -12,8 +12,14 @@ import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.background.BackgroundTimerThread;
 
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -318,6 +324,9 @@ public class ConsoleMenu {
             System.exit(0);
         }
 
+        // Measure total initialization time for all coins
+        long startTime = System.currentTimeMillis();
+        // Initialize Blocknet first (synchronous) as it's the active currency
         CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(entropy, userMnemonic, isMnemonic, xliteRPC);
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
@@ -325,13 +334,20 @@ public class ConsoleMenu {
             System.exit(0);
         }
 
+        // Get all coin tickers except Blocknet (which is already initialized)
+        List<CoinTicker> otherCoins = new ArrayList<>();
         for (CoinTicker cointicker : CoinTicker.coins()) {
-            if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BLOCKNET_TESTNET5)
-                continue;
-            coinError = CoinInstance.getInstance(cointicker).init(entropy, userMnemonic, isMnemonic, xliteRPC);
-            if (coinError != null) // fail silently
-                LOGGER.log(Level.WARNING, "[" + cointicker.name() + "] Error(" + coinError.getCode().name() + "): " + coinError.getMessage());
+            if (cointicker != CoinTicker.BLOCKNET && cointicker != CoinTicker.BLOCKNET_TESTNET5) {
+                otherCoins.add(cointicker);
+            }
         }
+
+        // Initialize remaining coins concurrently
+        initializeCoinsConcurrently(otherCoins, entropy, userMnemonic, isMnemonic, xliteRPC);
+
+        long endTime = System.currentTimeMillis();
+        long totalTime = endTime - startTime;
+        LOGGER.log(Level.INFO, "[coin] Concurrent coins initialization completed in " + totalTime + " ms");
 
         App.masterRPC.start();
         backgroundTimerThread = new BackgroundTimerThread();
@@ -339,6 +355,60 @@ public class ConsoleMenu {
         // Start EXR capability probing after wallet is decrypted
         if (App.exrServerPool != null) {
             App.exrServerPool.probeAllCapabilities();
+        }
+    }
+
+    /**
+     * Initialize coins concurrently using CompletableFuture
+     * @param coinTickers List of coin tickers to initialize
+     * @param entropy Password entropy
+     * @param userMnemonic User mnemonic (if any)
+     * @param isMnemonic Whether the input is a mnemonic
+     * @param xliteRPC Whether to use xlite RPC
+     */
+    private void initializeCoinsConcurrently(List<CoinTicker> coinTickers, String entropy,
+                                             String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
+        if (coinTickers.isEmpty()) {
+            return;
+        }
+
+        // Create thread pool with number of coins (or a reasonable limit)
+        int threadCount = Math.min(coinTickers.size(), 8); // Limit to 8 threads max
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+        try {
+            // Create CompletableFuture for each coin initialization
+            CompletableFuture<?>[] futures = coinTickers.stream()
+                    .map(coinTicker -> CompletableFuture.runAsync(() -> {
+                        try {
+                            LOGGER.log(Level.FINE, "[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
+                            CoinInstance.CoinError coinError = CoinInstance.getInstance(coinTicker)
+                                    .init(entropy, userMnemonic, isMnemonic, xliteRPC);
+                            if (coinError != null) {
+                                LOGGER.log(Level.WARNING, "[" + coinTicker.name() + "] Error(" +
+                                        coinError.getCode().name() + "): " + coinError.getMessage());
+                            }
+                        } catch (Exception e) {
+                            LOGGER.log(Level.SEVERE, "Failed to initialize " + coinTicker.name(), e);
+                        }
+                    }, executor))
+                    .toArray(CompletableFuture[]::new);
+
+            // Wait for all initializations to complete
+            CompletableFuture.allOf(futures).join();
+
+
+        } finally {
+            // Shutdown executor service
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

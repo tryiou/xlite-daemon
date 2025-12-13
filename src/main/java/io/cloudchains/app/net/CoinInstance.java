@@ -481,10 +481,10 @@ public class CoinInstance {
         // RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
         // This ensures discovery runs once at wallet startup in ANY case
         if (addressDiscoveryEnabled) {
-            LOGGER.log(Level.INFO, "[coin] Running address discovery");
+            LOGGER.log(Level.FINER, "[coinAddressDiscoveryService created] Running address discovery");
             runAddressDiscovery();
         } else {
-            LOGGER.log(Level.FINE, "[coin] Address discovery disabled");
+            LOGGER.log(Level.FINER, "[coin] Address discovery disabled");
         }
 
         // Make sure wallet addresses are available
@@ -1030,7 +1030,7 @@ public class CoinInstance {
 
         if (discoveryService == null) {
             discoveryService = new AddressDiscoveryService(this);
-            LOGGER.log(Level.INFO, "[coin-" + currency + "] AddressDiscoveryService created");
+            LOGGER.log(Level.FINER, "[coin-" + currency + "] AddressDiscoveryService created");
         }
 
         int discoveredCount = discoveryService.discoverAddressCount();
@@ -1047,7 +1047,7 @@ public class CoinInstance {
             LOGGER.log(Level.INFO, "[coin-" + currency + "] Updated address count to " +
                     discoveredCount);
         } else {
-            LOGGER.log(Level.INFO, "[coin-" + currency + "] No new addresses discovered, " +
+            LOGGER.log(Level.FINE, "[coin-" + currency + "] No new addresses discovered, " +
                     "keeping current count: " + currentCount);
         }
     }
