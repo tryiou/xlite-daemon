@@ -69,7 +69,6 @@ jobs:
         with:
           name: XLite Daemon ${{ github.ref_name}}
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          generate_release_notes: true
           files: |
             target/xlite-daemon-linux64
 
@@ -116,7 +115,6 @@ jobs:
         with:
           name: XLite Daemon ${{ github.ref_name}}
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          generate_release_notes: true
           files: |
             target/xlite-daemon-osx64
 
@@ -162,5 +160,4 @@ jobs:
         with:
           name: XLite Daemon ${{ github.ref_name}}
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          generate_release_notes: true
           files: target/xlite-daemon-win64.exe
