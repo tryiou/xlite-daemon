@@ -82,7 +82,7 @@ public class CoinInstance {
 
     private static final int FORWARD_ADDRESS_COUNT = 0;
 
-    private static ArrayList<CoinInstance> coinInstances = new ArrayList<>();
+    private static final List<CoinInstance> coinInstances = Collections.synchronizedList(new ArrayList<>());
     private static CoinInstance activeCurrency;
     private static CoinTicker activeBlocknetNetwork = null;
     private static CopyOnWriteArrayList<ListenerRegistration<ActiveCoinChangedEventListener>> activeCoinChangedListeners = new CopyOnWriteArrayList<>();
@@ -156,7 +156,7 @@ public class CoinInstance {
         return relayFees.get(ticker).get();
     }
 
-    public static ArrayList<CoinInstance> getCoinInstances() {
+    public static List<CoinInstance> getCoinInstances() {
         return coinInstances;
     }
 

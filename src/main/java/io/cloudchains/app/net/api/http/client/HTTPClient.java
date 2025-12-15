@@ -781,7 +781,14 @@ public class HTTPClient {
             return null;
         }
 
-        JsonArray json = new Gson().fromJson(res, JsonArray.class);
+        JsonArray json;
+        try {
+            json = new Gson().fromJson(res, JsonArray.class);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[httpclient] getHistory parsing error - Response: " + res, e);
+            return null;
+        }
+
         if (json == null) {
             LOGGER.log(Level.WARNING, "[httpclient] getHistory " + coinInstance.getTicker() + " null json");
             return null;
