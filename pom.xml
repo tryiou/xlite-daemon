@@ -20,6 +20,9 @@
     <maven.compiler.release>21</maven.compiler.release>
     <java.version>21</java.version>
 
+    <!-- Native build architecture (can be overridden from command line) -->
+    <native.march>native</native.march>
+
     <!-- Dependency Versions -->
     <bitcoinj.version>0.14.7</bitcoinj.version>
     <netty.version>4.2.7.Final</netty.version>
@@ -315,7 +318,7 @@
             <arg>--enable-url-protocols=http,https</arg>
             <arg>--enable-native-access=ALL-UNNAMED</arg>
             <arg>--strict-image-heap</arg>
-            <arg>-march=native</arg>
+            <arg>-march=${native.march}</arg>
             <arg>-H:+ReportExceptionStackTraces</arg>
             
             <!-- Initialize at runtime -->

@@ -48,7 +48,7 @@ jobs:
         run: chmod +x mvnw
 
       - name: Build native image
-        run: ./mvnw clean package -Pnative -DskipTests "-Dnative-image.args=-march=x86-64"
+        run: ./mvnw clean package -Pnative -DskipTests -Dnative.march=x86-64
 
       - name: Make daemon executable
         run: chmod +x target/xlite-daemon
@@ -94,7 +94,7 @@ jobs:
         run: chmod +x mvnw
 
       - name: Build native image
-        run: ./mvnw clean package -Pnative -DskipTests "-Dnative-image.args=-march=x86-64"
+        run: ./mvnw clean package -Pnative -DskipTests -Dnative.march=x86-64
 
       - name: Make daemon executable
         run: chmod +x target/xlite-daemon
@@ -143,7 +143,7 @@ jobs:
         run: choco install -y visualstudio2022-workload-vctools
 
       - name: Build native image
-        run: .\mvnw.cmd clean package -Pnative -DskipTests "-Dnative-image.args=-march=x86-64"
+        run: .\mvnw.cmd clean package -Pnative -DskipTests -Dnative.march=x86-64
 
 
       - name: Rename executable
