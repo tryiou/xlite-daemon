@@ -143,8 +143,7 @@ jobs:
         run: choco install -y visualstudio2022-workload-vctools
 
       - name: Build native image
-        run: .\mvnw.cmd clean package -Pnative -DskipTests -Dnative.march=x86-64
-
+        run: .\mvnw.cmd clean package -Pnative -DskipTests "-Dnative.march=x86-64"        
 
       - name: Rename executable
         run: Rename-Item target\xlite-daemon.exe xlite-daemon-win64.exe
