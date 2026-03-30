@@ -18,32 +18,33 @@ import java.util.logging.Logger;
 public class AddressDiscoveryService {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
-    // Simplified configuration values
-    private static final int GAP_LIMIT = 25;
-    private static final int BATCH_SIZE = 100;
-    private static final int MAX_DISCOVERY_DEPTH = 10000;
-    private static int DISCOVERY_TIMEOUT_MS = 30000; // 30 seconds timeout - made non-final for testing
-    private static final int MAX_CONSECUTIVE_FAILURES = 3;
+
+    private static final int BATCH_SIZE = 250;
+    private static final int NUM_BATCHES = 100;  // 250 * 100 = 25,000 address range
+    private static final int MAX_CONSECUTIVE_ERRORS = 3;
+    private static int DISCOVERY_TIMEOUT_MS = 30000; // non-final for testing
+
+    public static int getBatchSize() {
+        return BATCH_SIZE;
+    }
+
+    public static int getNumBatches() {
+        return NUM_BATCHES;
+    }
+
     private final CoinInstance coinInstance;
     private final HTTPClient httpClient;
     private final ConfigHelper configHelper;
     private final String currencyString;
 
-    // Enhanced logging helper
     private String getLogPrefix() {
         return "[discovery-" + currencyString + "]";
     }
 
-    /**
-     * Constructor for production use - creates its own HTTPClient
-     */
     public AddressDiscoveryService(CoinInstance coinInstance) {
         this(coinInstance, new HTTPClient(5));
     }
 
-    /**
-     * Constructor for testing - accepts HTTPClient as parameter for dependency injection
-     */
     public AddressDiscoveryService(CoinInstance coinInstance, HTTPClient httpClient) {
         this.coinInstance = coinInstance;
         this.httpClient = httpClient;
@@ -52,138 +53,131 @@ public class AddressDiscoveryService {
         LOGGER.log(Level.FINER, getLogPrefix() + " AddressDiscoveryService initialized for " + currencyString);
     }
 
-    /**
-     * Setter for timeout - for testing purposes only
-     */
     public static void setDiscoveryTimeoutMs(int timeoutMs) {
         DISCOVERY_TIMEOUT_MS = timeoutMs;
     }
 
     /**
-     * Main discovery method - determines correct addressCount based on last used address with funds + 1
+     * Discovers the correct address count by scanning batches sequentially from batch 0.
+     *
+     * Each batch (100 addresses) is checked for any UTXOs. As long as a batch has funds,
+     * the scan continues to the next batch. The first empty batch marks the boundary.
+     * Within the last non-empty batch, the exact highest funded address is found.
+     *
+     * Returns the index of the last funded address + 1 as the discovered address count.
+     * Returns the current config value if batch 0 is empty (wallet unused) or on failure.
      */
     public int discoverAddressCount() {
-        LOGGER.log(Level.FINE, getLogPrefix() + " Starting address discovery for " + currencyString);
-        long discoveryStartTime = System.currentTimeMillis();
-        int consecutiveFailures = 0;
-        int lastUsedIndex = -1;
-        int consecutiveEmpty = 0;
+        long startTime = System.currentTimeMillis();
         int currentAddressCount = configHelper.getAddressCount();
-        int batchStart = currentAddressCount;
-        LOGGER.log(Level.FINE, getLogPrefix() + " Starting discovery from address index: " + currentAddressCount);
+
+        LOGGER.log(Level.FINE, getLogPrefix() + " Starting sequential batch scan");
+
         try {
-            while (consecutiveEmpty < GAP_LIMIT && batchStart < MAX_DISCOVERY_DEPTH) {
-                // Check for discovery timeout
-                long elapsedTime = System.currentTimeMillis() - discoveryStartTime;
-                if (elapsedTime > DISCOVERY_TIMEOUT_MS) {
-                    LOGGER.log(Level.WARNING, getLogPrefix() + " Discovery timeout reached after " +
-                            (elapsedTime / 1000) + " seconds, aborting discovery");
-                    return configHelper.getAddressCount();
-                }
-                // Check for consecutive failures (circuit breaker)
-                if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                    LOGGER.log(Level.SEVERE, getLogPrefix() + " Maximum consecutive failures (" +
-                            MAX_CONSECUTIVE_FAILURES + ") reached, aborting discovery");
-                    return configHelper.getAddressCount();
-                }
-                // Progress logging every 5 batches
-                if (batchStart > currentAddressCount && batchStart % (BATCH_SIZE * 5) == 0) {
-                    LOGGER.log(Level.INFO, getLogPrefix() + " Discovery progress: " + batchStart +
-                            " addresses checked, " + consecutiveEmpty + " consecutive empty");
-                }
-                LOGGER.log(Level.FINE, getLogPrefix() + " Processing batch starting at index " + batchStart);
-                // Generate batch of addresses
-                List<AddressBalance> batch = generateAddressBatch(batchStart, BATCH_SIZE);
-                // Check for UTXOs in batch
-                List<UTXO> batchUtxos = checkBatchForUtxos(batch);
-                // Handle HTTP failures with circuit breaker
-                if (batchUtxos == null) {
-                    consecutiveFailures++;
-                    LOGGER.log(Level.WARNING, getLogPrefix() + " HTTP failure " + consecutiveFailures +
-                            "/" + MAX_CONSECUTIVE_FAILURES + " for batch starting at " + batchStart);
-                    // Continue to next batch instead of failing immediately
-                    batchStart += BATCH_SIZE;
-                    continue;
-                } else {
-                    consecutiveFailures = 0; // Reset failure count on success
-                }
-                if (!batchUtxos.isEmpty()) {
-                    // Found UTXOs - update last used index
-                    int batchLastUsedIndex = findLastUsedIndex(batch, batchUtxos);
-                    int globalLastUsedIndex = batchStart + batchLastUsedIndex;
-                    lastUsedIndex = Math.max(lastUsedIndex, globalLastUsedIndex);
-                    consecutiveEmpty = 0;
-                    LOGGER.log(Level.INFO, getLogPrefix() + " Found UTXOs in batch, last used index: " +
-                            globalLastUsedIndex + ", batch range: " + batchStart + "-" +
-                            (batchStart + BATCH_SIZE - 1));
-                } else {
-                    consecutiveEmpty += BATCH_SIZE;
-                    LOGGER.log(Level.FINE, getLogPrefix() + " Empty batch (addresses " + batchStart + "-" +
-                            (batchStart + BATCH_SIZE - 1) + "), consecutive empty: " + consecutiveEmpty);
-                }
-                batchStart += BATCH_SIZE;
-                // Safety check for max depth
-                if (batchStart >= MAX_DISCOVERY_DEPTH) {
-                    LOGGER.log(Level.WARNING, getLogPrefix() + " Hit max discovery depth at " + MAX_DISCOVERY_DEPTH);
+            if (isTimedOut(startTime)) return currentAddressCount;
+
+            int lastNonEmptyBatch = -1;
+            List<UTXO> lastBatchUtxos = null;
+            int consecutiveErrors = 0;
+
+            for (int i = 0; i < NUM_BATCHES; i++) {
+                if (isTimedOut(startTime)) {
+                    LOGGER.log(Level.WARNING, getLogPrefix() + " Timeout at batch " + i);
                     break;
                 }
+
+                ensureAddressesGenerated((i + 1) * BATCH_SIZE);
+
+                List<UTXO> utxos = probeBatch(i);
+
+                if (utxos == null) {
+                    consecutiveErrors++;
+                    if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                        LOGGER.log(Level.WARNING, getLogPrefix()
+                                + " Aborting: " + MAX_CONSECUTIVE_ERRORS + " consecutive HTTP failures");
+                        break;
+                    }
+                    continue;
+                }
+
+                consecutiveErrors = 0;
+                if (utxos.isEmpty()) break;
+
+                lastNonEmptyBatch = i;
+                lastBatchUtxos = utxos;
             }
 
-            // Calculate final address count: last used address with funds detected + 1
-            int finalCount;
-            if (lastUsedIndex >= 0) {
-                // Found used addresses, set to last used + 1
-                finalCount = lastUsedIndex + 1;
-                LOGGER.log(Level.INFO, getLogPrefix() + " Found used addresses, setting address count to: " + finalCount);
-            } else {
-                // No used addresses found, keep current config value
-                finalCount = configHelper.getAddressCount();
-                LOGGER.log(Level.FINE, getLogPrefix() + " No used addresses found, keeping current address count: " + finalCount);
+            if (lastNonEmptyBatch < 0) {
+                LOGGER.log(Level.INFO, getLogPrefix() + " No UTXOs found");
+                return currentAddressCount;
             }
 
-            LOGGER.log(Level.INFO, getLogPrefix() + " Discovery complete for " + currencyString +
-                    ". Last used index: " + lastUsedIndex + ", final address count: " + finalCount);
+            // Find exact highest funded address in the last non-empty batch
+            int batchStart = lastNonEmptyBatch * BATCH_SIZE;
+            List<AddressBalance> batch = getBatch(batchStart, BATCH_SIZE);
 
-            return finalCount;
+            int lastUsedInBatch = findLastUsedIndexInBatch(batch, lastBatchUtxos);
+            int discoveredCount = batchStart + lastUsedInBatch + 1;
+
+            LOGGER.log(Level.INFO, getLogPrefix() + " Discovery complete: lastBatch="
+                    + lastNonEmptyBatch + ", count=" + discoveredCount
+                    + ", time=" + (System.currentTimeMillis() - startTime) + "ms");
+
+            return discoveredCount;
 
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, getLogPrefix() + " Error during discovery for " + currencyString, e);
-            return configHelper.getAddressCount();
+            LOGGER.log(Level.SEVERE, getLogPrefix() + " Error during discovery", e);
+            return currentAddressCount;
         }
     }
 
     /**
-     * Generate a batch of addresses starting from a specific index
+     * Probe a batch for UTXOs.
+     * @return UTXO list (may be empty), or null on HTTP failure
      */
-    private List<AddressBalance> generateAddressBatch(int startIndex, int batchSize) {
-        List<AddressBalance> batch = new ArrayList<>();
-        // Ensure we have enough addresses generated
-        int currentGenerated = coinInstance.getAddressKeyPairs().size();
-        int needed = startIndex + batchSize;
-        if (needed > currentGenerated) {
-            // Generate additional addresses starting from currentGenerated
-            for (int i = currentGenerated; i < needed; i++) {
-                AddressBalance addr = coinInstance.generateAddress(false);
-                // Don't add to batch here - we'll extract the correct slice below
-            }
-            LOGGER.log(Level.FINE, getLogPrefix() + " Generated " + (needed - currentGenerated) +
-                    " new addresses for " + currencyString);
-        }
-        // Always extract the batch from the correct startIndex range
-        for (int i = startIndex; i < needed; i++) {
+    private List<UTXO> probeBatch(int batchIndex) {
+        List<AddressBalance> batch = getBatch(batchIndex * BATCH_SIZE, BATCH_SIZE);
+        return checkBatchForUtxos(batch);
+    }
+
+    /**
+     * Get a slice of addresses [startIndex, startIndex + size) from CoinInstance.
+     */
+    private List<AddressBalance> getBatch(int startIndex, int size) {
+        List<AddressBalance> batch = new ArrayList<>(size);
+        int end = Math.min(startIndex + size, coinInstance.getAddressKeyPairs().size());
+        for (int i = startIndex; i < end; i++) {
             batch.add(coinInstance.getAddressKeyPairs().get(i));
         }
         return batch;
     }
 
     /**
-     * Check a batch of addresses for UTXOs
+     * Ensure addresses up to count are generated in CoinInstance.
+     */
+    private void ensureAddressesGenerated(int count) {
+        int currentGenerated = coinInstance.getAddressKeyPairs().size();
+        if (count > currentGenerated) {
+            int toGenerate = count - currentGenerated;
+            for (int i = 0; i < toGenerate; i++) {
+                coinInstance.generateAddress(false);
+            }
+            LOGGER.log(Level.FINE, getLogPrefix() + " Generated " + toGenerate + " addresses");
+        }
+    }
+
+    private boolean isTimedOut(long startTime) {
+        return (System.currentTimeMillis() - startTime) > DISCOVERY_TIMEOUT_MS;
+    }
+
+    /**
+     * Check a batch of addresses for UTXOs via HTTP.
+     * @return list of UTXOs found (may be empty), or null on HTTP failure
      */
     private List<UTXO> checkBatchForUtxos(List<AddressBalance> batch) {
         if (batch.isEmpty()) {
             return new ArrayList<>();
         }
-        // Extract addresses for UTXO query
         String[] addresses = batch.stream()
                 .map(addr -> addr.getAddress().toBase58())
                 .toArray(String[]::new);
@@ -191,10 +185,9 @@ public class AddressDiscoveryService {
         try {
             utxoResponse = httpClient.getUtxosUncached(coinInstance.getTicker(), addresses);
         } catch (Exception e) {
-            // Log without stack trace to avoid bloated output in tests
-            LOGGER.log(Level.SEVERE, getLogPrefix() + " HTTP request failed for addresses " +
-                    addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage());
-            return null; // Signal failure to caller
+            LOGGER.log(Level.SEVERE, getLogPrefix() + " HTTP request failed for addresses "
+                    + addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage());
+            return null;
         }
         if (utxoResponse == null || utxoResponse.size() == 0) {
             return new ArrayList<>();
@@ -204,7 +197,6 @@ public class AddressDiscoveryService {
             try {
                 JsonObject utxoJson = element.getAsJsonObject();
 
-                // Validate required fields exist and are not null
                 JsonElement addressElement = utxoJson.get("address");
                 JsonElement txidElement = utxoJson.get("txid");
                 JsonElement voutElement = utxoJson.get("vout");
@@ -230,44 +222,28 @@ public class AddressDiscoveryService {
                 utxos.add(utxo);
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, getLogPrefix() + " Failed to parse UTXO response element: " + e.getMessage());
-                // Continue processing other UTXOs instead of failing completely
             }
         }
         return utxos;
     }
 
     /**
-     * Find the last used address index in the batch
-     * Uses HashMap for O(1) lookups when batch size is large enough to benefit
+     * Find the highest address index within a batch that has UTXOs.
+     * Uses HashMap for O(1) lookups when batch size > 20.
      */
-    private int findLastUsedIndex(List<AddressBalance> batch, List<UTXO> utxos) {
-        // Use HashMap for O(1) lookups when batch is large enough to benefit
-        if (batch.size() > 20) {
-            Map<String, Integer> addressToIndex = new HashMap<>(batch.size());
-            for (int i = 0; i < batch.size(); i++) {
-                addressToIndex.put(batch.get(i).getAddress().toBase58(), i);
-            }
-
-            int lastIndex = 0;
-            for (UTXO utxo : utxos) {
-                Integer index = addressToIndex.get(utxo.getAddress());
-                if (index != null) {
-                    lastIndex = Math.max(lastIndex, index);
-                }
-            }
-            return lastIndex;
-        } else {
-            // For small batches, linear search is faster due to cache locality
-            int lastIndex = 0;
-            for (UTXO utxo : utxos) {
-                for (int i = 0; i < batch.size(); i++) {
-                    if (batch.get(i).getAddress().toBase58().equals(utxo.getAddress())) {
-                        lastIndex = Math.max(lastIndex, i);
-                        break;
-                    }
-                }
-            }
-            return lastIndex;
+    private int findLastUsedIndexInBatch(List<AddressBalance> batch, List<UTXO> utxos) {
+        Map<String, Integer> addressToIndex = new HashMap<>(batch.size());
+        for (int i = 0; i < batch.size(); i++) {
+            addressToIndex.put(batch.get(i).getAddress().toBase58(), i);
         }
+
+        int lastIndex = 0;
+        for (UTXO utxo : utxos) {
+            Integer index = addressToIndex.get(utxo.getAddress());
+            if (index != null) {
+                lastIndex = Math.max(lastIndex, index);
+            }
+        }
+        return lastIndex;
     }
 }
