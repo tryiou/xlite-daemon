@@ -239,16 +239,14 @@ public class CoinInstance {
     }
 
     public static CoinInstance getInstance(CoinTicker ticker) {
-        CoinInstance instance = getInstanceByTicker(ticker);
-        if (getActiveBlocknetNetwork() != null && (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5)) {
-            return getInstanceByTicker(activeBlocknetNetwork);
+        if (ticker != CoinTicker.BLOCKNET) {
+            ConfigHelper cfg = new ConfigHelper(CoinTickerUtils.tickerToString(ticker));
+            if (!cfg.isRpcEnabled()) {
+                return null;
+            }
         }
 
-        if (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5) {
-            activeBlocknetNetwork = ticker;
-            LOGGER.log(Level.FINER, "[coin] Initialized active Blocknet network: " + ticker.toString());
-            LOGGER.log(Level.FINER, "[coin] All subsequent calls to this function requesting a Blocknet network will return the above regardless of testnet or mainnet status.");
-        }
+        CoinInstance instance = getInstanceByTicker(ticker);
 
         if (instance == null) {
             instance = new CoinInstance(ticker);
@@ -256,6 +254,14 @@ public class CoinInstance {
                 coinInstances.add(0, instance);
             else
                 coinInstances.add(instance);
+        }
+
+        if (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5) {
+            activeBlocknetNetwork = ticker;
+        }
+
+        if (getActiveBlocknetNetwork() != null && (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5)) {
+            return getInstanceByTicker(activeBlocknetNetwork);
         }
 
         return instance;
@@ -1027,6 +1033,11 @@ public class CoinInstance {
 
     public void runAddressDiscovery() {
         String currency = CoinTickerUtils.tickerToString(this.getTicker());
+
+        if (!configHelper.isRpcEnabled()) {
+            LOGGER.log(Level.FINE, "[coin-" + currency + "] RPC disabled, skipping address discovery");
+            return;
+        }
 
         if (discoveryService == null) {
             discoveryService = new AddressDiscoveryService(this);

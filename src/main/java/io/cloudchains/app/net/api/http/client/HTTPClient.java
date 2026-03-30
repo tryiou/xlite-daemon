@@ -562,9 +562,8 @@ public class HTTPClient {
         JsonObject result = new Gson().fromJson(res, JsonObject.class);
         JsonObject fees = result.get("result").getAsJsonObject();
 
-        for (CoinTicker coinTicker : CoinTicker.coins()) {
-            CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
-            String ticker = CoinTickerUtils.tickerToString(coinTicker);
+        for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
+            String ticker = CoinTickerUtils.tickerToString(coinInstance.getTicker());
 
             if (!fees.keySet().contains(ticker) || fees.get(ticker).isJsonNull()) {
                 coinInstance.incrementUpdateFailures();
@@ -573,7 +572,7 @@ public class HTTPClient {
 
             double fee = fees.get(ticker).getAsDouble();
 
-            coinInstance.addRelayFee(coinTicker, fee);
+            coinInstance.addRelayFee(coinInstance.getTicker(), fee);
 
             if (logCount % HttpClientConfig.LOG_COUNT_MODULO == 0)
                 LOGGER.log(Level.INFO, "[httpclient] Got relayfee for currency " + ticker + " - " + fee);
@@ -653,9 +652,8 @@ public class HTTPClient {
         JsonObject result = new Gson().fromJson(res, JsonObject.class);
         JsonObject blockCounts = result.get("result").getAsJsonObject();
 
-        for (CoinTicker coinTicker : CoinTicker.coins()) {
-            CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
-            String ticker = CoinTickerUtils.tickerToString(coinTicker);
+        for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
+            String ticker = CoinTickerUtils.tickerToString(coinInstance.getTicker());
 
             if (!blockCounts.keySet().contains(ticker) || blockCounts.get(ticker).isJsonNull()) {
                 coinInstance.incrementUpdateFailures();
@@ -664,7 +662,7 @@ public class HTTPClient {
 
             int blockCount = blockCounts.get(ticker).getAsInt();
 
-            coinInstance.addBlockCount(coinTicker, blockCount);
+            coinInstance.addBlockCount(coinInstance.getTicker(), blockCount);
             coinInstance.resetUpdateFailures();
 
             LOGGER.log(Level.FINER, "[httpclient] Got blockcount for currency " + ticker + " - " + blockCount);

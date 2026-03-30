@@ -20,7 +20,7 @@ class CoinInstanceTest extends TestHelper {
     @Test
     void deterministicAddresses_fromMnemonic() {
         for (int runCount = 0; runCount < 10; runCount++) {
-            CoinInstance coin = CoinInstance.getInstance(CoinTicker.LITECOIN);
+            CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCount());
             assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
@@ -47,7 +47,7 @@ class CoinInstanceTest extends TestHelper {
     @Test
     void deterministicAddresses_generateAddress() {
         for (int runCount = 0; runCount < 10; runCount++) {
-            CoinInstance coin = CoinInstance.getInstance(CoinTicker.LITECOIN);
+            CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCountInitial());
             assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
@@ -78,7 +78,7 @@ class CoinInstanceTest extends TestHelper {
     @Test
     void deterministicAddresses_generateForwardAddresses() {
         for (int runCount = 0; runCount < 10; runCount++) {
-            CoinInstance coin = CoinInstance.getInstance(CoinTicker.LITECOIN);
+            CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCountInitial());
             assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
@@ -107,7 +107,7 @@ class CoinInstanceTest extends TestHelper {
 
     @Test
     void deterministicAddresses_generateForwardAddressesReloadConfig() {
-        CoinInstance coin = CoinInstance.getInstance(CoinTicker.LITECOIN);
+        CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
         assertNotNull(coin);
         coin.getConfigHelper().setAddressCount(getAddressCountInitial());
         assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));

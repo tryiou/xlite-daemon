@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class ConsoleMenu {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
@@ -377,8 +378,13 @@ public class ConsoleMenu {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
         try {
+            // Filter to only enabled coins before initialization
+            List<CoinTicker> enabledCoins = coinTickers.stream()
+                    .filter(ticker -> ticker == CoinTicker.BLOCKNET || CoinInstance.getInstance(ticker) != null)
+                    .collect(Collectors.toList());
+
             // Create CompletableFuture for each coin initialization
-            CompletableFuture<?>[] futures = coinTickers.stream()
+            CompletableFuture<?>[] futures = enabledCoins.stream()
                     .map(coinTicker -> CompletableFuture.runAsync(() -> {
                         try {
                             LOGGER.log(Level.FINE, "[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
