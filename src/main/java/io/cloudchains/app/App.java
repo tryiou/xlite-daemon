@@ -9,6 +9,7 @@ import io.cloudchains.app.util.CCLogger;
 import io.cloudchains.app.util.ConsoleFormatter;
 import io.cloudchains.app.util.FileFormatter;
 import io.cloudchains.app.util.LogRotationUtil;
+import io.github.cdimascio.dotenv.Dotenv;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,10 +33,25 @@ public class App {
     public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
     public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();
     public static ConsoleMenu console = null;
+    public static Dotenv dotenv = null;
+
+    public static String getEnv(String key) {
+        if (dotenv != null) {
+            String value = dotenv.get(key);
+            if (value != null) return value;
+        }
+        return System.getenv(key);
+    }
 
     static {
+        // Load .env file if present
+        try {
+            dotenv = Dotenv.configure().ignoreIfMissing().load();
+        } catch (Exception ignored) {
+        }
+
         // Check for EXR_ENDPOINT environment variable
-        String exrEndpoint = System.getenv("EXR_ENDPOINT");
+        String exrEndpoint = getEnv("EXR_ENDPOINT");
         if (exrEndpoint != null && !exrEndpoint.isEmpty()) {
             EXR_ENDPOINT = exrEndpoint;
             exrServerPool = new EXRServerPool(EXR_ENDPOINT);
@@ -58,7 +74,7 @@ public class App {
             String OS = (System.getProperty("os.name")).toLowerCase();
 
             if (OS.contains("win")) {
-                userHomeDir = System.getenv("AppData");
+                userHomeDir = getEnv("AppData");
             } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
                 userHomeDir = System.getProperty("user.home") + File.separator + ".config";
             } else if (OS.contains("mac")) {

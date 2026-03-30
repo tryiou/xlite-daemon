@@ -1,5 +1,7 @@
 package io.cloudchains.app.util;
 
+import io.cloudchains.app.App;
+
 import java.io.File;
 import java.util.List;
 import java.util.logging.Level;
@@ -13,7 +15,7 @@ import java.util.logging.Logger;
 public class LogRotationUtil {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
-    private static final int DEFAULT_LOG_RETENTION_DAYS = 2;
+    private static final int DEFAULT_LOG_RETENTION_DAYS = 30;
     private static final String LOG_RETENTION_ENV_VAR = "CLOUDCHAINS_LOG_RETENTION_DAYS";
 
     /**
@@ -59,7 +61,7 @@ public class LogRotationUtil {
         String OS = (System.getProperty("os.name")).toLowerCase();
 
         if (OS.contains("win")) {
-            return System.getenv("AppData");
+            return App.getEnv("AppData");
         } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
             return System.getProperty("user.home") + File.separator + ".config";
         } else if (OS.contains("mac")) {
@@ -76,7 +78,7 @@ public class LogRotationUtil {
      */
     private static int getRetentionDaysFromEnvironment() {
         int retentionDays = DEFAULT_LOG_RETENTION_DAYS;
-        String retentionEnv = System.getenv(LOG_RETENTION_ENV_VAR);
+        String retentionEnv = App.getEnv(LOG_RETENTION_ENV_VAR);
 
         if (retentionEnv != null && !retentionEnv.trim().isEmpty()) {
             try {

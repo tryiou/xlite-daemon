@@ -71,8 +71,10 @@ public class BackgroundTimerThread implements Runnable {
                 initialDelay,
                 24, TimeUnit.HOURS
         );
-        LOGGER.log(Level.INFO, "[BackgroundTimer] Scheduled daily log rotation at {0:02d}:{1:02d}",
-                new Object[]{DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE});
+        LocalTime now = LocalTime.now();
+        LOGGER.log(Level.INFO, "[BackgroundTimer] Scheduled daily log rotation at {0} (current time: {1})",
+                new Object[]{String.format("%02d:%02d", DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE),
+                        String.format("%02d:%02d", now.getHour(), now.getMinute())});
     }
 
     /**

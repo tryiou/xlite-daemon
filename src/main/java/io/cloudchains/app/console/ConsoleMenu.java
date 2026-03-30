@@ -52,8 +52,8 @@ public class ConsoleMenu {
     }
 
     public void init() {
-        if (System.getenv("WALLET_MNEMONIC") != null) {
-            String mnemonicImport = System.getenv("WALLET_MNEMONIC");
+        if (App.getEnv("WALLET_MNEMONIC") != null) {
+            String mnemonicImport = App.getEnv("WALLET_MNEMONIC");
             if (mnemonicImport == null) {
                 LOGGER.log(Level.INFO, "Bad mnemonic.");
                 return;
@@ -61,8 +61,8 @@ public class ConsoleMenu {
 
             completeLogin(mnemonicImport, null, true);
             return;
-        } else if (System.getenv("WALLET_PASSWORD") != null) {
-            String password = System.getenv("WALLET_PASSWORD");
+        } else if (App.getEnv("WALLET_PASSWORD") != null) {
+            String password = App.getEnv("WALLET_PASSWORD");
             if (password == null) {
                 LOGGER.log(Level.INFO, "Bad password.");
                 return;

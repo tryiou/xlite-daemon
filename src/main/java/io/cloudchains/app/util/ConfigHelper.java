@@ -1,6 +1,7 @@
 package io.cloudchains.app.util;
 
 import com.google.common.base.Preconditions;
+import io.cloudchains.app.App;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -220,7 +221,7 @@ public class ConfigHelper {
             String OS = (System.getProperty("os.name")).toLowerCase();
 
             if (OS.contains("win")) {
-                userHomeDir = System.getenv("AppData");
+                userHomeDir = App.getEnv("AppData");
             } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
                 userHomeDir = System.getProperty("user.home") + File.separator + ".config";
             } else if (OS.contains("mac")) {

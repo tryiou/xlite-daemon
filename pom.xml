@@ -112,6 +112,13 @@
       <version>20250517</version>
     </dependency>
 
+    <!-- java-dotenv -->
+    <dependency>
+      <groupId>io.github.cdimascio</groupId>
+      <artifactId>java-dotenv</artifactId>
+      <version>5.2.2</version>
+    </dependency>
+
     <!-- Netty Core Modules -->
     <dependency>
       <groupId>io.netty</groupId>
@@ -285,6 +292,7 @@
                   <include>io.netty:netty-codec-http</include>
                   <include>io.netty:netty-codec-compression</include>
                   <include>com.google.code.findbugs:jsr305</include>
+                  <include>io.github.cdimascio:java-dotenv</include>
                 </includes>
                 <!-- Exclude conflicting artifacts -->
                 <excludes>
