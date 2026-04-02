@@ -6,6 +6,6 @@ import org.bitcoinj.core.FilteredBlock;
 
 public interface BlocknetOnBlocksDownloadedEventListener {
 
-	void onBlocksDownloaded(BlocknetPeer peer, Block block, FilteredBlock filteredBlock, int blocksLeft);
+    void onBlocksDownloaded(BlocknetPeer peer, Block block, FilteredBlock filteredBlock, int blocksLeft);
 
 }

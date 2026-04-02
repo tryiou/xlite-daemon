@@ -6,10 +6,14 @@ import io.cloudchains.app.net.CoinTicker;
 import java.util.List;
 
 public class Transaction {
-    @SerializedName("address") private String addressB58;
-    @SerializedName("txhash") private String txid;
-    @SerializedName("blockhash") private String blockhash;
-    @SerializedName("category") private String category;
+    @SerializedName("address")
+    private String addressB58;
+    @SerializedName("txhash")
+    private String txid;
+    @SerializedName("blockhash")
+    private String blockhash;
+    @SerializedName("category")
+    private String category;
     private double fee;
     protected transient double value;
     private int vout;
@@ -39,6 +43,7 @@ public class Transaction {
     public void setFee(double fee) {
         this.fee = fee;
     }
+
     public double getFee() {
         return fee;
     }

@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Project Metadata -->
+  <groupId>io.cloudchains</groupId>
+  <artifactId>xlite-daemon</artifactId>
+  <version>0.5.15</version>
+  <packaging>jar</packaging>
+
+  <name>XLite Daemon</name>
+  <description>XLite Daemon - Multi-cryptocurrency wallet daemon</description>
+  <url>https://github.com/blocknetdx/xlite-daemon</url>
+
+  <!-- Properties -->
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <maven.compiler.release>21</maven.compiler.release>
+    <java.version>21</java.version>
+
+    <!-- Native build architecture (can be overridden from command line) -->
+    <native.march>native</native.march>
+
+    <!-- Dependency Versions -->
+    <bitcoinj.version>0.14.7</bitcoinj.version>
+    <netty.version>4.2.7.Final</netty.version>
+    <junit.version>5.11.3</junit.version>
+    <gson.version>2.13.2</gson.version>
+
+    <!-- Plugin Versions -->
+    <native.maven.plugin.version>0.11.3</native.maven.plugin.version>
+    <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+    <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
+    <exec.maven.plugin.version>3.5.0</exec.maven.plugin.version>
+  </properties>
+
+  <!-- Dependency Management -->
+  <dependencyManagement>
+    <dependencies>
+      <!-- JUnit BOM -->
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  <!-- Dependencies -->
+  <dependencies>
+    <!-- BitcoinJ Core -->
+    <dependency>
+      <groupId>org.bitcoinj</groupId>
+      <artifactId>bitcoinj-core</artifactId>
+      <version>${bitcoinj.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpclient</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpcore</artifactId>
+        </exclusion>
+        <!-- Exclude SLF4J API to prevent multiple bindings -->
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- Gson -->
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>${gson.version}</version>
+    </dependency>
+
+    <!-- Apache HttpClient (includes httpcore) -->
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+      <version>4.5.14</version>
+    </dependency>
+
+    <!-- SLF4J API (needed by bitcoinj) -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.7.36</version>
+    </dependency>
+
+    <!-- SLF4J NOP binding (suppresses warnings without logging) -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <version>1.7.36</version>
+    </dependency>
+
+    <!-- JSON -->
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20250517</version>
+    </dependency>
+
+    <!-- java-dotenv -->
+    <dependency>
+      <groupId>io.github.cdimascio</groupId>
+      <artifactId>java-dotenv</artifactId>
+      <version>5.2.2</version>
+    </dependency>
+
+    <!-- Netty Core Modules -->
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-common</artifactId>
+      <version>${netty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-buffer</artifactId>
+      <version>${netty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-transport</artifactId>
+      <version>${netty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-handler</artifactId>
+      <version>${netty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-codec-http</artifactId>
+      <version>${netty.version}</version>
+    </dependency>
+
+    <!-- JSR305 Annotations -->
+    <dependency>
+      <groupId>com.google.code.findbugs</groupId>
+      <artifactId>jsr305</artifactId>
+      <version>3.0.2</version>
+    </dependency>
+
+    <!-- Test Dependencies -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>5.15.2</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <!-- Build Configuration -->
+  <build>
+    <plugins>
+      <!-- Maven Surefire Plugin for JUnit 5 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
+        <configuration>
+          <includes>
+            <include>**/*Test*.java</include>
+          </includes>
+          <argLine>-javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar</argLine>
+        </configuration>
+      </plugin>
+
+      <!-- Maven Compiler Plugin -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${maven.compiler.plugin.version}</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+          <release>${java.version}</release>
+          <compilerArgs>
+            <arg>-Xlint:unchecked</arg>
+            <arg>-Xlint:deprecation</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
+      <!-- Maven Enforcer Plugin -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <id>enforce-versions</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>21</version>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>3.8.6</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Maven Shade Plugin (Shadow JAR equivalent) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>${maven.shade.plugin.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <phase>package</phase>
+            <configuration>
+              <createDependencyReducedPom>true</createDependencyReducedPom>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <!-- Exclude duplicate license files to prevent warnings -->
+                    <exclude>META-INF/DEPENDENCIES</exclude>
+                    <exclude>META-INF/LICENSE.txt</exclude>
+                    <exclude>META-INF/NOTICE.txt</exclude>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                    <!-- Exclude module-info files to prevent overlapping warnings -->
+                    <exclude>META-INF/versions/*/module-info.class</exclude>
+                    <exclude>META-INF/versions/9/module-info</exclude>
+                    <exclude>META-INF/versions/11/module-info</exclude>
+                    <!-- Exclude Netty version properties to prevent overlapping warnings -->
+                    <exclude>META-INF/io.netty.versions.properties</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                  <resource>simplelogger.properties</resource>
+                </transformer>
+                <!-- Merge module-info files properly -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"></transformer>
+              </transformers>
+              <artifactSet>
+                <!-- Explicitly include only needed artifacts -->
+                <includes>
+                  <include>org.bitcoinj:bitcoinj-core</include>
+                  <include>com.madgag.spongycastle:core</include>
+                  <include>com.google.protobuf:protobuf-java</include>
+                  <include>com.google.guava:guava</include>
+                  <include>net.jcip:jcip-annotations</include>
+                  <include>com.lambdaworks:scrypt</include>
+                  <include>com.squareup.okhttp:okhttp</include>
+                  <include>com.squareup.okio:okio</include>
+                  <include>org.bitcoinj:orchid</include>
+                  <include>com.google.code.gson:gson</include>
+                  <include>com.google.errorprone:error_prone_annotations</include>
+                  <include>org.apache.httpcomponents:httpclient</include>
+                  <include>commons-logging:commons-logging</include>
+                  <include>commons-codec:commons-codec</include>
+                  <include>org.json:json</include>
+                  <include>io.netty:netty-common</include>
+                  <include>io.netty:netty-buffer</include>
+                  <include>io.netty:netty-transport</include>
+                  <include>io.netty:netty-resolver</include>
+                  <include>io.netty:netty-handler</include>
+                  <include>io.netty:netty-transport-native-unix-common</include>
+                  <include>io.netty:netty-codec-base</include>
+                  <include>io.netty:netty-codec-http</include>
+                  <include>io.netty:netty-codec-compression</include>
+                  <include>com.google.code.findbugs:jsr305</include>
+                  <include>io.github.cdimascio:java-dotenv</include>
+                </includes>
+                <!-- Exclude conflicting artifacts -->
+                <excludes>
+                  <exclude>org.apache.httpcomponents:httpcore</exclude>
+                  <exclude>org.slf4j:slf4j-api</exclude>
+                </excludes>
+              </artifactSet>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- GraalVM Build Tools Native Plugin -->
+      <plugin>
+        <groupId>org.graalvm.buildtools</groupId>
+        <artifactId>native-maven-plugin</artifactId>
+        <version>${native.maven.plugin.version}</version>
+        <configuration>
+          <!-- Main class -->
+          <mainClass>io.cloudchains.app.App</mainClass>
+
+          <!-- Image name -->
+          <imageName>xlite-daemon</imageName>
+
+          <!-- Basic flags -->
+          <fallback>false</fallback>
+          <verbose>true</verbose>
+
+          <!-- Additional build arguments -->
+          <buildArgs>
+            <arg>--enable-url-protocols=http,https</arg>
+            <arg>--enable-native-access=ALL-UNNAMED</arg>
+            <arg>--strict-image-heap</arg>
+            <arg>-march=${native.march}</arg>
+            <arg>-H:+ReportExceptionStackTraces</arg>
+            
+            <!-- Initialize at runtime -->
+            <arg>--initialize-at-run-time=io.netty</arg>
+            <arg>--initialize-at-run-time=io.netty.util.internal</arg>
+            <arg>--initialize-at-run-time=io.netty.channel</arg>
+            <arg>--initialize-at-run-time=io.netty.channel.nio</arg>
+            <arg>--initialize-at-run-time=io.netty.buffer</arg>
+            <arg>--initialize-at-run-time=io.netty.handler</arg>
+            <arg>--initialize-at-run-time=io.netty.bootstrap</arg>
+            <arg>--initialize-at-run-time=org.apache.httpcomponents</arg>
+            <arg>--initialize-at-run-time=org.json</arg>
+            <arg>--initialize-at-run-time=org.slf4j</arg>
+            <arg>--initialize-at-run-time=org.slf4j.impl</arg>
+            
+            <!-- Initialize at build time -->
+            <arg>--initialize-at-build-time=com.google.common.base.Charsets</arg>
+            <arg>--initialize-at-build-time=com.google.common.base.CharMatcher</arg>
+            <arg>--initialize-at-build-time=com.google.common.base.CharMatcher$8</arg>
+            <arg>--initialize-at-build-time=com.google.common.math.IntMath</arg>
+            <arg>--initialize-at-build-time=com.google.common.base.StandardCharsets</arg>
+            <arg>--initialize-at-build-time=com.google.common.base.Joiner</arg>
+            <arg>--initialize-at-build-time=com.google.common.io.BaseEncoding</arg>
+            <arg>--initialize-at-build-time=com.google.common.io.BaseEncoding$StandardBaseEncoding</arg>
+            <arg>--initialize-at-build-time=com.google.common.io.BaseEncoding$Alphabet</arg>
+            <arg>--initialize-at-build-time=org.apache.commons.logging</arg>
+            <arg>--initialize-at-build-time=org.slf4j.helpers.NOPLogger</arg>
+            <arg>--initialize-at-build-time=org.bitcoinj.core.Utils</arg>
+            <arg>--initialize-at-build-time=org.bitcoinj.core.Sha256Hash</arg>
+            <arg>--initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode</arg>
+            <arg>--initialize-at-build-time=io.cloudchains.app.util</arg>
+            <arg>--initialize-at-build-time=io.cloudchains.app.crypto</arg>
+            <arg>--initialize-at-build-time=io.cloudchains.app.console</arg>
+            <arg>--initialize-at-build-time=io.cloudchains.app.net.api</arg>
+            <arg>--initialize-at-build-time=io.cloudchains.app.net.protocols</arg>
+            <arg>--initialize-at-build-time=io.cloudchains.app.net.xrouter</arg>
+            <arg>--initialize-at-build-time=io.cloudchains.app.net.api.http</arg>
+            
+            
+            <!-- Additional options -->
+            <arg>--report-unsupported-elements-at-runtime</arg>
+          </buildArgs>
+        </configuration>
+        <executions>
+          <execution>
+            <id>build-native</id>
+            <goals>
+              <goal>compile-no-fork</goal>
+            </goals>
+            <phase>package</phase>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- OpenRewrite Maven Plugin for automatic code cleanup -->
+      <plugin>
+        <groupId>org.openrewrite.maven</groupId>
+        <artifactId>rewrite-maven-plugin</artifactId>
+        <version>6.25.0</version>
+        <configuration>
+          <!-- Active recipes for automatic cleanup during build -->
+          <activeRecipes>
+            <!-- Maven cleanup recipes -->
+            <recipe>org.openrewrite.maven.cleanup.DependencyManagementDependencyRequiresVersion</recipe>
+            <recipe>org.openrewrite.maven.cleanup.ExplicitPluginGroupId</recipe>
+            <recipe>org.openrewrite.maven.cleanup.ExplicitPluginVersion</recipe>
+            <recipe>org.openrewrite.maven.cleanup.PrefixlessExpressions</recipe>
+            <recipe>org.openrewrite.maven.RemoveDuplicateDependencies</recipe>
+            <recipe>org.openrewrite.maven.RemoveDuplicatePluginDeclarations</recipe>
+            <recipe>org.openrewrite.maven.RemoveRedundantDependencyVersions</recipe>
+            <recipe>org.openrewrite.maven.RemoveRedundantProperties</recipe>
+            <recipe>org.openrewrite.maven.RemoveUnusedProperties</recipe>
+            <recipe>org.openrewrite.maven.OrderPomElements</recipe>
+            <recipe>org.openrewrite.maven.ModernizeObsoletePoms</recipe>
+            <recipe>org.openrewrite.maven.BestPractices</recipe>
+            
+            <!-- Java cleanup recipes -->
+            <recipe>org.openrewrite.java.RemoveUnusedImports</recipe>
+            <recipe>org.openrewrite.java.format.AutoFormat</recipe>
+            <recipe>org.openrewrite.java.OrderImports</recipe>
+            <recipe>org.openrewrite.java.format.RemoveTrailingWhitespace</recipe>
+            <recipe>org.openrewrite.java.RemoveObjectsIsNull</recipe>
+            <recipe>org.openrewrite.java.ShortenFullyQualifiedTypeReferences</recipe>
+            <recipe>org.openrewrite.java.SimplifySingleElementAnnotation</recipe>
+          </activeRecipes>
+          
+          <!-- Code style -->
+          <activeStyles>
+            <style>org.openrewrite.java.IntelliJ</style>
+          </activeStyles>
+          
+          <!-- Export datatables for analysis -->
+          <exportDatatables>true</exportDatatables>
+          
+          <!-- Skip cleanup during certain phases if needed -->
+          <!-- <skip>false</skip> -->
+        </configuration>
+        <executions>
+          <!-- Run cleanup during the compile phase -->
+          <execution>
+            <id>cleanup-code</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      
+      <!-- Exec Maven Plugin for running the application -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>${exec.maven.plugin.version}</version>
+        <configuration>
+          <mainClass>io.cloudchains.app.App</mainClass>
+          <includePluginDependencies>true</includePluginDependencies>
+          <systemProperties>
+            <systemProperty>
+              <key>java.util.logging.config.file</key>
+              <value>logging.properties</value>
+            </systemProperty>
+          </systemProperties>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- Profiles -->
+  <profiles>
+    <!-- Native build profile -->
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>0.11.3</version>
+            <configuration>
+              <skip>false</skip>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Test skip profile for faster native builds -->
+    <profile>
+      <id>native-fast</id>
+      <properties>
+        <skipTests>true</skipTests>
+      </properties>
+    </profile>
+  </profiles>
+</project>

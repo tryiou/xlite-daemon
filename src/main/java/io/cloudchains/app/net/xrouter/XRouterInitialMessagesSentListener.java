@@ -4,6 +4,6 @@ import io.cloudchains.app.net.CoinInstance;
 
 public interface XRouterInitialMessagesSentListener {
 
-	void initialMessagesSent(CoinInstance instance);
+    void initialMessagesSent(CoinInstance instance);
 
 }

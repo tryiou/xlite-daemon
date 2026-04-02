@@ -7,95 +7,96 @@ import org.bitcoinj.utils.MonetaryFormat;
 
 public class DashcoinNetworkParameters extends NetworkParameters {
 
-	public DashcoinNetworkParameters() {
-		super();
-	}
+    public DashcoinNetworkParameters() {
+        super();
+    }
 
-	@Override
-	public String getPaymentProtocolId() {
-		return "main";
-	}
+    @Override
+    public String getPaymentProtocolId() {
+        return "main";
+    }
 
-	@Override
-	public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {}
+    @Override
+    public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {
+    }
 
-	@Override
-	public Coin getMaxMoney() {
-		return Coin.valueOf(22000000 * Coin.COIN.value);
-	}
+    @Override
+    public Coin getMaxMoney() {
+        return Coin.valueOf(22000000 * Coin.COIN.value);
+    }
 
-	@Override
-	public Coin getMinNonDustOutput() {
-		return Coin.valueOf(5460);
-	}
+    @Override
+    public Coin getMinNonDustOutput() {
+        return Coin.valueOf(5460);
+    }
 
-	@Override
-	public MonetaryFormat getMonetaryFormat() {
-		return new MonetaryFormat().code(0, "DASH");
-	}
+    @Override
+    public MonetaryFormat getMonetaryFormat() {
+        return new MonetaryFormat().code(0, "DASH");
+    }
 
-	@Override
-	public String getUriScheme() {
-		return "dashcoin:";
-	}
+    @Override
+    public String getUriScheme() {
+        return "dashcoin:";
+    }
 
-	@Override
-	public boolean hasMaxMoney() {
-		return true;
-	}
+    @Override
+    public boolean hasMaxMoney() {
+        return true;
+    }
 
-	@Override
-	public BitcoinSerializer getSerializer(boolean parseRetain) {
-		return new BitcoinSerializer(this, parseRetain);
-	}
+    @Override
+    public BitcoinSerializer getSerializer(boolean parseRetain) {
+        return new BitcoinSerializer(this, parseRetain);
+    }
 
-	@Override
-	public int getProtocolVersionNum(ProtocolVersion version) {
-		return 70210;
-	}
+    @Override
+    public int getProtocolVersionNum(ProtocolVersion version) {
+        return 70210;
+    }
 
-	@Override
-	public int getAddressHeader() {
-		return 76;
-	}
+    @Override
+    public int getAddressHeader() {
+        return 76;
+    }
 
-	@Override
-	public int getP2SHHeader() {
-		return 16;
-	}
+    @Override
+    public int getP2SHHeader() {
+        return 16;
+    }
 
-	@Override
-	public int getDumpedPrivateKeyHeader() {
-		return 204;
-	}
+    @Override
+    public int getDumpedPrivateKeyHeader() {
+        return 204;
+    }
 
-	@Override
-	public int[] getAcceptableAddressCodes() {
-		return new int[] {getAddressHeader(), getP2SHHeader()};
-	}
+    @Override
+    public int[] getAcceptableAddressCodes() {
+        return new int[]{getAddressHeader(), getP2SHHeader()};
+    }
 
-	@Override
-	public int getBip32HeaderPriv() {
-		return 0x0488ADE4;
-	}
+    @Override
+    public int getBip32HeaderPriv() {
+        return 0x0488ADE4;
+    }
 
-	@Override
-	public int getBip32HeaderPub() {
-		return 0x0488B21E;
-	}
+    @Override
+    public int getBip32HeaderPub() {
+        return 0x0488B21E;
+    }
 
-	@Override
-	public int getSubsidyDecreaseBlockCount() {
-		return 210240;
-	}
+    @Override
+    public int getSubsidyDecreaseBlockCount() {
+        return 210240;
+    }
 
-	@Override
-	public int getInterval() {
-		return 57;
-	}
+    @Override
+    public int getInterval() {
+        return 57;
+    }
 
-	@Override
-	public String getId() {
-		return "DASH";
-	}
+    @Override
+    public String getId() {
+        return "DASH";
+    }
 }

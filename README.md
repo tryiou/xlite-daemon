@@ -1,12 +1,13 @@
 # Xlite Wallet Backend
 
-The Xlite Wallet Backend is a Java-based project that serves as the backend infrastructure for the Xlite wallet application. It is built using Java with JDK version 21 and utilizes Gradle for build automation. The project incorporates the org.bitcoinj library version 0.14.7 for Bitcoin-related functionality.
+The Xlite Wallet Backend is a Java-based project that serves as the backend infrastructure for the Xlite wallet application. It is built using Java with JDK version 21 and utilizes Maven for build automation. The project incorporates the org.bitcoinj library version 0.14.7 for Bitcoin-related functionality.
 
 ## Table of Contents
 
 - [Project Overview](#project-overview)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
+- [Maven Build Commands](#maven-build-commands)
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
@@ -21,6 +22,7 @@ Provide a brief description of the Xlite Wallet Backend project. Explain its pur
 List the prerequisites required to set up and run the Xlite Wallet Backend. Include the following:
 
 - JDK 21: Install the Java Development Kit version 21 or a compatible version.
+- Maven 3.8.6 or higher: Install Apache Maven for build automation.
 
 ## Getting Started
 
@@ -34,18 +36,59 @@ git clone https://github.com/blocknetdx/xlite-daemon
 ```
 cd xlite-daemon
 
-# mac/linux:
-chmod +x gradlew
-./gradlew nativeImage
+# Make Maven wrapper executable (mac/linux):
+chmod +x mvnw
 
-# windows:
-nativeImageWindows.bat
+# Build native image:
+./mvnw clean package -Pnative
+
+# Or for faster build without tests:
+./mvnw clean package -Pnative-fast
 ```
 3. Configuration: If any configuration files or settings need to be modified, provide instructions on how to set them up.
 
-4. Run the application: 
+4. Run the application:
 ```
-binary to find in build/graal/ folder
+./target/xlite-daemon
+```
+
+## Maven Build Commands
+
+### Basic Maven Operations
+
+```bash
+# Clean and compile
+mvn clean compile
+
+# Run tests
+mvn test
+
+# Package JAR (without native compilation)
+mvn package -DskipTests
+
+# Build native image
+mvn clean package -Pnative
+
+# Run application
+mvn exec:java
+
+# Skip tests for faster builds
+mvn clean package -Pnative-fast
+```
+
+### Profile-Specific Commands
+
+- **native**: Full native image compilation with all optimizations
+- **native-fast**: Faster native compilation with reduced optimizations for development
+
+### Common Maven Goals
+
+- `mvn clean`: Remove build artifacts
+- `mvn compile`: Compile source code
+- `mvn test`: Run unit tests
+- `mvn package`: Package compiled code into distributable format
+- `mvn install`: Install package into local repository
+- `mvn dependency:tree`: Display dependency tree
 ```
 ## Usage
 

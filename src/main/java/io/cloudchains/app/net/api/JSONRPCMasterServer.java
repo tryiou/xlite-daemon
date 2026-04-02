@@ -1,6 +1,5 @@
 package io.cloudchains.app.net.api;
 
-import io.cloudchains.app.App;
 import io.cloudchains.app.net.api.http.master.HTTPServerInitializer;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -15,50 +14,49 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class JSONRPCMasterServer extends Thread {
-	private final static LogManager LOGMANAGER = LogManager.getLogManager();
-	private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private final static LogManager LOGMANAGER = LogManager.getLogManager();
+    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-	private final int port;
-	private boolean stopping = false;
+    private final int port;
+    private boolean stopping = false;
 
-	private Channel channel;
+    private Channel channel;
 
-	JSONRPCMasterServer(int port) {
-		this.port = port;
-	}
+    JSONRPCMasterServer(int port) {
+        this.port = port;
+    }
 
-	public void run() {
-		EventLoopGroup workerGroup = new NioEventLoopGroup(2);
-		try {
-			LOGGER.log(Level.INFO, "[rpc] Starting master RPC server on port " + port + ".");
+    public void run() {
+        EventLoopGroup workerGroup = new NioEventLoopGroup(2);
+        try {
+            LOGGER.log(Level.INFO, "[rpc] Starting master RPC server on port " + port + ".");
 
-			ServerBootstrap bootstrap = new ServerBootstrap();
-			bootstrap.group(workerGroup)
-					.option(ChannelOption.SO_BACKLOG, 128)
-					.option(ChannelOption.SO_REUSEADDR, true)
-					.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-					.channel(NioServerSocketChannel.class)
-					.childHandler(new HTTPServerInitializer());
+            ServerBootstrap bootstrap = new ServerBootstrap();
+            bootstrap.group(workerGroup)
+                    .option(ChannelOption.SO_BACKLOG, 128)
+                    .option(ChannelOption.SO_REUSEADDR, true)
+                    .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new HTTPServerInitializer());
 
-			channel = bootstrap.bind(port).sync().channel();
+            channel = bootstrap.bind(port).sync().channel();
 
-			channel.closeFuture().sync();
-		} catch (Exception e) {
-			if (!stopping) {
-				LOGGER.log(Level.FINER, "[json-rpc-server] ERROR: Error during server operation! (master RPC)");
-				e.printStackTrace();
-			}
-		}
-	}
+            channel.closeFuture().sync();
+        } catch (Exception e) {
+            if (!stopping) {
+                LOGGER.log(Level.WARNING, "[rpc-master] Error during master RPC server operation", e);
+            }
+        }
+    }
 
-	public void deinit() {
-		stopping = true;
-		LOGGER.log(Level.FINER, "[json-rpc-server] Interrupting server.");
+    public void deinit() {
+        stopping = true;
+        LOGGER.log(Level.FINER, "[json-rpc-server] Interrupting server.");
 
-		if (channel != null && channel.isOpen()) {
-			channel.close();
-		} else {
-			LOGGER.log(Level.FINER, "[json-rpc-server] Channel is null or not open during deinitialization.");
-		}
-	}
+        if (channel != null && channel.isOpen()) {
+            channel.close();
+        } else {
+            LOGGER.log(Level.FINER, "[json-rpc-server] Channel is null or not open during deinitialization.");
+        }
+    }
 }

@@ -2,7 +2,7 @@ package io.cloudchains.app;
 
 public class Version {
     private static final String CLIENT_NAME = "CloudChains";
-    private static final String CLIENT_PROTOCOL_VERSION = "0.5.14";
+    private static final String CLIENT_PROTOCOL_VERSION = "0.5.15";
 
     public static final String CLIENT_TYPE = "CloudPeer";
     public static final String CLIENT_COMMENTS = "SPV";
