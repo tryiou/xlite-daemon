@@ -32,6 +32,7 @@ public class CoinTickerUtils {
         tickers.put(CoinTicker.TREZARCOIN, "TZC");
         tickers.put(CoinTicker.BITBAY, "BAY");
         tickers.put(CoinTicker.UNOBTANIUM, "UNO");
+        tickers.put(CoinTicker.PKOIN, "PKOIN");
 
     }
 
@@ -68,6 +69,7 @@ public class CoinTickerUtils {
                 CoinTicker.TREZARCOIN,
                 CoinTicker.BITBAY,
                 CoinTicker.UNOBTANIUM,
+                CoinTicker.PKOIN,
 		};
     }
 
