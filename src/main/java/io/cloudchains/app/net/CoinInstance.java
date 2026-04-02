@@ -82,7 +82,7 @@ public class CoinInstance {
 
     private static final int FORWARD_ADDRESS_COUNT = 0;
 
-    private static final List<CoinInstance> coinInstances = Collections.synchronizedList(new ArrayList<>());
+    private static final List<CoinInstance> coinInstances = new CopyOnWriteArrayList<>();
     private static CoinInstance activeCurrency;
     private static CoinTicker activeBlocknetNetwork = null;
     private static CopyOnWriteArrayList<ListenerRegistration<ActiveCoinChangedEventListener>> activeCoinChangedListeners = new CopyOnWriteArrayList<>();
@@ -93,8 +93,8 @@ public class CoinInstance {
     private WalletHelper walletHelper = null;
     private CoinTicker ticker;
     private ConcurrentHashMap<String, Transaction> transactionList = new ConcurrentHashMap<>();
-    private ArrayList<AddressBalance> addressKeyPairs = new ArrayList<>();
-    private ArrayList<CloudTransaction> transactionObservableList = new ArrayList<>();
+    private final CopyOnWriteArrayList<AddressBalance> addressKeyPairs = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<CloudTransaction> transactionObservableList = new CopyOnWriteArrayList<>();
     private BlocknetPeerGroup blocknetPeerGroup;
     private BlocknetParameters blocknetNetworkParameters;
     private NetworkParameters networkParameters;
@@ -133,11 +133,15 @@ public class CoinInstance {
         if (!KeyHandler.existsBaseECKeyFromLocal())
             return "";
 
-        List<String> seed = KeyHandler.getBaseSeed(pw);
-        if (seed == null)
-            return "";
-
-        return Joiner.on(" ").join(seed);
+        char[] passphrase = pw.toCharArray();
+        try {
+            List<String> seed = KeyHandler.getBaseSeed(passphrase);
+            if (seed == null)
+                return "";
+            return Joiner.on(" ").join(seed);
+        } finally {
+            Arrays.fill(passphrase, '\0');
+        }
     }
 
     public static int getBlockCountByTicker(CoinTicker ticker) {
@@ -200,7 +204,7 @@ public class CoinInstance {
         Address address = addressKeyPair.getAddress();
         DumpedPrivateKey privateKey = addressKeyPair.getPrivateKey();
         addressKeyPairs.add(addressKeyPair);
-        LOGGER.log(Level.FINER, "[wallet] DEBUG: Generated new address, have " + addressKeyPairs.size() + ": " + address.toBase58() + ", private key: " + privateKey.toBase58() + " (hex: " + privateKey.getKey().getPrivateKeyAsHex() + ")");
+        LOGGER.log(Level.FINER, "[wallet] Generated new address, have " + addressKeyPairs.size() + ": " + address.toBase58());
 
         if (updateConfig) {
             configHelper.setAddressCount(configHelper.getAddressCount() + 1);
@@ -246,25 +250,27 @@ public class CoinInstance {
             }
         }
 
-        CoinInstance instance = getInstanceByTicker(ticker);
+        synchronized (CoinInstance.class) {
+            CoinInstance instance = getInstanceByTicker(ticker);
 
-        if (instance == null) {
-            instance = new CoinInstance(ticker);
-            if (ticker == CoinTicker.BLOCKNET)
-                coinInstances.add(0, instance);
-            else
-                coinInstances.add(instance);
+            if (instance == null) {
+                instance = new CoinInstance(ticker);
+                if (ticker == CoinTicker.BLOCKNET)
+                    coinInstances.add(0, instance);
+                else
+                    coinInstances.add(instance);
+            }
+
+            if (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5) {
+                activeBlocknetNetwork = ticker;
+            }
+
+            if (getActiveBlocknetNetwork() != null && (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5)) {
+                return getInstanceByTicker(activeBlocknetNetwork);
+            }
+
+            return instance;
         }
-
-        if (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5) {
-            activeBlocknetNetwork = ticker;
-        }
-
-        if (getActiveBlocknetNetwork() != null && (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5)) {
-            return getInstanceByTicker(activeBlocknetNetwork);
-        }
-
-        return instance;
     }
 
     /**
@@ -280,24 +286,31 @@ public class CoinInstance {
                     CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
         }
 
-        List<String> baseSeed = KeyHandler.getBaseSeed(oldPassword);
-        if (baseSeed == null) {
-            LOGGER.log(Level.FINER, "[wallet] Unable to change the password: Incorrect password");
-            return new CoinError("Unable to change the password: Incorrect password",
-                    CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
+        char[] oldPassphrase = oldPassword.toCharArray();
+        char[] newPassphrase = newPassword.toCharArray();
+        try {
+            List<String> baseSeed = KeyHandler.getBaseSeed(oldPassphrase);
+            if (baseSeed == null) {
+                LOGGER.log(Level.FINER, "[wallet] Unable to change the password: Incorrect password");
+                return new CoinError("Unable to change the password: Incorrect password",
+                        CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
+            }
+
+            // Get current wallet seed
+            DeterministicSeed seed = new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
+            List<String> mnemonic = seed.getMnemonicCode();
+
+            if (!KeyHandler.importFromMnemonic(mnemonic, newPassphrase)) {
+                LOGGER.log(Level.FINER, "[wallet] Unable to change the password: Failed to create new wallet file");
+                return new CoinError("Unable to change the password: Failed to create new wallet file",
+                        CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
+            }
+
+            return null;
+        } finally {
+            Arrays.fill(oldPassphrase, '\0');
+            Arrays.fill(newPassphrase, '\0');
         }
-
-        // Get current wallet seed
-        DeterministicSeed seed = new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
-        List<String> mnemonic = seed.getMnemonicCode();
-
-        if (!KeyHandler.importFromMnemonic(mnemonic, newPassword)) {
-            LOGGER.log(Level.FINER, "[wallet] Unable to change the password: Failed to create new wallet file");
-            return new CoinError("Unable to change the password: Failed to create new wallet file",
-                    CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
-        }
-
-        return null;
     }
 
     public NetworkParameters getNetworkParameters() {
@@ -322,8 +335,7 @@ public class CoinInstance {
                 coinRPCServer.deinit();
                 coinRPCServer.join();
             } catch (Exception e) {
-                LOGGER.log(Level.FINER, "[coin] ERROR: Error while deinitializing coin RPC server!");
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[coin] Error deinitializing RPC server for " + CoinTickerUtils.tickerToString(ticker), e);
             }
         }
     }
@@ -460,15 +472,29 @@ public class CoinInstance {
         if (isMnemonic) {
             baseSeed = Arrays.asList(pw.split(" "));
         } else {
-            if (KeyHandler.existsBaseECKeyFromLocal())
-                existsOnDisk = true;else if (userMnemonic != null) {
-                if (!KeyHandler.importFromMnemonic(Arrays.asList(new String(userMnemonic).split(" ")), pw)) {
-                    LOGGER.log(Level.FINER, "[wallet] Unable to create wallet from mnemonic");
-                    return new CoinError("Unable to create wallet from mnemonic", CoinError.CoinErrorCode.BADMNEMONIC);
+            if (KeyHandler.existsBaseECKeyFromLocal()) {
+                existsOnDisk = true;
+                if (userMnemonic != null) {
+                    LOGGER.log(Level.WARNING, "[wallet] Wallet already exists on disk, ignoring provided mnemonic");
+                }
+            } else if (userMnemonic != null) {
+                char[] importPassphrase = pw.toCharArray();
+                try {
+                    if (!KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), importPassphrase)) {
+                        LOGGER.log(Level.FINER, "[wallet] Unable to create wallet from mnemonic");
+                        return new CoinError("Unable to create wallet from mnemonic", CoinError.CoinErrorCode.BADMNEMONIC);
+                    }
+                } finally {
+                    Arrays.fill(importPassphrase, '\0');
                 }
             }
 
-            baseSeed = KeyHandler.getBaseSeed(pw);
+            char[] readPassphrase = pw.toCharArray();
+            try {
+                baseSeed = KeyHandler.getBaseSeed(readPassphrase);
+            } finally {
+                Arrays.fill(readPassphrase, '\0');
+            }
         }
 
         if (baseSeed == null) {
@@ -591,8 +617,7 @@ public class CoinInstance {
         try {
             blocknetPeerGroup.start();
         } catch (Exception e) {
-            LOGGER.log(Level.FINER, "Error while initializing blocking client object!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[coin] Error initializing blocking client for " + CoinTickerUtils.tickerToString(ticker), e);
             return;
         }
 
@@ -914,16 +939,18 @@ public class CoinInstance {
     }
 
     public void addCloudTransaction(CloudTransaction cloudTransaction) {
-        if (transactionObservableList.isEmpty()) {
-            transactionObservableList.add(cloudTransaction);
-            return;
-        }
+        synchronized (transactionObservableList) {
+            if (transactionObservableList.isEmpty()) {
+                transactionObservableList.add(cloudTransaction);
+                return;
+            }
 
-        CloudTransaction tx = transactionObservableList.stream()
-                .filter(e -> e.getTxHash().equals(cloudTransaction.getTxHash())).findAny().orElse(null);
+            CloudTransaction tx = transactionObservableList.stream()
+                    .filter(e -> e.getTxHash().equals(cloudTransaction.getTxHash())).findAny().orElse(null);
 
-        if (tx == null) {
-            transactionObservableList.add(cloudTransaction);
+            if (tx == null) {
+                transactionObservableList.add(cloudTransaction);
+            }
         }
     }
 
@@ -995,12 +1022,12 @@ public class CoinInstance {
         return blocknetPeerGroup.getBestBlocknetPeer(currency);
     }
 
-    public ArrayList<AddressBalance> getAddressKeyPairs() {
-        return addressKeyPairs;
+    public List<AddressBalance> getAddressKeyPairs() {
+        return Collections.unmodifiableList(addressKeyPairs);
     }
 
-    public ArrayList<CloudTransaction> getTransactionList() {
-        return transactionObservableList;
+    public List<CloudTransaction> getTransactionList() {
+        return Collections.unmodifiableList(transactionObservableList);
     }
 
     public static AtomicInteger getBlockCount(CoinTicker ticker) {

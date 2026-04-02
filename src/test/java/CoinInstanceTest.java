@@ -25,7 +25,7 @@ class CoinInstanceTest extends TestHelper {
             coin.getConfigHelper().setAddressCount(getAddressCount());
             assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
 
-            ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
+            List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses) {
                 actual.add(address.getAddress().toBase58());
@@ -57,7 +57,7 @@ class CoinInstanceTest extends TestHelper {
                 coin.generateAddress(false);
             coin.generateAddress(true); // last one
 
-            ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
+            List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses)
                 actual.add(address.getAddress().toBase58());
@@ -87,7 +87,7 @@ class CoinInstanceTest extends TestHelper {
             coin.getConfigHelper().setAddressCount(getAddressCount());
             assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), null, false));
 
-            ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
+            List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses)
                 actual.add(address.getAddress().toBase58());
@@ -117,7 +117,7 @@ class CoinInstanceTest extends TestHelper {
             coin.getConfigHelper().setAddressCount(idx);
             coin.getConfigHelper().writeConfig();
             coin.reloadConfig();
-            ArrayList<AddressBalance> addresses = coin.getAddressKeyPairs();
+            List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
             for (AddressBalance address : addresses)
                 actual.add(address.getAddress().toBase58());

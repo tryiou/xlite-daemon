@@ -24,27 +24,21 @@ import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
-import org.apache.http.ssl.SSLContextBuilder;
 import org.bitcoinj.core.Address;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -188,16 +182,7 @@ public class HTTPClient {
     }
 
     public HTTPClient(int maximumSockets) {
-        SSLContext sslContext = null;
         lastFetchTimes = new ConcurrentHashMap<>();
-
-        try {
-            sslContext = new SSLContextBuilder()
-                    .loadTrustMaterial(null, (x509CertChain, authType) -> true)
-                    .build();
-        } catch (NoSuchAlgorithmException | KeyManagementException | KeyStoreException e) {
-            e.printStackTrace();
-        }
 
         Header header = new BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json");
         List<Header> headers = Lists.newArrayList(header);
@@ -207,12 +192,10 @@ public class HTTPClient {
         requestBuilder.setConnectionRequestTimeout(HttpClientConfig.HTTP_TIMEOUT_MS);
         requestBuilder.setSocketTimeout(HttpClientConfig.HTTP_TIMEOUT_MS);
 
-        assert sslContext != null;
         PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(
                 RegistryBuilder.<ConnectionSocketFactory>create()
                         .register("http", PlainConnectionSocketFactory.INSTANCE)
-                        .register("https", new SSLConnectionSocketFactory(sslContext,
-                                NoopHostnameVerifier.INSTANCE))
+                        .register("https", SSLConnectionSocketFactory.getSystemSocketFactory())
                         .build()
         );
         connectionManager.setDefaultMaxPerRoute(maximumSockets);
@@ -220,8 +203,6 @@ public class HTTPClient {
 
         client = HttpClients.custom()
                 .setDefaultHeaders(headers)
-                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                .setSSLContext(sslContext)
                 .setConnectionManager(connectionManager)
                 .setDefaultRequestConfig(requestBuilder.build())
                 .build();
@@ -231,7 +212,7 @@ public class HTTPClient {
         try {
             client.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[httpclient] Failed to close HTTP client", e);
         }
     }
 
@@ -330,7 +311,7 @@ public class HTTPClient {
                     //     (server != null ? server.getEndpoint() : "null"));
                         
                     if (server == null) {
-                        LOGGER.log(Level.SEVERE, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
+                        LOGGER.log(Level.WARNING, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
                                 CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     } else {
@@ -350,7 +331,7 @@ public class HTTPClient {
                 if (coin != null) {
                     server = App.exrServerPool.selectServerForCoin(coin);
                     if (server == null) {
-                        LOGGER.log(Level.SEVERE, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
+                        LOGGER.log(Level.WARNING, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
                                 CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     }
@@ -445,7 +426,7 @@ public class HTTPClient {
             jsonObject = new JSONObject(res);
             utxoArr = jsonObject.getJSONArray("utxos");
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " parse error - " + e.getMessage());
         }
 
         if (jsonObject == null || utxoArr == null) {
@@ -524,7 +505,7 @@ public class HTTPClient {
             jsonObject = new JSONObject(res);
             utxoArr = jsonObject.getJSONArray("utxos");
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[httpclient] getUtxos " + coinInstance.getTicker() + " parse error - " + e.getMessage());
         }
 
         if (jsonObject == null || utxoArr == null) {
@@ -783,7 +764,7 @@ public class HTTPClient {
         try {
             json = new Gson().fromJson(res, JsonArray.class);
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "[httpclient] getHistory parsing error - Response: " + res, e);
+            LOGGER.log(Level.WARNING, "[httpclient] getHistory parsing error - Response: " + res + " - " + e.getMessage());
             return null;
         }
 
@@ -897,7 +878,7 @@ public class HTTPClient {
                         } else
                             ++fails;
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[httpclient] getRawTransaction failed - " + e.getMessage());
                         ++fails;
                     }
                 }
@@ -927,7 +908,7 @@ public class HTTPClient {
                             } else
                                 ++fails;
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            LOGGER.log(Level.WARNING, "[httpclient] getRawTransaction(vout) failed - " + e.getMessage());
                             ++fails;
                         }
                     }

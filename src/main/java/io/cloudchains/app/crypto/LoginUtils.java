@@ -23,8 +23,7 @@ public class LoginUtils {
             }
             return hex.toString();
         } catch (Exception e) {
-            LOGGER.log(Level.FINER, "Error while hashing message with SHA256!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[security] Error hashing message with SHA-256", e);
         }
         return null;
     }
