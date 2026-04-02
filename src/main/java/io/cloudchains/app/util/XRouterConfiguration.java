@@ -55,8 +55,7 @@ public class XRouterConfiguration {
             try {
                 properties = getPluginProperties(rawPluginConfig);
             } catch (IOException e) {
-                LOGGER.log(Level.FINER, "[xrouter-plugin-config-parser] ERROR: Error while parsing plugin config!");
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[xrouter-config] Failed to parse plugin config for " + pluginName, e);
                 return;
             }
 
@@ -206,8 +205,7 @@ public class XRouterConfiguration {
         try {
             properties = parseINI(formatted);
         } catch (IOException e) {
-            LOGGER.log(Level.FINER, "[xrouter-config-parser] ERROR: Error while parsing XRouter config!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[xrouter-config] Failed to parse XRouter config", e);
             return null;
         }
 

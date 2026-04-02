@@ -126,7 +126,7 @@ public class AddressDiscoveryService {
             return discoveredCount;
 
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, getLogPrefix() + " Error during discovery", e);
+            LOGGER.log(Level.WARNING, getLogPrefix() + " Error during discovery", e);
             return currentAddressCount;
         }
     }
@@ -185,8 +185,8 @@ public class AddressDiscoveryService {
         try {
             utxoResponse = httpClient.getUtxosUncached(coinInstance.getTicker(), addresses);
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, getLogPrefix() + " HTTP request failed for addresses "
-                    + addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage());
+            LOGGER.log(Level.WARNING, getLogPrefix() + " HTTP request failed for addresses "
+                    + addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage(), e);
             return null;
         }
         if (utxoResponse == null || utxoResponse.size() == 0) {

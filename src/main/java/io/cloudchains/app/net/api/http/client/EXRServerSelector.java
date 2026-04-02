@@ -112,7 +112,7 @@ class EXRServerSelectorImpl implements ServerSelector {
     @Override
     public EXRServer selectServerForCoin(List<EXRServer> supportingServers, CoinTicker coin) {
         if (supportingServers == null || supportingServers.isEmpty()) {
-            LOGGER.log(Level.SEVERE, "[server-selector] NO EXR SERVERS SUPPORT COIN: " +
+            LOGGER.log(Level.WARNING, "[server-selector] NO EXR SERVERS SUPPORT COIN: " +
                     CoinTickerUtils.tickerToString(coin));
             return null; // FAIL - NO FALLBACK TO BASE_URL
         }
@@ -152,7 +152,7 @@ class EXRServerSelectorImpl implements ServerSelector {
      */
     private EXRServer selectFromHealthyServers(List<EXRServer> healthyServers, CoinTicker coin) {
         if (healthyServers.isEmpty()) {
-            LOGGER.log(Level.SEVERE, "[server-selector] NO HEALTHY EXR SERVERS FOR COIN: " +
+            LOGGER.log(Level.WARNING, "[server-selector] NO HEALTHY EXR SERVERS FOR COIN: " +
                     CoinTickerUtils.tickerToString(coin));
             return null;
         }

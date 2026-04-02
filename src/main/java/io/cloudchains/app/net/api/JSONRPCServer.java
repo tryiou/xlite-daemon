@@ -48,8 +48,7 @@ public class JSONRPCServer extends Thread {
             channel.closeFuture().sync();
         } catch (Exception e) {
             if (!stopping) {
-                LOGGER.log(Level.FINER, "[json-rpc-server] ERROR: Error during server operation! (" + CoinTickerUtils.tickerToString(coin.getTicker()) + ")");
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[rpc-server] Error during RPC server operation for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
             }
         }
     }

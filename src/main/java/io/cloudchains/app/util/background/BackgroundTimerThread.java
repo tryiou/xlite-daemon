@@ -40,6 +40,7 @@ public class BackgroundTimerThread implements Runnable {
 
     private long lastOut;
     private boolean shutdownRequested = false;
+    private volatile Thread workerThread;
 
     // Log rotation scheduler fields
     private ScheduledExecutorService logRotationScheduler;
@@ -110,6 +111,9 @@ public class BackgroundTimerThread implements Runnable {
 
     public void stop() {
         shutdownRequested = true;
+        if (workerThread != null) {
+            workerThread.interrupt();
+        }
         if (logRotationScheduler != null && !logRotationScheduler.isShutdown()) {
             logRotationScheduler.shutdown();
             try {
@@ -208,6 +212,7 @@ public class BackgroundTimerThread implements Runnable {
 
     @Override
     public void run() {
+        workerThread = Thread.currentThread();
         LOGGER.log(Level.FINER, "[BackgroundTimer] Waiting until initial messages are sent off.");
 
         for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
@@ -227,12 +232,12 @@ public class BackgroundTimerThread implements Runnable {
                 outputAvailableCurrencies();
 
                 Thread.sleep(100);
+            } catch (InterruptedException e) {
+                break;
             } catch (NullPointerException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[BackgroundTimer] Null pointer", e);
             } catch (Exception e) {
-                LOGGER.log(Level.FINER, "[BackgroundTimer] Interrupted thread");
-                e.printStackTrace();
-                Thread.currentThread().interrupt();
+                LOGGER.log(Level.WARNING, "[BackgroundTimer] Unexpected error", e);
             }
         }
     }

@@ -47,8 +47,7 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
                 runReadLoop(stream, connection);
             } catch (Exception e) {
                 if (!closeRequested) {
-                    LOGGER.log(Level.FINER, "[blocknet-blocking-client] Error trying to open/read from connection with " + serverAddress.toString() + ".");
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[blocknet] Error opening/reading connection with " + serverAddress.toString(), e);
                     connectFuture.setException(e);
                 }
             } finally {
@@ -99,8 +98,7 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
             closeRequested = true;
             socket.close();
         } catch (IOException e) {
-            LOGGER.log(Level.FINER, "[blocknet-blocking-client] Error while closing socket!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[blocknet] Error closing socket", e);
         }
     }
 
@@ -111,8 +109,7 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
             out.write(bytes);
             out.flush();
         } catch (IOException e) {
-            LOGGER.log(Level.FINER, "[blocknet-blocking-client] Error while writing bytes to socket!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[blocknet] Error writing bytes to socket", e);
             closeConnection();
             throw e;
         }

@@ -44,8 +44,7 @@ public class JSONRPCMasterServer extends Thread {
             channel.closeFuture().sync();
         } catch (Exception e) {
             if (!stopping) {
-                LOGGER.log(Level.FINER, "[json-rpc-server] ERROR: Error during server operation! (master RPC)");
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[rpc-master] Error during master RPC server operation", e);
             }
         }
     }

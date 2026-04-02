@@ -16,8 +16,14 @@ import org.bitcoinj.wallet.Wallet;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 public class WalletHelper {
+    private final static LogManager LOGMANAGER = LogManager.getLogManager();
+    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+
     private CoinInstance coin;
     private NetworkParameters networkParameters;
 
@@ -49,7 +55,7 @@ public class WalletHelper {
             }
             return tx;
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[wallet-helper] Error creating transaction", e);
             return null;
         }
     }

@@ -91,8 +91,7 @@ public class XRouterMessage extends Message {
         try {
             bitcoinSerializeToStream(byteArrayOutputStream);
         } catch (Exception e) {
-            LOGGER.log(Level.FINER, "Error while serializing XRouter packet! Invalid packet structure?");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[xrouter] Error serializing XRouter packet", e);
             return null;
         }
 

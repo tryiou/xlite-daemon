@@ -58,7 +58,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
+        LOGGER.log(Level.WARNING, "[http-master] Exception caught on channel", cause);
 
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
         writeResponse(ctx, httpResponse, null);
@@ -163,7 +163,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 }
             } catch (Exception e) {
                 LOGGER.log(Level.INFO, "Failed Content: " + content);
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[http-master] Failed to parse JSON-RPC request", e);
                 JsonObject errorParsingJSON = new JsonObject();
                 errorParsingJSON.addProperty("code", -1001);
                 errorParsingJSON.addProperty("message", "Error parsing JSON.");
@@ -236,7 +236,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         Thread.sleep(500);
                         instance.reloadConfig();
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[http-master] Interrupted during reloadconfig for " + ticker, e);
                     }
                 };
                 new Thread(r).start();

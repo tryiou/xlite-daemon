@@ -75,7 +75,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
+        LOGGER.log(Level.WARNING, "[http-server-handler] Exception caught on channel for " + CoinTickerUtils.tickerToString(coin.getTicker()), cause);
 
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
         writeResponse(ctx, httpResponse, null);
@@ -192,7 +192,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 }
             } catch (Exception e) {
                 LOGGER.log(Level.INFO, "Failed Content: " + content);
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[http-server-handler] Failed to parse JSON-RPC request for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                 JsonObject errorParsingJSON = new JsonObject();
                 errorParsingJSON.addProperty("code", -1001);
                 errorParsingJSON.addProperty("message", "Error parsing JSON.");
@@ -250,7 +250,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     try {
                         Thread.sleep(500);
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[http-server-handler] Interrupted during reloadconfig for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     }
 
                     coin.reloadConfig();
@@ -420,7 +420,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     errorJSON.addProperty("message", "Error parsing JSON!");
                     response.add("error", errorJSON);
 
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing JSON in sendrawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     break;
                 }
 
@@ -562,7 +562,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     errorJSON.addProperty("message", "Error parsing JSON!");
                     response.add("error", errorJSON);
 
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing JSON in getblock for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     break;
                 }
 
@@ -751,7 +751,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     } catch (Exception e) {
                         LOGGER.log(Level.FINER,
                                 "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[http-server-handler] Error in createrawtransaction P2SH output phase for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                         txConstructionError(response, e, "Error while constructing transaction (output phase)");
                         outputSuccess = false;
                     }
@@ -767,7 +767,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     } catch (Exception e) {
                         LOGGER.log(Level.FINER,
                                 "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[http-server-handler] Error in createrawtransaction output phase for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                         txConstructionError(response, e, "Error while constructing transaction (output phase)");
                         outputSuccess = false;
                     }
@@ -799,7 +799,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 try {
                     tx = new Transaction(coin.getNetworkParameters(), Hex.decode(rawTx));
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error decoding raw transaction in decoderawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     getInvalidTxResponse(response, e);
                     break;
                 }
@@ -829,7 +829,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         vin.add(thisVin);
                     } catch (Exception e) {
                         LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing transaction inputs!");
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing transaction inputs for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
@@ -878,7 +878,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         vout.add(thisVout);
                     } catch (Exception e) {
                         LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing transaction outputs!");
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing transaction outputs for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
@@ -920,7 +920,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 try {
                     tx = new Transaction(coin.getNetworkParameters(), Hex.decode(rawTx));
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error decoding raw tx in signrawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     getInvalidTxResponse(response, e);
                     break;
                 }
@@ -1155,7 +1155,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     response.add("error", JsonNull.INSTANCE);
                 } catch (Exception e) {
                     LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing transaction!");
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing transaction in gettxout for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
@@ -1289,7 +1289,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.FINER, "[http-server-handler] Error while verifying signature! Invalid signature?");
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error verifying message for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                     response.addProperty("result", verified);
                     response.add("error", JsonNull.INSTANCE);
@@ -1323,7 +1323,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     errorJSON.addProperty("message", "Error parsing JSON!");
                     response.add("error", errorJSON);
 
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing JSON in sendtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     break;
                 }
 
@@ -1338,7 +1338,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     errorJSON.addProperty("message", "Error while creating transaction!");
                     response.add("error", errorJSON);
 
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error creating transaction in sendtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     break;
                 }
 
@@ -1540,8 +1540,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             bos.write(messageBytes);
             return bos.toByteArray();
         } catch (IOException e) {
-            LOGGER.log(Level.FINER, "[http-server-handler] Error while formatting message for signing!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[http-server-handler] Error formatting message for signing for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
         }
 
         return null;
@@ -1613,8 +1612,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if (Arrays.equals(k.getPubKey(), key.getPubKey()))
                 verified = true;
         } catch (SignatureException e) {
-            LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while verifying message. Invalid signature?");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[http-server-handler] Error verifying message for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
         }
 
         return verified;
@@ -1683,8 +1681,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     private void getInvalidTxResponse(JsonObject response, Exception e) {
-        LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while decoding raw tx!");
-        e.printStackTrace();
+        LOGGER.log(Level.WARNING, "[http-server-handler] Error decoding raw tx for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
         response.add("result", JsonNull.INSTANCE);
         JsonObject errorJSON = new JsonObject();
@@ -1695,7 +1692,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     private void txConstructionError(JsonObject response, Exception e, String s) {
-        e.printStackTrace();
+        LOGGER.log(Level.WARNING, "[http-server-handler] Error constructing transaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
         response.add("result", JsonNull.INSTANCE);
         JsonObject errorJSON = new JsonObject();
@@ -1727,7 +1724,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 latch.await(timeoutPeriod, TimeUnit.SECONDS);
             }
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[http-server-handler] Interrupted waiting for XRouter response for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
         }
 
         if (xRouterResult.get() == null || xRouterResult.get().isEmpty()) {

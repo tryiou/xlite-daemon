@@ -7,6 +7,7 @@ import org.bitcoinj.core.DumpedPrivateKey;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -15,7 +16,7 @@ public class AddressBalance {
     private DumpedPrivateKey privateKey;
     private AtomicReference<String> addrProp = null;
     private AtomicDouble balanceProp = null;
-    private ArrayList<UTXO> utxos = null;
+    private final CopyOnWriteArrayList<UTXO> utxos = new CopyOnWriteArrayList<>();
 
     public AddressBalance(Address address, DumpedPrivateKey privateKey) {
         this.address = address;
@@ -60,48 +61,50 @@ public class AddressBalance {
     }
 
     public void clearUtxos() {
-        if (utxos == null)
-            return;
-
-        utxos.removeIf(utxo -> !utxo.isSpent());
+        synchronized (this) {
+            utxos.removeIf(utxo -> !utxo.isSpent());
+        }
     }
 
     public boolean addUtxo(UTXO utxo) {
         Preconditions.checkNotNull(utxo);
-        if (this.utxos == null)
-            this.utxos = new ArrayList<>();
+        synchronized (this) {
+            // Only add UTXO's that do not exist in our wallet
+            UTXO bUtxo = getUtxo(utxo.getTxid(), utxo.getVout());
+            if (bUtxo == null)
+                this.utxos.add(utxo);
+            else
+                return false;
 
-        // Only add UTXO's that do not exist in our wallet
-        UTXO bUtxo = getUtxo(utxo.getTxid(), utxo.getVout());
-        if (bUtxo == null)
-            this.utxos.add(utxo);
-        else
-            return false;
-
-        calculateBalance();
-        return true;
+            calculateBalance();
+            return true;
+        }
     }
 
-    public void setUtxos(ArrayList<UTXO> recvUtxos) {
-        ArrayList<UTXO> newUtxos = new ArrayList<>();
+    public void setUtxos(List<UTXO> recvUtxos) {
+        synchronized (this) {
+            List<UTXO> newUtxos = new ArrayList<>();
 
-        if (this.utxos != null && this.utxos.size() > 0) {
-            for (UTXO utxo : recvUtxos) {
-                for (UTXO bUtxo : this.utxos) {
-                    if (!utxo.getTxid().equals(bUtxo.getTxid()) || utxo.getVout() != bUtxo.getVout()) {
-                        newUtxos.add(utxo);
+            if (this.utxos.size() > 0) {
+                for (UTXO utxo : recvUtxos) {
+                    for (UTXO bUtxo : this.utxos) {
+                        if (!utxo.getTxid().equals(bUtxo.getTxid()) || utxo.getVout() != bUtxo.getVout()) {
+                            newUtxos.add(utxo);
+                        }
                     }
                 }
+
+                if (newUtxos.size() > 0) {
+                    this.utxos.clear();
+                    this.utxos.addAll(newUtxos);
+                }
+            } else {
+                this.utxos.clear();
+                this.utxos.addAll(recvUtxos);
             }
 
-            if (newUtxos.size() > 0) {
-                this.utxos = newUtxos;
-            }
-        } else {
-            this.utxos = recvUtxos;
+            calculateBalance();
         }
-
-        calculateBalance();
     }
 
     private UTXO getUtxo(String txid, int vout) {
@@ -109,16 +112,10 @@ public class AddressBalance {
     }
 
     public List<UTXO> getSpentUtxos() {
-        if (utxos == null)
-            utxos = new ArrayList<>();
-
         return utxos.stream().filter(UTXO::isSpent).collect(Collectors.toList());
     }
 
     public List<UTXO> getUtxos() {
-        if (utxos == null)
-            utxos = new ArrayList<>();
-
         return utxos.stream().filter(utxo -> !utxo.isSpent()).collect(Collectors.toList());
     }
 

@@ -38,7 +38,7 @@ public class ConfigHelper {
             file = Preconditions.checkNotNull(this.getFile());
             loadConfig();
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[config] Failed to initialize config for " + tickerStr, e);
         }
     }
 
@@ -94,8 +94,7 @@ public class ConfigHelper {
                 addressCount = config.getInt("addressCount");
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINER, "[config] ERROR: Error while reading config file!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[config] Error reading config file for " + tickerStr, e);
         }
     }
 
@@ -117,7 +116,7 @@ public class ConfigHelper {
             if (!configFile.createNewFile() && !configFile.exists())
                 return null;
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[config] IOException creating config file for " + tickerStr, e);
         }
 
         return configFile;
@@ -211,7 +210,7 @@ public class ConfigHelper {
             fileWriter.flush();
             fileWriter.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[config] IOException writing config for " + tickerStr, e);
         }
     }
 

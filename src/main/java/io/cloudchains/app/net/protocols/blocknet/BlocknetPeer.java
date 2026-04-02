@@ -275,8 +275,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                 messagesPendingReply.add((XRouterMessage) message);
                 LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Added UUID " + ((XRouterMessage) message).getXRouterHeader().getUUID() + " to pending reply list.");
             } catch (IOException e) {
-                LOGGER.log(Level.FINER, "[blocknet-peer] Error while serializing XRouter message!");
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[blocknet] Error serializing XRouter message", e);
             }
         } else {
             try {
@@ -284,8 +283,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                 serializer.serialize(message, outputStream);
                 writeTarget.writeBytes(outputStream.toByteArray());
             } catch (IOException e) {
-                LOGGER.log(Level.FINER, "[blocknet-peer] Error while serializing/sending non-XRouter message!");
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[blocknet] Error serializing/sending non-XRouter message", e);
             }
         }
     }
@@ -499,8 +497,7 @@ public class BlocknetPeer extends PeerSocketHandler {
             try {
                 cursor = cursor.getPrev(blockStore);
             } catch (BlockStoreException e) {
-                LOGGER.log(Level.FINER, "[blocknet-peer] Failed to walk the blockchain while constructing a locator.");
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[blocknet] Failed to walk blockchain while constructing locator", e);
             }
         }
 
@@ -566,8 +563,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                 }
             }
         } catch (VerificationException e) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] Block failed to properly verify!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[blocknet] Block failed to properly verify", e);
         } catch (PrunedException e) {
             LOGGER.log(Level.FINER, "[blocknet-peer] Some data needed to handle this block was pruned! Hash: " + filteredBlock.getHash().toString());
             throw new RuntimeException(e);
@@ -657,8 +653,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                 firstMessage = false;
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINER, "Error while receiving bytes!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[blocknet] Error closing peer connection", e);
             return -1;
         }
     }

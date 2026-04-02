@@ -139,7 +139,7 @@ public class BlocknetPeerGroup {
             if (future.isDone())
                 Uninterruptibles.getUninterruptibly(future);
         } catch (ExecutionException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[blocknet] Error connecting to peer", e);
             Throwable cause = Throwables.getRootCause(e);
             handlePeerDeath(blocknetPeer, cause);
         }
@@ -182,7 +182,7 @@ public class BlocknetPeerGroup {
 
 //                scheduleMessageQueueRuns();
             } catch (Throwable e) {
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[blocknet] Error starting connections", e);
             }
             return null;
         });
@@ -198,8 +198,7 @@ public class BlocknetPeerGroup {
             clientManager.awaitTerminated();
             threadPool.shutdownNow();
         } catch (Exception e) {
-            LOGGER.log(Level.FINER, "[coin] ERROR: Error while deinitializing keep alive or balance update thread!");
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[blocknet] Error stopping peer group", e);
         }
     }
 
@@ -305,8 +304,7 @@ public class BlocknetPeerGroup {
                         }
 
                     } catch (Exception e) {
-                        LOGGER.log(Level.FINER, "[xrouter] ERROR: Error while parsing XRouter config/plugin list!");
-                        e.printStackTrace();
+                        LOGGER.log(Level.WARNING, "[blocknet] Error processing XRouter config/plugin list", e);
                     }
 
                     if (!peer.getHaveConfig().get()) {
@@ -516,7 +514,7 @@ public class BlocknetPeerGroup {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, "[blocknet] Error handling peer group event", e);
             }
         };
     }
@@ -526,9 +524,11 @@ public class BlocknetPeerGroup {
             BlocknetSeed blocknetSeed = blocknetPeer.getBlocknetSeed();
             connectTo(new InetSocketAddress(blocknetSeed.getAddress(), blocknetSeed.getPort()), blocknetPeer);
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "[blocknet] Error during peer group shutdown", e);
         }
     }
+
+    // --- XRouter connector message queue (latent feature) ---
 
     public void addToMessageQueue(QueueItem queueItem) {
         messageQueue.add(queueItem);
@@ -598,12 +598,13 @@ public class BlocknetPeerGroup {
                     e -> (e.getHaveConfig().get() && e.getAddress().getAddr() == blocknetPeer.getAddress().getAddr())
             ).findFirst().orElse(null);
 
-            if (filteredPeer != null)
-                return true;else {
+            if (filteredPeer != null) {
+                return true;
+            } else {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    LOGGER.log(Level.WARNING, "[blocknet] Error waiting for connection", e);
                 }
             }
         }
@@ -614,6 +615,8 @@ public class BlocknetPeerGroup {
     private void scheduleMessageQueueRuns() {
         executor.scheduleWithFixedDelay(processQueue(), 0, 1, TimeUnit.SECONDS);
     }
+
+    // --- end XRouter connector ---
 
     private void scheduleReconnects() {
         executor.scheduleWithFixedDelay(attemptReconnects(false), 0, 60, TimeUnit.SECONDS);
