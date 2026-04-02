@@ -36,6 +36,12 @@ public class App {
     public static Dotenv dotenv = null;
 
     public static String getEnv(String key) {
+        if (dotenv == null) {
+            try {
+                dotenv = Dotenv.configure().ignoreIfMissing().load();
+            } catch (Exception ignored) {
+            }
+        }
         if (dotenv != null) {
             String value = dotenv.get(key);
             if (value != null) return value;
@@ -43,14 +49,8 @@ public class App {
         return System.getenv(key);
     }
 
-    static {
-        // Load .env file if present
-        try {
-            dotenv = Dotenv.configure().ignoreIfMissing().load();
-        } catch (Exception ignored) {
-        }
-
-        // Check for EXR_ENDPOINT environment variable
+    public static void initExrEndpoint() {
+        if (EXR_ENDPOINT != null) return;
         String exrEndpoint = getEnv("EXR_ENDPOINT");
         if (exrEndpoint != null && !exrEndpoint.isEmpty()) {
             EXR_ENDPOINT = exrEndpoint;
@@ -60,6 +60,19 @@ public class App {
     }
 
     public static void main(String[] args) {
+        for (String arg : args) {
+            if (arg.equals("--version")) {
+                System.out.println(Version.CLIENT_VERSION);
+                System.exit(0);
+            }
+            if (arg.equals("--help")) {
+                System.out.println(ConsoleMenu.getHelpText());
+                System.exit(0);
+            }
+        }
+
+        initExrEndpoint();
+
         CCLogger.setLogging(isLoggingEnabled);
         LOGGER.setLevel(Level.INFO);
         LOGGER.setUseParentHandlers(false);
@@ -120,8 +133,12 @@ public class App {
     }
 
     public static void shutdown() {
-        if (masterRPC.isAlive()) {
+        if (masterRPC != null && masterRPC.isAlive()) {
             System.out.println("Shutting down...");
+        }
+
+        if (console != null) {
+            console.deinit();
         }
 
         if (feeUpdateHttpClient != null) {
@@ -138,10 +155,6 @@ public class App {
 
         if (masterRPC != null) {
             masterRPC.deinit();
-        }
-
-        if (console != null) {
-            console.deinit();
         }
 
         for (Handler handler : LOGGER.getHandlers()) {

@@ -11,6 +11,7 @@ import io.cloudchains.app.net.api.http.client.EXRServerPool;
 import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.background.BackgroundTimerThread;
 
+import java.io.Console;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -52,6 +53,198 @@ public class ConsoleMenu {
     }
 
     public void init() {
+        int selection;
+        String newWalletStr = "";
+        Scanner input = new Scanner(System.in);
+
+        if (KeyHandler.existsBaseECKeyFromLocal()) {
+            newWalletStr = "- Disabled. Wallet already exists.";
+        }
+
+        if (arguments.length > 0) {
+            for (int i = 0; i < arguments.length; i++) {
+                String argument = arguments[i];
+
+                switch (argument) {
+                    case "--enablerpcandconfigure":
+                        autoGenerateRPCConfig();
+                        System.exit(0);
+                    case "--development-endpoint": {
+                        // sample endpoint url: "https://utils.blocknet.org/"
+                        if (i + 1 < arguments.length) {
+                            String customEndpoint = arguments[i + 1];
+                            if (customEndpoint.startsWith("--")) {
+                                LOGGER.log(Level.WARNING, "Invalid endpoint: " + customEndpoint);
+                                break;
+                            }
+                            App.BASE_URL = customEndpoint;
+                            i++;
+                        } else {
+                            String envEndpoint = App.getEnv("BASE_URL");
+                            if (envEndpoint != null && !envEndpoint.isEmpty()) {
+                                App.BASE_URL = envEndpoint;
+                            } else {
+                                LOGGER.log(Level.WARNING, "Missing custom endpoint after '--development-endpoint'");
+                            }
+                        }
+                        break;
+                    }
+                    case "--exr-endpoint": {
+                        if (i + 1 < arguments.length) {
+                            String exrEndpoint = arguments[i + 1];
+                            if (exrEndpoint.startsWith("--")) {
+                                LOGGER.log(Level.WARNING, "Invalid endpoint: " + exrEndpoint);
+                                break;
+                            }
+                            App.EXR_ENDPOINT = exrEndpoint;
+                            App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
+                            LOGGER.log(Level.INFO, "[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
+                            new Thread(() -> {
+                                try {
+                                    Thread.sleep(1000);
+                                    App.exrServerPool.probeAllCapabilities();
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }, "EXR-Capability-Prober").start();
+                            i++;
+                        } else {
+                            String envExrEndpoint = App.getEnv("EXR_ENDPOINT");
+                            if (envExrEndpoint != null && !envExrEndpoint.isEmpty()) {
+                                App.EXR_ENDPOINT = envExrEndpoint;
+                                App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
+                                LOGGER.log(Level.INFO, "[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
+                                new Thread(() -> {
+                                    try {
+                                        Thread.sleep(1000);
+                                        App.exrServerPool.probeAllCapabilities();
+                                    } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                    }
+                                }, "EXR-Capability-Prober").start();
+                            } else {
+                                LOGGER.log(Level.WARNING, "Missing EXR endpoint after '--exr-endpoint'");
+                            }
+                        }
+                        break;
+                    }
+                    case "--version":
+                        LOGGER.log(Level.INFO, Version.CLIENT_VERSION);
+                        System.exit(0);
+                        break;
+                    case "--createdefaultwallet": {
+                        if (KeyHandler.existsBaseECKeyFromLocal()) {
+                            LOGGER.log(Level.INFO, "Wallet already exists");
+                            System.exit(0);
+                        }
+
+                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        int strength = KeyHandler.calculatePasswordStrength(password);
+                        if (strength < 9) {
+                            logBadPassword(null);
+                            System.exit(1);
+                        }
+
+                        String entropy = LoginUtils.loginToEntropy(password);
+                        completeLogin(entropy, null, false);
+
+                        System.exit(0);
+                    }
+                    case "--createwalletmnemonic": {
+                        if (KeyHandler.existsBaseECKeyFromLocal()) {
+                            LOGGER.log(Level.INFO, "Wallet already exists");
+                            System.exit(0);
+                        }
+
+                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        String mnemonic = readPassword(input, arguments, i + 2, "Mnemonic:\n", "WALLET_MNEMONIC").trim();
+                        int strength = KeyHandler.calculatePasswordStrength(password);
+                        if (strength < 9) {
+                            logBadPassword(null);
+                            System.exit(1);
+                        }
+                        if (mnemonic.isEmpty()) {
+                            logBadMnemonic();
+                            System.exit(1);
+                        }
+
+                        String entropy = LoginUtils.loginToEntropy(password);
+                        completeLogin(entropy, mnemonic, false);
+                        System.exit(0);
+                    }
+                    case "--xliterpc": {
+                        // Increment RPC port by 1
+                        xliteRPC = true;
+
+                        break;
+                    }
+                    case "--password": {
+                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        int strength = KeyHandler.calculatePasswordStrength(password);
+
+                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                            LOGGER.log(Level.INFO, "Bad password.");
+                            System.exit(1);
+                        }
+
+                        String entropy = LoginUtils.loginToEntropy(password);
+                        completeLogin(entropy, null, false);
+
+                        return;
+                    }
+                    case "--getmnemonic": {
+                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
+
+                        if (!KeyHandler.existsBaseECKeyFromLocal()) {
+                            LOGGER.log(Level.INFO, "No wallet found.");
+                            System.exit(1);
+                        }
+
+                        String entropy = LoginUtils.loginToEntropy(password);
+                        String mnemonic = CoinInstance.getMnemonicForPw(entropy);
+                        System.out.println(mnemonic);
+                        System.exit(0);
+                    }
+                    case "--changepassword": {
+                        if (!KeyHandler.existsBaseECKeyFromLocal()) {
+                            logBadChangePass("Wallet not found");
+                            System.exit(1);
+                        }
+
+                        String currentPassword = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        String newPassword = readPassword(input, arguments, i + 2, "", null);
+                        if (currentPassword.isEmpty() || newPassword.isEmpty()) {
+                            LOGGER.log(Level.INFO, "Password cannot be empty");
+                            System.exit(1);
+                        }
+                        if (currentPassword.equals(newPassword)) {
+                            LOGGER.log(Level.INFO, "New password must be different from old password");
+                            System.exit(1);
+                        }
+
+                        // Check new password strength
+                        int strength = KeyHandler.calculatePasswordStrength(newPassword);
+                        if (strength < 9) {
+                            LOGGER.log(Level.INFO, "Unable to change the password: New password is not strong enough");
+                            System.exit(1);
+                        }
+
+                        CoinInstance.CoinError err = CoinInstance.changePassword(LoginUtils.loginToEntropy(currentPassword),
+                                LoginUtils.loginToEntropy(newPassword));
+                        if (err != null)
+                            logBadChangePass(err.getMessage());
+                        else
+                            LOGGER.log(Level.INFO, "Wallet password changed successfully");
+
+                        System.exit(0);
+                    }
+                    case "--help":
+                        displayHelp();
+                        System.exit(0);
+                }
+            }
+        }
+
         if (App.getEnv("WALLET_MNEMONIC") != null) {
             String mnemonicImport = App.getEnv("WALLET_MNEMONIC");
             if (mnemonicImport == null) {
@@ -76,175 +269,7 @@ public class ConsoleMenu {
             }
 
             completeLogin(LoginUtils.loginToEntropy(password), null, false);
-        }
-
-        int selection;
-        String newWalletStr = "";
-        Scanner input = new Scanner(System.in);
-
-        if (KeyHandler.existsBaseECKeyFromLocal()) {
-            newWalletStr = "- Disabled. Wallet already exists.";
-        }
-
-        if (arguments.length > 0) {
-            for (int i = 0; i < arguments.length; i++) {
-                String argument = arguments[i];
-
-                switch (argument) {
-                    case "--enablerpcandconfigure":
-                        autoGenerateRPCConfig();
-                        break;
-                    case "--development-endpoint": {
-                        // sample endpoint url: "https://utils.blocknet.org/"
-                        if (i + 1 < arguments.length) {
-                            // Check if there is another argument after "--development-endpoint"
-                            String customEndpoint = arguments[i + 1];
-                            App.BASE_URL = customEndpoint;
-                            i++; // Increment i to skip the next argument (custom endpoint)
-                        } else {
-                            LOGGER.log(Level.WARNING, "Missing custom endpoint after '--development-endpoint'");
-                        }
-                        break;
-                    }
-                    case "--exr-endpoint": {
-                        if (i + 1 < arguments.length) {
-                            // Check if there is another argument after "--exr-endpoint"
-                            String exrEndpoint = arguments[i + 1];
-                            App.EXR_ENDPOINT = exrEndpoint;
-                            App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
-                            LOGGER.log(Level.INFO, "[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
-                            // Start capability probing in background
-                            new Thread(() -> {
-                                try {
-                                    Thread.sleep(1000); // Wait 1 second before starting probe
-                                    App.exrServerPool.probeAllCapabilities();
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                }
-                            }, "EXR-Capability-Prober").start();
-                            i++; // Increment i to skip the next argument (EXR endpoint)
-                        } else {
-                            LOGGER.log(Level.WARNING, "Missing EXR endpoint after '--exr-endpoint'");
-                        }
-                        break;
-                    }
-                    case "--version":
-                        LOGGER.log(Level.INFO, Version.CLIENT_VERSION);
-                        return;
-                    case "--createdefaultwallet": {
-                        if (KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.log(Level.INFO, "Wallet already exists");
-                            return;
-                        }
-
-                        String password = readPassword(input, arguments, i + 1, "");
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-                        if (strength < 9) {
-                            logBadPassword(null);
-                            return;
-                        }
-
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        completeLogin(entropy, null, false);
-
-                        return;
-                    }
-                    case "--createwalletmnemonic": {
-                        if (KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.log(Level.INFO, "Wallet already exists");
-                            return;
-                        }
-
-                        String password = readPassword(input, arguments, i + 1, "");
-                        String mnemonic = readPassword(input, arguments, i + 2, "Mnemonic:\n").trim();
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-                        if (strength < 9) {
-                            logBadPassword(null);
-                            return;
-                        }
-                        if (mnemonic.isEmpty()) {
-                            logBadMnemonic();
-                            return;
-                        }
-
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        completeLogin(entropy, mnemonic, false);
-                        return;
-                    }
-                    case "--xliterpc": {
-                        // Increment RPC port by 1
-                        xliteRPC = true;
-
-                        break;
-                    }
-                    case "--password": {
-                        // If password is provided as an arg then use it, otherwise ask for
-                        // password via stdin. Don't mistake another cmd option as the
-                        // password.
-                        String password = readPassword(input, arguments, i + 1, "");
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-
-                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            LOGGER.log(Level.INFO, "Bad password.");
-                            return;
-                        }
-
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        completeLogin(entropy, null, false);
-
-                        return;
-                    }
-                    case "--getmnemonic": {
-                        String password = readPassword(input, arguments, i + 1, "");
-
-                        if (!KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.log(Level.INFO, "No wallet found.");
-                            return;
-                        }
-
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        String mnemonic = CoinInstance.getMnemonicForPw(entropy);
-                        System.out.println(mnemonic);
-                        return;
-                    }
-                    case "--changepassword": {
-                        if (!KeyHandler.existsBaseECKeyFromLocal()) {
-                            logBadChangePass("Wallet not found");
-                            return;
-                        }
-
-                        String currentPassword = readPassword(input, arguments, i + 1, "");
-                        String newPassword = readPassword(input, arguments, i + 2, "");
-                        if (currentPassword.isEmpty() || newPassword.isEmpty()) {
-                            LOGGER.log(Level.INFO, "Password cannot be empty");
-                            return;
-                        }
-                        if (currentPassword.equals(newPassword)) {
-                            LOGGER.log(Level.INFO, "New password must be different from old password");
-                            return;
-                        }
-
-                        // Check new password strength
-                        int strength = KeyHandler.calculatePasswordStrength(newPassword);
-                        if (strength < 9) {
-                            LOGGER.log(Level.INFO, "Unable to change the password: New password is not strong enough");
-                            return;
-                        }
-
-                        CoinInstance.CoinError err = CoinInstance.changePassword(LoginUtils.loginToEntropy(currentPassword),
-                                LoginUtils.loginToEntropy(newPassword));
-                        if (err != null)
-                            logBadChangePass(err.getMessage());
-                        else
-                            LOGGER.log(Level.INFO, "Wallet password changed successfully");
-
-                        return;
-                    }
-                    case "--help":
-                        displayHelp();
-                        return; // Exit after displaying help
-                }
-            }
+            return;
         }
 
         String entropy = null;
@@ -267,8 +292,14 @@ public class ConsoleMenu {
                         return;
                     }
 
-                    LOGGER.log(Level.INFO, "Enter new password: ");
-                    String password = input.next();
+                    Console console = System.console();
+                    String password;
+                    if (console != null) {
+                        password = new String(console.readPassword("Enter new password: "));
+                    } else {
+                        LOGGER.log(Level.INFO, "Enter new password: ");
+                        password = input.next();
+                    }
                     int strength = KeyHandler.calculatePasswordStrength(password);
 
                     if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
@@ -280,7 +311,14 @@ public class ConsoleMenu {
                 }
                 case 2: {
                     LOGGER.log(Level.INFO, "Enter password: ");
-                    String password = new String(System.console().readPassword());
+                    Console console = System.console();
+                    String password;
+                    if (console != null) {
+                        password = new String(console.readPassword());
+                    } else {
+                        LOGGER.log(Level.WARNING, "Console not available, using Scanner fallback");
+                        password = readPassword(input, null, 0, "", null);
+                    }
                     int strength = KeyHandler.calculatePasswordStrength(password);
 
                     if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
@@ -315,8 +353,11 @@ public class ConsoleMenu {
     public void deinit() {
         if (backgroundTimerThread != null)
             backgroundTimerThread.stop();
-        for (CoinTicker cointicker : CoinTicker.coins())
-            CoinInstance.getInstance(cointicker).deinit();
+        for (CoinTicker cointicker : CoinTicker.coins()) {
+            CoinInstance instance = CoinInstance.getInstance(cointicker);
+            if (instance != null)
+                instance.deinit();
+        }
     }
 
     private void completeLogin(String entropy, String userMnemonic, boolean isMnemonic) {
@@ -427,6 +468,11 @@ public class ConsoleMenu {
             configHelper.setRpcEnabled(true);
             configHelper.writeConfig();
         }
+        ConfigHelper masterConf = new ConfigHelper("master");
+        masterConf.setRpcUsername(generateRandomString(24));
+        masterConf.setRpcPassword(generateRandomString(32));
+        masterConf.setRpcEnabled(true);
+        masterConf.writeConfig();
     }
 
     private String generateRandomString(int length) {
@@ -439,42 +485,52 @@ public class ConsoleMenu {
     }
 
     /**
-    * Reads the password from args or from stdin if password is not specified.
+    * Reads the password from args, environment variable, or stdin (in that priority order).
+    * When no positional arg is available, checks the env var before falling back to stdin.
     * @param input Stdin
     * @param args Program arguments
     * @param argPos Current arg position
-    * @param msg Message to display on stdin
-    * @return Password
+    * @param msg Message to display on stdin (defaults to "Password:\n" if empty)
+    * @param envVar Environment variable name to check as fallback (nullable)
+    * @return Password string
     */
-    private String readPassword(Scanner input, String[] args, int argPos, String msg) {
+    private String readPassword(Scanner input, String[] args, int argPos, String msg, String envVar) {
         if (msg.isEmpty())
             msg = "Password:\n";
-        if (args.length <= argPos || args[argPos].contains("--")) { // ask pw on stdin
+        if (args.length <= argPos || args[argPos].contains("--")) {
+            if (envVar != null) {
+                String envVal = App.getEnv(envVar);
+                if (envVal != null && !envVal.isEmpty())
+                    return envVal;
+            }
             System.out.println(msg);
-            return input.nextLine(); // clear buffer
+            return input.nextLine();
         }
-        // get pw from args
         return args[argPos];
     }
 
     // Function to display help information
     private static void displayHelp() {
-        System.out.println("Usage: xlite-daemon [options]");
-        System.out.println("Options:");
-        System.out.println("  --enablerpcandconfigure    Enable and configure RPC");
-        System.out.println("  --development-endpoint     Set a custom development endpoint");
-        System.out.println("                             Example: --development-endpoint <https://url.endpoint.org/>");
-        System.out.println("  --exr-endpoint             Set EXR endpoint for EXR server");
-        System.out.println("                             Example: --exr-endpoint <http://exrproxy1.airdns.org:42114>");
-        System.out.println("  --version                  Display the version");
-        System.out.println("  --createdefaultwallet     Create a default wallet");
-        System.out.println("  --createwalletmnemonic    Create a wallet with a mnemonic");
-        System.out.println("  --xliterpc                Increment RPC port by 1");
-        System.out.println("  --password                Set password without prompt");
-        System.out.println("                           Example: --password <your_password>");
-        System.out.println("  --getmnemonic             Retrieve mnemonic for a password");
-        System.out.println("                           Example: --getmnemonic <your_password>");
-        System.out.println("  --changepassword          Change wallet password");
-        System.out.println("                           Example: --changepassword <current_password> <new_password>");
+        System.out.print(getHelpText());
+    }
+
+    public static String getHelpText() {
+        return "Usage: xlite-daemon [options]\n" +
+                "Options:\n" +
+                "  --enablerpcandconfigure    Enable and configure RPC\n" +
+                "  --development-endpoint     Set a custom development endpoint\n" +
+                "                             Example: --development-endpoint <https://url.endpoint.org/>\n" +
+                "  --exr-endpoint             Set EXR endpoint for EXR server\n" +
+                "                             Example: --exr-endpoint <http://exrproxy1.airdns.org:42114>\n" +
+                "  --version                  Display the version\n" +
+                "  --createdefaultwallet     Create a default wallet\n" +
+                "  --createwalletmnemonic    Create a wallet with a mnemonic\n" +
+                "  --xliterpc                Increment RPC port by 1\n" +
+                "  --password                Set password without prompt\n" +
+                "                           Example: --password <your_password>\n" +
+                "  --getmnemonic             Retrieve mnemonic for a password\n" +
+                "                           Example: --getmnemonic <your_password>\n" +
+                "  --changepassword          Change wallet password\n" +
+                "                           Example: --changepassword <current_password> <new_password>\n";
     }
 }
