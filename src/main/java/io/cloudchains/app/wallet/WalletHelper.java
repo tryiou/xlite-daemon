@@ -175,20 +175,7 @@ public class WalletHelper {
         DeterministicKey key = wallet.freshReceiveKey();
         DumpedPrivateKey privateKey = key.getPrivateKeyEncoded(params);
 
-        Address address = new Address(params, key.getPubKeyHash()) {
-            public byte[] getHash() {
-                return new byte[0];
-            }
-
-            public Script.ScriptType getOutputScriptType() {
-                return null;
-            }
-
-
-            public int compareTo(Address o) {
-                return 0;
-            }
-        };
+        LegacyAddress address = LegacyAddress.fromPubKeyHash(params, key.getPubKeyHash());
 
         return new AddressBalance(address, privateKey);
     }
@@ -199,20 +186,7 @@ public class WalletHelper {
         ECKey key = DumpedPrivateKey.fromBase58(params, privKey).getKey();
         DumpedPrivateKey privateKey = key.getPrivateKeyEncoded(params);
 
-        Address address = new Address(params, key.getPubKeyHash()) {
-            public byte[] getHash() {
-                return new byte[0];
-            }
-
-            public Script.ScriptType getOutputScriptType() {
-                return null;
-            }
-
-
-            public int compareTo(Address o) {
-                return 0;
-            }
-        };
+        LegacyAddress address = LegacyAddress.fromPubKeyHash(params, key.getPubKeyHash());
 
         return new AddressBalance(address, privateKey);
     }
@@ -234,14 +208,14 @@ public class WalletHelper {
         double totalSpending = amount + fee;
         double totalAvailable = walletHelper.getSpendBalance(totalSpending);
         double changeAmt = (totalAvailable - amount) - fee;
-        Address toAddress = Address.fromBase58(params, address);
+        LegacyAddress toAddress = LegacyAddress.fromBase58(params, address);
         Coin sendAmount = Coin.valueOf((long) Math.floor(amount * Coin.COIN.value));
         Coin changeAmount = Coin.valueOf((long) Math.floor(changeAmt * Coin.COIN.value));
 
         Transaction tx = new Transaction(params);
 
         if (isP2SHAddress(coinInstance, address)) {
-            Script p2shScript = ScriptBuilder.createP2SHOutputScript(toAddress.getHash160());
+            Script p2shScript = ScriptBuilder.createP2SHOutputScript(toAddress.getHash());
             tx.addOutput(sendAmount, p2shScript);
         } else {
             tx.addOutput(sendAmount, toAddress);
@@ -277,15 +251,6 @@ public class WalletHelper {
     private static boolean isP2SHAddress(CoinInstance coin, String address) {
         byte[] versionAndDataBytes = Base58.decodeChecked(address);
         int version = versionAndDataBytes[0] & 0xFF;
-
-        if (coin.getNetworkParameters().getAcceptableAddressCodes().length > 2) {
-            for (int t : coin.getNetworkParameters().getAcceptableAddressCodes()) {
-                if (coin.getNetworkParameters().getAddressHeader() != t && t == version) {
-                    return true;
-                }
-            }
-        }
-
         return coin.getNetworkParameters().getP2SHHeader() == version;
     }
 }

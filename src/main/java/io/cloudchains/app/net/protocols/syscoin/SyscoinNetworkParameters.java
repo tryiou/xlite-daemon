@@ -11,10 +11,6 @@ public class SyscoinNetworkParameters extends NetworkParameters {
         super();
     }
 
-    @Override
-    public int[] getAcceptableAddressCodes() {
-        return new int[]{getAddressHeader(), getP2SHHeader()};
-    }
 
     @Override
     public String getPaymentProtocolId() {
@@ -76,12 +72,12 @@ public class SyscoinNetworkParameters extends NetworkParameters {
     }
 
     @Override
-    public int getBip32HeaderPriv() {
+    public int getBip32HeaderP2PKHpriv() {
         return 0x0488ADE4;
     }
 
     @Override
-    public int getBip32HeaderPub() {
+    public int getBip32HeaderP2PKHpub() {
         return 0x0488B21E;
     }
 

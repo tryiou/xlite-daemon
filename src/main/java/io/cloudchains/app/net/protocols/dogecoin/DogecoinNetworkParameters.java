@@ -70,18 +70,14 @@ public class DogecoinNetworkParameters extends NetworkParameters {
         return 158;
     }
 
-    @Override
-    public int[] getAcceptableAddressCodes() {
-        return new int[]{getAddressHeader(), getP2SHHeader()};
-    }
 
     @Override
-    public int getBip32HeaderPriv() {
+    public int getBip32HeaderP2PKHpriv() {
         return 0x02fac398;
     }
 
     @Override
-    public int getBip32HeaderPub() {
+    public int getBip32HeaderP2PKHpub() {
         return 0x02facafd;
     }
 

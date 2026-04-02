@@ -442,8 +442,7 @@ public class KeyHandler {
     private static List<String> generateAndPersistNewSeed(char[] passphrase, File file) {
         try {
             DeterministicSeed seed = new DeterministicSeed(
-                    SecureRandom.getInstanceStrong(), 128, "",
-                    System.currentTimeMillis() / 1000);
+                    SecureRandom.getInstanceStrong(), 128, "");
             String mnemonic = Joiner.on(" ").join(
                     Objects.requireNonNull(seed.getMnemonicCode()));
             if (writeInitialData(file, mnemonic, passphrase)) {

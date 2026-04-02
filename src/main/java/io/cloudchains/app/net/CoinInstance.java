@@ -202,7 +202,7 @@ public class CoinInstance {
 
     public AddressBalance generateAddress(boolean updateConfig) {
         AddressBalance addressKeyPair = getWalletHelper().generateAddress();
-        Address address = addressKeyPair.getAddress();
+        LegacyAddress address = (LegacyAddress) addressKeyPair.getAddress();
         DumpedPrivateKey privateKey = addressKeyPair.getPrivateKey();
         addressKeyPairs.add(addressKeyPair);
         LOGGER.log(Level.FINER, "[wallet] Generated new address, have " + addressKeyPairs.size() + ": " + address.toBase58());

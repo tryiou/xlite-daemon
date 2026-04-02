@@ -2,6 +2,7 @@ package io.cloudchains.app.net.protocols.blocknet;
 
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -13,7 +14,6 @@ import io.cloudchains.app.net.xrouter.XRouterInitialMessagesSentListener;
 import io.cloudchains.app.net.xrouter.XRouterMessage;
 import io.cloudchains.app.net.xrouter.XRouterMessageSerializer;
 import io.cloudchains.app.util.XRouterConfiguration;
-import net.jcip.annotations.GuardedBy;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
@@ -23,6 +23,7 @@ import org.bitcoinj.wallet.Wallet;
 import org.json.JSONObject;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.BufferUnderflowException;
@@ -254,7 +255,7 @@ public class BlocknetPeer extends PeerSocketHandler {
     }
 
     @Override
-    public void sendMessage(Message message) throws NotYetConnectedException {
+    public ListenableFuture sendMessage(Message message) throws NotYetConnectedException {
         lock.lock();
         try {
             if (writeTarget == null) {
@@ -270,10 +271,11 @@ public class BlocknetPeer extends PeerSocketHandler {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 xRouterMessageSerializer.serialize(message, outputStream);
                 LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding network header) is " + (outputStream.size() - BlocknetPacketHeader.HEADER_LENGTH - 4) + " bytes.");
-                writeTarget.writeBytes(outputStream.toByteArray());
+                ListenableFuture future = writeTarget.writeBytes(outputStream.toByteArray());
 
                 messagesPendingReply.add((XRouterMessage) message);
                 LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Added UUID " + ((XRouterMessage) message).getXRouterHeader().getUUID() + " to pending reply list.");
+                return future;
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "[blocknet] Error serializing XRouter message", e);
             }
@@ -281,11 +283,13 @@ public class BlocknetPeer extends PeerSocketHandler {
             try {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 serializer.serialize(message, outputStream);
-                writeTarget.writeBytes(outputStream.toByteArray());
+                return writeTarget.writeBytes(outputStream.toByteArray());
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "[blocknet] Error serializing/sending non-XRouter message", e);
             }
         }
+
+        return Futures.immediateFuture(null);
     }
 
     @Override
@@ -348,7 +352,7 @@ public class BlocknetPeer extends PeerSocketHandler {
         LOGGER.log(Level.FINER, "[blocknet-peer] Received version message: " + peerVersionMessage.subVer
                 + ", version " + peerVersionMessage.clientVersion
                 + ", blocks=" + peerVersionMessage.bestHeight
-                + ", us=" + peerVersionMessage.theirAddr);
+                + ", us=" + peerVersionMessage.receivingAddr);
 
         if (!peerVersionMessage.hasBlockChain() || (!params.allowEmptyPeerChain() && peerVersionMessage.bestHeight == 0)) {
             LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Peer has an empty blockchain while this network does not allow empty blockchains. Disconnecting.");
@@ -469,7 +473,7 @@ public class BlocknetPeer extends PeerSocketHandler {
             throw new IllegalStateException("Lock is not held by current thread.");
         }
 
-        List<Sha256Hash> blockLocator = new ArrayList<>(51);
+        List<Sha256Hash> blockLocatorHashes = new ArrayList<>(51);
 
         if (blockChain == null) {
             throw new NullPointerException("Blockchain object is null.");
@@ -493,7 +497,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
         StoredBlock cursor = chainHead;
         for (int i = 100; cursor != null && i > 0; i--) {
-            blockLocator.add(cursor.getHeader().getHash());
+            blockLocatorHashes.add(cursor.getHeader().getHash());
             try {
                 cursor = cursor.getPrev(blockStore);
             } catch (BlockStoreException e) {
@@ -502,7 +506,9 @@ public class BlocknetPeer extends PeerSocketHandler {
         }
 
         if (cursor != null)
-            blockLocator.add(params.getGenesisBlockHash());
+            blockLocatorHashes.add(params.getGenesisBlockHash());
+
+        BlockLocator blockLocator = new BlockLocator(ImmutableList.copyOf(blockLocatorHashes));
 
         lastGetBlocksBegin = chainHeadHash;
         lastGetBlocksEnd = toHash;

@@ -3,8 +3,8 @@ package io.cloudchains.app.util;
 import com.google.gson.annotations.SerializedName;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
-import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
@@ -65,7 +65,7 @@ public class UTXO {
     }
 
     public org.bitcoinj.core.UTXO createUTXO() {
-        Address address = Address.fromBase58(CoinInstance.getInstance(this.ticker).getNetworkParameters(), getAddress());
+        LegacyAddress address = LegacyAddress.fromBase58(CoinInstance.getInstance(this.ticker).getNetworkParameters(), getAddress());
 
         Script scriptForUTXO = ScriptBuilder.createOutputScript(address);
 

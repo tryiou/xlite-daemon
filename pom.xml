@@ -24,7 +24,7 @@
     <native.march>native</native.march>
 
     <!-- Dependency Versions -->
-    <bitcoinj.version>0.14.7</bitcoinj.version>
+    <bitcoinj.version>0.15.10</bitcoinj.version>
     <netty.version>4.2.7.Final</netty.version>
     <junit.version>5.11.3</junit.version>
     <gson.version>2.13.2</gson.version>
@@ -75,6 +75,20 @@
           <artifactId>slf4j-api</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+
+    <!-- Guava (required at compile time; bitcoinj 0.15.10 declares it as runtime) -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>28.2-android</version>
+    </dependency>
+
+    <!-- Orchid (Hex encoder; removed from bitcoinj 0.15.10) -->
+    <dependency>
+      <groupId>org.bitcoinj</groupId>
+      <artifactId>orchid</artifactId>
+      <version>1.2.1</version>
     </dependency>
 
     <!-- Gson -->
@@ -269,7 +283,7 @@
                 <!-- Explicitly include only needed artifacts -->
                 <includes>
                   <include>org.bitcoinj:bitcoinj-core</include>
-                  <include>com.madgag.spongycastle:core</include>
+                  <include>org.bouncycastle:bcprov-jdk15to18</include>
                   <include>com.google.protobuf:protobuf-java</include>
                   <include>com.google.guava:guava</include>
                   <include>net.jcip:jcip-annotations</include>
@@ -353,9 +367,11 @@
             <arg>--initialize-at-build-time=com.google.common.io.BaseEncoding</arg>
             <arg>--initialize-at-build-time=com.google.common.io.BaseEncoding$StandardBaseEncoding</arg>
             <arg>--initialize-at-build-time=com.google.common.io.BaseEncoding$Alphabet</arg>
+            <arg>--initialize-at-build-time=com.google.common.io.BaseEncoding$Base16Encoding</arg>
             <arg>--initialize-at-build-time=org.apache.commons.logging</arg>
             <arg>--initialize-at-build-time=org.slf4j.helpers.NOPLogger</arg>
             <arg>--initialize-at-build-time=org.bitcoinj.core.Utils</arg>
+            <arg>--initialize-at-build-time=org.bitcoinj.core.Utils$Runtime</arg>
             <arg>--initialize-at-build-time=org.bitcoinj.core.Sha256Hash</arg>
             <arg>--initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode</arg>
             <arg>--initialize-at-build-time=io.cloudchains.app.util</arg>

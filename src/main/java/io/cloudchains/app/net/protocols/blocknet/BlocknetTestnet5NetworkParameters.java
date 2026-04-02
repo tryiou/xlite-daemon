@@ -24,10 +24,6 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
 
     }
 
-    @Override
-    public int[] getAcceptableAddressCodes() {
-        return new int[]{getAddressHeader(), getP2SHHeader()};
-    }
 
     @Override
     public Sha256Hash getGenesisBlockHash() {
@@ -134,12 +130,12 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
     }
 
     @Override
-    public int getBip32HeaderPub() {
+    public int getBip32HeaderP2PKHpub() {
         return 0x3A8061A0;
     }
 
     @Override
-    public int getBip32HeaderPriv() {
+    public int getBip32HeaderP2PKHpriv() {
         return 0x3A805837;
     }
 

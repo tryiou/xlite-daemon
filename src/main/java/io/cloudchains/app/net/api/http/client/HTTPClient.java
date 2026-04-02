@@ -30,7 +30,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
-import org.bitcoinj.core.Address;
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 import org.json.JSONArray;
@@ -448,7 +448,7 @@ public class HTTPClient {
             String address = utxoArr.getJSONObject(i).getString("address");
             utxoJSON.addProperty("address", address);
 
-            Address addr = Address.fromBase58(coinInstance.getNetworkParameters(), address);
+            LegacyAddress addr = LegacyAddress.fromBase58(coinInstance.getNetworkParameters(), address);
             Script script = ScriptBuilder.createOutputScript(addr);
             utxoJSON.addProperty("scriptPubKey", new String(Hex.encode(script.getProgram())));
 

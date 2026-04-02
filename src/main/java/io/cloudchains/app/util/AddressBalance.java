@@ -2,8 +2,8 @@ package io.cloudchains.app.util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
-import org.bitcoinj.core.Address;
 import org.bitcoinj.core.DumpedPrivateKey;
+import org.bitcoinj.core.LegacyAddress;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,19 +12,19 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class AddressBalance {
-    private Address address;
+    private LegacyAddress address;
     private DumpedPrivateKey privateKey;
     private AtomicReference<String> addrProp = null;
     private AtomicDouble balanceProp = null;
     private final CopyOnWriteArrayList<UTXO> utxos = new CopyOnWriteArrayList<>();
 
-    public AddressBalance(Address address, DumpedPrivateKey privateKey) {
+    public AddressBalance(LegacyAddress address, DumpedPrivateKey privateKey) {
         this.address = address;
         this.privateKey = privateKey;
         setAddrProp(address.toBase58());
     }
 
-    public Address getAddress() {
+    public LegacyAddress getAddress() {
         return address;
     }
 

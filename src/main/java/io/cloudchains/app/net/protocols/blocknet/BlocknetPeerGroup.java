@@ -107,7 +107,7 @@ public class BlocknetPeerGroup {
     private BlocknetPeer createPeer(BlocknetParameters blocknetNetworkParameters, BlockChain chain, BlocknetSeed blocknetSeed) {
         PeerAddress peerAddress;
         try {
-            peerAddress = new PeerAddress(InetAddress.getByName(blocknetSeed.getAddress()), blocknetSeed.getPort(), 0);
+            peerAddress = new PeerAddress(blocknetNetworkParameters, InetAddress.getByName(blocknetSeed.getAddress()), blocknetSeed.getPort());
         } catch (UnknownHostException e) {
             return null;
         }
