@@ -14,6 +14,7 @@ import io.cloudchains.app.util.background.BackgroundTimerThread;
 import java.io.Console;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
@@ -145,8 +146,16 @@ public class ConsoleMenu {
                             System.exit(1);
                         }
 
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        completeLogin(entropy, null, false);
+                        char[] passphrase = LoginUtils.loginToEntropy(password).toCharArray();
+                        try {
+                            List<String> mnemonic = KeyHandler.getBaseSeed(passphrase);
+                            if (mnemonic == null) {
+                                logBadPassword(null);
+                                System.exit(1);
+                            }
+                        } finally {
+                            Arrays.fill(passphrase, '\0');
+                        }
 
                         System.exit(0);
                     }
@@ -168,8 +177,16 @@ public class ConsoleMenu {
                             System.exit(1);
                         }
 
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        completeLogin(entropy, mnemonic, false);
+                        char[] passphrase = LoginUtils.loginToEntropy(password).toCharArray();
+                        try {
+                            if (!KeyHandler.importFromMnemonic(Arrays.asList(mnemonic.split(" ")), passphrase)) {
+                                logBadMnemonic();
+                                System.exit(1);
+                            }
+                        } finally {
+                            Arrays.fill(passphrase, '\0');
+                        }
+
                         System.exit(0);
                     }
                     case "--xliterpc": {
@@ -366,17 +383,17 @@ public class ConsoleMenu {
             System.exit(0);
         }
 
-        // Measure total initialization time for all coins
         long startTime = System.currentTimeMillis();
-        // Initialize Blocknet first (synchronous) as it's the active currency
-        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(entropy, userMnemonic, isMnemonic, xliteRPC);
+
+        // Wallet file already exists on disk at this point. Pass null for userMnemonic
+        // so CoinInstance reads the seed from disk rather than attempting to create it.
+        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(entropy, null, isMnemonic, xliteRPC);
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.log(Level.SEVERE, msg);
             System.exit(0);
         }
 
-        // Get all coin tickers except Blocknet (which is already initialized)
         List<CoinTicker> otherCoins = new ArrayList<>();
         for (CoinTicker cointicker : CoinTicker.coins()) {
             if (cointicker != CoinTicker.BLOCKNET && cointicker != CoinTicker.BLOCKNET_TESTNET5) {
@@ -384,8 +401,7 @@ public class ConsoleMenu {
             }
         }
 
-        // Initialize remaining coins concurrently
-        initializeCoinsConcurrently(otherCoins, entropy, userMnemonic, isMnemonic, xliteRPC);
+        initializeCoinsConcurrently(otherCoins, entropy, null, isMnemonic, xliteRPC);
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
@@ -394,7 +410,6 @@ public class ConsoleMenu {
         App.masterRPC.start();
         backgroundTimerThread = new BackgroundTimerThread();
         (new Thread(backgroundTimerThread)).start();
-        // Start EXR capability probing after wallet is decrypted
         if (App.exrServerPool != null) {
             App.exrServerPool.probeAllCapabilities();
         }

@@ -60,6 +60,10 @@ public class AddressBalance {
         return privateKey;
     }
 
+    public void clearPrivateKey() {
+        privateKey = null;
+    }
+
     public void clearUtxos() {
         synchronized (this) {
             utxos.removeIf(utxo -> !utxo.isSpent());

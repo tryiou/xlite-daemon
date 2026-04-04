@@ -1,13 +1,22 @@
 package io.cloudchains.app.util;
 
+import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTickerUtils;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
+import org.bitcoinj.core.DumpedPrivateKey;
+import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.crypto.ChildNumber;
+import org.bitcoinj.crypto.DeterministicKey;
+import org.bitcoinj.crypto.HDKeyDerivation;
+import org.bitcoinj.wallet.Wallet;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +28,8 @@ public class AddressDiscoveryService {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-    private static final int BATCH_SIZE = 250;
-    private static final int NUM_BATCHES = 100;  // 250 * 100 = 25,000 address range
+    private static final int BATCH_SIZE = 500;
+    private static final int NUM_BATCHES = 100;  // 500 * 100 = 50,000 address range
     private static final int MAX_CONSECUTIVE_ERRORS = 3;
     private static int DISCOVERY_TIMEOUT_MS = 30000; // non-final for testing
 
@@ -36,6 +45,7 @@ public class AddressDiscoveryService {
     private final HTTPClient httpClient;
     private final ConfigHelper configHelper;
     private final String currencyString;
+    private DeterministicKey externalChainKey;
 
     private String getLogPrefix() {
         return "[discovery-" + currencyString + "]";
@@ -50,7 +60,39 @@ public class AddressDiscoveryService {
         this.httpClient = httpClient;
         this.configHelper = coinInstance.getConfigHelper();
         this.currencyString = CoinTickerUtils.tickerToString(coinInstance.getTicker());
+        this.externalChainKey = initExternalChainKey(coinInstance.getWallet());
         LOGGER.log(Level.FINER, getLogPrefix() + " AddressDiscoveryService initialized for " + currencyString);
+    }
+
+    /**
+     * Derive and cache the external chain key from the wallet seed.
+     * Clears the seed copy immediately after derivation per security conventions.
+     * Note: the wallet's original seed is never modified.
+     */
+    private static DeterministicKey initExternalChainKey(Wallet wallet) {
+        byte[] seedBytes = wallet.getKeyChainSeed().getSeedBytes();
+        if (seedBytes == null) {
+            return null;
+        }
+        byte[] seedCopy = Arrays.copyOf(seedBytes, seedBytes.length);
+        try {
+            DeterministicKey masterKey = HDKeyDerivation.createMasterPrivateKey(seedCopy);
+            ImmutableList<ChildNumber> accountPath = wallet.getActiveKeyChain().getAccountPath();
+            DeterministicKey accountKey = masterKey;
+            for (ChildNumber child : accountPath) {
+                accountKey = HDKeyDerivation.deriveChildKey(accountKey, child);
+            }
+            return HDKeyDerivation.deriveChildKey(accountKey, ChildNumber.ZERO);
+        } finally {
+            Arrays.fill(seedCopy, (byte) 0);
+        }
+    }
+
+    /**
+     * Clear the cached external chain key from memory after address discovery is complete.
+     */
+    public void clearExternalChainKey() {
+        this.externalChainKey = null;
     }
 
     public static void setDiscoveryTimeoutMs(int timeoutMs) {
@@ -86,8 +128,6 @@ public class AddressDiscoveryService {
                     break;
                 }
 
-                ensureAddressesGenerated((i + 1) * BATCH_SIZE);
-
                 List<UTXO> utxos = probeBatch(i);
 
                 if (utxos == null) {
@@ -114,10 +154,14 @@ public class AddressDiscoveryService {
 
             // Find exact highest funded address in the last non-empty batch
             int batchStart = lastNonEmptyBatch * BATCH_SIZE;
-            List<AddressBalance> batch = getBatch(batchStart, BATCH_SIZE);
+            List<AddressBalance> batch = deriveAddressRange(batchStart, BATCH_SIZE);
 
             int lastUsedInBatch = findLastUsedIndexInBatch(batch, lastBatchUtxos);
             int discoveredCount = batchStart + lastUsedInBatch + 1;
+
+            for (AddressBalance addr : batch) {
+                addr.clearPrivateKey();
+            }
 
             LOGGER.log(Level.INFO, getLogPrefix() + " Discovery complete: lastBatch="
                     + lastNonEmptyBatch + ", count=" + discoveredCount
@@ -136,34 +180,36 @@ public class AddressDiscoveryService {
      * @return UTXO list (may be empty), or null on HTTP failure
      */
     private List<UTXO> probeBatch(int batchIndex) {
-        List<AddressBalance> batch = getBatch(batchIndex * BATCH_SIZE, BATCH_SIZE);
-        return checkBatchForUtxos(batch);
-    }
-
-    /**
-     * Get a slice of addresses [startIndex, startIndex + size) from CoinInstance.
-     */
-    private List<AddressBalance> getBatch(int startIndex, int size) {
-        List<AddressBalance> batch = new ArrayList<>(size);
-        int end = Math.min(startIndex + size, coinInstance.getAddressKeyPairs().size());
-        for (int i = startIndex; i < end; i++) {
-            batch.add(coinInstance.getAddressKeyPairs().get(i));
-        }
-        return batch;
-    }
-
-    /**
-     * Ensure addresses up to count are generated in CoinInstance.
-     */
-    private void ensureAddressesGenerated(int count) {
-        int currentGenerated = coinInstance.getAddressKeyPairs().size();
-        if (count > currentGenerated) {
-            int toGenerate = count - currentGenerated;
-            for (int i = 0; i < toGenerate; i++) {
-                coinInstance.generateAddress(false);
+        int startIndex = batchIndex * BATCH_SIZE;
+        List<AddressBalance> batch = deriveAddressRange(startIndex, BATCH_SIZE);
+        try {
+            return checkBatchForUtxos(batch);
+        } finally {
+            for (AddressBalance addr : batch) {
+                addr.clearPrivateKey();
             }
-            LOGGER.log(Level.FINE, getLogPrefix() + " Generated " + toGenerate + " addresses");
         }
+    }
+
+    /**
+     * Derive addresses at specific HD indices without modifying wallet state.
+     * Uses the pre-derived external chain key, bypassing the wallet lookahead window limitation.
+     */
+    private List<AddressBalance> deriveAddressRange(int startIndex, int count) {
+        List<AddressBalance> result = new ArrayList<>(count);
+        if (externalChainKey == null) {
+            return result;
+        }
+        NetworkParameters params = coinInstance.getNetworkParameters();
+
+        for (int i = 0; i < count; i++) {
+            int index = startIndex + i;
+            DeterministicKey addressKey = HDKeyDerivation.deriveChildKey(externalChainKey, new ChildNumber(index, false));
+            LegacyAddress address = LegacyAddress.fromPubKeyHash(params, addressKey.getPubKeyHash());
+            DumpedPrivateKey privKey = addressKey.getPrivateKeyEncoded(params);
+            result.add(new AddressBalance(address, privKey));
+        }
+        return result;
     }
 
     private boolean isTimedOut(long startTime) {
