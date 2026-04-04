@@ -6,6 +6,9 @@ XLite Daemon — a multi-cryptocurrency wallet daemon built with Java 21 and Mav
 Core packages: `crypto` (wallet encryption/key management), `net` (coin networking, JSON-RPC),
 `util` (config, address discovery, logging), `wallet` (wallet helpers).
 
+# Java — use jabba
+source ~/.jabba/jabba.sh && jabba use graalvm_community@21.0.2
+
 ## Build & Test Commands
 
 ```bash
@@ -19,12 +22,15 @@ mvn test
 mvn test -pl . -Dtest=KeyHandlerTest
 
 # Run a single test method
-mvn test -pl . -Dtest=KeyHandlerTest#testGetBaseSeed
+mvn test -pl . -Dtest=KeyHandlerTest#testGetBaseSeedRoundTrip
 
 # Build shaded JAR
 mvn package -q
 
-# Requirements: Java 21, Maven 3.8.6+
+# Build GraalVM native image
+mvn package -Pnative -Pnative-fast -q
+
+# Requirements: Java 21 (jabba: graalvm_community@21.0.2), Maven 3.8.6+
 ```
 
 ## Code Style
@@ -62,23 +68,21 @@ Log messages use bracketed prefixes: `[security]`, `[discovery-BLOCK]`, `[wallet
 - Methods/variables: `camelCase`
 - Constants: `UPPER_SNAKE_CASE`
 - Test classes: `<ClassUnderTest>Test.java`
-- Test methods: `test<Behavior>` (e.g., `testGetBaseSeed`, `testLegacyWalletMigration`)
+- Test methods: `test<Behavior>` (e.g., `testGetBaseSeedRoundTrip`, `testDiscovery_FindsUsedAddresses`)
+- Tests use `@TestMethodOrder(OrderAnnotation.class)` + `@Order(n)` for sequencing
+- Use `static import org.junit.jupiter.api.Assertions.*` for assertions
 
-### Error Handling
+### Error Handling & Security
 
-- Crypto operations: use try/finally to clear sensitive byte arrays with `Arrays.fill(bytes, (byte) 0)`
-- Use `PBEKeySpec.clearPassword()` after key derivation
-- Do not use `e.printStackTrace()` — use `LOGGER.log(Level.WARNING, "message", e)` instead
-- Catch specific exceptions (`BadPaddingException`) before generic `Exception`
-- `RuntimeException` for unrecoverable state; return `null` or `false` for expected failures
-
-### Security Conventions
-
-- AES-CBC with random IV for all new encryption; ECB only for legacy decryption
-- PBKDF2 with `PBKDF2WithHmacSHA256`, 100k iterations for current format
-- `SecureRandom.getInstanceStrong()` for all cryptographic RNG
-- Explicit `StandardCharsets.UTF_8` in all `getBytes()` calls
-- Clear sensitive data in `finally` blocks — never rely on GC alone
+- Crypto ops: try/finally with `Arrays.fill(bytes, (byte) 0)` to clear sensitive data
+- Call `PBEKeySpec.clearPassword()` after key derivation
+- Never use `e.printStackTrace()` — use `LOGGER.log(Level.WARNING, "msg", e)`
+- Catch specific exceptions before generic `Exception`
+- `RuntimeException` for unrecoverable state; return `null`/`false` for expected failures
+- AES-CBC + random IV for new encryption; ECB only for legacy migration
+- PBKDF2WithHmacSHA256, 100k iterations; `SecureRandom.getInstanceStrong()` for RNG
+- Always use `StandardCharsets.UTF_8` for `getBytes()` calls
+- Passphrases use `char[]` — `String` is unsupported (immutable, cannot be wiped)
 
 ## Project Structure
 
@@ -91,18 +95,22 @@ src/main/java/io/cloudchains/app/
   App.java       Main entry point
 
 src/test/java/
-  KeyHandlerTest.java, CoinInstanceTest.java, ConfigHelperTest.java,
-  AddressDiscoveryServiceTest.java, LoginUtilsTest.java
+  KeyHandlerTest, CoinInstanceTest, ConfigHelperTest,
+  AddressDiscoveryServiceTest, LoginUtilsTest, TestHelper
 ```
 
 ## Key Dependencies
 
 | Library | Purpose |
 |---------|---------|
-| bitcoinj-core 0.14.7 | Bitcoin/crypto primitives, MnemonicCode, ECKey |
+| bitcoinj-core 0.15.10 | Bitcoin/crypto, MnemonicCode, ECKey |
 | Gson 2.13.2 | JSON serialization |
 | Netty 4.2.7 | HTTP servers, networking |
-| Guava (via bitcoinj) | Joiner, Preconditions, utilities |
+| Guava 28.2-android | Joiner, Preconditions, AtomicDouble |
+| Orchid 1.2.1 | Hex/Base64 encoders |
+| httpclient 4.5.14 | HTTP client |
+| json 20250517 | JSONObject/JSONArray |
+| java-dotenv 5.2.2 | .env file support |
 | JUnit Jupiter 5.11.3 | Test framework |
 | Mockito 5.15.2 | Test mocking |
 
@@ -119,5 +127,9 @@ Some older commits use `[category] description` style (e.g., `[security] Upgrade
 - The `rewrite-maven-plugin` runs on `mvn compile` and may auto-modify imports and formatting.
   Always review `git diff` after compiling.
 - `ConfigHelper.CONFIG_DIR` is a mutable static used to override config path in tests.
-- Tests create temp directories and write wallet files; `@AfterEach` handles cleanup.
+- Tests use `@TempDir` (JUnit 5 auto-cleanup); never run with parallel execution
+  due to mutable `ConfigHelper.CONFIG_DIR` static state.
+- Mockito requires ByteBuddy agent (configured in pom.xml surefire plugin).
+- App reads `.env` via java-dotenv (`App.getEnv()` wraps `Dotenv`).
+- Javadoc uses `<p>` tags and `{@code}` inline; section dividers use `// ===` / `// ---`.
 - The enforcer plugin requires Java 21 and Maven 3.8.6+.
