@@ -153,7 +153,12 @@ public class BackgroundTimerThread implements Runnable {
 
         if (HTTP_BLOCK_COUNT_UPDATES) {
             heightUpdateHttpClient.getAllBlockCounts();
-            feeUpdateHttpClient.getAllFees();
+
+            // feeUpdateHttpClient.getAllFees();
+            // TODO: Re-enable when remote servers support relayfee queries.
+            // Currently disabled — remote endpoints return incorrect relayfee data.
+            // Using locally-configured fee values until server-side fixes are deployed.
+
         } else if (!blocknetPeerGroup.getConnectedPeers().isEmpty()) {
             for (BlocknetPeer blocknetPeer : blocknetPeerGroup.getConnectedPeers()) {
                 XRouterConfiguration xRouterConfiguration = blocknetPeer.getxRouterConfiguration();

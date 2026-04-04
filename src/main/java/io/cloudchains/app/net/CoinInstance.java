@@ -113,9 +113,9 @@ public class CoinInstance {
     private AddressDiscoveryService discoveryService = null;
     private static boolean addressDiscoveryEnabled = true;
 
-    private CoinInstance(CoinTicker ticker) {
+    private CoinInstance(CoinTicker ticker, ConfigHelper configHelper) {
         this.ticker = ticker;
-        this.configHelper = new ConfigHelper(CoinTickerUtils.tickerToString(getTicker()));
+        this.configHelper = configHelper;
 
         addBlockCount(ticker, 0);
 
@@ -244,8 +244,14 @@ public class CoinInstance {
     }
 
     public static CoinInstance getInstance(CoinTicker ticker) {
+        CoinInstance existing = getInstanceByTicker(ticker);
+        if (existing != null) {
+            return existing;
+        }
+
+        ConfigHelper cfg = null;
         if (ticker != CoinTicker.BLOCKNET) {
-            ConfigHelper cfg = new ConfigHelper(CoinTickerUtils.tickerToString(ticker));
+            cfg = new ConfigHelper(CoinTickerUtils.tickerToString(ticker));
             if (!cfg.isRpcEnabled()) {
                 return null;
             }
@@ -255,7 +261,10 @@ public class CoinInstance {
             CoinInstance instance = getInstanceByTicker(ticker);
 
             if (instance == null) {
-                instance = new CoinInstance(ticker);
+                if (cfg == null) {
+                    cfg = new ConfigHelper(CoinTickerUtils.tickerToString(ticker));
+                }
+                instance = new CoinInstance(ticker, cfg);
                 if (ticker == CoinTicker.BLOCKNET)
                     coinInstances.add(0, instance);
                 else
@@ -282,7 +291,7 @@ public class CoinInstance {
     */
     public static CoinError changePassword(String oldPassword, String newPassword) {
         if (!KeyHandler.existsBaseECKeyFromLocal()) {
-            LOGGER.log(Level.FINER, "[wallet] Unable to change the password: Wallet not found on disk");
+            LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Wallet not found on disk");
             return new CoinError("Unable to change the password: Wallet not found on disk",
                     CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
         }
@@ -292,7 +301,7 @@ public class CoinInstance {
         try {
             List<String> baseSeed = KeyHandler.getBaseSeed(oldPassphrase);
             if (baseSeed == null) {
-                LOGGER.log(Level.FINER, "[wallet] Unable to change the password: Incorrect password");
+                LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Incorrect password");
                 return new CoinError("Unable to change the password: Incorrect password",
                         CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
             }
@@ -302,7 +311,7 @@ public class CoinInstance {
             List<String> mnemonic = seed.getMnemonicCode();
 
             if (!KeyHandler.importFromMnemonic(mnemonic, newPassphrase)) {
-                LOGGER.log(Level.FINER, "[wallet] Unable to change the password: Failed to create new wallet file");
+                LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Failed to create new wallet file");
                 return new CoinError("Unable to change the password: Failed to create new wallet file",
                         CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
             }
@@ -348,7 +357,7 @@ public class CoinInstance {
     public CoinError init(String pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
         switch (ticker) {
             case BLOCKNET: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Blocknet main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Blocknet main network.");
                 blocknetNetworkParameters = new BlocknetNetworkParameters();
                 networkParameters = blocknetNetworkParameters;
                 hasXRouter = true;
@@ -356,7 +365,7 @@ public class CoinInstance {
                 break;
             }
             case BLOCKNET_TESTNET5: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Blocknet test network v5.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Blocknet test network v5.");
                 blocknetNetworkParameters = new BlocknetTestnet5NetworkParameters();
                 networkParameters = blocknetNetworkParameters;
                 hasXRouter = true;
@@ -365,43 +374,43 @@ public class CoinInstance {
                 break;
             }
             case BITCOIN: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Bitcoin main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Bitcoin main network.");
                 networkParameters = MainNetParams.get();
                 rpcPort = 8332;
                 break;
             }
             // case BITCOIN_CASH: {
-            // 	LOGGER.log(Level.FINER, "[coin] Initializing for BitcoinCash main network.");
+            // 	LOGGER.log(Level.FINE, "[coin] Initializing for BitcoinCash main network.");
             // 	networkParameters = new BitcoinCashNetworkParameters();
             // 	rpcPort = 48332;
             // 	break;
             // }
             case LITECOIN: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Litecoin main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Litecoin main network.");
                 networkParameters = new LitecoinNetworkParameters();
                 rpcPort = 9332;
                 break;
             }
             case DASHCOIN: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Dashcoin main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Dashcoin main network.");
                 networkParameters = new DashcoinNetworkParameters();
                 rpcPort = 9998;
                 break;
             }
             case DIGIBYTE: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Digibyte main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Digibyte main network.");
                 networkParameters = new DigibyteNetworkParameters();
                 rpcPort = 14022;
                 break;
             }
             case DOGECOIN: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Dogecoin main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Dogecoin main network.");
                 networkParameters = new DogecoinNetworkParameters();
                 rpcPort = 22555;
                 break;
             }
             case SYSCOIN: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Syscoin main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Syscoin main network.");
                 networkParameters = new SyscoinNetworkParameters();
                 rpcPort = 8370;
                 break;
@@ -417,57 +426,65 @@ public class CoinInstance {
             // 	break;
             // }
             case PIVX: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Pivx main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Pivx main network.");
                 networkParameters = new PivxNetworkParameters();
                 rpcPort = 9951;
                 break;
             }
             case UNOBTANIUM: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Unobtanium main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Unobtanium main network.");
                 networkParameters = new UnobtaniumNetworkParameters();
                 rpcPort = 65111;
                 break;
             }
             case PKOIN: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Pocketcoin main network.");
+                LOGGER.log(Level.FINE, "[coin] Initializing for Pocketcoin main network.");
                 networkParameters = new PocketcoinNetworkParameters();
                 rpcPort = 37071;
                 break;
             }
             // case ALQOCOIN: {
-            // 	LOGGER.log(Level.FINER, "[coin] Initializing for Alqo main network.");
+            // 	LOGGER.log(Level.FINE, "[coin] Initializing for Alqo main network.");
             // 	networkParameters = new AlqocoinNetworkParameters();
             // 	rpcPort = 55000;
             // 	break;
             // }
             // case POLISCOIN: {
-            // 	LOGGER.log(Level.FINER, "[coin] Initializing for Polis main network.");
+            // 	LOGGER.log(Level.FINE, "[coin] Initializing for Polis main network.");
             // 	networkParameters = new PoliscoinNetworkParameters();
             // 	rpcPort = 24127;
             // 	break;
             // }
             // case PHORECOIN: {
-            // 	LOGGER.log(Level.FINER, "[coin] Initializing for Phore main network.");
+            // 	LOGGER.log(Level.FINE, "[coin] Initializing for Phore main network.");
             // 	networkParameters = new PhorecoinNetworkParameters();
             // 	rpcPort = 11772;
             // 	break;
             // }
             case RAVENCOIN: {
-                LOGGER.log(Level.FINER, "[coin] Initializing for Ravencoin main network.");
-                networkParameters = new RavencoinNetworkParameters();
+                LOGGER.log(Level.FINE, "[coin] Initializing for Ravencoin main network.");
+                RavencoinNetworkParameters rvnParams = new RavencoinNetworkParameters();
+                networkParameters = rvnParams;
                 rpcPort = 8766;
+                Coin minFee = rvnParams.getMinRelayTxFee();
+                LOGGER.log(Level.FINE, "[coin] " + ticker + " getMinRelayTxFee: " + minFee.value + " satoshis");
+                configHelper.setFee(minFee.value / (double) Coin.COIN.value);
                 break;
             }
             default: {
-                LOGGER.log(Level.FINER, "[coin] ERROR: Invalid/unsupported network: " + ticker.toString());
+                LOGGER.log(Level.FINE, "[coin] ERROR: Invalid/unsupported network: " + ticker.toString());
                 return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
             }
         }
 
+        configHelper.writeConfig();
+
         if (xliteRPC) {
             rpcPort = rpcPort + 1;
 
-            configHelper.setRpcPort(rpcPort);
+            if (!configHelper.setRpcPort(rpcPort)) {
+                LOGGER.log(Level.WARNING, "[coin] Failed to allocate RPC port, skipping RPC config");
+            }
             configHelper.writeConfig();
         }
 
@@ -488,7 +505,7 @@ public class CoinInstance {
                 char[] importPassphrase = pw.toCharArray();
                 try {
                     if (!KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), importPassphrase)) {
-                        LOGGER.log(Level.FINER, "[wallet] Unable to create wallet from mnemonic");
+                        LOGGER.log(Level.WARNING, "[wallet] Unable to create wallet from mnemonic");
                         return new CoinError("Unable to create wallet from mnemonic", CoinError.CoinErrorCode.BADMNEMONIC);
                     }
                 } finally {
@@ -505,7 +522,7 @@ public class CoinInstance {
         }
 
         if (baseSeed == null) {
-            LOGGER.log(Level.FINER, "[wallet] Possible Bad password: Unable to import or create base seed!");
+            LOGGER.log(Level.WARNING, "[wallet] Possible Bad password: Unable to import or create base seed!");
             return new CoinError("Bad password", CoinError.CoinErrorCode.BADPASSWORD);
         }
 
@@ -520,17 +537,19 @@ public class CoinInstance {
         // RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
         // This ensures discovery runs once at wallet startup in ANY case
         if (addressDiscoveryEnabled) {
-            LOGGER.log(Level.FINER, "[coinAddressDiscoveryService created] Running address discovery");
+            LOGGER.log(Level.FINE, "[coinAddressDiscoveryService created] Running address discovery");
             runAddressDiscovery();
         } else {
-            LOGGER.log(Level.FINER, "[coin] Address discovery disabled");
+            LOGGER.log(Level.FINE, "[coin] Address discovery disabled");
         }
 
         // Make sure wallet addresses are available
         generateForwardAddresses(true);
 
         if (configHelper.getRpcPort() == -1000) {
-            configHelper.setRpcPort(rpcPort);
+            if (!configHelper.setRpcPort(rpcPort)) {
+                LOGGER.log(Level.WARNING, "[coin] Failed to allocate RPC port, RPC server will not start");
+            }
             configHelper.writeConfig();
         } else {
             rpcPort = configHelper.getRpcPort();
@@ -550,9 +569,9 @@ public class CoinInstance {
 //		if (isBlocknetNetwork() && hasXRouter()) {
 //			XRouterMessageSerializer xRouterMessageSerializer = (getBlocknetNetworkParameters()).getXRouterMessageSerializer(false);
 //			xRouterPacketManager = new XRouterPacketManager(xRouterMessageSerializer, blocknetNetworkParameters);
-//			LOGGER.log(Level.FINER, "[coin] This network is a Blocknet network and supports XRouter. Our packet version is " + Integer.toString(XRouterPacketManager.getXRouterPacketVersion(), 16));
+//			LOGGER.log(Level.FINE, "[coin] This network is a Blocknet network and supports XRouter. Our packet version is " + Integer.toString(XRouterPacketManager.getXRouterPacketVersion(), 16));
 //		} else {
-//			LOGGER.log(Level.FINER, "[coin] WARNING: This network (" + CoinTickerUtils.tickerToString(getTicker()) + ") does not support XRouter.");
+//			LOGGER.log(Level.FINE, "[coin] WARNING: This network (" + CoinTickerUtils.tickerToString(getTicker()) + ") does not support XRouter.");
 //		}
 //
 //		if (isBlocknetNetwork()) {
@@ -566,7 +585,7 @@ public class CoinInstance {
 //				try {
 //					chain = new BlockChain(networkParameters, getWallet(), new SPVBlockStore(networkParameters, spvDat));
 //				} catch (BlockStoreException ex) {
-//					LOGGER.log(Level.FINER, "Error while initializing blockchain object!");
+//					LOGGER.log(Level.WARNING, "Error while initializing blockchain object!");
 //					ex.printStackTrace();
 //					return false;
 //				}
@@ -575,7 +594,7 @@ public class CoinInstance {
 //			LOGGER.log(Level.INFO, "[coin] Connecting to the (" + getTicker().toString() + ") network.");
 //
 //			if (getAddressKeyPairs().size() == 0) {
-//				LOGGER.log(Level.FINER, "[peer] Have no addresses. Generating forward addresses.");
+//				LOGGER.log(Level.FINE, "[peer] Have no addresses. Generating forward addresses.");
 //
 //				generateForwardAddresses(true);
 //			}
@@ -599,7 +618,7 @@ public class CoinInstance {
             updateConfig = true;
         }
 
-        LOGGER.log(Level.FINER, "[wallet] Generating " + configAddressCount + " forward addresses for network " + getTicker().toString() + ".");
+        LOGGER.log(Level.FINE, "[wallet] Generating " + configAddressCount + " forward addresses for network " + getTicker().toString() + ".");
 
         // Ensure that internal HD wallet pointer matches the count we're expecting.
         // Required because wallet doesn't remember last HD wallet address prior to
@@ -628,7 +647,7 @@ public class CoinInstance {
             return;
         }
 
-        LOGGER.log(Level.FINER, "[coin] This network is connecting/connected.");
+        LOGGER.log(Level.FINE, "[coin] This network is connecting/connected.");
     }
 
     public Wallet getWallet() {
@@ -675,7 +694,7 @@ public class CoinInstance {
 
     public void sendXrGetUtxos(BlocknetPeer blocknetPeer) {
         if (System.currentTimeMillis() - lastUtxoUpdate < MINIMUM_UTXO_UPDATE_INTERVAL) {
-            LOGGER.log(Level.FINER, "[coin] Aborting UTXO checking as the list was updated less than 1 second ago.");
+            LOGGER.log(Level.FINE, "[coin] Aborting UTXO checking as the list was updated less than 1 second ago.");
             return;
         }
 
@@ -697,7 +716,7 @@ public class CoinInstance {
         XRouterMessage message = null;
 
         if (blocknetPeer == null || !blocknetPeer.getHaveConfig().get()) {
-            LOGGER.log(Level.FINER, "[sendXrMessage] Config not received yet");
+            LOGGER.log(Level.FINE, "[sendXrMessage] Config not received yet");
             return null;
         }
 
@@ -795,7 +814,7 @@ public class CoinInstance {
                 break;
             }
             default: {
-                LOGGER.log(Level.FINER, "[coin] ERROR: Unknown XRouter Message! Command: " + command);
+                LOGGER.log(Level.FINE, "[coin] ERROR: Unknown XRouter Message! Command: " + command);
                 uuid = null;
                 break;
             }
@@ -962,29 +981,39 @@ public class CoinInstance {
     }
 
     public void processUtxos(List<UTXO> utxoList) {
-        //  first lets clear UTXOs out of each address
+        if (utxoList == null) {
+            LOGGER.log(Level.WARNING, "[coin-" + CoinTickerUtils.tickerToString(getTicker()) + "] processUtxos: null UTXO list received");
+            return;
+        }
+        LOGGER.log(Level.FINE, "[coin-" + CoinTickerUtils.tickerToString(getTicker()) + "] processUtxos: remote returned " + utxoList.size() + " UTXOs, tracking " + addressKeyPairs.size() + " addresses locally");
+        int added = 0, skipped = 0;
+
+        Set<String> clearedAddresses = new HashSet<>();
         for (UTXO utxo : utxoList) {
-            AddressBalance addressBalance = getAddress(utxo.getAddress());
-            addressBalance.clearUtxos();
+            String addr = utxo.getAddress();
+            if (clearedAddresses.add(addr)) {
+                AddressBalance addressBalance = getAddress(addr);
+                if (addressBalance != null) {
+                    addressBalance.clearUtxos();
+                }
+            }
         }
 
-        // now let's add them back
         for (UTXO utxo : utxoList) {
             AddressBalance addressBalance = getAddress(utxo.getAddress());
-
             if (addressBalance == null) {
-                LOGGER.log(Level.FINER, "[utxo-parser] Warning: Encountered non-tracked address in reply: " + utxo.getAddress());
+                LOGGER.log(Level.WARNING, "[utxo-parser] Warning: Encountered non-tracked address in reply: " + utxo.getAddress());
+                skipped++;
                 continue;
             }
-
             boolean isNewUtxo = addressBalance.addUtxo(utxo);
-
             if (isNewUtxo) {
+                added++;
                 addCloudTransaction(new CloudTransaction(utxo));
                 LOGGER.log(Level.FINER, "[utxo-parser] Added new UTXO, address: " + utxo.getAddress() + " value: " + utxo.getAmount());
             }
         }
-
+        LOGGER.log(Level.FINE, "[coin-" + CoinTickerUtils.tickerToString(getTicker()) + "] processUtxos: added=" + added + ", skipped=" + skipped);
         setLastUtxoUpdate(System.currentTimeMillis());
     }
 
@@ -1075,10 +1104,11 @@ public class CoinInstance {
 
         if (discoveryService == null) {
             discoveryService = new AddressDiscoveryService(this);
-            LOGGER.log(Level.FINER, "[coin-" + currency + "] AddressDiscoveryService created");
+            LOGGER.log(Level.FINE, "[coin-" + currency + "] AddressDiscoveryService created");
         }
 
         int discoveredCount = discoveryService.discoverAddressCount();
+        discoveryService.clearExternalChainKey();
         int currentCount = configHelper.getAddressCount();
 
         if (discoveredCount > currentCount) {

@@ -200,9 +200,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 response.add("error", errorParsingJSON);
                 response.add("result", JsonNull.INSTANCE);
                 if (e instanceof IllegalArgumentException) {
-                    LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
+                    LOGGER.log(Level.WARNING, "[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
                 } else {
-                    LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client sent invalid JSON!");
+                    LOGGER.log(Level.WARNING, "[http-server-handler] WARNING: Client sent invalid JSON!");
                 }
                 status = HttpResponseStatus.BAD_REQUEST;
             }
@@ -412,15 +412,14 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 try {
                     rawTx = params.get(0).getAsString();
                     transaction = new Transaction(coin.getNetworkParameters(), Hex.decode(rawTx));
-                    WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
-                } catch (JsonParseException e) {
+                } catch (RuntimeException e) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -1);
-                    errorJSON.addProperty("message", "Error parsing JSON!");
+                    errorJSON.addProperty("message", "Error parsing transaction!");
                     response.add("error", errorJSON);
 
-                    LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing JSON in sendrawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing transaction in sendrawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     break;
                 }
 
@@ -439,6 +438,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     break;
                 }
+
+                WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
 
                 if (txid.has("result")) {
                     response.add("result", txid.get("result"));
@@ -703,7 +704,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         throw new JsonParseException("Invalid outputs format");
                     }
                 } catch (JsonParseException e) {
-                    LOGGER.log(Level.FINER,
+                    LOGGER.log(Level.WARNING,
                             "[http-server-handler] ERROR: Error while parsing JSON for createrawtransaction!");
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
@@ -726,7 +727,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         int vout = input.get("vout").getAsInt();
                         tx.addInput(Sha256Hash.wrap(txid), vout, ScriptBuilder.createInputScript(null));
                     } catch (Exception e) {
-                        LOGGER.log(Level.FINER,
+                        LOGGER.log(Level.WARNING,
                                 "[http-server-handler] ERROR: Error while constructing transaction (input phase)!");
                         txConstructionError(response, e, "Error while constructing transaction (input phase)");
                         inputSuccess = false;
@@ -744,12 +745,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         LegacyAddress address = LegacyAddress.fromBase58(coin.getNetworkParameters(), entry.address);
                         Coin outputValue = Coin.valueOf((long) Math.floor(entry.amount * Coin.COIN.value));
                         if (isP2SHAddress(entry.address)) {
-                            LOGGER.log(Level.FINER, "[http-server-handler] P2SH Address Found: " + entry.address);
+                            LOGGER.log(Level.FINE, "[http-server-handler] P2SH Address Found: " + entry.address);
                             Script p2shScript = ScriptBuilder.createP2SHOutputScript(address.getHash());
                             tx.addOutput(outputValue, p2shScript);
                         }
                     } catch (Exception e) {
-                        LOGGER.log(Level.FINER,
+                        LOGGER.log(Level.WARNING,
                                 "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
                         LOGGER.log(Level.WARNING, "[http-server-handler] Error in createrawtransaction P2SH output phase for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                         txConstructionError(response, e, "Error while constructing transaction (output phase)");
@@ -765,7 +766,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             tx.addOutput(outputValue, address);
                         }
                     } catch (Exception e) {
-                        LOGGER.log(Level.FINER,
+                        LOGGER.log(Level.WARNING,
                                 "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
                         LOGGER.log(Level.WARNING, "[http-server-handler] Error in createrawtransaction output phase for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                         txConstructionError(response, e, "Error while constructing transaction (output phase)");
@@ -828,7 +829,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                         vin.add(thisVin);
                     } catch (Exception e) {
-                        LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing transaction inputs!");
+                        LOGGER.log(Level.WARNING, "[http-server-handler] ERROR: Error while parsing transaction inputs!");
                         LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing transaction inputs for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                         response.add("result", JsonNull.INSTANCE);
@@ -877,7 +878,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                         vout.add(thisVout);
                     } catch (Exception e) {
-                        LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing transaction outputs!");
+                        LOGGER.log(Level.WARNING, "[http-server-handler] ERROR: Error while parsing transaction outputs!");
                         LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing transaction outputs for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                         response.add("result", JsonNull.INSTANCE);
@@ -990,7 +991,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 UTXO requested = this.getUtxo(Sha256Hash.wrap(txid), n);
 
                 if (requested != null) {
-                    LOGGER.log(Level.FINER, "[http-server-handler] Using cached UTXO for gettxout");
+                    LOGGER.log(Level.FINE, "[http-server-handler] Using cached UTXO for gettxout");
 
                     org.bitcoinj.core.UTXO utxo = requested.createUTXO();
                     JsonObject resultJSON = new JsonObject();
@@ -1020,7 +1021,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 }
 
                 if (!includeMempool) {
-                    LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client requested UTXO that is not ours!");
+                    LOGGER.log(Level.WARNING, "[http-server-handler] WARNING: Client requested UTXO that is not ours!");
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
 
@@ -1099,7 +1100,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     }
 
                     if (!isOurs) {
-                        LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client requested UTXO that cannot be ours!");
+                        LOGGER.log(Level.WARNING, "[http-server-handler] WARNING: Client requested UTXO that cannot be ours!");
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
 
@@ -1133,7 +1134,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         }
 
                         if (!unspent) {
-                            LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client requested UTXO that was already spent!");
+                            LOGGER.log(Level.WARNING, "[http-server-handler] WARNING: Client requested UTXO that was already spent!");
                             response.add("result", JsonNull.INSTANCE);
                             JsonObject errorJSON = new JsonObject();
 
@@ -1154,7 +1155,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     response.add("result", resultJSON);
                     response.add("error", JsonNull.INSTANCE);
                 } catch (Exception e) {
-                    LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Error while parsing transaction!");
+                    LOGGER.log(Level.WARNING, "[http-server-handler] ERROR: Error while parsing transaction!");
                     LOGGER.log(Level.WARNING, "[http-server-handler] Error parsing transaction in gettxout for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                     response.add("result", JsonNull.INSTANCE);
@@ -1284,11 +1285,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     String derivedAddr = LegacyAddress.fromKey(coin.getNetworkParameters(), key).toBase58();
                     if (!addr.equals(derivedAddr)) {
-                        LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Addresses do not match! Failing.");
+                        LOGGER.log(Level.WARNING, "[http-server-handler] ERROR: Addresses do not match! Failing.");
                         verified = false;
                     }
                 } catch (Exception e) {
-                    LOGGER.log(Level.FINER, "[http-server-handler] Error while verifying signature! Invalid signature?");
+                    LOGGER.log(Level.WARNING, "[http-server-handler] Error while verifying signature! Invalid signature?");
                     LOGGER.log(Level.WARNING, "[http-server-handler] Error verifying message for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
 
                     response.addProperty("result", verified);
@@ -1316,7 +1317,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 try {
                     address = params.get(0).getAsString();
                     amount = params.get(1).getAsDouble();
-                } catch (JsonParseException e) {
+                } catch (RuntimeException e) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -1);
@@ -1330,33 +1331,52 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 Transaction transaction;
                 try {
                     transaction = WalletHelper.createTransactionSimple(coin.getTicker(), address, amount);
-                    WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
-                } catch (JsonParseException e) {
+                    if (transaction == null) {
+                        response.add("result", JsonNull.INSTANCE);
+                        JsonObject errorJSON = new JsonObject();
+                        errorJSON.addProperty("code", -6);
+                        errorJSON.addProperty("message", "Failed to create transaction");
+                        response.add("error", errorJSON);
+                        break;
+                    }
+                } catch (RuntimeException e) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
-                    errorJSON.addProperty("code", -1);
-                    errorJSON.addProperty("message", "Error while creating transaction!");
+                    errorJSON.addProperty("code", -6);
+                    errorJSON.addProperty("message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
                     response.add("error", errorJSON);
 
                     LOGGER.log(Level.WARNING, "[http-server-handler] Error creating transaction in sendtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
                     break;
                 }
 
-                JsonObject txid = httpClient.sendRawTransaction(coin.getTicker(), new String(Hex.encode(transaction.bitcoinSerialize())));
+                String rawTxHex = new String(Hex.encode(transaction.bitcoinSerialize()));
+                LOGGER.log(Level.FINE, "[http-server-handler] sendtransaction: rawTx size=" + rawTxHex.length() + " bytes");
+                LOGGER.log(Level.FINER, "[http-server-handler] sendtransaction: rawTx hex=" + rawTxHex);
+                JsonObject txid = httpClient.sendRawTransaction(coin.getTicker(), rawTxHex);
                 if (txid == null || txid.has("error") && !txid.get("error").isJsonNull()) {
                     int code = -1;
-
-                    if (txid != null)
-                        code = txid.get("error").getAsInt();
-
+                    String errorMsg = "Error sending transaction!";
+                    if (txid != null) {
+                        JsonElement errorNode = txid.get("error");
+                        if (errorNode.isJsonPrimitive()) {
+                            code = errorNode.getAsInt();
+                        } else if (errorNode.isJsonObject()) {
+                            JsonObject errObj = errorNode.getAsJsonObject();
+                            if (errObj.has("code")) code = errObj.get("code").getAsInt();
+                            if (errObj.has("message")) errorMsg = errObj.get("message").getAsString();
+                        }
+                    }
+                    LOGGER.log(Level.WARNING, "[http-server-handler] sendrawtransaction failed for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " code=" + code + " message=" + errorMsg);
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", code);
-                    errorJSON.addProperty("message", "Error sending transaction!");
+                    errorJSON.addProperty("message", errorMsg);
                     response.add("error", errorJSON);
-
                     break;
                 }
+
+                WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
 
                 if (txid.has("result")) {
                     response.add("result", txid.get("result"));
@@ -1528,7 +1548,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 header = "Syscoin Signed Message:\n";
                 break;
             default:
-                LOGGER.log(Level.FINER, "[http-server-handler] ERROR: Unsupported coin. This should never happen.");
+                LOGGER.log(Level.WARNING, "[http-server-handler] ERROR: Unsupported coin. This should never happen.");
                 break;
         }
 

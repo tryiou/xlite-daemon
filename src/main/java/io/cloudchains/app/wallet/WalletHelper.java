@@ -3,6 +3,7 @@ package io.cloudchains.app.wallet;
 import com.google.common.base.Preconditions;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
+import io.cloudchains.app.net.CoinTickerUtils;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetPeer;
 import io.cloudchains.app.util.AddressBalance;
 import io.cloudchains.app.util.CloudTransaction;
@@ -34,11 +35,24 @@ public class WalletHelper {
     }
 
     public Transaction createRawTransactionWithAllUTXOs(Transaction tx, double amount) {
-        try {
-            ArrayList<UTXO> utxos = coinSelector(amount);
+        ArrayList<UTXO> utxos = coinSelector(amount);
 
-            Preconditions.checkNotNull(utxos);
-            for (UTXO utxo : utxos) {
+        if (utxos == null) {
+            LOGGER.log(Level.WARNING, "[wallet-" + coin.getTicker() + "] createRawTransactionWithAllUTXOs: no UTXOs for amount=" + amount);
+            return null;
+        }
+
+        return signTransactionWithUtxos(tx, utxos);
+    }
+
+    private Transaction signTransactionWithUtxos(Transaction tx, ArrayList<UTXO> selectedUtxos) {
+        try {
+            if (selectedUtxos == null) {
+                LOGGER.log(Level.WARNING, "[wallet-" + coin.getTicker() + "] signTransactionWithUtxos: no UTXOs provided");
+                return null;
+            }
+            LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "] signTransactionWithUtxos: signing " + selectedUtxos.size() + " UTXOs");
+            for (UTXO utxo : selectedUtxos) {
                 if (utxo.isSpent())
                     continue;
 
@@ -49,13 +63,14 @@ public class WalletHelper {
                 TransactionOutPoint outPoint = new TransactionOutPoint(networkParameters, bUtxo.getIndex(), bUtxo.getHash());
 
                 tx.addSignedInput(outPoint, bUtxo.getScript(), addressBalance.getPrivateKey().getKey(), Transaction.SigHash.ALL, true);
+                LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "]   signed input: txid=" + utxo.getTxid() + " vout=" + utxo.getVout());
 
                 utxo.setSpent(true);
                 addressBalance.calculateBalance();
             }
             return tx;
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[wallet-helper] Error creating transaction", e);
+            LOGGER.log(Level.WARNING, "[wallet-" + coin.getTicker() + "] Error creating transaction", e);
             return null;
         }
     }
@@ -84,8 +99,9 @@ public class WalletHelper {
 
     private ArrayList<UTXO> advancedCoinSorting() {
         ArrayList<UTXO> utxos = new ArrayList<>();
-
+        LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "] advancedCoinSorting: " + coin.getAddressKeyPairs().size() + " addresses tracked locally");
         for (AddressBalance addressBalance : coin.getAddressKeyPairs()) {
+            LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "]   addr=" + addressBalance.getAddress().toBase58() + " utxos=" + addressBalance.getUtxos().size());
             utxos.addAll(addressBalance.getUtxos());
         }
 
@@ -120,7 +136,13 @@ public class WalletHelper {
         ArrayList<UTXO> utxos = new ArrayList<>();
         double totalBalance = 0.0;
 
-        for (UTXO utxo : advancedCoinSorting()) {
+        ArrayList<UTXO> sorted = advancedCoinSorting();
+        LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "] coinSelector: requested=" + amount + ", available UTXOs=" + sorted.size());
+        for (UTXO utxo : sorted) {
+            LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "]   UTXO: txid=" + utxo.getTxid() + " vout=" + utxo.getVout() + " amount=" + utxo.getAmount() + " spent=" + utxo.isSpent());
+        }
+
+        for (UTXO utxo : sorted) {
             if (totalBalance < amount) {
                 totalBalance += utxo.getAmount();
                 utxos.add(utxo);
@@ -129,10 +151,13 @@ public class WalletHelper {
             }
         }
 
-        if (utxos.size() > 0)
+        if (utxos.size() > 0) {
+            LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "] coinSelector: selected " + utxos.size() + " UTXOs, total=" + totalBalance);
             return utxos;
-        else
+        } else {
+            LOGGER.log(Level.WARNING, "[wallet-" + coin.getTicker() + "] coinSelector: no UTXOs found (requested=" + amount + ", available in wallet=" + sorted.size() + ")");
             return null;
+        }
     }
 
     public String formatAmount(double amount) {
@@ -153,10 +178,14 @@ public class WalletHelper {
         double totalBalance = 0.0;
         ArrayList<UTXO> utxos = coinSelector(amount);
 
-        Preconditions.checkNotNull(utxos);
+        if (utxos == null) {
+            LOGGER.log(Level.WARNING, "[wallet-" + coin.getTicker() + "] getSpendBalance: insufficient funds (requested=" + amount + ")");
+            return 0.0;
+        }
         for (UTXO utxo : utxos)
             totalBalance += utxo.getAmount();
 
+        LOGGER.log(Level.FINE, "[wallet-" + coin.getTicker() + "] getSpendBalance: available=" + totalBalance + " for request=" + amount);
         return totalBalance;
     }
 
@@ -206,8 +235,20 @@ public class WalletHelper {
 
         double fee = coinInstance.getConfigHelper().getFee();
         double totalSpending = amount + fee;
-        double totalAvailable = walletHelper.getSpendBalance(totalSpending);
+
+        LOGGER.log(Level.FINE, "[wallet-" + CoinTickerUtils.tickerToString(coinTicker) + "] createTransactionSimple: to=" + address + " amount=" + amount + " fee=" + fee + " totalSpending=" + totalSpending);
+
+        ArrayList<UTXO> selectedUtxos = walletHelper.coinSelector(totalSpending);
+        if (selectedUtxos == null) {
+            LOGGER.log(Level.WARNING, "[wallet-" + CoinTickerUtils.tickerToString(coinTicker) + "] createTransactionSimple: insufficient funds (need " + totalSpending + ")");
+            return null;
+        }
+        double totalAvailable = 0.0;
+        for (UTXO utxo : selectedUtxos) totalAvailable += utxo.getAmount();
         double changeAmt = (totalAvailable - amount) - fee;
+
+        LOGGER.log(Level.FINE, "[wallet-" + CoinTickerUtils.tickerToString(coinTicker) + "] createTransactionSimple: totalAvailable=" + totalAvailable + " changeAmt=" + changeAmt);
+
         LegacyAddress toAddress = LegacyAddress.fromBase58(params, address);
         Coin sendAmount = Coin.valueOf((long) Math.floor(amount * Coin.COIN.value));
         Coin changeAmount = Coin.valueOf((long) Math.floor(changeAmt * Coin.COIN.value));
@@ -224,7 +265,7 @@ public class WalletHelper {
         if (changeAmount.isPositive())
             tx.addOutput(changeAmount, walletHelper.getChangeAddress());
 
-        return walletHelper.createRawTransactionWithAllUTXOs(tx, totalAvailable);
+        return walletHelper.signTransactionWithUtxos(tx, selectedUtxos);
     }
 
     public static void setAsSpent(CoinTicker coinTicker, Transaction transaction, boolean setSpent) {

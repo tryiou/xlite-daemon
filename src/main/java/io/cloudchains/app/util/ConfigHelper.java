@@ -7,6 +7,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -18,7 +19,6 @@ public class ConfigHelper {
 
     private String tickerStr;
     private File file;
-    private FileWriter fileWriter;
 
     private double fee;
     private boolean feeFlat;
@@ -32,7 +32,7 @@ public class ConfigHelper {
     public static String CONFIG_DIR = ""; // Must not end with [/], e.g. /home/user/.config, not /home/user/.config/
 
     public ConfigHelper(String tickerStr) {
-        this.tickerStr = tickerStr;
+        this.tickerStr = Preconditions.checkNotNull(tickerStr, "tickerStr must not be null");
 
         try {
             file = Preconditions.checkNotNull(this.getFile());
@@ -42,20 +42,16 @@ public class ConfigHelper {
         }
     }
 
-    public void loadConfig() {
+    public synchronized void loadConfig() {
         try {
-            String rawConfig = new String(Files.readAllBytes(file.toPath()));
+            String rawConfig = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
             if (rawConfig.isEmpty()) {
                 fee = 0.0001;
                 feeFlat = true;
                 rpcEnabled = false;
                 rpcUsername = "";
                 rpcPassword = "";
-                if (this.tickerStr.equalsIgnoreCase("master")) {
-                    rpcPort = 9955;
-                } else {
-                    rpcPort = -1000;
-                }
+                rpcPort = defaultRpcPort();
                 addressCount = 0;
 
                 writeConfig();
@@ -76,22 +72,72 @@ public class ConfigHelper {
 
             for (String configKey : configKeys) {
                 if (!config.has(configKey)) {
-                    LOGGER.log(Level.FINER, "[config] Warning: Configuration file does not contain required value '" + configKey + "'. This will probably break things later on.");
+                    LOGGER.log(Level.FINER, "[config] Missing config key '" + configKey + "' for " + tickerStr + ", will use default");
                 }
             }
 
-            fee = config.getDouble("fee");
-            feeFlat = config.getBoolean("feeFlat");
-            rpcEnabled = config.getBoolean("rpcEnabled");
-            rpcUsername = config.getString("rpcUsername");
-            rpcPassword = config.getString("rpcPassword");
-            rpcPort = config.getInt("rpcPort");
+            boolean needsWrite = false;
+
+            if (!config.has("fee")) {
+                fee = 0.0001;
+                needsWrite = true;
+            } else {
+                fee = config.getDouble("fee");
+                LOGGER.log(Level.FINE, "[config] " + tickerStr + " fee from config: " + fee);
+                if (fee <= 0) {
+                    fee = 0.0001;
+                    needsWrite = true;
+                }
+            }
+
+            if (!config.has("feeFlat")) {
+                feeFlat = true;
+                needsWrite = true;
+            } else {
+                feeFlat = config.getBoolean("feeFlat");
+            }
+
+            if (!config.has("rpcEnabled")) {
+                rpcEnabled = false;
+                needsWrite = true;
+            } else {
+                rpcEnabled = config.getBoolean("rpcEnabled");
+            }
+
+            if (!config.has("rpcUsername")) {
+                rpcUsername = "";
+                needsWrite = true;
+            } else {
+                rpcUsername = config.getString("rpcUsername");
+            }
+
+            if (!config.has("rpcPassword")) {
+                rpcPassword = "";
+                needsWrite = true;
+            } else {
+                rpcPassword = config.getString("rpcPassword");
+            }
+
+            if (!config.has("rpcPort")) {
+                rpcPort = defaultRpcPort();
+                needsWrite = true;
+            } else {
+                rpcPort = config.getInt("rpcPort");
+                if (rpcPort == 0) {
+                    rpcPort = -1000;
+                    needsWrite = true;
+                }
+            }
 
             if (!config.has("addressCount")) {
                 setAddressCount(0);
-                writeConfig();
+                needsWrite = true;
             } else {
                 addressCount = config.getInt("addressCount");
+            }
+
+            if (needsWrite) {
+                writeConfig();
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "[config] Error reading config file for " + tickerStr, e);
@@ -122,120 +168,139 @@ public class ConfigHelper {
         return configFile;
     }
 
-    public void setFee(double fee) {
+    public synchronized void setFee(double fee) {
         this.fee = fee;
     }
 
-    public void setFlatFee(boolean flat) {
+    public synchronized void setFlatFee(boolean flat) {
         this.feeFlat = flat;
     }
 
-    public void setRpcEnabled(boolean isEnabled) {
+    public synchronized void setRpcEnabled(boolean isEnabled) {
         this.rpcEnabled = isEnabled;
     }
 
-    public void setRpcUsername(String user) {
+    public synchronized void setRpcUsername(String user) {
         this.rpcUsername = user;
     }
 
-    public void setRpcPassword(String pass) {
+    public synchronized void setRpcPassword(String pass) {
         this.rpcPassword = pass;
     }
 
-    public void setRpcPort(int rpcPort) {
-        if (PortCheck.available(rpcPort))
-            this.rpcPort = rpcPort;
-        else
-            setRpcPort(rpcPort + 1);
+    public synchronized boolean setRpcPort(int rpcPort) {
+        if (rpcPort < 1 || rpcPort > 65535) {
+            LOGGER.log(Level.WARNING, "[config] Invalid port " + rpcPort + ", must be 1-65535");
+            return false;
+        }
+        int maxAttempts = 100;
+        for (int i = 0; i < maxAttempts && rpcPort + i <= 65535; i++) {
+            if (PortCheck.available(rpcPort + i)) {
+                this.rpcPort = rpcPort + i;
+                return true;
+            }
+        }
+        LOGGER.log(Level.WARNING, "[config] No available port in range " + rpcPort + "-" + Math.min(rpcPort + maxAttempts - 1, 65535));
+        return false;
     }
 
-    public void setAddressCount(int addressCount) {
+    public synchronized void setAddressCount(int addressCount) {
         this.addressCount = addressCount;
     }
 
-    public double getFee() {
+    public synchronized double getFee() {
         return fee;
     }
 
-    public boolean isFlatFee() {
+    public synchronized boolean isFlatFee() {
         return feeFlat;
     }
 
-    public boolean isRpcEnabled() {
+    public synchronized boolean isRpcEnabled() {
         return rpcEnabled;
     }
 
-    public String getRpcUsername() {
+    public synchronized String getRpcUsername() {
         return rpcUsername;
     }
 
-    public String getRpcPassword() {
+    public synchronized String getRpcPassword() {
         return rpcPassword;
     }
 
-    public int getMasterRpcPort() {
+    private int defaultRpcPort() {
+        return this.tickerStr.equalsIgnoreCase("master") ? 9955 : -1000;
+    }
+
+    public synchronized int getMasterRpcPort() {
         if (rpcPort == -1000) {
-            rpcPort = 9955;
+            return 9955;
         }
-
         return rpcPort;
     }
 
-    public int getRpcPort() {
+    public synchronized int getRpcPort() {
         return rpcPort;
     }
 
-    public int getAddressCount() {
+    public synchronized int getAddressCount() {
         return addressCount;
     }
 
-    public boolean validAuth() {
-        return rpcUsername != null && !rpcUsername.equals("") && rpcPassword != null && !rpcPassword.equals("");
+    private JSONObject toConfigJson() {
+        JSONObject config = new JSONObject();
+        config.put("fee", fee);
+        config.put("feeFlat", feeFlat);
+        config.put("rpcEnabled", rpcEnabled);
+        config.put("rpcUsername", rpcUsername);
+        config.put("rpcPassword", rpcPassword);
+        config.put("rpcPort", rpcPort);
+        config.put("addressCount", addressCount);
+        return config;
     }
 
-    public void writeConfig() {
+    public synchronized boolean validAuth() {
+        return rpcUsername != null && !rpcUsername.isEmpty() && rpcPassword != null && !rpcPassword.isEmpty();
+    }
+
+    public synchronized void writeConfig() {
         try {
-            fileWriter = new FileWriter(file, false);
+            String newContent = toConfigJson().toString(4);
 
-            JSONObject config = new JSONObject();
-            config.put("fee", fee);
-            config.put("feeFlat", feeFlat);
-            config.put("rpcEnabled", rpcEnabled);
-            config.put("rpcUsername", rpcUsername);
-            config.put("rpcPassword", rpcPassword);
-            config.put("rpcPort", rpcPort);
-            config.put("addressCount", addressCount);
+            if (file.exists()) {
+                String existingContent = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+                if (existingContent.equals(newContent)) {
+                    return;
+                }
+            }
 
-            fileWriter.write(config.toString(4));
-            fileWriter.flush();
-            fileWriter.close();
+            try (FileWriter fw = new FileWriter(file, false)) {
+                fw.write(newContent);
+            }
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, "[config] IOException writing config for " + tickerStr, e);
         }
     }
 
     public static String getLocalDataDirectory() {
-        String userHomeDir;
+        String baseDir;
         if (CONFIG_DIR.isEmpty()) {
-            String OS = (System.getProperty("os.name")).toLowerCase();
-
-            if (OS.contains("win")) {
-                userHomeDir = App.getEnv("AppData");
-            } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
-                userHomeDir = System.getProperty("user.home") + File.separator + ".config";
-            } else if (OS.contains("mac")) {
-                userHomeDir = System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support";
+            String os = System.getProperty("os.name").toLowerCase();
+            if (os.contains("win")) {
+                baseDir = App.getEnv("AppData");
+            } else if (os.contains("mac")) {
+                baseDir = System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support";
             } else {
-                userHomeDir = System.getProperty("user.home") + File.separator + ".config";
+                baseDir = System.getProperty("user.home") + File.separator + ".config";
             }
-            userHomeDir += File.separator + "CloudChains" + File.separator;
         } else {
-            userHomeDir = CONFIG_DIR + File.separator + "CloudChains" + File.separator;
+            baseDir = CONFIG_DIR;
         }
 
+        String userHomeDir = baseDir + File.separator + "CloudChains" + File.separator;
         File directory = new File(userHomeDir);
         if (!directory.exists()) {
-            directory.mkdir();
+            directory.mkdirs();
         }
 
         return userHomeDir;
