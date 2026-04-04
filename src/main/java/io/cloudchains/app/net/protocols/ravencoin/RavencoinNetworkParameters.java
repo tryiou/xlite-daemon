@@ -95,4 +95,8 @@ public class RavencoinNetworkParameters extends NetworkParameters {
     public String getId() {
         return "RVN";
     }
+
+    public Coin getMinRelayTxFee() {
+        return Coin.valueOf(500000);
+    }
 }
