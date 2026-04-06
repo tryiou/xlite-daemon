@@ -96,13 +96,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     byte[] credDecoded = Base64.decode(base64Credentials);
                     String credentials = new String(credDecoded, StandardCharsets.UTF_8);
                     final String[] values = credentials.split(":", 2);
+                    if (values.length < 2) {
+                        LOGGER.log(Level.WARNING, "[http-server-handler] Malformed Basic Auth header");
+                    } else {
+                        headerUser = values[0];
+                        headerPass = values[1];
 
-                    headerUser = values[0];
-                    headerPass = values[1];
-
-                    if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
-                        successfulAuth = true;
-                        LOGGER.log(Level.FINER, "[http-server-handler] Successful Auth");
+                        if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
+                            successfulAuth = true;
+                            LOGGER.log(Level.FINER, "[http-server-handler] Successful Auth");
+                        }
                     }
                 }
             }
@@ -226,7 +229,22 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 }
 
                 CoinTicker ticker = CoinTickerUtils.stringToTicker(params.get(0).getAsString());
+                if (ticker == null) {
+                    JsonObject errorJSON = new JsonObject();
+                    errorJSON.addProperty("code", -1);
+                    errorJSON.addProperty("message", "Unknown ticker: " + params.get(0).getAsString());
+                    response.add("error", errorJSON);
+                    break;
+                }
+
                 CoinInstance instance = CoinInstance.getInstance(ticker);
+                if (instance == null) {
+                    JsonObject errorJSON = new JsonObject();
+                    errorJSON.addProperty("code", -1);
+                    errorJSON.addProperty("message", "Coin instance not found for ticker: " + CoinTickerUtils.tickerToString(ticker));
+                    response.add("error", errorJSON);
+                    break;
+                }
 
                 Thread t = new Thread(() -> {
                     try {

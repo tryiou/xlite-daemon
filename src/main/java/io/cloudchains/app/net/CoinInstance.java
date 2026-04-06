@@ -87,8 +87,8 @@ public class CoinInstance {
     private static CoinInstance activeCurrency;
     private static CoinTicker activeBlocknetNetwork = null;
     private static CopyOnWriteArrayList<ListenerRegistration<ActiveCoinChangedEventListener>> activeCoinChangedListeners = new CopyOnWriteArrayList<>();
-    private static HashMap<CoinTicker, AtomicInteger> blockCounts = new HashMap<>();
-    private static HashMap<CoinTicker, AtomicDouble> relayFees = new HashMap<>();
+    private static ConcurrentHashMap<CoinTicker, AtomicInteger> blockCounts = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<CoinTicker, AtomicDouble> relayFees = new ConcurrentHashMap<>();
 
     private ConfigHelper configHelper;
     private WalletHelper walletHelper = null;
@@ -1070,7 +1070,7 @@ public class CoinInstance {
         return blockCounts.putIfAbsent(ticker, new AtomicInteger(0));
     }
 
-    public static HashMap<CoinTicker, AtomicInteger> getBlockCounts() {
+    public static ConcurrentHashMap<CoinTicker, AtomicInteger> getBlockCounts() {
         return blockCounts;
     }
 

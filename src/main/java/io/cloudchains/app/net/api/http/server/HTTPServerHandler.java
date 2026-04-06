@@ -114,13 +114,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     byte[] credDecoded = Base64.decode(base64Credentials);
                     String credentials = new String(credDecoded, StandardCharsets.UTF_8);
                     final String[] values = credentials.split(":", 2);
+                    if (values.length < 2) {
+                        LOGGER.log(Level.WARNING, "[http-server-handler] Malformed Basic Auth header");
+                    } else {
+                        headerUser = values[0];
+                        headerPass = values[1];
 
-                    headerUser = values[0];
-                    headerPass = values[1];
-
-                    if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
-                        successfulAuth = true;
-                        LOGGER.log(Level.FINER, "[http-server-handler] Successful Auth");
+                        if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
+                            successfulAuth = true;
+                            LOGGER.log(Level.FINER, "[http-server-handler] Successful Auth");
+                        }
                     }
                 }
             }
@@ -1038,7 +1041,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         if (i < retries - 1) {
                             try {
                                 Thread.sleep(2000);
-                            } catch (Exception e) {
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                break;
                             }
                             continue;
                         }
