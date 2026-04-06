@@ -184,10 +184,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + method + " PARAMS: " + params.size());
-                for (int i = 0; i < params.size(); i++) {
-                    LOGGER.log(Level.INFO, "[http-server-handler] PARAM " + i + ": " + params.get(i).toString());
-                }
+                LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + method + " PARAMS: " + params.toString().replace(",", ", "));
 
                 response = getResponse(method, params);
                 LOGGER.log(Level.FINER, response.toString());
@@ -231,15 +228,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 CoinTicker ticker = CoinTickerUtils.stringToTicker(params.get(0).getAsString());
                 CoinInstance instance = CoinInstance.getInstance(ticker);
 
-                Runnable r = () -> {
+                Thread t = new Thread(() -> {
                     try {
                         Thread.sleep(500);
                         instance.reloadConfig();
                     } catch (InterruptedException e) {
                         LOGGER.log(Level.WARNING, "[http-master] Interrupted during reloadconfig for " + ticker, e);
                     }
-                };
-                new Thread(r).start();
+                });
+                t.setDaemon(true);
+                t.start();
 
                 response.addProperty("result", true);
                 response.add("error", JsonNull.INSTANCE);
@@ -301,9 +299,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
 
         if (shutdownRequested) {
-            (new Thread(() -> {
-                System.exit(0);
-            })).start(); // shutdown the server
+            Thread t = new Thread(() -> System.exit(0));
+            t.setDaemon(true);
+            t.start();
         }
         return response;
     }

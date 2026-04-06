@@ -213,10 +213,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + coin.getTicker() + " " + method + " PARAMS: " + params.size());
-                for (int i = 0; i < params.size(); i++) {
-                    LOGGER.log(Level.INFO, "[http-server-handler] PARAM " + i + ": " + params.get(i).toString());
-                }
+                LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + coin.getTicker() + " " + method + " PARAMS: " + params.toString().replace(",", ", "));
 
                 response = getResponse(method, params);
                 LOGGER.log(Level.FINER, response.toString());
@@ -246,7 +243,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         switch (method.toLowerCase()) {
             case "reloadconfig": {
-                Runnable r = () -> {
+                Thread t = new Thread(() -> {
                     try {
                         Thread.sleep(500);
                     } catch (InterruptedException e) {
@@ -254,8 +251,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     }
 
                     coin.reloadConfig();
-                };
-                new Thread(r).start();
+                });
+                t.setDaemon(true);
+                t.start();
 
                 response.addProperty("result", true);
                 response.add("error", JsonNull.INSTANCE);
@@ -498,7 +496,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 break;
             }
             case "getrawmempool": {
-                if (params.size() > 1) {
+                if (params.size() > 2) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -1);
@@ -671,7 +669,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 long locktime = 0;
 
                 if (params.size() >= 3)
-                    locktime = params.get(3).getAsLong();
+                    locktime = params.get(2).getAsLong();
 
                 try {
                     inputs = params.get(0).getAsJsonArray();
