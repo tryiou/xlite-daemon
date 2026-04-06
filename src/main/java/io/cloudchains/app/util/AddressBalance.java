@@ -5,7 +5,6 @@ import com.google.common.util.concurrent.AtomicDouble;
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.LegacyAddress;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,32 +81,6 @@ public class AddressBalance {
 
             calculateBalance();
             return true;
-        }
-    }
-
-    public void setUtxos(List<UTXO> recvUtxos) {
-        synchronized (this) {
-            List<UTXO> newUtxos = new ArrayList<>();
-
-            if (this.utxos.size() > 0) {
-                for (UTXO utxo : recvUtxos) {
-                    for (UTXO bUtxo : this.utxos) {
-                        if (!utxo.getTxid().equals(bUtxo.getTxid()) || utxo.getVout() != bUtxo.getVout()) {
-                            newUtxos.add(utxo);
-                        }
-                    }
-                }
-
-                if (newUtxos.size() > 0) {
-                    this.utxos.clear();
-                    this.utxos.addAll(newUtxos);
-                }
-            } else {
-                this.utxos.clear();
-                this.utxos.addAll(recvUtxos);
-            }
-
-            calculateBalance();
         }
     }
 

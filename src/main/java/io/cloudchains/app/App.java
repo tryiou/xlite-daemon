@@ -114,7 +114,7 @@ public class App {
             LOGGER.addHandler(fileHandler);
 
         } catch (IOException e) {
-            // TODO Auto-generated catch block
+            LOGGER.log(Level.WARNING, "[app] Failed to initialize file handler", e);
         }
 
         ConsoleHandler consoleHandler = new ConsoleHandler(){
