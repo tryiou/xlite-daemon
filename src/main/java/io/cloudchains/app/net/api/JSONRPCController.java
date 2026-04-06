@@ -3,11 +3,11 @@ package io.cloudchains.app.net.api;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.util.ConfigHelper;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class JSONRPCController {
 
-    private static final HashMap<CoinInstance, JSONRPCServer> servers = new HashMap<>();
+    private static final ConcurrentHashMap<CoinInstance, JSONRPCServer> servers = new ConcurrentHashMap<>();
     private static JSONRPCMasterServer masterServer = new JSONRPCMasterServer(new ConfigHelper("master").getMasterRpcPort());
 
     public static JSONRPCMasterServer getMasterServer() {
@@ -19,11 +19,8 @@ public class JSONRPCController {
             throw new IllegalArgumentException("Bad coin instance");
         }
 
-        if (!servers.containsKey(coinInstance)) {
-            servers.put(coinInstance, new JSONRPCServer(coinInstance, coinInstance.getRPCPort()));
-        }
-
-        return servers.get(coinInstance);
+        return servers.computeIfAbsent(coinInstance,
+                coin -> new JSONRPCServer(coin, coin.getRPCPort()));
     }
 
     public static void removeRPCServer(CoinInstance coinInstance) {

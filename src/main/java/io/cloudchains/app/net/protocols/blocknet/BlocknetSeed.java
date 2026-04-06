@@ -6,10 +6,10 @@ public class BlocknetSeed {
     private String address;
     private Integer port;
 
-    private int failCount;
-    private long lastFailTime;
+    private volatile int failCount;
+    private volatile long lastFailTime;
 
-    private boolean isActivePeer;
+    private volatile boolean isActivePeer;
 
     BlocknetSeed(String address, int port) {
         this.address = address;

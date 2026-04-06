@@ -47,10 +47,10 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     private final ReentrantLock lock = Threading.lock("BlocknetPeer");
 
-    private boolean activePeer;
-    private boolean hasRequiredPlugins;
+    private volatile boolean activePeer;
+    private volatile boolean hasRequiredPlugins;
 
-    private boolean pastConnectionSuccess;
+    private volatile boolean pastConnectionSuccess;
 
     private BlocknetParameters params;
     private BlocknetSerializer serializer;

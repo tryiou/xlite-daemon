@@ -27,8 +27,8 @@ public class App {
     public static String BASE_URL = "https://xliterevp.mywire.org/";
     // "http://xl-dae-prox.airdns.org:42111/";
     // DEBUG ENDPOINT
-    public static String EXR_ENDPOINT = null;
-    public static EXRServerPool exrServerPool = null;
+    public static volatile String EXR_ENDPOINT = null;
+    public static volatile EXRServerPool exrServerPool = null;
     public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
     public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
     public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();

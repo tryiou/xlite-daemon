@@ -196,7 +196,9 @@ public class BlocknetPeerGroup {
         try {
             clientManager.stopAsync();
             clientManager.awaitTerminated();
-            threadPool.shutdownNow();
+            if (threadPool != null) {
+                threadPool.shutdownNow();
+            }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "[blocknet] Error stopping peer group", e);
         }

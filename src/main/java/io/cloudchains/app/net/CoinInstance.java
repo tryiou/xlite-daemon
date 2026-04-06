@@ -84,7 +84,7 @@ public class CoinInstance {
     private static final int FORWARD_ADDRESS_COUNT = 0;
 
     private static final List<CoinInstance> coinInstances = new CopyOnWriteArrayList<>();
-    private static CoinInstance activeCurrency;
+    private static volatile CoinInstance activeCurrency;
     private static CoinTicker activeBlocknetNetwork = null;
     private static CopyOnWriteArrayList<ListenerRegistration<ActiveCoinChangedEventListener>> activeCoinChangedListeners = new CopyOnWriteArrayList<>();
     private static ConcurrentHashMap<CoinTicker, AtomicInteger> blockCounts = new ConcurrentHashMap<>();
@@ -107,11 +107,11 @@ public class CoinInstance {
     private int rpcPort = -1;
     private boolean testnet = false;
     private JSONRPCServer coinRPCServer = null;
-    private long lastUtxoUpdate = 0;
-    private int updateFailures = 0;
+    private volatile long lastUtxoUpdate = 0;
+    private final AtomicInteger updateFailures = new AtomicInteger(0);
     private int generatedAddressCount;
     private AddressDiscoveryService discoveryService = null;
-    private static boolean addressDiscoveryEnabled = true;
+    private static volatile boolean addressDiscoveryEnabled = true;
 
     private CoinInstance(CoinTicker ticker, ConfigHelper configHelper) {
         this.ticker = ticker;
@@ -942,26 +942,13 @@ public class CoinInstance {
     }
 
     public void addBlockCount(CoinTicker ticker, Integer blockCount) {
-        if (blockCounts.containsKey(ticker)) {
-            if (blockCounts.get(ticker).get() > blockCount)
-                return;
-
-            blockCounts.get(ticker).set(blockCount);
-            return;
-        }
-
-        blockCounts.put(ticker, new AtomicInteger(blockCount));
+        blockCounts.computeIfAbsent(ticker, k -> new AtomicInteger(0))
+                .updateAndGet(current -> Math.max(current, blockCount));
     }
 
     public void addRelayFee(CoinTicker ticker, Double relayFee) {
-        if (relayFees.containsKey(ticker)) {
-            relayFees.get(ticker).set(relayFee);
-            return;
-        }
-
+        relayFees.computeIfAbsent(ticker, k -> new AtomicDouble(relayFee)).set(relayFee);
         configHelper.setFee(relayFee);
-
-        relayFees.put(ticker, new AtomicDouble(relayFee));
     }
 
     public void addCloudTransaction(CloudTransaction cloudTransaction) {
@@ -1087,11 +1074,11 @@ public class CoinInstance {
     }
 
     public void incrementUpdateFailures() {
-        updateFailures += 1;
+        updateFailures.incrementAndGet();
     }
 
     public void resetUpdateFailures() {
-        updateFailures = 0;
+        updateFailures.set(0);
     }
 
     public void runAddressDiscovery() {
@@ -1128,7 +1115,7 @@ public class CoinInstance {
     }
 
     public boolean isInstanceRunning() {
-        return updateFailures < 5;
+        return updateFailures.get() < 5;
     }
 
     public static void setAddressDiscoveryEnabled(boolean enabled) {

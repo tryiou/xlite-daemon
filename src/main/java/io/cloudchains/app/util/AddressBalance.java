@@ -13,14 +13,15 @@ import java.util.stream.Collectors;
 public class AddressBalance {
     private LegacyAddress address;
     private DumpedPrivateKey privateKey;
-    private AtomicReference<String> addrProp = null;
-    private AtomicDouble balanceProp = null;
+    private final AtomicReference<String> addrProp;
+    private final AtomicDouble balanceProp;
     private final CopyOnWriteArrayList<UTXO> utxos = new CopyOnWriteArrayList<>();
 
     public AddressBalance(LegacyAddress address, DumpedPrivateKey privateKey) {
         this.address = address;
         this.privateKey = privateKey;
-        setAddrProp(address.toBase58());
+        this.addrProp = new AtomicReference<>(address.toBase58());
+        this.balanceProp = new AtomicDouble(0);
     }
 
     public LegacyAddress getAddress() {
@@ -36,8 +37,6 @@ public class AddressBalance {
     }
 
     private AtomicReference<String> addrProperty() {
-        if (addrProp == null)
-            addrProp = new AtomicReference<String>("addrProp");
         return addrProp;
     }
 
@@ -50,8 +49,6 @@ public class AddressBalance {
     }
 
     public AtomicDouble balanceProperty() {
-        if (balanceProp == null)
-            balanceProp = new AtomicDouble(0);
         return balanceProp;
     }
 

@@ -18,7 +18,7 @@ public class UTXO {
     private int height;
     protected transient long value;
     private int vout;
-    private boolean spent;
+    private volatile boolean spent;
     protected CoinTicker ticker;
 
     public UTXO(CoinTicker ticker, String addressB58, String txid, int vout, int blockHeight, long value) {

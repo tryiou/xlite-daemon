@@ -18,7 +18,7 @@ public class EXRServer {
     private final String endpoint;
     private final EXRWrapper wrapper;
     private volatile boolean healthy;
-    private long lastHealthCheck;
+    private volatile long lastHealthCheck;
     private final Set<CoinTicker> supportedCoins;
     private volatile boolean capabilitiesProbed;
     // Use centralized configuration constants
@@ -46,40 +46,42 @@ public class EXRServer {
         if (capabilitiesProbed) {
             return true;
         }
-        if (!isHealthy()) {
-            return false;
-        }
-        try {
-            // CALL HEIGHTS ONCE - not per coin
-            JsonObject result = wrapper.executeGet("heights");
-            if (result != null && result.has("result")) {
-                JsonObject heights = result.getAsJsonObject("result");
-                // Extract ALL supported coins from single response
-                // Only include coins that have non-null values (null means not supported)
-                for (String coinName : heights.keySet()) {
-                    JsonElement heightValue = heights.get(coinName);
-                    if (heightValue.isJsonNull()) {
-                        continue; // Skip unsupported coins (null values)
-                    }
-                    try {
-                        CoinTicker coin = CoinTickerUtils.stringToTicker(coinName);
-                        if (coin != null) {
-                            supportedCoins.add(coin);
+        synchronized (this) {
+            if (capabilitiesProbed) {
+                return true;
+            }
+            if (!isHealthy()) {
+                return false;
+            }
+            try {
+                JsonObject result = wrapper.executeGet("heights");
+                if (result != null && result.has("result")) {
+                    JsonObject heights = result.getAsJsonObject("result");
+                    for (String coinName : heights.keySet()) {
+                        JsonElement heightValue = heights.get(coinName);
+                        if (heightValue.isJsonNull()) {
+                            continue;
                         }
-                    } catch (Exception e) {
-                        LOGGER.log(Level.FINER, "[exr-server] Failed to map coin " + coinName, e);
+                        try {
+                            CoinTicker coin = CoinTickerUtils.stringToTicker(coinName);
+                            if (coin != null) {
+                                supportedCoins.add(coin);
+                            }
+                        } catch (Exception e) {
+                            LOGGER.log(Level.FINER, "[exr-server] Failed to map coin " + coinName, e);
+                        }
                     }
                 }
-            }
 
-            capabilitiesProbed = true;
-            LOGGER.log(Level.INFO, "[exr-server] Probed capabilities for " + endpoint + ", supports: " + supportedCoins.size() + " coins: " +
-                    supportedCoins.stream().map(CoinTickerUtils::tickerToString)
-                            .reduce((a, b) -> a + ", " + b).orElse("none"));
-            return !supportedCoins.isEmpty();
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[exr-server] Failed to probe capabilities for " + endpoint, e);
-            return false;
+                capabilitiesProbed = true;
+                LOGGER.log(Level.INFO, "[exr-server] Probed capabilities for " + endpoint + ", supports: " + supportedCoins.size() + " coins: " +
+                        supportedCoins.stream().map(CoinTickerUtils::tickerToString)
+                                .reduce((a, b) -> a + ", " + b).orElse("none"));
+                return !supportedCoins.isEmpty();
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "[exr-server] Failed to probe capabilities for " + endpoint, e);
+                return false;
+            }
         }
     }
 
