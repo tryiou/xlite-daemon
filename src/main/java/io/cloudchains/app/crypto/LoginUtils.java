@@ -1,5 +1,6 @@
 package io.cloudchains.app.crypto;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -12,7 +13,7 @@ public class LoginUtils {
     private static String toSha256(String message) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update((message).getBytes());
+            digest.update(message.getBytes(StandardCharsets.UTF_8));
             byte[] hash = digest.digest();
             StringBuilder hex = new StringBuilder();
             for (byte b : hash) {
