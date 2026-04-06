@@ -24,6 +24,7 @@ public class JSONRPCServer extends Thread {
     private boolean stopping = false;
 
     private Channel channel;
+    private EventLoopGroup workerGroup;
 
     JSONRPCServer(CoinInstance coin, int port) {
         this.coin = coin;
@@ -31,7 +32,7 @@ public class JSONRPCServer extends Thread {
     }
 
     public void run() {
-        EventLoopGroup workerGroup = new NioEventLoopGroup(5);
+        workerGroup = new NioEventLoopGroup(5);
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.group(workerGroup)
@@ -57,6 +58,11 @@ public class JSONRPCServer extends Thread {
         stopping = true;
         LOGGER.log(Level.FINER, "[json-rpc-server] Interrupting server.");
 
-        channel.close();
+        if (channel != null) {
+            channel.close();
+        }
+        if (workerGroup != null) {
+            workerGroup.shutdownGracefully();
+        }
     }
 }

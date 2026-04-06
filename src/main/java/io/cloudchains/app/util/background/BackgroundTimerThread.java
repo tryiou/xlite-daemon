@@ -11,6 +11,10 @@ import io.cloudchains.app.util.XRouterConfiguration;
 
 import java.time.Duration;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,6 +45,9 @@ public class BackgroundTimerThread implements Runnable {
     private long lastOut;
     private boolean shutdownRequested = false;
     private volatile Thread workerThread;
+
+    private Set<String> lastAvailable = new HashSet<>();
+    private Set<String> lastUnavailable = new HashSet<>();
 
     // Log rotation scheduler fields
     private ScheduledExecutorService logRotationScheduler;
@@ -114,6 +121,17 @@ public class BackgroundTimerThread implements Runnable {
         if (workerThread != null) {
             workerThread.interrupt();
         }
+        if (threadPool != null && !threadPool.isShutdown()) {
+            threadPool.shutdown();
+            try {
+                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                    threadPool.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                threadPool.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
         if (logRotationScheduler != null && !logRotationScheduler.isShutdown()) {
             logRotationScheduler.shutdown();
             try {
@@ -133,15 +151,31 @@ public class BackgroundTimerThread implements Runnable {
         if (elapsed < 60 * 1000 && lastOut != 0)
             return;
 
+        List<String> available = new ArrayList<>();
+        Set<String> unavailable = new HashSet<>();
+
         for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
             if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker()))
                 continue;
 
+            String name = CoinTickerUtils.tickerToString(coinInstance.getTicker());
             if (CoinInstance.getBlockCountByTicker(coinInstance.getTicker()) > 0) {
-                LOGGER.log(Level.INFO, "[coin] Available Currency: " + CoinTickerUtils.tickerToString(coinInstance.getTicker()));
+                available.add(name);
+            } else {
+                unavailable.add(name);
             }
         }
 
+        Set<String> currentAvailable = new HashSet<>(available);
+        if (!currentAvailable.equals(lastAvailable)) {
+            LOGGER.log(Level.INFO, "[coin] Available: " + String.join(", ", available));
+        }
+        lastAvailable = currentAvailable;
+
+        if (!unavailable.isEmpty() && !unavailable.equals(lastUnavailable)) {
+            LOGGER.log(Level.INFO, "[coin] Unavailable: " + String.join(", ", unavailable));
+        }
+        lastUnavailable = unavailable;
         lastOut = System.currentTimeMillis();
     }
 

@@ -21,13 +21,14 @@ public class JSONRPCMasterServer extends Thread {
     private boolean stopping = false;
 
     private Channel channel;
+    private EventLoopGroup workerGroup;
 
     JSONRPCMasterServer(int port) {
         this.port = port;
     }
 
     public void run() {
-        EventLoopGroup workerGroup = new NioEventLoopGroup(2);
+        workerGroup = new NioEventLoopGroup(2);
         try {
             LOGGER.log(Level.INFO, "[rpc] Starting master RPC server on port " + port + ".");
 
@@ -53,10 +54,11 @@ public class JSONRPCMasterServer extends Thread {
         stopping = true;
         LOGGER.log(Level.FINER, "[json-rpc-server] Interrupting server.");
 
-        if (channel != null && channel.isOpen()) {
+        if (channel != null) {
             channel.close();
-        } else {
-            LOGGER.log(Level.FINER, "[json-rpc-server] Channel is null or not open during deinitialization.");
+        }
+        if (workerGroup != null) {
+            workerGroup.shutdownGracefully();
         }
     }
 }
