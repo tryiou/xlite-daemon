@@ -16,7 +16,10 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -139,9 +142,15 @@ public class KeyHandler {
             if (data.version == VERSION_1_SHA1) {
                 LOGGER.log(Level.INFO,
                         "[security] Legacy V1 wallet detected — migrating to V2 (SHA-256/CBC)");
-                String seed = decryptSeedEcb(passphrase, data.encrypted, data.salt);
-                migrateToNewFormat(passphrase, seed, file);
-                return Arrays.asList(seed.split("\\s+"));
+                char[] legacyPassphrase = null;
+                try {
+                    legacyPassphrase = sha256ToChars(passphrase);
+                    String seed = decryptSeedEcb(legacyPassphrase, data.encrypted, data.salt);
+                    migrateToNewFormat(passphrase, seed, file);
+                    return Arrays.asList(seed.split("\\s+"));
+                } finally {
+                    if (legacyPassphrase != null) Arrays.fill(legacyPassphrase, '\0');
+                }
             }
             String seed = decryptSeedCbc(passphrase, data.encrypted, data.salt, data.iv);
             return Arrays.asList(seed.split("\\s+"));
@@ -233,13 +242,13 @@ public class KeyHandler {
      * @param password the password to evaluate
      * @return score in [0, 10]
      */
-    public static int calculatePasswordStrength(String password) {
-        if (password.length() < 8) return 0;
+    public static int calculatePasswordStrength(char[] password) {
+        if (password.length < 8) return 0;
 
-        int score = password.length() >= 10 ? 2 : 1;
+        int score = password.length >= 10 ? 2 : 1;
         boolean hasDigit = false, hasLower = false, hasUpper = false, hasSpecial = false;
 
-        for (char c : password.toCharArray()) {
+        for (char c : password) {
             if (Character.isDigit(c)) {
                 hasDigit = true;
             } else if (Character.isLowerCase(c)) {
@@ -261,6 +270,43 @@ public class KeyHandler {
     // =========================================================================
     // Private — key derivation and cipher
     // =========================================================================
+
+    /**
+     * Hash a raw password with SHA-256 and return the hex digest as a char[].
+     * Used only for decrypting legacy V1 wallets where the passphrase was
+     * pre-hashed via {@code LoginUtils.loginToEntropy()} before PBKDF2.
+     */
+    private static char[] sha256ToChars(char[] input) {
+        byte[] hash = null;
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            hash = digest.digest(encodeUtf8Chars(input));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                if ((0xff & b) < 0x10)
+                    hex.append("0").append(Integer.toHexString(0xFF & b));
+                else
+                    hex.append(Integer.toHexString(0xFF & b));
+            }
+            return hex.toString().toCharArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to compute SHA-256 for legacy migration", e);
+        } finally {
+            if (hash != null) Arrays.fill(hash, (byte) 0);
+        }
+    }
+
+    /**
+     * Encode a char[] as UTF-8 bytes without creating an intermediate String.
+     * Caller must zero the returned byte array after use.
+     */
+    private static byte[] encodeUtf8Chars(char[] chars) {
+        ByteBuffer buf = StandardCharsets.UTF_8.encode(
+                CharBuffer.wrap(chars));
+        byte[] bytes = new byte[buf.remaining()];
+        buf.get(bytes);
+        return bytes;
+    }
 
     /**
      * Derive a 256-bit AES key from a passphrase using PBKDF2.
