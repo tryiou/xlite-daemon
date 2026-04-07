@@ -1,4 +1,3 @@
-import io.cloudchains.app.crypto.LoginUtils;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.util.AddressBalance;
@@ -7,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,7 +23,12 @@ class CoinInstanceTest extends TestHelper {
             CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCount());
-            assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
+            char[] pw = getPassword().toCharArray();
+            try {
+                assertNull(coin.init(pw, getMnemonic(), false));
+            } finally {
+                Arrays.fill(pw, '\0');
+            }
 
             List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
@@ -50,7 +55,12 @@ class CoinInstanceTest extends TestHelper {
             CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCountInitial());
-            assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
+            char[] pw = getPassword().toCharArray();
+            try {
+                assertNull(coin.init(pw, getMnemonic(), false));
+            } finally {
+                Arrays.fill(pw, '\0');
+            }
 
             final int total = getAddressCount() - getAddressCountInitial() - 1;
             for (int i = 0; i < total; i++)
@@ -81,11 +91,21 @@ class CoinInstanceTest extends TestHelper {
             CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCountInitial());
-            assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
+            char[] pw = getPassword().toCharArray();
+            try {
+                assertNull(coin.init(pw, getMnemonic(), false));
+            } finally {
+                Arrays.fill(pw, '\0');
+            }
 
             // Reinit which triggers generate forward addresses
             coin.getConfigHelper().setAddressCount(getAddressCount());
-            assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), null, false));
+            char[] pw2 = getPassword().toCharArray();
+            try {
+                assertNull(coin.init(pw2, null, false));
+            } finally {
+                Arrays.fill(pw2, '\0');
+            }
 
             List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
@@ -110,7 +130,12 @@ class CoinInstanceTest extends TestHelper {
         CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
         assertNotNull(coin);
         coin.getConfigHelper().setAddressCount(getAddressCountInitial());
-        assertNull(coin.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
+        char[] pw = getPassword().toCharArray();
+        try {
+            assertNull(coin.init(pw, getMnemonic(), false));
+        } finally {
+            Arrays.fill(pw, '\0');
+        }
 
         for (int idx = getAddressCountInitial() * 2; idx < getAddressCount(); idx += getAddressCountInitial()) {
             // ReloadConfig with new address count triggers generate forward addresses

@@ -3,7 +3,6 @@ package io.cloudchains.app.console;
 import io.cloudchains.app.App;
 import io.cloudchains.app.Version;
 import io.cloudchains.app.crypto.KeyHandler;
-import io.cloudchains.app.crypto.LoginUtils;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
@@ -71,7 +70,6 @@ public class ConsoleMenu {
                         autoGenerateRPCConfig();
                         System.exit(0);
                     case "--development-endpoint": {
-                        // sample endpoint url: "https://utils.blocknet.org/"
                         if (i + 1 < arguments.length) {
                             String customEndpoint = arguments[i + 1];
                             if (customEndpoint.startsWith("--")) {
@@ -139,22 +137,21 @@ public class ConsoleMenu {
                             System.exit(0);
                         }
 
-                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-                        if (strength < 9) {
-                            logBadPassword(null);
-                            System.exit(1);
-                        }
-
-                        char[] passphrase = LoginUtils.loginToEntropy(password).toCharArray();
+                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
                         try {
-                            List<String> mnemonic = KeyHandler.getBaseSeed(passphrase);
+                            int strength = KeyHandler.calculatePasswordStrength(password);
+                            if (strength < 9) {
+                                logBadPassword(null);
+                                System.exit(1);
+                            }
+
+                            List<String> mnemonic = KeyHandler.getBaseSeed(password);
                             if (mnemonic == null) {
                                 logBadPassword(null);
                                 System.exit(1);
                             }
                         } finally {
-                            Arrays.fill(passphrase, '\0');
+                            Arrays.fill(password, '\0');
                         }
 
                         System.exit(0);
@@ -165,61 +162,63 @@ public class ConsoleMenu {
                             System.exit(0);
                         }
 
-                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
                         String mnemonic = readPassword(input, arguments, i + 2, "Mnemonic:\n", "WALLET_MNEMONIC").trim();
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-                        if (strength < 9) {
-                            logBadPassword(null);
-                            System.exit(1);
-                        }
-                        if (mnemonic.isEmpty()) {
-                            logBadMnemonic();
-                            System.exit(1);
-                        }
-
-                        char[] passphrase = LoginUtils.loginToEntropy(password).toCharArray();
                         try {
-                            if (!KeyHandler.importFromMnemonic(Arrays.asList(mnemonic.split(" ")), passphrase)) {
+                            int strength = KeyHandler.calculatePasswordStrength(password);
+                            if (strength < 9) {
+                                logBadPassword(null);
+                                System.exit(1);
+                            }
+                            if (mnemonic.isEmpty()) {
+                                logBadMnemonic();
+                                System.exit(1);
+                            }
+
+                            if (!KeyHandler.importFromMnemonic(Arrays.asList(mnemonic.split(" ")), password)) {
                                 logBadMnemonic();
                                 System.exit(1);
                             }
                         } finally {
-                            Arrays.fill(passphrase, '\0');
+                            Arrays.fill(password, '\0');
                         }
 
                         System.exit(0);
                     }
                     case "--xliterpc": {
-                        // Increment RPC port by 1
                         xliteRPC = true;
-
                         break;
                     }
                     case "--password": {
-                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        int strength = KeyHandler.calculatePasswordStrength(password);
+                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        try {
+                            int strength = KeyHandler.calculatePasswordStrength(password);
 
-                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            LOGGER.log(Level.INFO, "Bad password.");
-                            System.exit(1);
+                            if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                                LOGGER.log(Level.INFO, "Bad password.");
+                                System.exit(1);
+                            }
+
+                            completeLogin(password, null, false);
+                        } finally {
+                            Arrays.fill(password, '\0');
                         }
-
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        completeLogin(entropy, null, false);
 
                         return;
                     }
                     case "--getmnemonic": {
-                        String password = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        try {
+                            if (!KeyHandler.existsBaseECKeyFromLocal()) {
+                                LOGGER.log(Level.INFO, "No wallet found.");
+                                System.exit(1);
+                            }
 
-                        if (!KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.log(Level.INFO, "No wallet found.");
-                            System.exit(1);
+                            String mnemonic = CoinInstance.getMnemonicForPw(password);
+                            System.out.println(mnemonic);
+                        } finally {
+                            Arrays.fill(password, '\0');
                         }
-
-                        String entropy = LoginUtils.loginToEntropy(password);
-                        String mnemonic = CoinInstance.getMnemonicForPw(entropy);
-                        System.out.println(mnemonic);
                         System.exit(0);
                     }
                     case "--changepassword": {
@@ -228,30 +227,33 @@ public class ConsoleMenu {
                             System.exit(1);
                         }
 
-                        String currentPassword = readPassword(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        String newPassword = readPassword(input, arguments, i + 2, "", null);
-                        if (currentPassword.isEmpty() || newPassword.isEmpty()) {
-                            LOGGER.log(Level.INFO, "Password cannot be empty");
-                            System.exit(1);
-                        }
-                        if (currentPassword.equals(newPassword)) {
-                            LOGGER.log(Level.INFO, "New password must be different from old password");
-                            System.exit(1);
-                        }
+                        char[] currentPassword = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
+                        char[] newPassword = readPasswordChars(input, arguments, i + 2, "", null);
+                        try {
+                            if (currentPassword.length == 0 || newPassword.length == 0) {
+                                LOGGER.log(Level.INFO, "Password cannot be empty");
+                                System.exit(1);
+                            }
+                            if (Arrays.equals(currentPassword, newPassword)) {
+                                LOGGER.log(Level.INFO, "New password must be different from old password");
+                                System.exit(1);
+                            }
 
-                        // Check new password strength
-                        int strength = KeyHandler.calculatePasswordStrength(newPassword);
-                        if (strength < 9) {
-                            LOGGER.log(Level.INFO, "Unable to change the password: New password is not strong enough");
-                            System.exit(1);
-                        }
+                            int strength = KeyHandler.calculatePasswordStrength(newPassword);
+                            if (strength < 9) {
+                                LOGGER.log(Level.INFO, "Unable to change the password: New password is not strong enough");
+                                System.exit(1);
+                            }
 
-                        CoinInstance.CoinError err = CoinInstance.changePassword(LoginUtils.loginToEntropy(currentPassword),
-                                LoginUtils.loginToEntropy(newPassword));
-                        if (err != null)
-                            logBadChangePass(err.getMessage());
-                        else
-                            LOGGER.log(Level.INFO, "Wallet password changed successfully");
+                            CoinInstance.CoinError err = CoinInstance.changePassword(currentPassword, newPassword);
+                            if (err != null)
+                                logBadChangePass(err.getMessage());
+                            else
+                                LOGGER.log(Level.INFO, "Wallet password changed successfully");
+                        } finally {
+                            Arrays.fill(currentPassword, '\0');
+                            Arrays.fill(newPassword, '\0');
+                        }
 
                         System.exit(0);
                     }
@@ -262,36 +264,36 @@ public class ConsoleMenu {
             }
         }
 
-        if (App.getEnv("WALLET_MNEMONIC") != null) {
-            String mnemonicImport = App.getEnv("WALLET_MNEMONIC");
-            if (mnemonicImport == null) {
-                LOGGER.log(Level.INFO, "Bad mnemonic.");
-                return;
+        String mnemonicImport = App.getEnv("WALLET_MNEMONIC");
+        if (mnemonicImport != null && !mnemonicImport.isEmpty()) {
+            char[] mnemonicChars = mnemonicImport.toCharArray();
+            try {
+                completeLogin(mnemonicChars, null, true);
+            } finally {
+                Arrays.fill(mnemonicChars, '\0');
             }
-
-            completeLogin(mnemonicImport, null, true);
             return;
-        } else if (App.getEnv("WALLET_PASSWORD") != null) {
-            String password = App.getEnv("WALLET_PASSWORD");
-            if (password == null) {
-                LOGGER.log(Level.INFO, "Bad password.");
+        } else {
+            String passwordEnv = App.getEnv("WALLET_PASSWORD");
+            if (passwordEnv != null && !passwordEnv.isEmpty()) {
+                char[] password = passwordEnv.toCharArray();
+                try {
+                    int strength = KeyHandler.calculatePasswordStrength(password);
+
+                    if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                        LOGGER.log(Level.INFO, "Bad password.");
+                        return;
+                    }
+
+                    completeLogin(password, null, false);
+                } finally {
+                    Arrays.fill(password, '\0');
+                }
                 return;
             }
-
-            int strength = KeyHandler.calculatePasswordStrength(password);
-
-            if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                LOGGER.log(Level.INFO, "Bad password.");
-                return;
-            }
-
-            completeLogin(LoginUtils.loginToEntropy(password), null, false);
-            return;
         }
 
-        String entropy = null;
-
-        while (entropy == null) {
+        while (true) {
             LOGGER.log(Level.INFO, "-------------------------");
             LOGGER.log(Level.INFO, "1 - Create new wallet " + newWalletStr);
             LOGGER.log(Level.INFO, "2 - Decrypt wallet");
@@ -300,7 +302,7 @@ public class ConsoleMenu {
 
             LOGGER.log(Level.INFO, "Selection: ");
             selection = input.nextInt();
-            input.nextLine(); // clear buffer
+            input.nextLine();
 
             switch (selection) {
                 case 1: {
@@ -310,47 +312,59 @@ public class ConsoleMenu {
                     }
 
                     Console console = System.console();
-                    String password;
+                    char[] password;
                     if (console != null) {
-                        password = new String(console.readPassword("Enter new password: "));
+                        password = console.readPassword("Enter new password: ");
                     } else {
                         LOGGER.log(Level.INFO, "Enter new password: ");
-                        password = input.next();
+                        password = input.next().toCharArray();
                     }
-                    int strength = KeyHandler.calculatePasswordStrength(password);
+                    try {
+                        int strength = KeyHandler.calculatePasswordStrength(password);
 
-                    if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                        LOGGER.log(Level.INFO, "Bad password.");
-                        return;
+                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                            LOGGER.log(Level.INFO, "Bad password.");
+                            return;
+                        }
+                        completeLogin(password, null, false);
+                    } finally {
+                        Arrays.fill(password, '\0');
                     }
-                    entropy = LoginUtils.loginToEntropy(password);
-                    break;
+                    return;
                 }
                 case 2: {
                     LOGGER.log(Level.INFO, "Enter password: ");
                     Console console = System.console();
-                    String password;
+                    char[] password;
                     if (console != null) {
-                        password = new String(console.readPassword());
+                        password = console.readPassword();
                     } else {
                         LOGGER.log(Level.WARNING, "Console not available, using Scanner fallback");
-                        password = readPassword(input, null, 0, "", null);
+                        password = readPasswordChars(input, null, 0, "", null);
                     }
-                    int strength = KeyHandler.calculatePasswordStrength(password);
+                    try {
+                        int strength = KeyHandler.calculatePasswordStrength(password);
 
-                    if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                        LOGGER.log(Level.INFO, "Bad password.");
-                        return;
+                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                            LOGGER.log(Level.INFO, "Bad password.");
+                            return;
+                        }
+                        completeLogin(password, null, false);
+                    } finally {
+                        Arrays.fill(password, '\0');
                     }
-
-                    entropy = LoginUtils.loginToEntropy(password);
-                    break;
+                    return;
                 }
                 case 3: {
                     LOGGER.log(Level.INFO, "Enter mnemonic: ");
-                    String mnemonicImport = input.nextLine().trim();
+                    String mnemonicInput = input.nextLine().trim();
 
-                    completeLogin(mnemonicImport, null, true);
+                    char[] mnemonicChars = mnemonicInput.toCharArray();
+                    try {
+                        completeLogin(mnemonicChars, null, true);
+                    } finally {
+                        Arrays.fill(mnemonicChars, '\0');
+                    }
                     return;
                 }
                 case 4: {
@@ -362,9 +376,6 @@ public class ConsoleMenu {
                 }
             }
         }
-
-        input.close();
-        completeLogin(entropy, null, false);
     }
 
     public void deinit() {
@@ -377,17 +388,15 @@ public class ConsoleMenu {
         }
     }
 
-    private void completeLogin(String entropy, String userMnemonic, boolean isMnemonic) {
-        if (entropy == null && userMnemonic == null) {
+    private void completeLogin(char[] password, String userMnemonic, boolean isMnemonic) {
+        if (password == null && userMnemonic == null) {
             logBadPassword(null);
             System.exit(0);
         }
 
         long startTime = System.currentTimeMillis();
 
-        // Wallet file already exists on disk at this point. Pass null for userMnemonic
-        // so CoinInstance reads the seed from disk rather than attempting to create it.
-        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(entropy, null, isMnemonic, xliteRPC);
+        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, null, isMnemonic, xliteRPC);
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.log(Level.SEVERE, msg);
@@ -401,7 +410,7 @@ public class ConsoleMenu {
             }
         }
 
-        initializeCoinsConcurrently(otherCoins, entropy, null, isMnemonic, xliteRPC);
+        initializeCoinsConcurrently(otherCoins, password, null, isMnemonic, xliteRPC);
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
@@ -415,37 +424,26 @@ public class ConsoleMenu {
         }
     }
 
-    /**
-     * Initialize coins concurrently using CompletableFuture
-     * @param coinTickers List of coin tickers to initialize
-     * @param entropy Password entropy
-     * @param userMnemonic User mnemonic (if any)
-     * @param isMnemonic Whether the input is a mnemonic
-     * @param xliteRPC Whether to use xlite RPC
-     */
-    private void initializeCoinsConcurrently(List<CoinTicker> coinTickers, String entropy,
+    private void initializeCoinsConcurrently(List<CoinTicker> coinTickers, char[] password,
                                              String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
         if (coinTickers.isEmpty()) {
             return;
         }
 
-        // Create thread pool with number of coins (or a reasonable limit)
-        int threadCount = Math.min(coinTickers.size(), 8); // Limit to 8 threads max
+        int threadCount = Math.min(coinTickers.size(), 8);
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
         try {
-            // Filter to only enabled coins before initialization
             List<CoinTicker> enabledCoins = coinTickers.stream()
                     .filter(ticker -> ticker == CoinTicker.BLOCKNET || CoinInstance.getInstance(ticker) != null)
                     .collect(Collectors.toList());
 
-            // Create CompletableFuture for each coin initialization
             CompletableFuture<?>[] futures = enabledCoins.stream()
                     .map(coinTicker -> CompletableFuture.runAsync(() -> {
                         try {
                             LOGGER.log(Level.FINE, "[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
                             CoinInstance.CoinError coinError = CoinInstance.getInstance(coinTicker)
-                                    .init(entropy, userMnemonic, isMnemonic, xliteRPC);
+                                    .init(password, userMnemonic, isMnemonic, xliteRPC);
                             if (coinError != null) {
                                 LOGGER.log(Level.WARNING, "[" + coinTicker.name() + "] Error(" +
                                         coinError.getCode().name() + "): " + coinError.getMessage());
@@ -456,12 +454,10 @@ public class ConsoleMenu {
                     }, executor))
                     .toArray(CompletableFuture[]::new);
 
-            // Wait for all initializations to complete
             CompletableFuture.allOf(futures).join();
 
 
         } finally {
-            // Shutdown executor service
             executor.shutdown();
             try {
                 if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
@@ -499,20 +495,10 @@ public class ConsoleMenu {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
     }
 
-    /**
-    * Reads the password from args, environment variable, or stdin (in that priority order).
-    * When no positional arg is available, checks the env var before falling back to stdin.
-    * @param input Stdin
-    * @param args Program arguments
-    * @param argPos Current arg position
-    * @param msg Message to display on stdin (defaults to "Password:\n" if empty)
-    * @param envVar Environment variable name to check as fallback (nullable)
-    * @return Password string
-    */
     private String readPassword(Scanner input, String[] args, int argPos, String msg, String envVar) {
         if (msg.isEmpty())
             msg = "Password:\n";
-        if (args.length <= argPos || args[argPos].contains("--")) {
+        if (args == null || args.length <= argPos || args[argPos].contains("--")) {
             if (envVar != null) {
                 String envVal = App.getEnv(envVar);
                 if (envVal != null && !envVal.isEmpty())
@@ -524,7 +510,25 @@ public class ConsoleMenu {
         return args[argPos];
     }
 
-    // Function to display help information
+    /**
+     * Reads the password as a char[] from args, environment variable, or stdin.
+     * Caller MUST zero-fill the returned array after use.
+     */
+    private char[] readPasswordChars(Scanner input, String[] args, int argPos, String msg, String envVar) {
+        if (msg.isEmpty())
+            msg = "Password:\n";
+        if (args == null || args.length <= argPos || args[argPos].contains("--")) {
+            if (envVar != null) {
+                String envVal = App.getEnv(envVar);
+                if (envVal != null && !envVal.isEmpty())
+                    return envVal.toCharArray();
+            }
+            System.out.println(msg);
+            return input.nextLine().toCharArray();
+        }
+        return args[argPos].toCharArray();
+    }
+
     private static void displayHelp() {
         System.out.print(getHelpText());
     }

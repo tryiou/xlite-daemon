@@ -1,9 +1,10 @@
 package io.cloudchains.app.console;
 
 import io.cloudchains.app.crypto.KeyHandler;
-import io.cloudchains.app.crypto.LoginUtils;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
+
+import java.util.Arrays;
 
 public class ArgMenu {
     private String[] arguments;
@@ -14,7 +15,7 @@ public class ArgMenu {
 
     public void init() {
         int selection = 2;
-        String password = "";
+        char[] password = null;
 
         System.out.println("-------------------------");
         System.out.println("Help: ");
@@ -26,62 +27,63 @@ public class ArgMenu {
             System.exit(0);
         } else {
             if (arguments.length == 1) {
-                password = arguments[0];
+                password = arguments[0].toCharArray();
             } else if (arguments.length == 2 && arguments[0].equals("--new-wallet")) {
                 selection = 1;
-                password = arguments[1];
+                password = arguments[1].toCharArray();
             } else if (arguments.length == 2 && arguments[0].equals("--decrypt-wallet")) {
-                password = arguments[1];
+                password = arguments[1].toCharArray();
             }
         }
 
-        String entropy = null;
-
-        switch (selection) {
-            case 1: {
-                if (KeyHandler.existsBaseECKeyFromLocal()) {
-                    System.out.println("Key already exists");
-                    return;
-                }
-
-                int strength = KeyHandler.calculatePasswordStrength(password);
-
-                if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                    System.out.println("Bad password.");
-                    return;
-                }
-
-                entropy = LoginUtils.loginToEntropy(password);
-                break;
+        try {
+            if (password == null) {
+                System.out.println("Unrecognized arguments. Use --new-wallet <password> or --decrypt-wallet <password>.");
+                return;
             }
-            case 2: {
-                int strength = KeyHandler.calculatePasswordStrength(password);
+            switch (selection) {
+                case 1: {
+                    if (KeyHandler.existsBaseECKeyFromLocal()) {
+                        System.out.println("Key already exists");
+                        return;
+                    }
 
-                if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                    System.out.println("Bad password.");
-                    return;
+                    int strength = KeyHandler.calculatePasswordStrength(password);
+
+                    if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                        System.out.println("Bad password.");
+                        return;
+                    }
+
+                    completeLogin(password, null);
+                    break;
                 }
+                case 2: {
+                    int strength = KeyHandler.calculatePasswordStrength(password);
 
-                entropy = LoginUtils.loginToEntropy(password);
-                break;
+                    if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                        System.out.println("Bad password.");
+                        return;
+                    }
+
+                    completeLogin(password, null);
+                    break;
+                }
+                case 3: {
+                    System.out.println("Exiting...");
+                    System.exit(0);
+                }
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + selection);
             }
-            case 3: {
-                System.out.println("Exiting...");
-                System.exit(0);
-            }
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + selection);
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
         }
-
-        if (entropy == null)
-            return;
-
-        completeLogin(entropy, null);
     }
 
-    private void completeLogin(String entropy, String userMnemonic) {
-        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(entropy, userMnemonic, false);
+    private void completeLogin(char[] password, String userMnemonic) {
+        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, userMnemonic, false);
         if (coinError != null) {
             System.out.println("[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage());
             System.exit(0);
@@ -90,7 +92,7 @@ public class ArgMenu {
         for (CoinTicker cointicker : CoinTicker.coins()) {
             if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BLOCKNET_TESTNET5 || cointicker == CoinTicker.BITCOIN)
                 continue;
-            coinError = CoinInstance.getInstance(cointicker).init(entropy, userMnemonic, false);
+            coinError = CoinInstance.getInstance(cointicker).init(password, userMnemonic, false);
             if (coinError != null)
                 System.out.println("[" + cointicker.name() + "] Error(" + coinError.getCode().name() + "): " + coinError.getMessage());
         }

@@ -11,6 +11,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
@@ -77,7 +78,7 @@ public class KeyHandlerTest {
     @Test
     @Order(1)
     void testPasswordStrengthTooShort() {
-        assertEquals(SCORE_TOO_SHORT, KeyHandler.calculatePasswordStrength("short"));
+        assertEquals(SCORE_TOO_SHORT, KeyHandler.calculatePasswordStrength("short".toCharArray()));
     }
 
     @Test
@@ -85,7 +86,7 @@ public class KeyHandlerTest {
     void testPasswordStrengthEightCharLowercaseOnly() {
         // 1 (8-9 chars) + 2 (lowercase) = 3
         assertEquals(SCORE_EIGHT_LOWERCASE_ONLY,
-                KeyHandler.calculatePasswordStrength("eightchr"));
+                KeyHandler.calculatePasswordStrength("eightchr".toCharArray()));
     }
 
     @Test
@@ -93,8 +94,8 @@ public class KeyHandlerTest {
     void testPasswordStrengthNineCharSameAsEight() {
         // Both 8 and 9 characters should yield the same length bonus (+1).
         assertEquals(
-                KeyHandler.calculatePasswordStrength("eightchr"),
-                KeyHandler.calculatePasswordStrength("ninechars"),
+                KeyHandler.calculatePasswordStrength("eightchr".toCharArray()),
+                KeyHandler.calculatePasswordStrength("ninechars".toCharArray()),
                 "8-char and 9-char passwords must receive the same length bonus"
         );
     }
@@ -104,14 +105,14 @@ public class KeyHandlerTest {
     void testPasswordStrengthTenPlusWithDigitAndLower() {
         // 2 (10+ chars) + 2 (digit) + 2 (lowercase) = 6
         assertEquals(SCORE_TEN_LOWER_DIGIT,
-                KeyHandler.calculatePasswordStrength("tenchars12"));
+                KeyHandler.calculatePasswordStrength("tenchars12".toCharArray()));
     }
 
     @Test
     @Order(5)
     void testPasswordStrengthAllCriteria() {
         assertEquals(SCORE_ALL_CRITERIA,
-                KeyHandler.calculatePasswordStrength("StrongPass123!"));
+                KeyHandler.calculatePasswordStrength("StrongPass123!".toCharArray()));
     }
 
     // =========================================================================
@@ -336,13 +337,14 @@ public class KeyHandlerTest {
      */
     private void createLegacyWalletFile() throws IOException {
         testKeyFile.getParentFile().mkdirs();
+        char[] hashedPass = sha256Hex(TEST_PASSPHRASE);
         try {
             SecureRandom rng = new SecureRandom();
             byte[] salt = new byte[20];
             rng.nextBytes(salt);
 
             SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
-            PBEKeySpec spec = new PBEKeySpec(TEST_PASSPHRASE.toCharArray(), salt, 16_384, 256);
+            PBEKeySpec spec = new PBEKeySpec(hashedPass, salt, 16_384, 256);
             SecretKey tmp = skf.generateSecret(spec);
             SecretKey key = new SecretKeySpec(tmp.getEncoded(), "AES");
             spec.clearPassword();
@@ -361,6 +363,8 @@ public class KeyHandlerTest {
             }
         } catch (Exception e) {
             throw new IOException("Failed to create legacy wallet file for test", e);
+        } finally {
+            Arrays.fill(hashedPass, '\0');
         }
     }
 
@@ -369,6 +373,24 @@ public class KeyHandlerTest {
         if (!testKeyFile.exists()) return new String[0];
         try (BufferedReader reader = new BufferedReader(new FileReader(testKeyFile))) {
             return reader.lines().toArray(String[]::new);
+        }
+    }
+
+    /**
+     * Replicate the legacy LoginUtils.loginToEntropy() behavior:
+     * SHA-256 hash the input and return the hex digest as a char[].
+     */
+    private static char[] sha256Hex(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString().toCharArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to compute SHA-256 for test", e);
         }
     }
 }

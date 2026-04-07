@@ -1,6 +1,5 @@
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import io.cloudchains.app.crypto.LoginUtils;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
@@ -12,6 +11,7 @@ import org.junit.jupiter.api.Timeout;
 import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -43,7 +43,12 @@ class AddressDiscoveryServiceTest extends TestHelper {
         coinInstance = CoinInstance.getInstance(CoinTicker.BLOCKNET);
         assertNotNull(coinInstance);
         coinInstance.getConfigHelper().setAddressCount(getAddressCountInitial());
-        assertNull(coinInstance.init(LoginUtils.loginToEntropy(getPassword()), getMnemonic(), false));
+        char[] pw = getPassword().toCharArray();
+        try {
+            assertNull(coinInstance.init(pw, getMnemonic(), false));
+        } finally {
+            Arrays.fill(pw, '\0');
+        }
 
         mockHttpClient = mock(HTTPClient.class);
         AddressDiscoveryService.setDiscoveryTimeoutMs(30000);

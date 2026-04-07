@@ -18,7 +18,7 @@ import java.util.Objects;
 
 /**
  * Test helper class providing shared utilities for all test files.
- * This avoids code duplication across TestCoinInstance, TestConfigHelper, and TestLoginUtils.
+ * This avoids code duplication across test files.
  */
 public class TestHelper {
 
