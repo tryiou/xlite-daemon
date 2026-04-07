@@ -127,22 +127,17 @@ public class CoinInstance {
     * Return mnemonic seed from wallet stored on disk. Correct passphrase required.
     * Returns empty string on error or failure to retrieve mnemonic (or if mnemonic
     * doesn't exist).
-    * @param pw String
+    * @param pw caller-owned char array; must be zeroed by the caller after use
     * @return String
     */
-    public static String getMnemonicForPw(String pw) {
+    public static String getMnemonicForPw(char[] pw) {
         if (!KeyHandler.existsBaseECKeyFromLocal())
             return "";
 
-        char[] passphrase = pw.toCharArray();
-        try {
-            List<String> seed = KeyHandler.getBaseSeed(passphrase);
-            if (seed == null)
-                return "";
-            return Joiner.on(" ").join(seed);
-        } finally {
-            Arrays.fill(passphrase, '\0');
-        }
+        List<String> seed = KeyHandler.getBaseSeed(pw);
+        if (seed == null)
+            return "";
+        return Joiner.on(" ").join(seed);
     }
 
     public static int getBlockCountByTicker(CoinTicker ticker) {
@@ -285,42 +280,34 @@ public class CoinInstance {
 
     /**
     * Change the password. Recreates the wallet file and encrypts with new password.
-    * @param oldPassword
-     * @param newPassword
+    * @param oldPassword caller-owned char array; must be zeroed by the caller after use
+     * @param newPassword caller-owned char array; must be zeroed by the caller after use
      * @return Error or null
     */
-    public static CoinError changePassword(String oldPassword, String newPassword) {
+    public static CoinError changePassword(char[] oldPassword, char[] newPassword) {
         if (!KeyHandler.existsBaseECKeyFromLocal()) {
             LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Wallet not found on disk");
             return new CoinError("Unable to change the password: Wallet not found on disk",
                     CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
         }
 
-        char[] oldPassphrase = oldPassword.toCharArray();
-        char[] newPassphrase = newPassword.toCharArray();
-        try {
-            List<String> baseSeed = KeyHandler.getBaseSeed(oldPassphrase);
-            if (baseSeed == null) {
-                LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Incorrect password");
-                return new CoinError("Unable to change the password: Incorrect password",
-                        CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
-            }
-
-            // Get current wallet seed
-            DeterministicSeed seed = new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
-            List<String> mnemonic = seed.getMnemonicCode();
-
-            if (!KeyHandler.importFromMnemonic(mnemonic, newPassphrase)) {
-                LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Failed to create new wallet file");
-                return new CoinError("Unable to change the password: Failed to create new wallet file",
-                        CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
-            }
-
-            return null;
-        } finally {
-            Arrays.fill(oldPassphrase, '\0');
-            Arrays.fill(newPassphrase, '\0');
+        List<String> baseSeed = KeyHandler.getBaseSeed(oldPassword);
+        if (baseSeed == null) {
+            LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Incorrect password");
+            return new CoinError("Unable to change the password: Incorrect password",
+                    CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
         }
+
+        DeterministicSeed seed = new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
+        List<String> mnemonic = seed.getMnemonicCode();
+
+        if (!KeyHandler.importFromMnemonic(mnemonic, newPassword)) {
+            LOGGER.log(Level.WARNING, "[wallet] Unable to change the password: Failed to create new wallet file");
+            return new CoinError("Unable to change the password: Failed to create new wallet file",
+                    CoinError.CoinErrorCode.CHANGEPASSWORDFAILED);
+        }
+
+        return null;
     }
 
     public NetworkParameters getNetworkParameters() {
@@ -350,11 +337,11 @@ public class CoinInstance {
         }
     }
 
-    public CoinError init(String pw, String userMnemonic, boolean isMnemonic) {
+    public CoinError init(char[] pw, String userMnemonic, boolean isMnemonic) {
         return init(pw, userMnemonic, isMnemonic, false);
     }
 
-    public CoinError init(String pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
+    public CoinError init(char[] pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
         switch (ticker) {
             case BLOCKNET: {
                 LOGGER.log(Level.FINE, "[coin] Initializing for Blocknet main network.");
@@ -494,7 +481,7 @@ public class CoinInstance {
         boolean existsOnDisk = false;
 
         if (isMnemonic) {
-            baseSeed = Arrays.asList(pw.split(" "));
+            baseSeed = splitMnemonicChars(pw);
         } else {
             if (KeyHandler.existsBaseECKeyFromLocal()) {
                 existsOnDisk = true;
@@ -502,23 +489,13 @@ public class CoinInstance {
                     LOGGER.log(Level.WARNING, "[wallet] Wallet already exists on disk, ignoring provided mnemonic");
                 }
             } else if (userMnemonic != null) {
-                char[] importPassphrase = pw.toCharArray();
-                try {
-                    if (!KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), importPassphrase)) {
-                        LOGGER.log(Level.WARNING, "[wallet] Unable to create wallet from mnemonic");
-                        return new CoinError("Unable to create wallet from mnemonic", CoinError.CoinErrorCode.BADMNEMONIC);
-                    }
-                } finally {
-                    Arrays.fill(importPassphrase, '\0');
+                if (!KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), pw)) {
+                    LOGGER.log(Level.WARNING, "[wallet] Unable to create wallet from mnemonic");
+                    return new CoinError("Unable to create wallet from mnemonic", CoinError.CoinErrorCode.BADMNEMONIC);
                 }
             }
 
-            char[] readPassphrase = pw.toCharArray();
-            try {
-                baseSeed = KeyHandler.getBaseSeed(readPassphrase);
-            } finally {
-                Arrays.fill(readPassphrase, '\0');
-            }
+            baseSeed = KeyHandler.getBaseSeed(pw);
         }
 
         if (baseSeed == null) {
@@ -1124,5 +1101,23 @@ public class CoinInstance {
 
     public static boolean isAddressDiscoveryEnabled() {
         return addressDiscoveryEnabled;
+    }
+
+    /**
+     * Split a mnemonic char[] into individual word strings without
+     * materializing the full mnemonic as a String.
+     */
+    private static List<String> splitMnemonicChars(char[] chars) {
+        List<String> words = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i <= chars.length; i++) {
+            if (i == chars.length || chars[i] == ' ') {
+                if (i > start) {
+                    words.add(new String(chars, start, i - start));
+                }
+                start = i + 1;
+            }
+        }
+        return words;
     }
 }

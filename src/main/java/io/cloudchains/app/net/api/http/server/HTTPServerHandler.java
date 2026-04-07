@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -120,7 +121,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         headerUser = values[0];
                         headerPass = values[1];
 
-                        if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
+                        if (MessageDigest.isEqual(headerUser.getBytes(StandardCharsets.UTF_8),
+                                configHelper.getRpcUsername().getBytes(StandardCharsets.UTF_8))
+                                && MessageDigest.isEqual(headerPass.getBytes(StandardCharsets.UTF_8),
+                                configHelper.getRpcPassword().getBytes(StandardCharsets.UTF_8))) {
                             successfulAuth = true;
                             LOGGER.log(Level.FINER, "[http-server-handler] Successful Auth");
                         }
