@@ -21,7 +21,6 @@ import io.netty.util.CharsetUtil;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -58,7 +57,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        LOGGER.log(Level.WARNING, "[http-master] Exception caught on channel", cause);
+        LOGGER.warning("[http-master] Exception caught on channel: " + cause.getMessage());
 
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
         writeResponse(ctx, httpResponse, null);
@@ -68,7 +67,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        LOGGER.log(Level.FINER, "[http-server-handler] DEBUG: Channel read complete. Flushing context.");
+        LOGGER.finer("[http-server-handler] DEBUG: Channel read complete. Flushing context.");
         super.channelReadComplete(ctx);
         ctx.flush();
     }
@@ -97,14 +96,14 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     String credentials = new String(credDecoded, StandardCharsets.UTF_8);
                     final String[] values = credentials.split(":", 2);
                     if (values.length < 2) {
-                        LOGGER.log(Level.WARNING, "[http-server-handler] Malformed Basic Auth header");
+                        LOGGER.warning("[http-server-handler] Malformed Basic Auth header");
                     } else {
                         headerUser = values[0];
                         headerPass = values[1];
 
                         if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
                             successfulAuth = true;
-                            LOGGER.log(Level.FINER, "[http-server-handler] Successful Auth");
+                            LOGGER.finer("[http-server-handler] Successful Auth");
                         }
                     }
                 }
@@ -165,8 +164,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     throw new IllegalArgumentException("Bad JSON-RPC request by client.");
                 }
             } catch (Exception e) {
-                LOGGER.log(Level.INFO, "Failed Content: " + content);
-                LOGGER.log(Level.WARNING, "[http-master] Failed to parse JSON-RPC request", e);
+                LOGGER.info("Failed Content: " + content);
+                LOGGER.warning("[http-master] Failed to parse JSON-RPC request" + e.getMessage());
                 JsonObject errorParsingJSON = new JsonObject();
                 errorParsingJSON.addProperty("code", -1001);
                 errorParsingJSON.addProperty("message", "Error parsing JSON.");
@@ -174,9 +173,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 response.add("error", errorParsingJSON);
                 response.add("result", JsonNull.INSTANCE);
                 if (e instanceof IllegalArgumentException) {
-                    LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
+                    LOGGER.finer("[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
                 } else {
-                    LOGGER.log(Level.FINER, "[http-server-handler] WARNING: Client sent invalid JSON!");
+                    LOGGER.finer("[http-server-handler] WARNING: Client sent invalid JSON!");
                 }
                 status = HttpResponseStatus.BAD_REQUEST;
             }
@@ -187,10 +186,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + method + " PARAMS: " + params.toString().replace(",", ", "));
+                LOGGER.info("[http-server-handler] RPC CALL: " + method + " PARAMS: " + params.toString().replace(",", ", "));
 
                 response = getResponse(method, params);
-                LOGGER.log(Level.FINER, response.toString());
+                LOGGER.finer(response.toString());
             } else {
                 ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
                 FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
@@ -251,7 +250,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         Thread.sleep(500);
                         instance.reloadConfig();
                     } catch (InterruptedException e) {
-                        LOGGER.log(Level.WARNING, "[http-master] Interrupted during reloadconfig for " + ticker, e);
+                        LOGGER.warning("[http-master] Interrupted during reloadconfig for " + ticker + ", " + e.getMessage());
                     }
                 });
                 t.setDaemon(true);
@@ -273,7 +272,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 //						continue;
 //
 //					try {
-//						LOGGER.log(Level.INFO, instance.getTicker().toString());
+//						LOGGER.info(instance.getTicker().toString());
 //						instance.reloadConfig();
 //					} catch (Exception e) {
 //						success = false;
@@ -334,8 +333,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
         httpResponse.headers().set(HttpHeaderNames.SERVER, CoinInstance.getVersionString());
 
-        LOGGER.log(Level.FINER, "[http-server-handler] Writing response to channel. Keep alive? " + keepAlive);
-        LOGGER.log(Level.FINER, "[http-server-handler] Response content: " + httpResponse.content().toString(CharsetUtil.UTF_8));
+        LOGGER.finer("[http-server-handler] Writing response to channel. Keep alive? " + keepAlive);
+        LOGGER.finer("[http-server-handler] Response content: " + httpResponse.content().toString(CharsetUtil.UTF_8));
         ctx.write(httpResponse);
 
         return keepAlive;

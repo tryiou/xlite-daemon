@@ -27,7 +27,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -140,8 +139,7 @@ public class KeyHandler {
         try {
             WalletData data = readWalletFile(file);
             if (data.version == VERSION_1_SHA1) {
-                LOGGER.log(Level.INFO,
-                        "[security] Legacy V1 wallet detected — migrating to V2 (SHA-256/CBC)");
+                LOGGER.info("[security] Legacy V1 wallet detected — migrating to V2 (SHA-256/CBC)");
                 char[] legacyPassphrase = null;
                 try {
                     legacyPassphrase = sha256ToChars(passphrase);
@@ -156,14 +154,13 @@ public class KeyHandler {
             return Arrays.asList(seed.split("\\s+"));
         } catch (BadPaddingException e) {
             // Wrong password — expected failure, low log level.
-            LOGGER.log(Level.FINER,
-                    "[security] Decryption failed — wrong passphrase or corrupted wallet");
+            LOGGER.finer("[security] Decryption failed — wrong passphrase or corrupted wallet");
             return null;
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[security] Cannot read wallet file", e);
+            LOGGER.warning("[security] Cannot read wallet file" + e.getMessage());
             return null;
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[security] Unexpected error reading wallet", e);
+            LOGGER.warning("[security] Unexpected error reading wallet" + e.getMessage());
             return null;
         }
     }
@@ -193,7 +190,7 @@ public class KeyHandler {
             String mnemonic = Joiner.on(" ").join(derived);
             return writeInitialData(keyFile(), mnemonic, passphrase);
         } catch (MnemonicException e) {
-            LOGGER.log(Level.WARNING, "Failed to convert mnemonic to entropy", e);
+            LOGGER.warning("Failed to convert mnemonic to entropy" + e.getMessage());
             return false;
         } finally {
             if (entropy != null) Arrays.fill(entropy, (byte) 0);
@@ -210,7 +207,7 @@ public class KeyHandler {
         try {
             return MNEMONIC_CODE.toEntropy(mnemonicList);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Failed to convert mnemonic to entropy", e);
+            LOGGER.warning("Failed to convert mnemonic to entropy" + e.getMessage());
             return null;
         }
     }
@@ -290,7 +287,7 @@ public class KeyHandler {
             }
             return hex.toString().toCharArray();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to compute SHA-256 for legacy migration", e);
+            throw new RuntimeException("Failed to compute SHA-256 for legacy migration" + e.getMessage());
         } finally {
             if (hash != null) Arrays.fill(hash, (byte) 0);
         }
@@ -325,7 +322,7 @@ public class KeyHandler {
                 Arrays.fill(raw, (byte) 0);
             }
         } catch (Exception e) {
-            throw new RuntimeException("Failed to derive encryption key", e);
+            throw new RuntimeException("Failed to derive encryption key" + e.getMessage());
         } finally {
             spec.clearPassword();
         }
@@ -350,7 +347,7 @@ public class KeyHandler {
                     new String(Base64.encode(encrypted), StandardCharsets.UTF_8)
             };
         } catch (Exception e) {
-            throw new RuntimeException("Failed to encrypt seed", e);
+            throw new RuntimeException("Failed to encrypt seed" + e.getMessage());
         }
     }
 
@@ -473,8 +470,7 @@ public class KeyHandler {
             try {
                 return Integer.parseInt(firstLine.substring(VERSION_HEADER.length()));
             } catch (NumberFormatException e) {
-                LOGGER.log(Level.WARNING,
-                        "[security] Unrecognised version header — treating wallet as legacy V1");
+                LOGGER.warning("[security] Unrecognised version header — treating wallet as legacy V1");
             }
         }
         return VERSION_1_SHA1;
@@ -496,7 +492,7 @@ public class KeyHandler {
             }
             return null;
         } catch (NoSuchAlgorithmException e) {
-            LOGGER.log(Level.SEVERE, "Failed to obtain strong SecureRandom", e);
+            LOGGER.severe("Failed to obtain strong SecureRandom");
             return null;
         }
     }
@@ -525,7 +521,7 @@ public class KeyHandler {
             LOGGER.info("[security] Wallet created with AES-256-CBC / PBKDF2-SHA-256");
             return true;
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "[security] Failed to create wallet file", e);
+            LOGGER.severe("[security] Failed to create wallet file");
             return false;
         } finally {
             if (salt != null) Arrays.fill(salt, (byte) 0);
@@ -573,21 +569,21 @@ public class KeyHandler {
                 throw new RuntimeException("Post-migration validation failed — new file is unreadable");
             }
 
-            LOGGER.log(Level.INFO, "[security] Wallet successfully migrated to V2 (SHA-256/CBC)");
+            LOGGER.info("[security] Wallet successfully migrated to V2 (SHA-256/CBC)");
 
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "[security] Migration failed: " + e.getMessage());
+            LOGGER.severe("[security] Migration failed: " + e.getMessage());
 
             // Rollback: remove the (potentially partial) new file, then restore the backup.
             keyFile.delete();
             if (legacyBackup != null && legacyBackup.exists()) {
                 if (!legacyBackup.renameTo(keyFile)) {
                     throw new RuntimeException(
-                            "[security] CRITICAL: migration failed AND backup restoration failed", e);
+                            "[security] CRITICAL: migration failed AND backup restoration failed" + e.getMessage());
                 }
-                LOGGER.log(Level.INFO, "[security] Legacy wallet restored from backup");
+                LOGGER.info("[security] Legacy wallet restored from backup");
             } else {
-                throw new RuntimeException("Migration failed with no backup available", e);
+                throw new RuntimeException("Migration failed with no backup available" + e.getMessage());
             }
         } finally {
             if (newSalt != null) Arrays.fill(newSalt, (byte) 0);
@@ -619,12 +615,11 @@ public class KeyHandler {
             boolean valid = wordCount == 12 || wordCount == 15 || wordCount == 18
                     || wordCount == 21 || wordCount == 24;
             if (!valid) {
-                LOGGER.log(Level.WARNING,
-                        "[security] Migration validation: unexpected word count " + wordCount);
+                LOGGER.warning("[security] Migration validation: unexpected word count " + wordCount);
             }
             return valid;
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[security] Migration validation failed: " + e.getMessage());
+            LOGGER.warning("[security] Migration validation failed: " + e.getMessage());
             return false;
         }
     }

@@ -9,7 +9,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -38,7 +37,7 @@ public class ConfigHelper {
             file = Preconditions.checkNotNull(this.getFile());
             loadConfig();
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[config] Failed to initialize config for " + tickerStr, e);
+            LOGGER.warning("[config] Failed to initialize config for " + tickerStr + ", " + e.getMessage());
         }
     }
 
@@ -70,7 +69,7 @@ public class ConfigHelper {
 
             for (String configKey : configKeys) {
                 if (!config.has(configKey)) {
-                    LOGGER.log(Level.FINER, "[config] Missing config key '" + configKey + "' for " + tickerStr + ", will use default");
+                    LOGGER.finer("[config] Missing config key '" + configKey + "' for " + tickerStr + ", will use default");
                 }
             }
 
@@ -131,7 +130,7 @@ public class ConfigHelper {
                 writeConfig();
             }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[config] Error reading config file for " + tickerStr, e);
+            LOGGER.warning("[config] Error reading config file for " + tickerStr + ", " + e.getMessage());
         }
     }
 
@@ -143,7 +142,7 @@ public class ConfigHelper {
         File settingsDirectory = new File(home, "settings");
         if (!settingsDirectory.exists()) {
             if (!settingsDirectory.mkdirs()) {
-                LOGGER.log(Level.FINER, "[config] ERROR: Could not create base/settings directory!");
+                LOGGER.finer("[config] ERROR: Could not create base/settings directory!");
                 return null;
             }
         }
@@ -153,7 +152,7 @@ public class ConfigHelper {
             if (!configFile.createNewFile() && !configFile.exists())
                 return null;
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[config] IOException creating config file for " + tickerStr, e);
+            LOGGER.warning("[config] IOException creating config file for " + tickerStr + ", " + e.getMessage());
         }
 
         return configFile;
@@ -181,7 +180,7 @@ public class ConfigHelper {
 
     public synchronized boolean setRpcPort(int rpcPort) {
         if (rpcPort < 1 || rpcPort > 65535) {
-            LOGGER.log(Level.WARNING, "[config] Invalid port " + rpcPort + ", must be 1-65535");
+            LOGGER.warning("[config] Invalid port " + rpcPort + ", must be 1-65535");
             return false;
         }
         int maxAttempts = 100;
@@ -191,7 +190,7 @@ public class ConfigHelper {
                 return true;
             }
         }
-        LOGGER.log(Level.WARNING, "[config] No available port in range " + rpcPort + "-" + Math.min(rpcPort + maxAttempts - 1, 65535));
+        LOGGER.warning("[config] No available port in range " + rpcPort + "-" + Math.min(rpcPort + maxAttempts - 1, 65535));
         return false;
     }
 
@@ -269,7 +268,7 @@ public class ConfigHelper {
                 fw.write(newContent);
             }
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[config] IOException writing config for " + tickerStr, e);
+            LOGGER.warning("[config] IOException writing config for " + tickerStr + ", " + e.getMessage());
         }
     }
 

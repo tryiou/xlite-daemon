@@ -14,7 +14,6 @@ import org.apache.http.impl.client.HttpClients;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -90,7 +89,7 @@ public class EXRWrapper {
             String responseBody = executeHttpRequest(httpPost, "execute POST for " + method + " " + currency);
             return responseBody != null ? processResponse(responseBody) : null;
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, LOG_TAG + " execute POST failed for " + method + " " + currency + " endpoint: " + endpoint, e);
+            LOGGER.warning(LOG_TAG + " execute POST failed for " + method + " " + currency + " endpoint: " + endpoint + ", " + e.getMessage());
             return null;
         } finally {
             httpPost.reset();
@@ -118,7 +117,7 @@ public class EXRWrapper {
         try {
             client.close();
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, LOG_TAG + " Failed to close HTTP client", e);
+            LOGGER.warning(LOG_TAG + " Failed to close HTTP client" + e.getMessage());
         }
     }
 

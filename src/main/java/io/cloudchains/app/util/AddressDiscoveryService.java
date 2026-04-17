@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -61,7 +60,7 @@ public class AddressDiscoveryService {
         this.configHelper = coinInstance.getConfigHelper();
         this.currencyString = CoinTickerUtils.tickerToString(coinInstance.getTicker());
         this.externalChainKey = initExternalChainKey(coinInstance.getWallet());
-        LOGGER.log(Level.FINER, getLogPrefix() + " AddressDiscoveryService initialized for " + currencyString);
+        LOGGER.finer(getLogPrefix() + " AddressDiscoveryService initialized for " + currencyString);
     }
 
     /**
@@ -113,7 +112,7 @@ public class AddressDiscoveryService {
         long startTime = System.currentTimeMillis();
         int currentAddressCount = configHelper.getAddressCount();
 
-        LOGGER.log(Level.FINE, getLogPrefix() + " Starting sequential batch scan");
+        LOGGER.fine(getLogPrefix() + " Starting sequential batch scan");
 
         try {
             if (isTimedOut(startTime)) return currentAddressCount;
@@ -124,7 +123,7 @@ public class AddressDiscoveryService {
 
             for (int i = 0; i < NUM_BATCHES; i++) {
                 if (isTimedOut(startTime)) {
-                    LOGGER.log(Level.WARNING, getLogPrefix() + " Timeout at batch " + i);
+                    LOGGER.warning(getLogPrefix() + " Timeout at batch " + i);
                     break;
                 }
 
@@ -133,7 +132,7 @@ public class AddressDiscoveryService {
                 if (utxos == null) {
                     consecutiveErrors++;
                     if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                        LOGGER.log(Level.WARNING, getLogPrefix()
+                        LOGGER.warning(getLogPrefix()
                                 + " Aborting: " + MAX_CONSECUTIVE_ERRORS + " consecutive HTTP failures");
                         break;
                     }
@@ -148,7 +147,7 @@ public class AddressDiscoveryService {
             }
 
             if (lastNonEmptyBatch < 0) {
-                LOGGER.log(Level.INFO, getLogPrefix() + " No UTXOs found");
+                LOGGER.info(getLogPrefix() + " No UTXOs found");
                 return currentAddressCount;
             }
 
@@ -163,14 +162,14 @@ public class AddressDiscoveryService {
                 addr.clearPrivateKey();
             }
 
-            LOGGER.log(Level.INFO, getLogPrefix() + " Discovery complete: lastBatch="
+            LOGGER.info(getLogPrefix() + " Discovery complete: lastBatch="
                     + lastNonEmptyBatch + ", count=" + discoveredCount
                     + ", time=" + (System.currentTimeMillis() - startTime) + "ms");
 
             return discoveredCount;
 
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, getLogPrefix() + " Error during discovery", e);
+            LOGGER.warning(getLogPrefix() + " Error during discovery" + e.getMessage());
             return currentAddressCount;
         }
     }
@@ -231,7 +230,7 @@ public class AddressDiscoveryService {
         try {
             utxoResponse = httpClient.getUtxosUncached(coinInstance.getTicker(), addresses);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, getLogPrefix() + " HTTP request failed for addresses "
+            LOGGER.warning(getLogPrefix() + " HTTP request failed for addresses "
                     + addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage());
             return null;
         }
@@ -253,7 +252,7 @@ public class AddressDiscoveryService {
                         confirmationsElement == null || valueElement == null ||
                         addressElement.isJsonNull() || txidElement.isJsonNull() || voutElement.isJsonNull() ||
                         confirmationsElement.isJsonNull() || valueElement.isJsonNull()) {
-                    LOGGER.log(Level.WARNING, getLogPrefix() + " Skipping invalid UTXO - missing required fields");
+                    LOGGER.warning(getLogPrefix() + " Skipping invalid UTXO - missing required fields");
                     continue;
                 }
 
@@ -267,7 +266,7 @@ public class AddressDiscoveryService {
                 );
                 utxos.add(utxo);
             } catch (Exception e) {
-                LOGGER.log(Level.WARNING, getLogPrefix() + " Failed to parse UTXO response element: " + e.getMessage());
+                LOGGER.warning(getLogPrefix() + " Failed to parse UTXO response element: " + e.getMessage());
             }
         }
         return utxos;

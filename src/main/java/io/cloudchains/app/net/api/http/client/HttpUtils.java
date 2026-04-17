@@ -8,7 +8,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -44,11 +43,11 @@ public class HttpUtils {
                 EntityUtils.consume(entity);
                 return result;
             } else {
-                LOGGER.log(Level.WARNING, HttpClientConfig.LOG_TAG + " " + operation + " failed");
+                LOGGER.warning(HttpClientConfig.LOG_TAG + " " + operation + " failed");
                 return null;
             }
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, HttpClientConfig.LOG_TAG + " " + operation + " failed", e);
+            LOGGER.warning(HttpClientConfig.LOG_TAG + " " + operation + " failed" + e.getMessage());
             return null;
         } finally {
             request.reset();
@@ -56,7 +55,7 @@ public class HttpUtils {
                 try {
                     response.close();
                 } catch (IOException e) {
-                    LOGGER.log(Level.WARNING, HttpClientConfig.LOG_TAG + " Failed to close response", e);
+                    LOGGER.warning(HttpClientConfig.LOG_TAG + " Failed to close response" + e.getMessage());
                 }
             }
         }

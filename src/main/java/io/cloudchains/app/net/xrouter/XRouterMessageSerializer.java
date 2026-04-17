@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -110,7 +109,7 @@ public class XRouterMessageSerializer extends MessageSerializer {
         out.write(header);
         out.write(data);
 
-        LOGGER.log(Level.FINER, "[blocknet-serializer] Serialized xrouter message. Bytes: " + new String(Hex.encode(header)) + new String(Hex.encode(data)));
+        LOGGER.finer("[blocknet-serializer] Serialized xrouter message. Bytes: " + new String(Hex.encode(header)) + new String(Hex.encode(data)));
     }
 
     /**

@@ -26,11 +26,9 @@ public class CoinTickerUtils {
         tickers.put(CoinTicker.RAVENCOIN, "RVN");
 
         tickers.put(CoinTicker.ALQOCOIN, "XLQ");
-        // TODO Temporarily disable PHORE and POLIS until supported
-//        tickers.put(CoinTicker.POLISCOIN, "POLIS");
+        // TODO Temporarily disable PHORE until supported
 //        tickers.put(CoinTicker.PHORECOIN, "PHR");
-        tickers.put(CoinTicker.TREZARCOIN, "TZC");
-        tickers.put(CoinTicker.BITBAY, "BAY");
+         tickers.put(CoinTicker.BITBAY, "BAY");
         tickers.put(CoinTicker.UNOBTANIUM, "UNO");
         tickers.put(CoinTicker.PKOIN, "PKOIN");
 
@@ -63,10 +61,9 @@ public class CoinTickerUtils {
                 CoinTicker.RAVENCOIN,
 
                 CoinTicker.ALQOCOIN,
-                // TODO Temporarily disable PHORE and POLIS until supported
-//                CoinTicker.POLISCOIN,
+                // TODO Temporarily disable PHORE until supported
 //                CoinTicker.PHORECOIN,
-                CoinTicker.TREZARCOIN,
+                
                 CoinTicker.BITBAY,
                 CoinTicker.UNOBTANIUM,
                 CoinTicker.PKOIN,

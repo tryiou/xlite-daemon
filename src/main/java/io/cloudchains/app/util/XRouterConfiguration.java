@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Properties;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -55,12 +54,12 @@ public class XRouterConfiguration {
             try {
                 properties = getPluginProperties(rawPluginConfig);
             } catch (IOException e) {
-                LOGGER.log(Level.WARNING, "[xrouter-config] Failed to parse plugin config for " + pluginName, e);
+                LOGGER.warning("[xrouter-config] Failed to parse plugin config for " + pluginName + ": " + e.getMessage());
                 return;
             }
 
             if (!properties.containsKey("parameters") && !properties.containsKey("paramsType")) {
-                LOGGER.log(Level.FINER, "[xrouter-plugin-config-parser] ERROR: Plugin has no parameters!");
+                LOGGER.finer("[xrouter-plugin-config-parser] ERROR: Plugin has no parameters!");
             } else {
                 String[] rawParamTypes;
 
@@ -75,7 +74,7 @@ public class XRouterConfiguration {
                         continue;
 
                     if (!pluginParamTypes.containsKey(rawParamType)) {
-                        LOGGER.log(Level.FINER, "[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin parameter type: " + rawParamType + ". Failing.");
+                        LOGGER.finer("[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin parameter type: " + rawParamType + ". Failing.");
                         throw new IllegalArgumentException("Invalid/unsupported plugin parameter type: " + rawParamType);
                     }
 
@@ -95,13 +94,13 @@ public class XRouterConfiguration {
                 clientRequestLimit = 100;
             }
 
-            LOGGER.log(Level.FINER, "[xrouter-plugin-config-parser] Processing '" + pluginName + "' complete.");
-            LOGGER.log(Level.FINER, "[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": fee = " + fee);
-            LOGGER.log(Level.FINER, "[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": params = ");
+            LOGGER.finer("[xrouter-plugin-config-parser] Processing '" + pluginName + "' complete.");
+            LOGGER.finer("[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": fee = " + fee);
+            LOGGER.finer("[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": params = ");
             for (int i = 0; i < paramTypes.size(); i++) {
-                LOGGER.log(Level.FINER, "Parameter " + i + ":\t" + paramTypes.get(i).getSimpleName());
+                LOGGER.finer("Parameter " + i + ":\t" + paramTypes.get(i).getSimpleName());
             }
-            LOGGER.log(Level.FINER, "[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": clientRequestLimit = " + clientRequestLimit);
+            LOGGER.finer("[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": clientRequestLimit = " + clientRequestLimit);
         }
 
         private static Properties getPluginProperties(String rawConfig) throws IOException {
@@ -139,7 +138,7 @@ public class XRouterConfiguration {
         if (properties == null)
             return;
 
-        LOGGER.log(Level.FINER, "[xrouter-config-parser] DEBUG: Properties: " + properties.toString());
+        LOGGER.finer("[xrouter-config-parser] DEBUG: Properties: " + properties.toString());
 
         supportedWallets.addAll(Arrays.asList(((String) properties.get("Main").get("wallets")).split(",")));
         timeout = Integer.parseInt((String) properties.get("Main").get("timeout"));
@@ -154,7 +153,7 @@ public class XRouterConfiguration {
             }
         }
 
-        LOGGER.log(Level.FINER, "[xrouter-config-parser] Processing complete.");
+        LOGGER.finer("[xrouter-config-parser] Processing complete.");
     }
 
     public ArrayList<String> getSupportedWallets() {
@@ -205,7 +204,7 @@ public class XRouterConfiguration {
         try {
             properties = parseINI(formatted);
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[xrouter-config] Failed to parse XRouter config", e);
+            LOGGER.warning("[xrouter-config] Failed to parse XRouter config: " + e.getMessage());
             return null;
         }
 

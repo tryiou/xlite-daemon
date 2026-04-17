@@ -7,7 +7,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -54,7 +53,7 @@ public class EXRServerPool {
         if (capabilitiesProbed || servers.isEmpty()) {
             return;
         }
-        LOGGER.log(Level.INFO, "[exr-pool] Starting capability probing for " + servers.size() + " servers");
+        LOGGER.info("[exr-pool] Starting capability probing for " + servers.size() + " servers");
         // Start capability probing in background
         new Thread(this::probeAllCapabilities, "EXR-Capability-Prober").start();
     }
@@ -63,7 +62,7 @@ public class EXRServerPool {
         if (capabilitiesProbed) {
             return;
         }
-        LOGGER.log(Level.INFO, "[exr-pool] Starting capability probing for " + servers.size() + " servers");
+        LOGGER.info("[exr-pool] Starting capability probing for " + servers.size() + " servers");
         // Probe each server concurrently
         List<Thread> probeThreads = new ArrayList<>();
         for (EXRServer server : servers) {
@@ -71,7 +70,7 @@ public class EXRServerPool {
                 try {
                     server.probeCapabilities();
                 } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "[exr-pool] Failed to probe server " + server.getEndpoint(), e);
+                    LOGGER.warning("[exr-pool] Failed to probe server " + server.getEndpoint() + ", " + e.getMessage());
                 }
             });
             probeThreads.add(t);
@@ -83,7 +82,7 @@ public class EXRServerPool {
                 t.join(CAPABILITY_PROBE_TIMEOUT_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                LOGGER.log(Level.WARNING, "[exr-pool] Capability probing interrupted", e);
+                LOGGER.warning("[exr-pool] Capability probing interrupted" + e.getMessage());
             }
         }
         // Build coin-to-servers mapping with synchronization
@@ -97,26 +96,26 @@ public class EXRServerPool {
         }
         capabilitiesProbed = true;
         logCapabilityResults();
-        LOGGER.log(Level.INFO, "[exr-pool] Capability probing completed");
+        LOGGER.info("[exr-pool] Capability probing completed");
     }
 
     private void logCapabilityResults() {
-        LOGGER.log(Level.INFO, "[exr-pool] === EXR Server Capabilities ===");
+        LOGGER.info("[exr-pool] === EXR Server Capabilities ===");
         for (EXRServer server : servers) {
             if (server.isCapabilitiesProbed()) {
                 String supportedCoins = server.getSupportedCoins().stream()
                         .map(coin -> CoinTickerUtils.tickerToString(coin))
                         .reduce((a, b) -> a + ", " + b).orElse("none");
-                LOGGER.log(Level.INFO, "[exr-pool] " + server.getEndpoint() + " supports: " + supportedCoins);
+                LOGGER.info("[exr-pool] " + server.getEndpoint() + " supports: " + supportedCoins);
             } else {
-                LOGGER.log(Level.WARNING, "[exr-pool] " + server.getEndpoint() + " capability probe failed");
+                LOGGER.warning("[exr-pool] " + server.getEndpoint() + " capability probe failed");
             }
         }
-        LOGGER.log(Level.INFO, "[exr-pool] === Coin Distribution ===");
+        LOGGER.info("[exr-pool] === Coin Distribution ===");
         for (CoinTicker coin : CoinTicker.coins()) {
             List<EXRServer> supportingServers = coinToServersMap.get(coin);
             if (supportingServers != null && !supportingServers.isEmpty()) {
-                LOGGER.log(Level.INFO, "[exr-pool] " + CoinTickerUtils.tickerToString(coin) + " supported by " + supportingServers.size() + " servers");
+                LOGGER.info("[exr-pool] " + CoinTickerUtils.tickerToString(coin) + " supported by " + supportingServers.size() + " servers");
             }
         }
     }
@@ -132,11 +131,11 @@ public class EXRServerPool {
                 EXRServer server = new EXRServer(trimmed);
                 servers.add(server);
                 endpointToServerMap.put(trimmed, server);
-                LOGGER.log(Level.INFO, "[exr-pool] Added EXR server: " + trimmed);
+                LOGGER.info("[exr-pool] Added EXR server: " + trimmed);
             }
         }
         if (!servers.isEmpty()) {
-            LOGGER.log(Level.INFO, "[exr-pool] Created pool with " + servers.size() + " servers");
+            LOGGER.info("[exr-pool] Created pool with " + servers.size() + " servers");
         }
     }
 

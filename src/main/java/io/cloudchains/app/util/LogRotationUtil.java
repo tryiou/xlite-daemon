@@ -4,7 +4,6 @@ import io.cloudchains.app.App;
 
 import java.io.File;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -37,17 +36,16 @@ public class LogRotationUtil {
             if (success) {
                 // Log current log files after rotation
                 List<LogRotationManager.LogFileInfo> logFiles = rotationManager.listLogFiles();
-                LOGGER.log(Level.INFO, "[log-rotation] Current log files after rotation: {0}", logFiles.size());
+                LOGGER.info("[log-rotation] Current log files after rotation: " + logFiles.size());
                 for (LogRotationManager.LogFileInfo fileInfo : logFiles) {
-                    LOGGER.log(Level.FINE, "[log-rotation]   {0} ({1} bytes)",
-                            new Object[]{fileInfo.getName(), fileInfo.getSize()});
+                    LOGGER.fine("[log-rotation]   " + fileInfo.getName() + " (" + fileInfo.getSize() + " bytes)");
                 }
             } else {
-                LOGGER.log(Level.WARNING, "[log-rotation] Log rotation completed with errors");
+                LOGGER.warning("[log-rotation] Log rotation completed with errors");
             }
 
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "[log-rotation] Failed to perform log rotation", e);
+            LOGGER.severe("[log-rotation] Failed to perform log rotation: " + e.getMessage());
         }
     }
 
@@ -65,17 +63,15 @@ public class LogRotationUtil {
                 int envRetention = Integer.parseInt(retentionEnv.trim());
                 if (envRetention > 0) {
                     retentionDays = envRetention;
-                    LOGGER.log(Level.INFO, "[log-rotation] Using retention period from environment: {0} days", retentionDays);
+                    LOGGER.info("[log-rotation] Using retention period from environment: " + retentionDays + " days");
                 } else {
-                    LOGGER.log(Level.WARNING, "[log-rotation] Invalid retention period from environment: {0}. Using default: {1} days",
-                            new Object[]{retentionEnv, DEFAULT_LOG_RETENTION_DAYS});
+                    LOGGER.warning("[log-rotation] Invalid retention period from environment: " + retentionEnv + ". Using default: " + DEFAULT_LOG_RETENTION_DAYS + " days");
                 }
             } catch (NumberFormatException e) {
-                LOGGER.log(Level.WARNING, "[log-rotation] Invalid retention period format from environment: {0}. Using default: {1} days",
-                        new Object[]{retentionEnv, DEFAULT_LOG_RETENTION_DAYS});
+                LOGGER.warning("[log-rotation] Invalid retention period format from environment: " + retentionEnv + ". Using default: " + DEFAULT_LOG_RETENTION_DAYS + " days");
             }
         } else {
-            LOGGER.log(Level.INFO, "[log-rotation] Using default retention period: {0} days", retentionDays);
+            LOGGER.info("[log-rotation] Using default retention period: " + retentionDays + " days");
         }
 
         return retentionDays;

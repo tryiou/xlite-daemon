@@ -10,7 +10,6 @@ import java.io.OutputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -80,13 +79,13 @@ public class BlocknetSerializer extends BitcoinSerializer {
 
         switch (blocknetPacketHeader.getCommand().toLowerCase()) {
             case "xrouter":
-                LOGGER.log(Level.FINER, "[blocknet-serializer] Received XRouter packet, at position: " + in.position());
+                LOGGER.finer("[blocknet-serializer] Received XRouter packet, at position: " + in.position());
                 return new XRouterMessage(params, payloadBytes);
             case "version":
-//				LOGGER.log(Level.FINER, "[blocknet-serializer] Version message received");
+//				LOGGER.finer("[blocknet-serializer] Version message received");
                 return new VersionMessage(params, payloadBytes);
             case "inv":
-//				LOGGER.log(Level.FINER, "[blocknet-serializer] Warning: Inventory messages are ignored");
+//				LOGGER.finer("[blocknet-serializer] Warning: Inventory messages are ignored");
                 return null;
             case "block":
                 return new Block(params, payloadBytes, 0, this, blocknetPacketHeader.getLength());
@@ -128,13 +127,13 @@ public class BlocknetSerializer extends BitcoinSerializer {
             case "ssc":
             case "mnget":
             case "xbridge":
-//				LOGGER.log(Level.FINER, "[blocknet-serializer] Warning: This serializer does not support deserializing xbridge/ssc/mnget/getsporks packets yet.");
+//				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support deserializing xbridge/ssc/mnget/getsporks packets yet.");
                 return null;
             case "dseg":
-//				LOGGER.log(Level.FINER, "[blocknet-serializer] Warning: This serializer does not support deserializing dseg packets yet.");
+//				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support deserializing dseg packets yet.");
                 return null;
             default:
-                LOGGER.log(Level.FINER, "[blocknet-serializer] Warning: This serializer does not support deserializing " + blocknetPacketHeader.getCommand() + " packets (yet).");
+                LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support deserializing " + blocknetPacketHeader.getCommand() + " packets (yet).");
                 return new UnknownMessage(params, blocknetPacketHeader.getCommand(), payloadBytes);
         }
     }
@@ -200,7 +199,7 @@ public class BlocknetSerializer extends BitcoinSerializer {
         out.write(header);
         out.write(message);
 
-        LOGGER.log(Level.FINER, "[blocknet-serializer] Serialized " + name + " message. Bytes: " + new String(Hex.encode(header)) + new String(Hex.encode(message)));
+        LOGGER.finer("[blocknet-serializer] Serialized " + name + " message. Bytes: " + new String(Hex.encode(header)) + new String(Hex.encode(message)));
     }
 
     @Override
@@ -210,7 +209,7 @@ public class BlocknetSerializer extends BitcoinSerializer {
         } else {
             String name = messageNames.get(message.getClass());
             if (name == null) {
-                LOGGER.log(Level.FINER, "[blocknet-serializer] ERROR: BlocknetSerializer cannot serialize " + message.getClass().getSimpleName() + " (yet)!");
+                LOGGER.finer("[blocknet-serializer] ERROR: BlocknetSerializer cannot serialize " + message.getClass().getSimpleName() + " (yet)!");
                 return;
             }
             serialize(name, message.bitcoinSerialize(), out);

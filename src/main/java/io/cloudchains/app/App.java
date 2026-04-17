@@ -38,7 +38,7 @@ public class App {
             try {
                 dotenv = Dotenv.configure().ignoreIfMissing().load();
             } catch (Exception e) {
-                LOGGER.log(Level.FINE, "[app] No .env file found or failed to load", e);
+                LOGGER.finer("[app] No .env file found or failed to load" + e.getMessage());
             }
         }
         if (dotenv != null) {
@@ -67,8 +67,7 @@ public class App {
         try {
             return Level.parse(envValue.trim().toUpperCase());
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[app] Invalid log level '{0}', using default {1}",
-                    new Object[]{envValue, defaultLevel});
+            LOGGER.warning("[app] Invalid log level '" + envValue + "', using default " + defaultLevel);
             return defaultLevel;
         }
     }
@@ -79,7 +78,7 @@ public class App {
         if (exrEndpoint != null && !exrEndpoint.isEmpty()) {
             EXR_ENDPOINT = exrEndpoint;
             exrServerPool = new EXRServerPool(EXR_ENDPOINT);
-            LOGGER.log(Level.INFO, "[app] EXR mode enabled with " + exrServerPool.getServerCount() + " servers: " + EXR_ENDPOINT);
+            LOGGER.info("[app] EXR mode enabled with " + exrServerPool.getServerCount() + " servers: " + EXR_ENDPOINT);
         }
     }
 
@@ -122,7 +121,7 @@ public class App {
             LOGGER.addHandler(fileHandler);
 
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[app] Failed to initialize file handler", e);
+            LOGGER.warning("[app] Failed to initialize file handler: " + e.getMessage());
         }
 
         ConsoleHandler consoleHandler = new ConsoleHandler(){

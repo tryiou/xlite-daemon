@@ -11,7 +11,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -44,19 +43,19 @@ public class JSONRPCServer extends Thread {
 
             channel = bootstrap.bind(port).sync().channel();
 
-            LOGGER.log(Level.FINER, "[rpc] Starting RPC server for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " on port " + port + ".");
+            LOGGER.finer("[rpc] Starting RPC server for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " on port " + port + ".");
 
             channel.closeFuture().sync();
         } catch (Exception e) {
             if (!stopping) {
-                LOGGER.log(Level.WARNING, "[rpc-server] Error during RPC server operation for " + CoinTickerUtils.tickerToString(coin.getTicker()), e);
+                LOGGER.warning("[rpc-server] Error during RPC server operation for " + CoinTickerUtils.tickerToString(coin.getTicker()) + e.getMessage());
             }
         }
     }
 
     public void deinit() {
         stopping = true;
-        LOGGER.log(Level.FINER, "[json-rpc-server] Interrupting server.");
+        LOGGER.finer("[json-rpc-server] Interrupting server.");
 
         if (channel != null) {
             channel.close();

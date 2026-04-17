@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -159,8 +158,8 @@ public class BlocknetPeer extends PeerSocketHandler {
         this.ourVersionMessage = new VersionMessageImpl(this.params, chain != null ? chain.getBestChainHeight() : 0);
         this.ourVersionMessage.appendToSubVer(Version.CLIENT_TYPE, Version.CLIENT_VERSION, Version.CLIENT_COMMENTS);
 
-        LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Our version message:");
-        LOGGER.log(Level.FINER, this.ourVersionMessage.toString());
+        LOGGER.finer("[blocknet-peer] DEBUG: Our version message:");
+        LOGGER.finer(this.ourVersionMessage.toString());
 
         this.activePeer = true;
         this.pastConnectionSuccess = false;
@@ -171,7 +170,7 @@ public class BlocknetPeer extends PeerSocketHandler {
         if (!activePeer) return;
 
         activePeer = false;
-        LOGGER.log(Level.FINER, "[blocknet-peer] Connection with " + (getAddress() != null ? getAddress().toString() : "<null address>") + " closed. Notifying receivers.");
+        LOGGER.finer("[blocknet-peer] Connection with " + (getAddress() != null ? getAddress().toString() : "<null address>") + " closed. Notifying receivers.");
 
         for (final ListenerRegistration<BlocknetPeerDisconnectedEventListener> registration : disconnectedEventListeners) {
             registration.executor.execute(() -> registration.listener.onPeerDisconnected(BlocknetPeer.this, 0));
@@ -180,7 +179,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     @Override
     public void connectionOpened() {
-        LOGGER.log(Level.FINER, "[blocknet-peer] Connection open to " + (getAddress() != null ? getAddress().toString() : "<null address>") + ", sending version message.");
+        LOGGER.finer("[blocknet-peer] Connection open to " + (getAddress() != null ? getAddress().toString() : "<null address>") + ", sending version message.");
 
         sendMessage(ourVersionMessage);
         connectionOpenFuture.set(this);
@@ -189,7 +188,7 @@ public class BlocknetPeer extends PeerSocketHandler {
     @Override
     protected void timeoutOccurred() {
         super.timeoutOccurred();
-        LOGGER.log(Level.FINER, "[blocknet-peer] Timeout occurred.");
+        LOGGER.finer("[blocknet-peer] Timeout occurred.");
         if (!connectionOpenFuture.isDone()) {
             connectionClosed();
         }
@@ -259,7 +258,7 @@ public class BlocknetPeer extends PeerSocketHandler {
         lock.lock();
         try {
             if (writeTarget == null) {
-                LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Attempted to send message on non-connected socket.");
+                LOGGER.finer("[blocknet-peer] ERROR: Attempted to send message on non-connected socket.");
                 throw new NotYetConnectedException();
             }
         } finally {
@@ -270,14 +269,14 @@ public class BlocknetPeer extends PeerSocketHandler {
             try {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 xRouterMessageSerializer.serialize(message, outputStream);
-                LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding network header) is " + (outputStream.size() - BlocknetPacketHeader.HEADER_LENGTH - 4) + " bytes.");
+                LOGGER.finer("[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding network header) is " + (outputStream.size() - BlocknetPacketHeader.HEADER_LENGTH - 4) + " bytes.");
                 ListenableFuture future = writeTarget.writeBytes(outputStream.toByteArray());
 
                 messagesPendingReply.add((XRouterMessage) message);
-                LOGGER.log(Level.FINER, "[blocknet-peer] DEBUG: Added UUID " + ((XRouterMessage) message).getXRouterHeader().getUUID() + " to pending reply list.");
+                LOGGER.finer("[blocknet-peer] DEBUG: Added UUID " + ((XRouterMessage) message).getXRouterHeader().getUUID() + " to pending reply list.");
                 return future;
             } catch (IOException e) {
-                LOGGER.log(Level.WARNING, "[blocknet] Error serializing XRouter message", e);
+                LOGGER.warning("[blocknet] Error serializing XRouter message" + e.getMessage());
             }
         } else {
             try {
@@ -285,7 +284,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                 serializer.serialize(message, outputStream);
                 return writeTarget.writeBytes(outputStream.toByteArray());
             } catch (IOException e) {
-                LOGGER.log(Level.WARNING, "[blocknet] Error serializing/sending non-XRouter message", e);
+                LOGGER.warning("[blocknet] Error serializing/sending non-XRouter message" + e.getMessage());
             }
         }
 
@@ -320,14 +319,14 @@ public class BlocknetPeer extends PeerSocketHandler {
         } else if (message instanceof VersionAck) {
             processVersionAck((VersionAck) message);
         } else if (message instanceof Ping) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] Received ping message from " + getAddress().toString() + ", sending pong.");
+            LOGGER.finer("[blocknet-peer] Received ping message from " + getAddress().toString() + ", sending pong.");
             processPing((Ping) message);
         } else if (message instanceof RejectMessage) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Received rejection message from " + getAddress().toString() + ": " + message.toString());
+            LOGGER.finer("[blocknet-peer] ERROR: Received rejection message from " + getAddress().toString() + ": " + message.toString());
         } else if (message instanceof XRouterMessage) {
             processXRouterMessage((XRouterMessage) message);
         } else {
-            LOGGER.log(Level.FINER, "[blocknet-peer] Warning: Received unhandled message from " + getAddress().toString() + ": " + message.toString());
+            LOGGER.finer("[blocknet-peer] Warning: Received unhandled message from " + getAddress().toString() + ": " + message.toString());
         }
 
         //TODO process other message types
@@ -349,23 +348,23 @@ public class BlocknetPeer extends PeerSocketHandler {
 
         peerVersionMessage = versionMessage;
 
-        LOGGER.log(Level.FINER, "[blocknet-peer] Received version message: " + peerVersionMessage.subVer
+        LOGGER.finer("[blocknet-peer] Received version message: " + peerVersionMessage.subVer
                 + ", version " + peerVersionMessage.clientVersion
                 + ", blocks=" + peerVersionMessage.bestHeight
                 + ", us=" + peerVersionMessage.receivingAddr);
 
         if (!peerVersionMessage.hasBlockChain() || (!params.allowEmptyPeerChain() && peerVersionMessage.bestHeight == 0)) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Peer has an empty blockchain while this network does not allow empty blockchains. Disconnecting.");
+            LOGGER.finer("[blocknet-peer] ERROR: Peer has an empty blockchain while this network does not allow empty blockchains. Disconnecting.");
             close();
         }
 
         if (peerVersionMessage.bestHeight < 0) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Peer reported bad blockchain height (" + peerVersionMessage.bestHeight + "). Disconnecting.");
+            LOGGER.finer("[blocknet-peer] ERROR: Peer reported bad blockchain height (" + peerVersionMessage.bestHeight + "). Disconnecting.");
             close();
         }
 
         sendMessage(new VersionAck());
-        LOGGER.log(Level.FINER, "[blocknet-peer] Incoming version handshake complete.");
+        LOGGER.finer("[blocknet-peer] Incoming version handshake complete.");
         incomingVersionHandshakeFuture.set(this);
     }
 
@@ -378,7 +377,7 @@ public class BlocknetPeer extends PeerSocketHandler {
             throw new ProtocolException("Received more than one version acknowledgement.");
         }
 
-        LOGGER.log(Level.FINER, "[blocknet-peer] Outgoing version handshake complete.");
+        LOGGER.finer("[blocknet-peer] Outgoing version handshake complete.");
         outgoingVersionHandshakeFuture.set(this);
     }
 
@@ -389,7 +388,7 @@ public class BlocknetPeer extends PeerSocketHandler {
         }
 
         if (peerVersionMessage.clientVersion < minProtocolVersion) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] Peer's protocol version (" + peerVersionMessage.clientVersion + ") is lower than the minimum (" + minProtocolVersion + ")! Disconnecting.");
+            LOGGER.finer("[blocknet-peer] Peer's protocol version (" + peerVersionMessage.clientVersion + ") is lower than the minimum (" + minProtocolVersion + ")! Disconnecting.");
             close();
         }
     }
@@ -418,26 +417,26 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     private void processReply(XRouterMessage message) {
         if (message.getXRouterHeader().getUUID().isEmpty()) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: XRouter server sent back packet with blank UUID!");
+            LOGGER.finer("[blocknet-peer] ERROR: XRouter server sent back packet with blank UUID!");
             return;
         }
 
         final XRouterMessage original = getOriginalXRouterMessage(message.getXRouterHeader().getUUID());
         if (original == null) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Unexpected UUID in reply message! Perhaps the server thinks we sent a packet that we didn't send?");
+            LOGGER.finer("[blocknet-peer] ERROR: Unexpected UUID in reply message! Perhaps the server thinks we sent a packet that we didn't send?");
             throw new ProtocolException("Unexpected UUID in reply message");
         }
 
         int removed = removeUUIDFromPendingReplyList(message.getXRouterHeader().getUUID());
         if (removed != 1) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] Warning: Exception occurred while removing message from pending list! This may break things later on. Amount of messages removed = " + removed);
+            LOGGER.finer("[blocknet-peer] Warning: Exception occurred while removing message from pending list! This may break things later on. Amount of messages removed = " + removed);
             if (removed == 0) {
-                LOGGER.log(Level.FINER, "[blocknet-peer] ERROR: Invalid UUID in reply message!");
+                LOGGER.finer("[blocknet-peer] ERROR: Invalid UUID in reply message!");
                 throw new ProtocolException("Invalid UUID in reply message");
             }
         }
 
-        LOGGER.log(Level.FINER, "[blocknet-peer] XRouter pre-processing successful. Notifying listeners.");
+        LOGGER.finer("[blocknet-peer] XRouter pre-processing successful. Notifying listeners.");
         for (ListenerRegistration<BlocknetOnXRouterMessageReceivedListener> registration : xRouterMessageListeners) {
             if (registration.executor == Threading.SAME_THREAD) {
                 registration.executor.execute(() -> registration.listener.onXRouterMessageReceived(message, original));
@@ -446,8 +445,8 @@ public class BlocknetPeer extends PeerSocketHandler {
     }
 
     private void processXRouterMessage(final XRouterMessage message) {
-        LOGGER.log(Level.FINER, "processXRouterMessage() called.");
-        LOGGER.log(Level.FINER, "This XRouter message's UUID is '" + message.getXRouterHeader().getUUID() + "'");
+        LOGGER.finer("processXRouterMessage() called.");
+        LOGGER.finer("This XRouter message's UUID is '" + message.getXRouterHeader().getUUID() + "'");
 
         switch (XRouterCommandUtils.commandIdToString(message.getXRouterHeader().getCommand())) {
             case "xrReply":  //xrReply
@@ -484,16 +483,16 @@ public class BlocknetPeer extends PeerSocketHandler {
         Sha256Hash chainHeadHash = chainHead.getHeader().getHash();
 
         if (Objects.equals(chainHeadHash, lastGetBlocksBegin) || Objects.equals(toHash, lastGetBlocksEnd)) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] Ignoring dupliated request: chainHeadHash = " + chainHeadHash.toString() + ", toHash = " + toHash.toString());
+            LOGGER.finer("[blocknet-peer] Ignoring dupliated request: chainHeadHash = " + chainHeadHash.toString() + ", toHash = " + toHash.toString());
 
             for (Sha256Hash hash : pendingBlockDownloads)
-                LOGGER.log(Level.FINER, "[blocknet-peer] Pending block download: " + hash.toString());
+                LOGGER.finer("[blocknet-peer] Pending block download: " + hash.toString());
 
-            LOGGER.log(Level.FINER, Throwables.getStackTraceAsString(new Throwable()));
+            LOGGER.finer(Throwables.getStackTraceAsString(new Throwable()));
             return;
         }
 
-        LOGGER.log(Level.FINER, "[blocknet-peer] blockChainDownloadLocked(" + toHash.toString() + "): Current head = " + chainHeadHash.toString());
+        LOGGER.finer("[blocknet-peer] blockChainDownloadLocked(" + toHash.toString() + "): Current head = " + chainHeadHash.toString());
 
         StoredBlock cursor = chainHead;
         for (int i = 100; cursor != null && i > 0; i--) {
@@ -501,7 +500,7 @@ public class BlocknetPeer extends PeerSocketHandler {
             try {
                 cursor = cursor.getPrev(blockStore);
             } catch (BlockStoreException e) {
-                LOGGER.log(Level.WARNING, "[blocknet] Failed to walk blockchain while constructing locator", e);
+                LOGGER.warning("[blocknet] Failed to walk blockchain while constructing locator" + e.getMessage());
             }
         }
 
@@ -524,12 +523,12 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     private void endFilteredBlock(FilteredBlock filteredBlock) {
         if (!downloadData) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] WARNING: [" + getAddress().toString() + "] Received block we did not ask for! Hash: " + filteredBlock.getHash().toString());
+            LOGGER.finer("[blocknet-peer] WARNING: [" + getAddress().toString() + "] Received block we did not ask for! Hash: " + filteredBlock.getHash().toString());
             return;
         }
 
         if (blockChain == null) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] WARNING: Received a block, but a blockchain object was not configured!");
+            LOGGER.finer("[blocknet-peer] WARNING: Received a block, but a blockchain object was not configured!");
             return;
         }
 
@@ -539,7 +538,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
             try {
                 if (awaitingFreshFilter != null) {
-                    LOGGER.log(Level.FINER, "[blocknet-peer] Discarding this block because we are waiting for a fresh filter. Hash: " + filteredBlock.getHash().toString());
+                    LOGGER.finer("[blocknet-peer] Discarding this block because we are waiting for a fresh filter. Hash: " + filteredBlock.getHash().toString());
 
                     awaitingFreshFilter.add(filteredBlock.getHash());
                     return;
@@ -569,9 +568,9 @@ public class BlocknetPeer extends PeerSocketHandler {
                 }
             }
         } catch (VerificationException e) {
-            LOGGER.log(Level.WARNING, "[blocknet] Block failed to properly verify", e);
+            LOGGER.warning("[blocknet] Block failed to properly verify" + e.getMessage());
         } catch (PrunedException e) {
-            LOGGER.log(Level.FINER, "[blocknet-peer] Some data needed to handle this block was pruned! Hash: " + filteredBlock.getHash().toString());
+            LOGGER.finer("[blocknet-peer] Some data needed to handle this block was pruned! Hash: " + filteredBlock.getHash().toString());
             throw new RuntimeException(e);
         }
     }
@@ -659,7 +658,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                 firstMessage = false;
             }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[blocknet] Error closing peer connection", e);
+            LOGGER.warning("[blocknet] Error closing peer connection" + e.getMessage());
             return -1;
         }
     }

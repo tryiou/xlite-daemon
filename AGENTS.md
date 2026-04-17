@@ -76,7 +76,7 @@ Log messages use bracketed prefixes: `[security]`, `[discovery-BLOCK]`, `[wallet
 
 - Crypto ops: try/finally with `Arrays.fill(bytes, (byte) 0)` to clear sensitive data
 - Call `PBEKeySpec.clearPassword()` after key derivation
-- Never use `e.printStackTrace()` — use `LOGGER.log(Level.WARNING, "msg", e)`
+- Never use `e.printStackTrace()` — use `LOGGER.level(msg + e.getMessage());`
 - Catch specific exceptions before generic `Exception`
 - `RuntimeException` for unrecoverable state; return `null`/`false` for expected failures
 - AES-CBC + random IV for new encryption; ECB only for legacy migration

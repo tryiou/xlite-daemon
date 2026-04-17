@@ -41,15 +41,15 @@ public class ConsoleMenu {
     public void logBadPassword(String msg) {
         if (msg == null || msg.isEmpty())
             msg = "Bad password";
-        LOGGER.log(Level.INFO, "[master] Error(" + CoinInstance.CoinError.CoinErrorCode.BADPASSWORD.name() + "): " + msg);
+        LOGGER.info("[master] Error(" + CoinInstance.CoinError.CoinErrorCode.BADPASSWORD.name() + "): " + msg);
     }
 
     public void logBadMnemonic() {
-        LOGGER.log(Level.INFO, "[master] Error(" + CoinInstance.CoinError.CoinErrorCode.BADMNEMONIC.name() + "): Bad mnemonic");
+        LOGGER.info("[master] Error(" + CoinInstance.CoinError.CoinErrorCode.BADMNEMONIC.name() + "): Bad mnemonic");
     }
 
     public void logBadChangePass(String msg) {
-        LOGGER.log(Level.INFO, "[master] Error(" + CoinInstance.CoinError.CoinErrorCode.CHANGEPASSWORDFAILED.name() + "): " + msg);
+        LOGGER.info("[master] Error(" + CoinInstance.CoinError.CoinErrorCode.CHANGEPASSWORDFAILED.name() + "): " + msg);
     }
 
     public void init() {
@@ -73,7 +73,7 @@ public class ConsoleMenu {
                         if (i + 1 < arguments.length) {
                             String customEndpoint = arguments[i + 1];
                             if (customEndpoint.startsWith("--")) {
-                                LOGGER.log(Level.WARNING, "Invalid endpoint: " + customEndpoint);
+                                LOGGER.warning("Invalid endpoint: " + customEndpoint);
                                 break;
                             }
                             App.BASE_URL = customEndpoint;
@@ -83,7 +83,7 @@ public class ConsoleMenu {
                             if (envEndpoint != null && !envEndpoint.isEmpty()) {
                                 App.BASE_URL = envEndpoint;
                             } else {
-                                LOGGER.log(Level.WARNING, "Missing custom endpoint after '--development-endpoint'");
+                                LOGGER.warning("Missing custom endpoint after '--development-endpoint'");
                             }
                         }
                         break;
@@ -92,12 +92,12 @@ public class ConsoleMenu {
                         if (i + 1 < arguments.length) {
                             String exrEndpoint = arguments[i + 1];
                             if (exrEndpoint.startsWith("--")) {
-                                LOGGER.log(Level.WARNING, "Invalid endpoint: " + exrEndpoint);
+                                LOGGER.warning("Invalid endpoint: " + exrEndpoint);
                                 break;
                             }
                             App.EXR_ENDPOINT = exrEndpoint;
                             App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
-                            LOGGER.log(Level.INFO, "[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
+                            LOGGER.info("[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
                             new Thread(() -> {
                                 try {
                                     Thread.sleep(1000);
@@ -112,7 +112,7 @@ public class ConsoleMenu {
                             if (envExrEndpoint != null && !envExrEndpoint.isEmpty()) {
                                 App.EXR_ENDPOINT = envExrEndpoint;
                                 App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
-                                LOGGER.log(Level.INFO, "[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
+                                LOGGER.info("[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
                                 new Thread(() -> {
                                     try {
                                         Thread.sleep(1000);
@@ -122,18 +122,18 @@ public class ConsoleMenu {
                                     }
                                 }, "EXR-Capability-Prober").start();
                             } else {
-                                LOGGER.log(Level.WARNING, "Missing EXR endpoint after '--exr-endpoint'");
+                                LOGGER.warning("Missing EXR endpoint after '--exr-endpoint'");
                             }
                         }
                         break;
                     }
                     case "--version":
-                        LOGGER.log(Level.INFO, Version.CLIENT_VERSION);
+                        LOGGER.info(Version.CLIENT_VERSION);
                         System.exit(0);
                         break;
                     case "--createdefaultwallet": {
                         if (KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.log(Level.INFO, "Wallet already exists");
+                            LOGGER.info("Wallet already exists");
                             System.exit(0);
                         }
 
@@ -158,7 +158,7 @@ public class ConsoleMenu {
                     }
                     case "--createwalletmnemonic": {
                         if (KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.log(Level.INFO, "Wallet already exists");
+                            LOGGER.info("Wallet already exists");
                             System.exit(0);
                         }
 
@@ -195,7 +195,7 @@ public class ConsoleMenu {
                             int strength = KeyHandler.calculatePasswordStrength(password);
 
                             if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                                LOGGER.log(Level.INFO, "Bad password.");
+                                LOGGER.info("Bad password.");
                                 System.exit(1);
                             }
 
@@ -210,7 +210,7 @@ public class ConsoleMenu {
                         char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
                         try {
                             if (!KeyHandler.existsBaseECKeyFromLocal()) {
-                                LOGGER.log(Level.INFO, "No wallet found.");
+                                LOGGER.info("No wallet found.");
                                 System.exit(1);
                             }
 
@@ -231,17 +231,17 @@ public class ConsoleMenu {
                         char[] newPassword = readPasswordChars(input, arguments, i + 2, "", null);
                         try {
                             if (currentPassword.length == 0 || newPassword.length == 0) {
-                                LOGGER.log(Level.INFO, "Password cannot be empty");
+                                LOGGER.info("Password cannot be empty");
                                 System.exit(1);
                             }
                             if (Arrays.equals(currentPassword, newPassword)) {
-                                LOGGER.log(Level.INFO, "New password must be different from old password");
+                                LOGGER.info("New password must be different from old password");
                                 System.exit(1);
                             }
 
                             int strength = KeyHandler.calculatePasswordStrength(newPassword);
                             if (strength < 9) {
-                                LOGGER.log(Level.INFO, "Unable to change the password: New password is not strong enough");
+                                LOGGER.info("Unable to change the password: New password is not strong enough");
                                 System.exit(1);
                             }
 
@@ -249,7 +249,7 @@ public class ConsoleMenu {
                             if (err != null)
                                 logBadChangePass(err.getMessage());
                             else
-                                LOGGER.log(Level.INFO, "Wallet password changed successfully");
+                                LOGGER.info("Wallet password changed successfully");
                         } finally {
                             Arrays.fill(currentPassword, '\0');
                             Arrays.fill(newPassword, '\0');
@@ -281,7 +281,7 @@ public class ConsoleMenu {
                     int strength = KeyHandler.calculatePasswordStrength(password);
 
                     if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                        LOGGER.log(Level.INFO, "Bad password.");
+                        LOGGER.info("Bad password.");
                         return;
                     }
 
@@ -294,20 +294,20 @@ public class ConsoleMenu {
         }
 
         while (true) {
-            LOGGER.log(Level.INFO, "-------------------------");
-            LOGGER.log(Level.INFO, "1 - Create new wallet " + newWalletStr);
-            LOGGER.log(Level.INFO, "2 - Decrypt wallet");
-            LOGGER.log(Level.INFO, "3 - Import from mnemonic");
-            LOGGER.log(Level.INFO, "4 - Quit");
+            LOGGER.info("-------------------------");
+            LOGGER.info("1 - Create new wallet " + newWalletStr);
+            LOGGER.info("2 - Decrypt wallet");
+            LOGGER.info("3 - Import from mnemonic");
+            LOGGER.info("4 - Quit");
 
-            LOGGER.log(Level.INFO, "Selection: ");
+            LOGGER.info("Selection: ");
             selection = input.nextInt();
             input.nextLine();
 
             switch (selection) {
                 case 1: {
                     if (KeyHandler.existsBaseECKeyFromLocal()) {
-                        LOGGER.log(Level.INFO, "Key already exists");
+                        LOGGER.info("Key already exists");
                         return;
                     }
 
@@ -316,14 +316,14 @@ public class ConsoleMenu {
                     if (console != null) {
                         password = console.readPassword("Enter new password: ");
                     } else {
-                        LOGGER.log(Level.INFO, "Enter new password: ");
+                        LOGGER.info("Enter new password: ");
                         password = input.next().toCharArray();
                     }
                     try {
                         int strength = KeyHandler.calculatePasswordStrength(password);
 
                         if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            LOGGER.log(Level.INFO, "Bad password.");
+                            LOGGER.info("Bad password.");
                             return;
                         }
                         completeLogin(password, null, false);
@@ -333,20 +333,20 @@ public class ConsoleMenu {
                     return;
                 }
                 case 2: {
-                    LOGGER.log(Level.INFO, "Enter password: ");
+                    LOGGER.info("Enter password: ");
                     Console console = System.console();
                     char[] password;
                     if (console != null) {
                         password = console.readPassword();
                     } else {
-                        LOGGER.log(Level.WARNING, "Console not available, using Scanner fallback");
+                        LOGGER.warning("Console not available, using Scanner fallback");
                         password = readPasswordChars(input, null, 0, "", null);
                     }
                     try {
                         int strength = KeyHandler.calculatePasswordStrength(password);
 
                         if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            LOGGER.log(Level.INFO, "Bad password.");
+                            LOGGER.info("Bad password.");
                             return;
                         }
                         completeLogin(password, null, false);
@@ -356,7 +356,7 @@ public class ConsoleMenu {
                     return;
                 }
                 case 3: {
-                    LOGGER.log(Level.INFO, "Enter mnemonic: ");
+                    LOGGER.info("Enter mnemonic: ");
                     String mnemonicInput = input.nextLine().trim();
 
                     char[] mnemonicChars = mnemonicInput.toCharArray();
@@ -368,11 +368,11 @@ public class ConsoleMenu {
                     return;
                 }
                 case 4: {
-                    LOGGER.log(Level.INFO, "Exiting...");
+                    LOGGER.info("Exiting...");
                     System.exit(0);
                 }
                 default: {
-                    LOGGER.log(Level.INFO, "Unknown Option.");
+                    LOGGER.info("Unknown Option.");
                 }
             }
         }
@@ -399,7 +399,7 @@ public class ConsoleMenu {
         CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, null, isMnemonic, xliteRPC);
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
-            LOGGER.log(Level.SEVERE, msg);
+            LOGGER.severe(msg);
             System.exit(0);
         }
 
@@ -414,7 +414,7 @@ public class ConsoleMenu {
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
-        LOGGER.log(Level.INFO, "[coin] Concurrent coins initialization completed in " + totalTime + " ms");
+        LOGGER.info("[coin] Concurrent coins initialization completed in " + totalTime + " ms");
 
         App.masterRPC.start();
         backgroundTimerThread = new BackgroundTimerThread();
@@ -441,15 +441,15 @@ public class ConsoleMenu {
             CompletableFuture<?>[] futures = enabledCoins.stream()
                     .map(coinTicker -> CompletableFuture.runAsync(() -> {
                         try {
-                            LOGGER.log(Level.FINE, "[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
+                            LOGGER.fine("[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
                             CoinInstance.CoinError coinError = CoinInstance.getInstance(coinTicker)
                                     .init(password, userMnemonic, isMnemonic, xliteRPC);
                             if (coinError != null) {
-                                LOGGER.log(Level.WARNING, "[" + coinTicker.name() + "] Error(" +
+                                LOGGER.warning("[" + coinTicker.name() + "] Error(" +
                                         coinError.getCode().name() + "): " + coinError.getMessage());
                             }
                         } catch (Exception e) {
-                            LOGGER.log(Level.SEVERE, "Failed to initialize " + coinTicker.name(), e);
+                            LOGGER.severe("Failed to initialize " + coinTicker.name() + ", " + e.getMessage());
                         }
                     }, executor))
                     .toArray(CompletableFuture[]::new);

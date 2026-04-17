@@ -8,7 +8,6 @@ import io.cloudchains.app.net.CoinTickerUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -68,18 +67,18 @@ public class EXRServer {
                                 supportedCoins.add(coin);
                             }
                         } catch (Exception e) {
-                            LOGGER.log(Level.FINER, "[exr-server] Failed to map coin " + coinName, e);
+                            LOGGER.finer("[exr-server] Failed to map coin " + coinName + ", " + e.getMessage());
                         }
                     }
                 }
 
                 capabilitiesProbed = true;
-                LOGGER.log(Level.INFO, "[exr-server] Probed capabilities for " + endpoint + ", supports: " + supportedCoins.size() + " coins: " +
+                LOGGER.info("[exr-server] Probed capabilities for " + endpoint + ", supports: " + supportedCoins.size() + " coins: " +
                         supportedCoins.stream().map(CoinTickerUtils::tickerToString)
                                 .reduce((a, b) -> a + ", " + b).orElse("none"));
                 return !supportedCoins.isEmpty();
             } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "[exr-server] Failed to probe capabilities for " + endpoint, e);
+                LOGGER.warning("[exr-server] Failed to probe capabilities for " + endpoint + ", " + e.getMessage());
                 return false;
             }
         }
@@ -95,7 +94,7 @@ public class EXRServer {
             healthy = result != null && !result.isJsonNull();
         } catch (Exception e) {
             healthy = false;
-            LOGGER.log(Level.WARNING, "[exr-server] Health check failed for " + endpoint, e);
+            LOGGER.warning("[exr-server] Health check failed for " + endpoint + ", " + e.getMessage());
         }
         lastHealthCheck = now;
         return healthy;

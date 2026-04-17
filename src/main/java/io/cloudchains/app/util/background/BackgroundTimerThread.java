@@ -19,7 +19,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -80,9 +79,7 @@ public class BackgroundTimerThread implements Runnable {
                 24, TimeUnit.HOURS
         );
         LocalTime now = LocalTime.now();
-        LOGGER.log(Level.INFO, "[BackgroundTimer] Scheduled daily log rotation at {0} (current time: {1})",
-                new Object[]{String.format("%02d:%02d", DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE),
-                        String.format("%02d:%02d", now.getHour(), now.getMinute())});
+        LOGGER.info("[BackgroundTimer] Scheduled daily log rotation at " + String.format("%02d:%02d", DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE) + " (current time: " + String.format("%02d:%02d", now.getHour(), now.getMinute()) + ")");
     }
 
     /**
@@ -108,11 +105,11 @@ public class BackgroundTimerThread implements Runnable {
      */
     private void performDailyLogRotation() {
         try {
-            LOGGER.log(Level.INFO, "[BackgroundTimer] Starting scheduled daily log rotation");
+            LOGGER.info("[BackgroundTimer] Starting scheduled daily log rotation");
             LogRotationUtil.performLogRotation();
-            LOGGER.log(Level.INFO, "[BackgroundTimer] Daily log rotation completed successfully");
+            LOGGER.info("[BackgroundTimer] Daily log rotation completed successfully");
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "[BackgroundTimer] Failed to perform daily log rotation", e);
+            LOGGER.severe("[BackgroundTimer] Failed to perform daily log rotation: " + e.getMessage());
         }
     }
 
@@ -168,12 +165,12 @@ public class BackgroundTimerThread implements Runnable {
 
         Set<String> currentAvailable = new HashSet<>(available);
         if (!currentAvailable.equals(lastAvailable)) {
-            LOGGER.log(Level.INFO, "[coin] Available: " + String.join(", ", available));
+            LOGGER.info("[coin] Available: " + String.join(", ", available));
         }
         lastAvailable = currentAvailable;
 
         if (!unavailable.isEmpty() && !unavailable.equals(lastUnavailable)) {
-            LOGGER.log(Level.INFO, "[coin] Unavailable: " + String.join(", ", unavailable));
+            LOGGER.info("[coin] Unavailable: " + String.join(", ", unavailable));
         }
         lastUnavailable = unavailable;
         lastOut = System.currentTimeMillis();
@@ -199,7 +196,7 @@ public class BackgroundTimerThread implements Runnable {
                         continue;
 
                     coinInstance.sendXrGetBlockCount(blocknetPeer);
-                    LOGGER.log(Level.FINER, "[BackgroundTimer] Sent keepalive message: " + coinInstance.getNetworkParameters().getId());
+                    LOGGER.finer("[BackgroundTimer] Sent keepalive message: " + coinInstance.getNetworkParameters().getId());
                 }
             }
         } else {
@@ -232,12 +229,12 @@ public class BackgroundTimerThread implements Runnable {
 
             BlocknetPeer blocknetPeer = blocknetPeerGroup.getBestBlocknetPeer(coinInstance.getNetworkParameters().getId());
             if (blocknetPeer == null) {
-                LOGGER.log(Level.FINER, "[BackgroundTimer] Peer was not found for currency " + coinInstance.getNetworkParameters().getId());
+                LOGGER.finer("[BackgroundTimer] Peer was not found for currency " + coinInstance.getNetworkParameters().getId());
                 continue;
             }
 
             coinInstance.sendXrGetUtxos(blocknetPeer);
-            LOGGER.log(Level.FINER, "[BackgroundTimer] Sent GetUtxos message: " + coinInstance.getNetworkParameters().getId());
+            LOGGER.finer("[BackgroundTimer] Sent GetUtxos message: " + coinInstance.getNetworkParameters().getId());
         }
 
         lastBalanceUpdateTime = System.currentTimeMillis();
@@ -246,7 +243,7 @@ public class BackgroundTimerThread implements Runnable {
     @Override
     public void run() {
         workerThread = Thread.currentThread();
-        LOGGER.log(Level.FINER, "[BackgroundTimer] Waiting until initial messages are sent off.");
+        LOGGER.finer("[BackgroundTimer] Waiting until initial messages are sent off.");
 
         for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
             if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker()))
@@ -268,9 +265,9 @@ public class BackgroundTimerThread implements Runnable {
             } catch (InterruptedException e) {
                 break;
             } catch (NullPointerException e) {
-                LOGGER.log(Level.WARNING, "[BackgroundTimer] Null pointer", e);
+                LOGGER.warning("[BackgroundTimer] Null pointer: " + e.getMessage());
             } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "[BackgroundTimer] Unexpected error", e);
+                LOGGER.warning("[BackgroundTimer] Unexpected error: " + e.getMessage());
             }
         }
     }

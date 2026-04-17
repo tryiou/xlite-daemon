@@ -6,7 +6,6 @@ import io.cloudchains.app.net.CoinTickerUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -80,7 +79,7 @@ class EXRServerSelectorImpl implements ServerSelector {
     @Override
     public EXRServer selectHealthyServer(List<EXRServer> servers) {
         if (servers.isEmpty()) {
-            LOGGER.log(Level.WARNING, "[server-selector] No servers available for selection");
+            LOGGER.warning("[server-selector] No servers available for selection");
             return null;
         }
 
@@ -90,12 +89,12 @@ class EXRServerSelectorImpl implements ServerSelector {
             int index = (start + i) % servers.size();
             EXRServer server = servers.get(index);
             if (server.isHealthy()) {
-                LOGGER.log(Level.FINE, "[server-selector] Selected server: " + server.getEndpoint());
+                LOGGER.fine("[server-selector] Selected server: " + server.getEndpoint());
                 return server;
             }
         }
 
-        LOGGER.log(Level.WARNING, "[server-selector] No healthy servers available");
+        LOGGER.warning("[server-selector] No healthy servers available");
         return null; // All servers unhealthy
     }
 
@@ -112,7 +111,7 @@ class EXRServerSelectorImpl implements ServerSelector {
     @Override
     public EXRServer selectServerForCoin(List<EXRServer> supportingServers, CoinTicker coin) {
         if (supportingServers == null || supportingServers.isEmpty()) {
-            LOGGER.log(Level.WARNING, "[server-selector] NO EXR SERVERS SUPPORT COIN: " +
+            LOGGER.warning("[server-selector] NO EXR SERVERS SUPPORT COIN: " +
                     CoinTickerUtils.tickerToString(coin));
             return null; // FAIL - NO FALLBACK TO BASE_URL
         }
@@ -152,7 +151,7 @@ class EXRServerSelectorImpl implements ServerSelector {
      */
     private EXRServer selectFromHealthyServers(List<EXRServer> healthyServers, CoinTicker coin) {
         if (healthyServers.isEmpty()) {
-            LOGGER.log(Level.WARNING, "[server-selector] NO HEALTHY EXR SERVERS FOR COIN: " +
+            LOGGER.warning("[server-selector] NO HEALTHY EXR SERVERS FOR COIN: " +
                     CoinTickerUtils.tickerToString(coin));
             return null;
         }
@@ -162,7 +161,7 @@ class EXRServerSelectorImpl implements ServerSelector {
 
         // Double-check that the selected server actually supports the coin
         if (!selectedServer.hasCapability(coin)) {
-            LOGGER.log(Level.SEVERE, "[server-selector] CRITICAL ERROR: Selected server " +
+            LOGGER.severe("[server-selector] CRITICAL ERROR: Selected server " +
                     selectedServer.getEndpoint() + " does NOT support coin " +
                     CoinTickerUtils.tickerToString(coin));
             return null;

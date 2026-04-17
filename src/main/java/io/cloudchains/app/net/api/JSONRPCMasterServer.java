@@ -9,7 +9,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -30,7 +29,7 @@ public class JSONRPCMasterServer extends Thread {
     public void run() {
         workerGroup = new NioEventLoopGroup(2);
         try {
-            LOGGER.log(Level.INFO, "[rpc] Starting master RPC server on port " + port + ".");
+            LOGGER.info("[rpc] Starting master RPC server on port " + port + ".");
 
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.group(workerGroup)
@@ -45,14 +44,14 @@ public class JSONRPCMasterServer extends Thread {
             channel.closeFuture().sync();
         } catch (Exception e) {
             if (!stopping) {
-                LOGGER.log(Level.WARNING, "[rpc-master] Error during master RPC server operation", e);
+                LOGGER.warning("[rpc-master] Error during master RPC server operation" + e.getMessage());
             }
         }
     }
 
     public void deinit() {
         stopping = true;
-        LOGGER.log(Level.FINER, "[json-rpc-server] Interrupting server.");
+        LOGGER.finer("[json-rpc-server] Interrupting server.");
 
         if (channel != null) {
             channel.close();

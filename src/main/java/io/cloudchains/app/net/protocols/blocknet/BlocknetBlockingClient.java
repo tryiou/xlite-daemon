@@ -16,7 +16,6 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -49,7 +48,7 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
                 runReadLoop(stream, connection);
             } catch (Exception e) {
                 if (!closeRequested) {
-                    LOGGER.log(Level.WARNING, "[blocknet] Error opening/reading connection with " + serverAddress.toString(), e);
+                    LOGGER.warning("[blocknet] Error opening/reading connection with " + serverAddress.toString() + ", " + e.getMessage());
                     connectFuture.setException(e);
                 }
             } finally {
@@ -100,7 +99,7 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
             closeRequested = true;
             socket.close();
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[blocknet] Error closing socket", e);
+            LOGGER.warning("[blocknet] Error closing socket" + e.getMessage());
         }
     }
 
@@ -112,7 +111,7 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
             out.flush();
             return Futures.immediateFuture(null);
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[blocknet] Error writing bytes to socket", e);
+            LOGGER.warning("[blocknet] Error writing bytes to socket" + e.getMessage());
             closeConnection();
             throw e;
         }

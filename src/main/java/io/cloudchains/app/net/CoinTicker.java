@@ -13,11 +13,9 @@ public enum CoinTicker {
     DASHCOIN,
     DIGIBYTE,
     DOGECOIN,
-    TREZARCOIN,
     SYSCOIN,
     PIVX,
     ALQOCOIN,
-    POLISCOIN,
     PHORECOIN,
     RAVENCOIN,
     BITBAY,
@@ -39,13 +37,13 @@ public enum CoinTicker {
                 DASHCOIN,
                 DIGIBYTE,
                 DOGECOIN,
-//           TREZARCOIN, - not support on backend
+
                 SYSCOIN,
                 PIVX,
                 UNOBTANIUM,
                 PKOIN,
 //            ALQOCOIN, - not support on backend
-//            POLISCOIN, - not support on backend
+
 //            PHORECOIN, - not support on backend
                 RAVENCOIN
 //            BITBAY - not support on backend

@@ -12,7 +12,6 @@ import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -35,30 +34,30 @@ public class XRouterPacketManager {
     }
 
     private byte[] signPacket(byte[] packetBytes, ECKey ecPrivateKey) {
-        LOGGER.log(Level.FINER, "[xrouter] DEBUG: Packet bytes: " + new String(Hex.encode(packetBytes)));
+        LOGGER.finer("[xrouter] DEBUG: Packet bytes: " + new String(Hex.encode(packetBytes)));
         Sha256Hash packetHash = Sha256Hash.wrap(Sha256Hash.hash(packetBytes));
-        LOGGER.log(Level.FINER, "[xrouter] DEBUG: Packet byte hash: " + packetHash.toString());
+        LOGGER.finer("[xrouter] DEBUG: Packet byte hash: " + packetHash.toString());
         ECKey.ECDSASignature rawSignature = ecPrivateKey.sign(packetHash).toCanonicalised();
 
         byte[] r = rawSignature.r.toByteArray();
         byte[] s = rawSignature.s.toByteArray();
 
         if (r.length > 32) {
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature R is greater than 32 bytes! Trimming from the beginning. Size: " + r.length);
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
+            LOGGER.finer("[xrouter] WARNING: Signature R is greater than 32 bytes! Trimming from the beginning. Size: " + r.length);
+            LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
         } else if (r.length < 32) {
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature R is less than 32 bytes! Prepending null bytes to the beginning. Size: " + s.length);
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
+            LOGGER.finer("[xrouter] WARNING: Signature R is less than 32 bytes! Prepending null bytes to the beginning. Size: " + s.length);
+            LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
 
             r = prependNullTo32(r);
         }
 
         if (s.length > 32) {
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature S is greater than 32 bytes! Trimming from the beginning. Size: " + s.length);
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
+            LOGGER.finer("[xrouter] WARNING: Signature S is greater than 32 bytes! Trimming from the beginning. Size: " + s.length);
+            LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
         } else if (s.length < 32) {
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature S is less than 32 bytes! Prepending null bytes. Size: " + s.length);
-            LOGGER.log(Level.FINER, "[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
+            LOGGER.finer("[xrouter] WARNING: Signature S is less than 32 bytes! Prepending null bytes. Size: " + s.length);
+            LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
 
             s = prependNullTo32(s);
         }
@@ -68,7 +67,7 @@ public class XRouterPacketManager {
         System.arraycopy(r, r.length - 32, signature, 0, 32);
         System.arraycopy(s, s.length - 32, signature, 32, 32);
 
-        LOGGER.log(Level.FINER, "[xrouter] Signature: " + new String(Hex.encode(signature)) + ", byte length " + signature.length);
+        LOGGER.finer("[xrouter] Signature: " + new String(Hex.encode(signature)) + ", byte length " + signature.length);
 
         return signature;
     }
@@ -97,13 +96,13 @@ public class XRouterPacketManager {
         if (extSize < 253) {
             xRouterHeaderBytes = new byte[158];
             compactSize = (byte) extSize;
-            //LOGGER.log(Level.FINER, "Compact size = " + compactSize);
+            //LOGGER.finer("Compact size = " + compactSize);
             xRouterHeaderBytes[0] = compactSize;
             compactSizeBytes = 1;
         } else if (extSize <= 65535) {
             xRouterHeaderBytes = new byte[160];
             compactSize = (byte) 253;
-            //LOGGER.log(Level.FINER, "Compact size = " + compactSize + ", extSize = " + extSize);
+            //LOGGER.finer("Compact size = " + compactSize + ", extSize = " + extSize);
             xRouterHeaderBytes[0] = compactSize;
             xRouterHeaderBytes[1] = (byte) (0xFF & (extSize));
             xRouterHeaderBytes[2] = (byte) (0xFF & (extSize >> 8));
@@ -111,7 +110,7 @@ public class XRouterPacketManager {
         } else {
             xRouterHeaderBytes = new byte[162];
             compactSize = (byte) 254;
-            //LOGGER.log(Level.FINER, "Compact size = " + compactSize + ", extSize = " + extSize);
+            //LOGGER.finer("Compact size = " + compactSize + ", extSize = " + extSize);
             xRouterHeaderBytes[0] = compactSize;
             Utils.uint32ToByteArrayLE(extSize, xRouterHeaderBytes, 1);
             compactSizeBytes = 5;
@@ -147,9 +146,9 @@ public class XRouterPacketManager {
 
         System.arraycopy(new byte[64], 0, xRouterHeaderBytes, cursor, 64);
         cursor += 64;
-        LOGGER.log(Level.FINER, "[xrouter] Serialized XRouter header. Cursor is at " + cursor);
+        LOGGER.finer("[xrouter] Serialized XRouter header. Cursor is at " + cursor);
 
-        LOGGER.log(Level.FINER, "[xrouter] Serializing XRouter message (phase 1).");
+        LOGGER.finer("[xrouter] Serializing XRouter message (phase 1).");
         XRouterPacketHeader xRouterHeader = new XRouterPacketHeader(ByteBuffer.wrap(xRouterHeaderBytes));
         XRouterMessage message = new XRouterMessage(blocknetPeer, blocknetNetworkParameters, xRouterHeader, body);
 
@@ -163,7 +162,7 @@ public class XRouterPacketManager {
 
         xRouterHeaderBufSigned.flip();
 
-        LOGGER.log(Level.FINER, "[xrouter] Serializing XRouter message (phase 2).");
+        LOGGER.finer("[xrouter] Serializing XRouter message (phase 2).");
         XRouterPacketHeader xRouterHeaderSigned = new XRouterPacketHeader(xRouterHeaderBufSigned);
         return new XRouterMessage(blocknetPeer, blocknetNetworkParameters, xRouterHeaderSigned, body);
     }

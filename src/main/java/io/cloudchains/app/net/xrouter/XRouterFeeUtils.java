@@ -10,7 +10,6 @@ import org.bitcoinj.core.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -29,8 +28,8 @@ public class XRouterFeeUtils {
         HashMap<String, Double> feeMap = xRouterConfig.getFeeMap();
 
         if (!feeMap.containsKey(xRouterCommand)) {
-            LOGGER.log(Level.FINER, "[xrouter-fee-utils] WARNING: Invalid/unknown XRouter command supplied to getXRouterFeeTx()! Assuming this command is free.");
-            LOGGER.log(Level.FINER, "[xrouter-fee-utils] Command: " + xRouterCommand);
+            LOGGER.finer("[xrouter-fee-utils] WARNING: Invalid/unknown XRouter command supplied to getXRouterFeeTx()! Assuming this command is free.");
+            LOGGER.finer("[xrouter-fee-utils] Command: " + xRouterCommand);
 
             return "nohash;nofee";
         }
@@ -39,7 +38,7 @@ public class XRouterFeeUtils {
 
         Coin xRouterFeeAmt = Coin.valueOf((long) Math.floor(fee * Coin.COIN.value));
         if (xRouterFeeAmt.value == 0) {
-            LOGGER.log(Level.FINER, "[xrouter-fee-utils] DEBUG: This command is free.");
+            LOGGER.finer("[xrouter-fee-utils] DEBUG: This command is free.");
             return "nohash;nofee";
         }
 
@@ -77,9 +76,9 @@ public class XRouterFeeUtils {
         Transaction xRouterFeeTx = blocknetWalletHelper.createRawTransactionWithAllUTXOs(outputs, totalAvailable);
 
         String feetx = new String(Hex.encode(xRouterFeeTx.bitcoinSerialize()));
-        LOGGER.log(Level.FINER, "[xrouter-fee-utils] XRouter fee transaction string representation:");
-        LOGGER.log(Level.FINER, xRouterFeeTx.toString());
-        LOGGER.log(Level.FINER, "[xrouter-fee-utils] DEBUG: Feetx: " + feetx);
+        LOGGER.finer("[xrouter-fee-utils] XRouter fee transaction string representation:");
+        LOGGER.finer(xRouterFeeTx.toString());
+        LOGGER.finer("[xrouter-fee-utils] DEBUG: Feetx: " + feetx);
         return feetx;
     }
 

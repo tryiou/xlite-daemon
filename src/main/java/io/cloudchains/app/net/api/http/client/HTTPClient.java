@@ -43,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -69,7 +68,7 @@ public class HTTPClient {
             return true;
         }
 
-        LOGGER.log(Level.FINE, "[httpclient] Waiting for EXR capabilities to be probed (timeout: " + timeoutMs + "ms)");
+        LOGGER.fine("[httpclient] Waiting for EXR capabilities to be probed (timeout: " + timeoutMs + "ms)");
 
         int waitTime = 0;
         while (!App.exrServerPool.isCapabilitiesProbed() && waitTime < timeoutMs) {
@@ -78,13 +77,13 @@ public class HTTPClient {
                 waitTime += HttpClientConfig.CAPABILITY_PROBE_WAIT_INTERVAL_MS;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                LOGGER.log(Level.WARNING, "[httpclient] Waiting for capabilities was interrupted");
+                LOGGER.warning("[httpclient] Waiting for capabilities was interrupted");
                 return false;
             }
         }
 
         boolean probed = App.exrServerPool.isCapabilitiesProbed();
-        LOGGER.log(Level.FINE, "[httpclient] EXR capabilities " +
+        LOGGER.fine("[httpclient] EXR capabilities " +
                 (probed ? "probed successfully" : "still not probed") +
                 " after waiting " + waitTime + "ms");
 
@@ -174,7 +173,7 @@ public class HTTPClient {
         try {
             httpPost.setEntity(new StringEntity(params.toString()));
         } catch (UnsupportedEncodingException e) {
-            LOGGER.log(Level.WARNING, "executePostRequest failed to set entity " + endpoint + " err: " + e.toString());
+            LOGGER.warning("executePostRequest failed to set entity " + endpoint + " err: " + e.getMessage());
             httpPost.reset();
             return null;
         }
@@ -212,7 +211,7 @@ public class HTTPClient {
         try {
             client.close();
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[httpclient] Failed to close HTTP client", e);
+            LOGGER.warning("[httpclient] Failed to close HTTP client" + e.getMessage());
         }
     }
 
@@ -286,7 +285,7 @@ public class HTTPClient {
                 coin = CoinTickerUtils.stringToTicker(coinString);
                 if (coin == null) {
                     // Log the failed coin extraction for debugging
-                    LOGGER.log(Level.WARNING, "[httpclient] Failed to extract coin from parameter: " + coinString);
+                    LOGGER.warning("[httpclient] Failed to extract coin from parameter: " + coinString);
                     // Not a coin-specific request
                 }
             }
@@ -297,31 +296,31 @@ public class HTTPClient {
             if (coin != null) {
                 // Wait for capabilities to be probed if not already done
                 if (!App.exrServerPool.isCapabilitiesProbed()) {
-                    LOGGER.log(Level.FINE, "[httpclient] Waiting for EXR capabilities to be probed for coin: " +
+                    LOGGER.fine("[httpclient] Waiting for EXR capabilities to be probed for coin: " +
                             CoinTickerUtils.tickerToString(coin));
                     if (!waitForCapabilities(HttpClientConfig.CAPABILITY_PROBE_WAIT_TIMEOUT_MS)) { // Wait up to 10 seconds
-                        LOGGER.log(Level.WARNING, "[httpclient] EXR capabilities not probed yet for coin: " +
+                        LOGGER.warning("[httpclient] EXR capabilities not probed yet for coin: " +
                                 CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     }
                 }
                 if (App.exrServerPool.isCapabilitiesProbed()) {
                     server = App.exrServerPool.selectServerForCoin(coin);
-                    // LOGGER.log(Level.INFO, "[httpclient] DEBUG: selectServerForCoin returned: " +
+                    // LOGGER.info("[httpclient] DEBUG: selectServerForCoin returned: " +
                     //     (server != null ? server.getEndpoint() : "null"));
                         
                     if (server == null) {
-                        LOGGER.log(Level.WARNING, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
+                        LOGGER.warning("[httpclient] NO EXR SERVER SUPPORTS COIN: " +
                                 CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     } else {
-                        LOGGER.log(Level.INFO, "[httpclient] DEBUG: Selected server " + server.getEndpoint() +
+                        LOGGER.info("[httpclient] DEBUG: Selected server " + server.getEndpoint() +
                                 " for coin " + CoinTickerUtils.tickerToString(coin) +
                                 ", method: " + method);
                     }
                 } else {
                     // Capabilities still not probed after waiting
-                    LOGGER.log(Level.WARNING, "[httpclient] EXR capabilities not probed yet for coin: " +
+                    LOGGER.warning("[httpclient] EXR capabilities not probed yet for coin: " +
                             CoinTickerUtils.tickerToString(coin));
                     return null; // FAIL - NO FALLBACK TO BASE_URL
                 }
@@ -331,13 +330,13 @@ public class HTTPClient {
                 if (coin != null) {
                     server = App.exrServerPool.selectServerForCoin(coin);
                     if (server == null) {
-                        LOGGER.log(Level.WARNING, "[httpclient] NO EXR SERVER SUPPORTS COIN: " +
+                        LOGGER.warning("[httpclient] NO EXR SERVER SUPPORTS COIN: " +
                                 CoinTickerUtils.tickerToString(coin));
                         return null; // FAIL - NO FALLBACK TO BASE_URL
                     }
                 } else {
                     // No coin extracted - this should not happen for coin-specific requests
-                    LOGGER.log(Level.SEVERE, "[httpclient] Cannot route request: coin extraction failed");
+                    LOGGER.severe("[httpclient] Cannot route request: coin extraction failed");
                     return null; // FAIL instead of using wrong server
                 }
             }
@@ -412,11 +411,11 @@ public class HTTPClient {
         params.addProperty("method", "getutxos");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " " + res);
+        LOGGER.finer("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " " + res);
 
 
         if (res == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null post result");
+            LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
@@ -426,14 +425,14 @@ public class HTTPClient {
             jsonObject = new JSONObject(res);
             utxoArr = jsonObject.getJSONArray("utxos");
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " parse error - " + e.getMessage());
+            LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " parse error - " + e.getMessage());
         }
 
         if (jsonObject == null || utxoArr == null) {
             if (jsonObject == null)
-                LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null jsonObject");
+                LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null jsonObject");
             if (utxoArr == null)
-                LOGGER.log(Level.WARNING, "[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null utxoArr");
+                LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null utxoArr");
             return null;
         }
 
@@ -481,7 +480,7 @@ public class HTTPClient {
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
-            LOGGER.log(Level.WARNING, "[httpclient] getUtxos " + coinInstance.getTicker() + " null param size");
+            LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null param size");
             return null;
         }
 
@@ -491,11 +490,11 @@ public class HTTPClient {
         params.addProperty("method", "getutxos");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getUtxos " + coinInstance.getTicker() + " " + res);
+        LOGGER.finer("[httpclient] getUtxos " + coinInstance.getTicker() + " " + res);
 
 
         if (res == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getUtxos " + coinInstance.getTicker() + " null post result");
+            LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
@@ -505,14 +504,14 @@ public class HTTPClient {
             jsonObject = new JSONObject(res);
             utxoArr = jsonObject.getJSONArray("utxos");
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[httpclient] getUtxos " + coinInstance.getTicker() + " parse error - " + e.getMessage());
+            LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " parse error - " + e.getMessage());
         }
 
         if (jsonObject == null || utxoArr == null) {
             if (jsonObject == null)
-                LOGGER.log(Level.WARNING, "[httpclient] getUtxos " + coinInstance.getTicker() + " null jsonObject");
+                LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null jsonObject");
             if (utxoArr == null)
-                LOGGER.log(Level.WARNING, "[httpclient] getUtxos " + coinInstance.getTicker() + " null utxoArr");
+                LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null utxoArr");
             return null;
         }
 
@@ -547,7 +546,7 @@ public class HTTPClient {
         params.addProperty("method", "getrawtransaction");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getRawTransaction " + res);
+        LOGGER.finer("[httpclient] getRawTransaction " + res);
 
 
         if (res == null) return null;
@@ -566,7 +565,7 @@ public class HTTPClient {
         params.addProperty("method", "getrawmempool");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getRawMempool " + res);
+        LOGGER.finer("[httpclient] getRawMempool " + res);
 
 
         if (res == null) return null;
@@ -594,7 +593,7 @@ public class HTTPClient {
 
         coinInstance.addBlockCount(coinTicker, blockCount);
 
-        LOGGER.log(Level.FINER, "[httpclient] Got blockcount for currency " + coinTicker + " - " + blockCount);
+        LOGGER.finer("[httpclient] Got blockcount for currency " + coinTicker + " - " + blockCount);
     }
 
     public void getAllBlockCounts() {
@@ -618,7 +617,7 @@ public class HTTPClient {
             coinInstance.addBlockCount(coinInstance.getTicker(), blockCount);
             coinInstance.resetUpdateFailures();
 
-            LOGGER.log(Level.FINER, "[httpclient] Got blockcount for currency " + ticker + " - " + blockCount);
+            LOGGER.finer("[httpclient] Got blockcount for currency " + ticker + " - " + blockCount);
         }
     }
 
@@ -634,7 +633,7 @@ public class HTTPClient {
         params.addProperty("method", "getblock");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getBlock " + res);
+        LOGGER.finer("[httpclient] getBlock " + res);
 
 
         if (res == null) return null;
@@ -651,7 +650,7 @@ public class HTTPClient {
         params.addProperty("method", "getblockhash");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getBlockHash " + res);
+        LOGGER.finer("[httpclient] getBlockHash " + res);
 
 
         if (res == null) return null;
@@ -671,7 +670,7 @@ public class HTTPClient {
         params.addProperty("method", "gettransaction");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getTransaction " + res);
+        LOGGER.finer("[httpclient] getTransaction " + res);
 
 
         if (res == null) return null;
@@ -690,7 +689,7 @@ public class HTTPClient {
         params.addProperty("method", "sendrawtransaction");
         params.add("params", innerParams);
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] sendRawTransaction " + res);
+        LOGGER.finer("[httpclient] sendRawTransaction " + res);
 
 
         if (res == null) return null;
@@ -715,7 +714,7 @@ public class HTTPClient {
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
-            LOGGER.log(Level.WARNING, "[httpclient] getHistory " + coinInstance.getTicker() + " null param size");
+            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null param size");
             return null;
         }
 
@@ -726,9 +725,9 @@ public class HTTPClient {
         params.add("params", innerParams);
 
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
+        LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getHistory " + coinInstance.getTicker() + " null post result");
+            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
@@ -736,19 +735,19 @@ public class HTTPClient {
         try {
             json = new Gson().fromJson(res, JsonArray.class);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[httpclient] getHistory parsing error - Response: " + res + " - " + e.getMessage());
+            LOGGER.warning("[httpclient] getHistory parsing error - Response: " + res + " - " + e.getMessage());
             return null;
         }
 
         if (json == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getHistory " + coinInstance.getTicker() + " null json");
+            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null json");
             return null;
         }
 
         List<Transaction> historyList = new ArrayList<>();
         for (JsonElement elements : json) {
             for (JsonElement element : elements.getAsJsonArray()) {
-                //LOGGER.log(Level.WARNING, "*** DEBUG *** [httpclient] getHistory " + element);
+                //LOGGER.warning("*** DEBUG *** [httpclient] getHistory " + element);
                 JsonObject jsonObject = element.getAsJsonObject();
 
                 List<String> fromAddresses = new Gson().fromJson(jsonObject.get("from_addresses"), new TypeToken<List<String>>() {
@@ -774,7 +773,7 @@ public class HTTPClient {
         // Return the latest transaction history
         JsonArray txs = coinInstance.getAllTransactions();
         if (txs == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getHistory " + coinInstance.getTicker() + " null txs");
+            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null txs");
             return null;
         }
 
@@ -802,7 +801,7 @@ public class HTTPClient {
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
-            LOGGER.log(Level.WARNING, "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null param size");
+            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null param size");
             return null;
         }
 
@@ -813,22 +812,22 @@ public class HTTPClient {
         params.add("params", innerParams);
 
         String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
+        LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null post result");
+            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
         JsonArray json = new Gson().fromJson(res, JsonArray.class);
         if (json == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null json");
+            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null json");
             return null;
         }
 
         List<Transaction> historyList = new ArrayList<>();
         for (JsonElement elements : json) {
             for (JsonElement element : elements.getAsJsonArray()) {
-                //LOGGER.log(Level.WARNING, "*** DEBUG *** [httpclient] getAddressHistory " + element );
+                //LOGGER.warning("*** DEBUG *** [httpclient] getAddressHistory " + element );
                 JsonObject jsonObject = element.getAsJsonObject();
 
                 String txid = jsonObject.get("tx_hash").getAsString();
@@ -850,7 +849,7 @@ public class HTTPClient {
                         } else
                             ++fails;
                     } catch (Exception e) {
-                        LOGGER.log(Level.WARNING, "[httpclient] getRawTransaction failed - " + e.getMessage());
+                        LOGGER.warning("[httpclient] getRawTransaction failed - " + e.getMessage());
                         ++fails;
                     }
                 }
@@ -880,7 +879,7 @@ public class HTTPClient {
                             } else
                                 ++fails;
                         } catch (Exception e) {
-                            LOGGER.log(Level.WARNING, "[httpclient] getRawTransaction(vout) failed - " + e.getMessage());
+                            LOGGER.warning("[httpclient] getRawTransaction(vout) failed - " + e.getMessage());
                             ++fails;
                         }
                     }
@@ -965,7 +964,7 @@ public class HTTPClient {
         // Return the latest transaction history
         JsonArray txs = coinInstance.getAllTransactions();
         if (txs == null) {
-            LOGGER.log(Level.WARNING, "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null txs");
+            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null txs");
             return null;
         }
 

@@ -15,7 +15,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -91,7 +90,7 @@ public class XRouterMessage extends Message {
         try {
             bitcoinSerializeToStream(byteArrayOutputStream);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[xrouter] Error serializing XRouter packet", e);
+            LOGGER.warning("[xrouter] Error serializing XRouter packet" + e.getMessage());
             return null;
         }
 
@@ -127,7 +126,7 @@ public class XRouterMessage extends Message {
                 break;
             }
             case "xrGetReply": {
-                LOGGER.log(Level.FINER, "[xrouter-message] DEBUG: Fetching reply for packet " + xRouterHeader.getUUID());
+                LOGGER.finer("[xrouter-message] DEBUG: Fetching reply for packet " + xRouterHeader.getUUID());
                 break;
             }
             case "xrGetConfig": {
@@ -181,7 +180,7 @@ public class XRouterMessage extends Message {
                 break;
             }
             case "xrGenerateBloomFilter": {
-                LOGGER.log(Level.FINER, "[xrouter-message] ERROR: Attempted to serialize unsupported command 41.");
+                LOGGER.finer("[xrouter-message] ERROR: Attempted to serialize unsupported command 41.");
                 break;
             }
             case "xrGetBlocks": {
@@ -198,7 +197,7 @@ public class XRouterMessage extends Message {
                 break;
             }
             case "xrGetBlockAtTime": {
-                LOGGER.log(Level.FINER, "[xrouter-message] ERROR: Attempted to serialize unsupported command 52.");
+                LOGGER.finer("[xrouter-message] ERROR: Attempted to serialize unsupported command 52.");
                 break;
             }
             case "xrGetBalance": { //OBSOLETE, only implemented for backwards compatibility
@@ -210,13 +209,13 @@ public class XRouterMessage extends Message {
             }
             case "xrService": {
                 String command = (String) parsedData.get("command");
-                LOGGER.log(Level.FINER, "[xrService] Command: " + command);
+                LOGGER.finer("[xrService] Command: " + command);
 
                 XRouterConfiguration.XRouterPluginConfiguration pluginConfig = blocknetPeer.getPluginConfig(command);
 
                 if (pluginConfig == null) {
-                    LOGGER.log(Level.FINER, "[xrService] ERROR: Unsupported server xrs plugin: " + command);
-                    LOGGER.log(Level.FINER, "[xrService] ERROR: Aborting transmission.");
+                    LOGGER.finer("[xrService] ERROR: Unsupported server xrs plugin: " + command);
+                    LOGGER.finer("[xrService] ERROR: Aborting transmission.");
                     throw new IllegalArgumentException("Unsupported server xrs plugin: " + command);
                 }
 
@@ -239,7 +238,7 @@ public class XRouterMessage extends Message {
                     if (!(param instanceof String && ((String) param).equalsIgnoreCase("true") || ((String) param).equalsIgnoreCase("false")))
                         Preconditions.checkState(paramClass.isInstance(param), "Supplied parameter at index " + i + " is not of type '" + classStr + "'. Aborting transmission.");
 
-                    LOGGER.log(Level.FINER, "[xrService] DEBUG: Parameter " + i + " is of type " + classStr);
+                    LOGGER.finer("[xrService] DEBUG: Parameter " + i + " is of type " + classStr);
 
                     switch (classStr) {
                         case "string": {
@@ -265,7 +264,7 @@ public class XRouterMessage extends Message {
                             break;
                         }
                         default: {
-                            LOGGER.log(Level.FINER, "[xrService] ERROR: Encountered unhandled parameter of type " + classStr + ". Aborting transmission.");
+                            LOGGER.finer("[xrService] ERROR: Encountered unhandled parameter of type " + classStr + ". Aborting transmission.");
                             throw new IllegalStateException("Bad parameter type at index " + i + ": " + classStr);
                         }
                     }
@@ -318,7 +317,7 @@ public class XRouterMessage extends Message {
     protected void parse() throws ProtocolException {
         parsedData.put("header", xRouterHeader);
 
-        LOGGER.log(Level.FINER, "Received raw XRouter packet: " + new String(Hex.encode(data)));
+        LOGGER.finer("Received raw XRouter packet: " + new String(Hex.encode(data)));
         ByteBuffer buf = ByteBuffer.wrap(data);
         buf.position(xRouterHeader.getHeaderLength());
 
@@ -329,15 +328,15 @@ public class XRouterMessage extends Message {
             case "xrConfigReply": {
                 String reply = readStringNT(buf);
                 parsedData.put("reply", reply);
-                LOGGER.log(Level.FINER, "[xrouter-message] Got reply: '" + reply + "' for packet with UUID '" + xRouterHeader.getUUID() + "'");
+                LOGGER.finer("[xrouter-message] Got reply: '" + reply + "' for packet with UUID '" + xRouterHeader.getUUID() + "'");
                 break;
             }
             case "xrGetReply": {
-                LOGGER.log(Level.FINER, "[xrouter-message] WARNING: Server asked to fetch reply, but we aren't a server.");
+                LOGGER.finer("[xrouter-message] WARNING: Server asked to fetch reply, but we aren't a server.");
                 break;
             }
             case "xrGetConfig": {
-                LOGGER.log(Level.FINER, "[xrouter-message] WARNING: Server asked us for config, but we aren't a servicenode.");
+                LOGGER.finer("[xrouter-message] WARNING: Server asked us for config, but we aren't a servicenode.");
                 break;
             }
             case "xrGetBlockCount": {

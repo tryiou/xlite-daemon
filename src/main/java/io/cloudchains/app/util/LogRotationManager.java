@@ -11,7 +11,6 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -72,11 +71,11 @@ public class LogRotationManager {
             List<File> oldLogFiles = findOldLogFiles();
 
             if (oldLogFiles.isEmpty()) {
-                LOGGER.log(Level.INFO, "[log-rotation] No old log files found. Current retention: {0} days", retentionDays);
+                LOGGER.info("[log-rotation] No old log files found. Current retention: " + retentionDays + " days");
                 return true;
             }
 
-            LOGGER.log(Level.INFO, "[log-rotation] Found {0} old log files to clean up", oldLogFiles.size());
+            LOGGER.info("[log-rotation] Found " + oldLogFiles.size() + " old log files to clean up");
 
             long totalSize = 0;
             int deletedCount = 0;
@@ -87,23 +86,21 @@ public class LogRotationManager {
                     if (file.delete()) {
                         totalSize += fileSize;
                         deletedCount++;
-                        LOGGER.log(Level.FINE, "[log-rotation] Deleted: {0} ({1} bytes)",
-                                new Object[]{file.getName(), fileSize});
+                        LOGGER.fine("[log-rotation] Deleted: " + file.getName() + " (" + fileSize + " bytes)");
                     } else {
-                        LOGGER.log(Level.WARNING, "[log-rotation] Failed to delete: {0}", file.getName());
+                        LOGGER.warning("[log-rotation] Failed to delete: " + file.getName());
                     }
                 } catch (SecurityException e) {
-                    LOGGER.log(Level.SEVERE, "[log-rotation] Security exception deleting file: " + file.getName(), e);
+                    LOGGER.severe("[log-rotation] Security exception deleting file: " + file.getName());
                 }
             }
 
-            LOGGER.log(Level.INFO, "[log-rotation] Cleanup completed: {0}/{1} files deleted, {2} bytes freed",
-                    new Object[]{deletedCount, oldLogFiles.size(), totalSize});
+            LOGGER.info("[log-rotation] Cleanup completed: " + deletedCount + "/" + oldLogFiles.size() + " files deleted, " + totalSize + " bytes freed");
 
             return true;
 
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "[log-rotation] Error during log rotation", e);
+            LOGGER.severe("[log-rotation] Error during log rotation: " + e.getMessage());
             return false;
         }
     }
@@ -134,7 +131,7 @@ public class LogRotationManager {
                     });
 
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[log-rotation] Error listing log files", e);
+            LOGGER.warning("[log-rotation] Error listing log files");
         }
 
         return files;
@@ -177,7 +174,7 @@ public class LogRotationManager {
 
             return LocalDate.parse(datePart, DATE_FORMATTER);
         } catch (DateTimeParseException e) {
-            LOGGER.log(Level.FINE, "[log-rotation] Could not parse date from filename: " + fileName);
+            LOGGER.fine("[log-rotation] Could not parse date from filename: " + fileName);
             return null;
         }
     }
@@ -208,7 +205,7 @@ public class LogRotationManager {
                     });
 
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "[log-rotation] Error finding old log files", e);
+            LOGGER.warning("[log-rotation] Error finding old log files");
         }
 
         return oldFiles;
@@ -223,11 +220,11 @@ public class LogRotationManager {
         try {
             if (!Files.exists(logDirectory)) {
                 Files.createDirectories(logDirectory);
-                LOGGER.log(Level.INFO, "[log-rotation] Created log directory: {0}", logDirectory);
+                LOGGER.info("[log-rotation] Created log directory: " + logDirectory);
             }
             return true;
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "[log-rotation] Failed to create log directory: " + logDirectory, e);
+            LOGGER.severe("[log-rotation] Failed to create log directory: " + logDirectory);
             return false;
         }
     }
