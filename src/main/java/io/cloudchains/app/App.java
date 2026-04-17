@@ -5,7 +5,6 @@ import io.cloudchains.app.net.api.JSONRPCController;
 import io.cloudchains.app.net.api.JSONRPCMasterServer;
 import io.cloudchains.app.net.api.http.client.EXRServerPool;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
-import io.cloudchains.app.util.CCLogger;
 import io.cloudchains.app.util.ConsoleFormatter;
 import io.cloudchains.app.util.FileFormatter;
 import io.cloudchains.app.util.LogRotationUtil;
@@ -22,7 +21,6 @@ public class App {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-    private static final boolean isLoggingEnabled = false;
     // DEBUG ENDPOINT
     public static String BASE_URL = "https://xliterevp.mywire.org/";
     // "http://xl-dae-prox.airdns.org:42111/";
@@ -39,7 +37,8 @@ public class App {
         if (dotenv == null) {
             try {
                 dotenv = Dotenv.configure().ignoreIfMissing().load();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                LOGGER.log(Level.FINE, "[app] No .env file found or failed to load", e);
             }
         }
         if (dotenv != null) {
@@ -47,6 +46,31 @@ public class App {
             if (value != null) return value;
         }
         return System.getenv(key);
+    }
+
+    public static String getUserConfigDir() {
+        String OS = (System.getProperty("os.name")).toLowerCase();
+        if (OS.contains("win")) {
+            return getEnv("AppData");
+        } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
+            return System.getProperty("user.home") + File.separator + ".config";
+        } else if (OS.contains("mac")) {
+            return System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support";
+        }
+        return System.getProperty("user.home") + File.separator + ".config";
+    }
+
+    private static Level parseLogLevel(String envValue, Level defaultLevel) {
+        if (envValue == null || envValue.trim().isEmpty()) {
+            return defaultLevel;
+        }
+        try {
+            return Level.parse(envValue.trim().toUpperCase());
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[app] Invalid log level '{0}', using default {1}",
+                    new Object[]{envValue, defaultLevel});
+            return defaultLevel;
+        }
     }
 
     public static void initExrEndpoint() {
@@ -73,39 +97,23 @@ public class App {
 
         initExrEndpoint();
 
-        CCLogger.setLogging(isLoggingEnabled);
-        LOGGER.setLevel(Level.INFO);
+        Level logLevel = parseLogLevel(getEnv("CLOUDCHAINS_LOG_LEVEL"), Level.INFO);
+        LOGGER.setLevel(logLevel);
         LOGGER.setUseParentHandlers(false);
 
-        // Perform log rotation before initializing other components
         LogRotationUtil.performLogRotation();
 
         Runtime.getRuntime().addShutdownHook(new Thread(App::shutdown));
 
         try {
-            String userHomeDir;
-            String OS = (System.getProperty("os.name")).toLowerCase();
-
-            if (OS.contains("win")) {
-                userHomeDir = getEnv("AppData");
-            } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
-                userHomeDir = System.getProperty("user.home") + File.separator + ".config";
-            } else if (OS.contains("mac")) {
-                userHomeDir = System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support";
-            } else {
-                userHomeDir = System.getProperty("user.home") + File.separator + ".config";
-            }
-
+            String userHomeDir = getUserConfigDir();
+            String logDir = userHomeDir + File.separator + "CloudChains";
             DateTimeFormatter timeStampPattern = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             Handler fileHandler = new FileHandler(
-                    userHomeDir +
-                            File.separator +
-                            "CloudChains" +
-                            File.separator +
-                            "error-" +
-                            timeStampPattern.format(LocalDateTime.now()) +
-                            ".log",
-                    true
+                    logDir + File.separator + "error-" + timeStampPattern.format(LocalDateTime.now()) + ".log",
+                    10_000_000,  // max file size 10MB
+                    5,          // 5 rotated files
+                    true         // append to existing
             );
 
             fileHandler.setFormatter(new FileFormatter());

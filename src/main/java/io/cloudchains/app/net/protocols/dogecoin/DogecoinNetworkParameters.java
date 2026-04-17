@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.dogecoin;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class DogecoinNetworkParameters extends NetworkParameters {
+public class DogecoinNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public DogecoinNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class DogecoinNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "DOGE";
+    }
+
+    public long getFeePerByte() {
+        return 2500;
+    }
+
+    public long getMinTxFee() {
+        return 225000;
     }
 }

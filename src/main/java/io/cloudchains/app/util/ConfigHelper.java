@@ -20,8 +20,8 @@ public class ConfigHelper {
     private String tickerStr;
     private File file;
 
-    private double fee;
-    private boolean feeFlat;
+    private long feePerByte;
+    private long minTxFee;
     private boolean rpcEnabled;
     private String rpcUsername;
     private String rpcPassword;
@@ -46,8 +46,6 @@ public class ConfigHelper {
         try {
             String rawConfig = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
             if (rawConfig.isEmpty()) {
-                fee = 0.0001;
-                feeFlat = true;
                 rpcEnabled = false;
                 rpcUsername = "";
                 rpcPassword = "";
@@ -61,8 +59,8 @@ public class ConfigHelper {
             JSONObject config = new JSONObject(rawConfig);
 
             final String[] configKeys = new String[]{
-                    "fee",
-                    "feeFlat",
+                    "feeperbyte",
+                    "mintxfee",
                     "rpcEnabled",
                     "rpcUsername",
                     "rpcPassword",
@@ -78,23 +76,16 @@ public class ConfigHelper {
 
             boolean needsWrite = false;
 
-            if (!config.has("fee")) {
-                fee = 0.0001;
+            if (!config.has("feeperbyte")) {
                 needsWrite = true;
             } else {
-                fee = config.getDouble("fee");
-                LOGGER.log(Level.FINE, "[config] " + tickerStr + " fee from config: " + fee);
-                if (fee <= 0) {
-                    fee = 0.0001;
-                    needsWrite = true;
-                }
+                feePerByte = config.getLong("feeperbyte");
             }
 
-            if (!config.has("feeFlat")) {
-                feeFlat = true;
+            if (!config.has("mintxfee")) {
                 needsWrite = true;
             } else {
-                feeFlat = config.getBoolean("feeFlat");
+                minTxFee = config.getLong("mintxfee");
             }
 
             if (!config.has("rpcEnabled")) {
@@ -168,12 +159,12 @@ public class ConfigHelper {
         return configFile;
     }
 
-    public synchronized void setFee(double fee) {
-        this.fee = fee;
+    public synchronized void setFeePerByte(long feePerByte) {
+        this.feePerByte = feePerByte;
     }
 
-    public synchronized void setFlatFee(boolean flat) {
-        this.feeFlat = flat;
+    public synchronized void setMinTxFee(long minTxFee) {
+        this.minTxFee = minTxFee;
     }
 
     public synchronized void setRpcEnabled(boolean isEnabled) {
@@ -208,12 +199,12 @@ public class ConfigHelper {
         this.addressCount = addressCount;
     }
 
-    public synchronized double getFee() {
-        return fee;
+    public synchronized long getFeePerByte() {
+        return feePerByte;
     }
 
-    public synchronized boolean isFlatFee() {
-        return feeFlat;
+    public synchronized long getMinTxFee() {
+        return minTxFee;
     }
 
     public synchronized boolean isRpcEnabled() {
@@ -249,8 +240,8 @@ public class ConfigHelper {
 
     private JSONObject toConfigJson() {
         JSONObject config = new JSONObject();
-        config.put("fee", fee);
-        config.put("feeFlat", feeFlat);
+        config.put("feeperbyte", feePerByte);
+        config.put("mintxfee", minTxFee);
         config.put("rpcEnabled", rpcEnabled);
         config.put("rpcUsername", rpcUsername);
         config.put("rpcPassword", rpcPassword);

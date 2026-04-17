@@ -279,7 +279,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 infoJSON.addProperty("keypoolsize", coin.getAddressKeyPairs().size());
                 infoJSON.addProperty("keypoololdest", 0.0);
 
-                BigDecimal relayFeeDecimal = new BigDecimal(coin.getConfigHelper().getFee()).setScale(8, RoundingMode.DOWN);
+                long relayFeeSats = WalletHelper.getFeePerByte(coin.getNetworkParameters()) * 1000;
+                BigDecimal relayFeeDecimal = new BigDecimal(relayFeeSats).divide(new BigDecimal(Coin.COIN.value), 8, RoundingMode.DOWN);
                 infoJSON.addProperty("relayfee", relayFeeDecimal);
 
                 infoJSON.addProperty("networkactive", true);
@@ -303,16 +304,20 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 networkInfoJSON.addProperty("connections", 1);
                 networkInfoJSON.addProperty("localservices", "0000000000000000");
 
-                double relayFee = CoinInstance.getRelayFeeByTicker(coin.getTicker());
-                if (relayFee == -1) {
-                    relayFee = coin.getConfigHelper().getFee();
-                }
-
-                BigDecimal relayFeeDecimal = BigDecimal.valueOf(relayFee).setScale(8, RoundingMode.DOWN);
+                long relayFeeSats = WalletHelper.getFeePerByte(coin.getNetworkParameters()) * 1000;
+                BigDecimal relayFeeDecimal = new BigDecimal(relayFeeSats).divide(new BigDecimal(Coin.COIN.value), 8, RoundingMode.DOWN);
 
                 networkInfoJSON.addProperty("relayfee", relayFeeDecimal);
 
                 response.add("result", networkInfoJSON);
+                response.add("error", JsonNull.INSTANCE);
+                break;
+            }
+            case "getfees": {
+                JsonObject feesJSON = new JsonObject();
+                feesJSON.addProperty("feeperbyte", WalletHelper.getFeePerByte(coin.getNetworkParameters()));
+                feesJSON.addProperty("mintxfee", WalletHelper.getMinTxFee(coin.getNetworkParameters()));
+                response.add("result", feesJSON);
                 response.add("error", JsonNull.INSTANCE);
                 break;
             }
@@ -1451,6 +1456,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         + "getinfo - Get information such as balances, protocol version, and more.\n"
                         + "getblockcount - Get block count\n"
                         + "getnetworkinfo - Get network information\n"
+                        + "getfees - Get fee per byte and minimum transaction fee\n"
                         + "getrawmempool - Get raw mempool\n"
                         + "getblockchaininfo - Get blockchain info\n"
                         + "getblockhash <height> - Get the hash of a block at a given height\n"

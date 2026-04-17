@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.ravencoin;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class RavencoinNetworkParameters extends NetworkParameters {
+public class RavencoinNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public RavencoinNetworkParameters() {
         super();
@@ -96,7 +97,11 @@ public class RavencoinNetworkParameters extends NetworkParameters {
         return "RVN";
     }
 
-    public Coin getMinRelayTxFee() {
-        return Coin.valueOf(500000);
+    public long getFeePerByte() {
+        return 1000;
+    }
+
+    public long getMinTxFee() {
+        return 100000;
     }
 }

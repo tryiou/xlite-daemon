@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.phorecoin;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class PhorecoinNetworkParameters extends NetworkParameters {
+public class PhorecoinNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public PhorecoinNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class PhorecoinNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "PHR";
+    }
+
+    public long getFeePerByte() {
+        return 20;
+    }
+
+    public long getMinTxFee() {
+        return 10000;
     }
 }

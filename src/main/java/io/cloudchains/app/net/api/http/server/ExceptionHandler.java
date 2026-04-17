@@ -21,7 +21,7 @@ public class ExceptionHandler extends ChannelDuplexHandler {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        LOGGER.log(Level.FINER, cause.getMessage());
+        LOGGER.log(Level.WARNING, "[http-server] Channel exception", cause);
         writeErrorResponse(ctx);
     }
 

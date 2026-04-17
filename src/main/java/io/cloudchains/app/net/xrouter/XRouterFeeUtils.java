@@ -43,12 +43,17 @@ public class XRouterFeeUtils {
             return "nohash;nofee";
         }
 
-        double totalSpending = fee + blocknetCoin.getConfigHelper().getFee();
+        long feePerByte = WalletHelper.getFeePerByte(blocknetCoin.getNetworkParameters());
+        long minTxFee = WalletHelper.getMinTxFee(blocknetCoin.getNetworkParameters());
+        long networkFeeSats = Math.max(feePerByte * (192 + 34), minTxFee);
+        double networkFee = (double) networkFeeSats / Coin.COIN.value;
+
+        double totalSpending = fee + networkFee;
         double totalAvailable = blocknetWalletHelper.getSpendBalance(totalSpending);
-        double changeAmt = ((totalAvailable - blocknetCoin.getConfigHelper().getFee()) - fee);
+        double changeAmt = totalAvailable - networkFee - fee;
 
         LegacyAddress xRouterPaymentAddress = LegacyAddress.fromBase58(params, xRouterConfig.getFeeAddress());
-        Coin blocknetNetworkFeeAmt = Coin.valueOf((long) Math.floor(blocknetCoin.getConfigHelper().getFee() * Coin.COIN.value));
+        Coin blocknetNetworkFeeAmt = Coin.valueOf(networkFeeSats);
         Coin xRouterChangeAmt = Coin.valueOf((long) Math.floor(totalAvailable * Coin.COIN.value)).minus(blocknetNetworkFeeAmt).minus(xRouterFeeAmt);
 
         TransactionOutput feeOutput = new TransactionOutput(params, null, xRouterFeeAmt, xRouterPaymentAddress);

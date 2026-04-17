@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.pivx;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class PivxNetworkParameters extends NetworkParameters {
+public class PivxNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public PivxNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class PivxNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "PIVX";
+    }
+
+    public long getFeePerByte() {
+        return 20;
+    }
+
+    public long getMinTxFee() {
+        return 10000;
     }
 }

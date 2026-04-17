@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.alqocoin;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class AlqocoinNetworkParameters extends NetworkParameters {
+public class AlqocoinNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public AlqocoinNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class AlqocoinNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "XLQ";
+    }
+
+    public long getFeePerByte() {
+        return 20;
+    }
+
+    public long getMinTxFee() {
+        return 10000;
     }
 }

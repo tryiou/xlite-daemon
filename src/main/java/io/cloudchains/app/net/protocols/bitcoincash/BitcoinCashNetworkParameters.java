@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.bitcoincash;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class BitcoinCashNetworkParameters extends NetworkParameters {
+public class BitcoinCashNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public BitcoinCashNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class BitcoinCashNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "BCH";
+    }
+
+    public long getFeePerByte() {
+        return 2;
+    }
+
+    public long getMinTxFee() {
+        return 500;
     }
 }

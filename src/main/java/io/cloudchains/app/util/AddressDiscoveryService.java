@@ -232,7 +232,7 @@ public class AddressDiscoveryService {
             utxoResponse = httpClient.getUtxosUncached(coinInstance.getTicker(), addresses);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, getLogPrefix() + " HTTP request failed for addresses "
-                    + addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage(), e);
+                    + addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage());
             return null;
         }
         if (utxoResponse == null || utxoResponse.size() == 0) {

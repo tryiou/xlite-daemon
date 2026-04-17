@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.unobtanium;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class UnobtaniumNetworkParameters extends NetworkParameters {
+public class UnobtaniumNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public UnobtaniumNetworkParameters() {
         super();
@@ -95,5 +96,13 @@ public class UnobtaniumNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "UNO";
+    }
+
+    public long getFeePerByte() {
+        return 3;
+    }
+
+    public long getMinTxFee() {
+        return 1000;
     }
 }

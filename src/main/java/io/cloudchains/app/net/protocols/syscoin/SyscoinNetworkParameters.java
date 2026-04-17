@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.syscoin;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class SyscoinNetworkParameters extends NetworkParameters {
+public class SyscoinNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public SyscoinNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class SyscoinNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "SYS";
+    }
+
+    public long getFeePerByte() {
+        return 40;
+    }
+
+    public long getMinTxFee() {
+        return 20000;
     }
 }

@@ -112,6 +112,7 @@ gettxout <txid> <vout> - Get info about an unspent transaction output
 =====Network=====
 getinfo - Get information such as balances, protocol version, and more
 getnetworkinfo - Get network information
+getfees - Get fee per byte and minimum transaction fee for the current coin
 getrawmempool - Get raw mempool
 getblockchaininfo - Get blockchain info
 getblockhash <height> - Get the hash of a block at a given height

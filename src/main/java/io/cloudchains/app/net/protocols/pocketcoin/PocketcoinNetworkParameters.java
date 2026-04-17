@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.pocketcoin;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class PocketcoinNetworkParameters extends NetworkParameters {
+public class PocketcoinNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public PocketcoinNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class PocketcoinNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "PKOIN";
+    }
+
+    public long getFeePerByte() {
+        return 20;
+    }
+
+    public long getMinTxFee() {
+        return 10000;
     }
 }

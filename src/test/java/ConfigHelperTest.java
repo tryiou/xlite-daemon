@@ -43,8 +43,8 @@ class ConfigHelperTest extends TestHelper {
 
     @Test
     void testDefaultConfigurationValues() {
-        assertEquals(0.0001, configHelper.getFee());
-        assertTrue(configHelper.isFlatFee());
+        assertEquals(0L, configHelper.getFeePerByte());
+        assertEquals(0L, configHelper.getMinTxFee());
         assertFalse(configHelper.isRpcEnabled());
         assertEquals("", configHelper.getRpcUsername());
         assertEquals("", configHelper.getRpcPassword());
@@ -53,22 +53,23 @@ class ConfigHelperTest extends TestHelper {
     }
 
     @Test
-    void testSetAndGetFee() {
-        double newFee = 0.001;
-        configHelper.setFee(newFee);
+    void testSetAndGetFeePerByte() {
+        long newFeePerByte = 60L;
+        configHelper.setFeePerByte(newFeePerByte);
         configHelper.writeConfig();
 
         ConfigHelper reloadedConfig = new ConfigHelper("test");
-        assertEquals(newFee, reloadedConfig.getFee());
+        assertEquals(newFeePerByte, reloadedConfig.getFeePerByte());
     }
 
     @Test
-    void testSetAndGetFlatFee() {
-        configHelper.setFlatFee(false);
+    void testSetAndGetMinTxFee() {
+        long newMinTxFee = 12000L;
+        configHelper.setMinTxFee(newMinTxFee);
         configHelper.writeConfig();
 
         ConfigHelper reloadedConfig = new ConfigHelper("test");
-        assertFalse(reloadedConfig.isFlatFee());
+        assertEquals(newMinTxFee, reloadedConfig.getMinTxFee());
     }
 
     @Test
@@ -157,27 +158,24 @@ class ConfigHelperTest extends TestHelper {
 
     @Test
     void testConfigFilePersistence() {
-        // Set some values
-        configHelper.setFee(0.005);
-        configHelper.setFlatFee(false);
+        configHelper.setFeePerByte(60L);
+        configHelper.setMinTxFee(12000L);
         configHelper.setRpcEnabled(true);
         configHelper.setAddressCount(100);
         configHelper.writeConfig();
 
-        // Create new instance and verify values persist
         ConfigHelper newConfig = new ConfigHelper("test");
-        assertEquals(0.005, newConfig.getFee());
-        assertFalse(newConfig.isFlatFee());
+        assertEquals(60L, newConfig.getFeePerByte());
+        assertEquals(12000L, newConfig.getMinTxFee());
         assertTrue(newConfig.isRpcEnabled());
         assertEquals(100, newConfig.getAddressCount());
     }
 
     @Test
     void testLoadConfigFromFile() {
-        // Write a config file manually
         String configContent = "{\n" +
-                "    \"fee\": 0.002,\n" +
-                "    \"feeFlat\": false,\n" +
+                "    \"feeperbyte\": 60,\n" +
+                "    \"mintxfee\": 12000,\n" +
                 "    \"rpcEnabled\": true,\n" +
                 "    \"rpcUsername\": \"testuser\",\n" +
                 "    \"rpcPassword\": \"testpass\",\n" +
@@ -195,11 +193,10 @@ class ConfigHelperTest extends TestHelper {
             fail("Failed to write config file", e);
         }
 
-        // Create new ConfigHelper instance to load from file
         ConfigHelper loadedConfig = new ConfigHelper("test");
 
-        assertEquals(0.002, loadedConfig.getFee());
-        assertFalse(loadedConfig.isFlatFee());
+        assertEquals(60L, loadedConfig.getFeePerByte());
+        assertEquals(12000L, loadedConfig.getMinTxFee());
         assertTrue(loadedConfig.isRpcEnabled());
         assertEquals("testuser", loadedConfig.getRpcUsername());
         assertEquals("testpass", loadedConfig.getRpcPassword());

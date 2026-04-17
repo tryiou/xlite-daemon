@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.digibyte;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class DigibyteNetworkParameters extends NetworkParameters {
+public class DigibyteNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public DigibyteNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class DigibyteNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "DGB";
+    }
+
+    public long getFeePerByte() {
+        return 200;
+    }
+
+    public long getMinTxFee() {
+        return 100000;
     }
 }

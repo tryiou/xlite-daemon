@@ -24,8 +24,7 @@ public class LogRotationUtil {
      */
     public static void performLogRotation() {
         try {
-            // Determine log directory path (same logic as App.java file handler creation)
-            String userHomeDir = getUserConfigDirectory();
+            String userHomeDir = App.getUserConfigDir();
             String logDirectoryPath = userHomeDir + File.separator + "CloudChains";
 
             // Get retention days from environment variable or use default
@@ -49,25 +48,6 @@ public class LogRotationUtil {
 
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[log-rotation] Failed to perform log rotation", e);
-        }
-    }
-
-    /**
-     * Gets the user configuration directory based on the operating system.
-     * 
-     * @return Path to user configuration directory
-     */
-    private static String getUserConfigDirectory() {
-        String OS = (System.getProperty("os.name")).toLowerCase();
-
-        if (OS.contains("win")) {
-            return App.getEnv("AppData");
-        } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
-            return System.getProperty("user.home") + File.separator + ".config";
-        } else if (OS.contains("mac")) {
-            return System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support";
-        } else {
-            return System.getProperty("user.home") + File.separator + ".config";
         }
     }
 

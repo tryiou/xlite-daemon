@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.litecoin;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class LitecoinNetworkParameters extends NetworkParameters {
+public class LitecoinNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public LitecoinNetworkParameters() {
         super();
@@ -98,5 +99,13 @@ public class LitecoinNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "LTC";
+    }
+
+    public long getFeePerByte() {
+        return 10;
+    }
+
+    public long getMinTxFee() {
+        return 5000;
     }
 }

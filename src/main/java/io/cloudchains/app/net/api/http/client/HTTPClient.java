@@ -535,34 +535,6 @@ public class HTTPClient {
         return coinInstance.getAllUTXOS();
     }
 
-    public void getAllFees() {
-        String res = executeGetRequest("/fees");
-
-        if (res == null) return;
-
-        JsonObject result = new Gson().fromJson(res, JsonObject.class);
-        JsonObject fees = result.get("result").getAsJsonObject();
-
-        for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-            String ticker = CoinTickerUtils.tickerToString(coinInstance.getTicker());
-
-            if (!fees.keySet().contains(ticker) || fees.get(ticker).isJsonNull()) {
-                coinInstance.incrementUpdateFailures();
-                continue;
-            }
-
-            double fee = fees.get(ticker).getAsDouble();
-
-            coinInstance.addRelayFee(coinInstance.getTicker(), fee);
-
-            if (logCount % HttpClientConfig.LOG_COUNT_MODULO == 0)
-                LOGGER.log(Level.INFO, "[httpclient] Got relayfee for currency " + ticker + " - " + fee);
-            else
-                LOGGER.log(Level.FINER, "[httpclient] Got relayfee for currency " + ticker + " - " + fee);
-        }
-        logCount += 1;
-    }
-
     public JsonObject getRawTransaction(CoinTicker coinTicker, String txid, boolean verbose) {
         ArrayList<String> rawTxParams = new ArrayList<>();
         rawTxParams.add(0, CoinTickerUtils.tickerToString(coinTicker));

@@ -1,6 +1,7 @@
 package io.cloudchains.app.net.protocols.blocknet;
 
 import com.subgraph.orchid.encoders.Hex;
+import io.cloudchains.app.net.HasFeeParams;
 import io.cloudchains.app.net.xrouter.XRouterMessageSerializer;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
@@ -8,7 +9,7 @@ import org.bitcoinj.utils.MonetaryFormat;
 
 import java.math.BigInteger;
 
-public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
+public class BlocknetTestnet5NetworkParameters extends BlocknetParameters implements HasFeeParams {
 
     public BlocknetTestnet5NetworkParameters() {
         super();
@@ -154,5 +155,13 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters {
     @Override
     public String getId() {
         return "tBLOCK";
+    }
+
+    public long getFeePerByte() {
+        return 20;
+    }
+
+    public long getMinTxFee() {
+        return 10000;
     }
 }

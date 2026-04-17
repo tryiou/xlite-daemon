@@ -1,11 +1,12 @@
 package io.cloudchains.app.net.protocols.bitbay;
 
+import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class BitbayNetworkParameters extends NetworkParameters {
+public class BitbayNetworkParameters extends NetworkParameters implements HasFeeParams {
 
     public BitbayNetworkParameters() {
         super();
@@ -94,5 +95,13 @@ public class BitbayNetworkParameters extends NetworkParameters {
     @Override
     public String getId() {
         return "BAY";
+    }
+
+    public long getFeePerByte() {
+        return 100;
+    }
+
+    public long getMinTxFee() {
+        return 20000;
     }
 }

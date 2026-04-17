@@ -1,7 +1,6 @@
 package io.cloudchains.app.net;
 
 import com.google.common.base.Joiner;
-import com.google.common.util.concurrent.AtomicDouble;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.subgraph.orchid.encoders.Hex;
@@ -13,6 +12,7 @@ import io.cloudchains.app.net.api.JSONRPCServer;
 //import io.cloudchains.app.net.protocols.alqocoin.AlqocoinNetworkParameters;
 //import io.cloudchains.app.net.protocols.bitbay.BitbayNetworkParameters;
 //import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParameters;
+import io.cloudchains.app.net.protocols.bitcoin.BitcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.blocknet.*;
 import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
@@ -36,7 +36,6 @@ import io.cloudchains.app.util.UTXO;
 import io.cloudchains.app.util.history.Transaction;
 import io.cloudchains.app.wallet.WalletHelper;
 import org.bitcoinj.core.*;
-import org.bitcoinj.params.MainNetParams;
 import org.bitcoinj.utils.BtcFormat;
 import org.bitcoinj.utils.ListenerRegistration;
 import org.bitcoinj.utils.MonetaryFormat;
@@ -88,7 +87,6 @@ public class CoinInstance {
     private static CoinTicker activeBlocknetNetwork = null;
     private static CopyOnWriteArrayList<ListenerRegistration<ActiveCoinChangedEventListener>> activeCoinChangedListeners = new CopyOnWriteArrayList<>();
     private static ConcurrentHashMap<CoinTicker, AtomicInteger> blockCounts = new ConcurrentHashMap<>();
-    private static ConcurrentHashMap<CoinTicker, AtomicDouble> relayFees = new ConcurrentHashMap<>();
 
     private ConfigHelper configHelper;
     private WalletHelper walletHelper = null;
@@ -146,14 +144,6 @@ public class CoinInstance {
         }
 
         return blockCounts.get(ticker).get();
-    }
-
-    public static double getRelayFeeByTicker(CoinTicker ticker) {
-        if (!relayFees.containsKey(ticker)) {
-            return -1;
-        }
-
-        return relayFees.get(ticker).get();
     }
 
     public static List<CoinInstance> getCoinInstances() {
@@ -362,7 +352,7 @@ public class CoinInstance {
             }
             case BITCOIN: {
                 LOGGER.log(Level.FINE, "[coin] Initializing for Bitcoin main network.");
-                networkParameters = MainNetParams.get();
+                networkParameters = new BitcoinNetworkParameters();
                 rpcPort = 8332;
                 break;
             }
@@ -450,12 +440,8 @@ public class CoinInstance {
             // }
             case RAVENCOIN: {
                 LOGGER.log(Level.FINE, "[coin] Initializing for Ravencoin main network.");
-                RavencoinNetworkParameters rvnParams = new RavencoinNetworkParameters();
-                networkParameters = rvnParams;
+                networkParameters = new RavencoinNetworkParameters();
                 rpcPort = 8766;
-                Coin minFee = rvnParams.getMinRelayTxFee();
-                LOGGER.log(Level.FINE, "[coin] " + ticker + " getMinRelayTxFee: " + minFee.value + " satoshis");
-                configHelper.setFee(minFee.value / (double) Coin.COIN.value);
                 break;
             }
             default: {
@@ -921,11 +907,6 @@ public class CoinInstance {
     public void addBlockCount(CoinTicker ticker, Integer blockCount) {
         blockCounts.computeIfAbsent(ticker, k -> new AtomicInteger(0))
                 .updateAndGet(current -> Math.max(current, blockCount));
-    }
-
-    public void addRelayFee(CoinTicker ticker, Double relayFee) {
-        relayFees.computeIfAbsent(ticker, k -> new AtomicDouble(relayFee)).set(relayFee);
-        configHelper.setFee(relayFee);
     }
 
     public void addCloudTransaction(CloudTransaction cloudTransaction) {
