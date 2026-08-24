@@ -186,7 +186,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                LOGGER.info("[http-server-handler] RPC CALL: " + method + " PARAMS: " + params.toString().replace(",", ", "));
+                // Master surface handles wallet management — params may contain
+                // passwords; never log them verbatim.
+                LOGGER.info("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
 
                 response = getResponse(method, params);
                 LOGGER.finer(response.toString());

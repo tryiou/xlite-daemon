@@ -305,7 +305,10 @@ public class WalletHelper {
             if (totalSelected >= required) {
                 return totalSelected - required;
             }
-            return 0.0;
+            // Shortfall must fail like the multi-input path — returning
+            // change 0.0 here used to build a deterministically invalid
+            // transaction (recipient output exceeding the lone input).
+            throw new RuntimeException("Not enough funds");
         }
 
         UTXO largestUtxo = allUtxos.get(allUtxos.size() - 1);

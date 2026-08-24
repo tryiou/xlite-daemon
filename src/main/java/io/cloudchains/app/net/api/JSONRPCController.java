@@ -35,6 +35,10 @@ public class JSONRPCController {
         if (server.isAlive())
             server.deinit();
 
+        // Wait (bounded) for the old listener to release its socket so an
+        // immediate rebind on the same port cannot lose the race.
+        server.awaitPortRelease(3000);
+
         servers.remove(coinInstance);
     }
 }

@@ -21,7 +21,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -35,7 +34,9 @@ public class ConsoleMenu {
 
     public ConsoleMenu(String[] args) {
         this.arguments = args;
-        LOGGER.setLevel(Level.INFO);
+        // Do NOT set the logger level here — App owns logging configuration
+        // (CLOUDCHAINS_LOG_LEVEL); clobbering it in this constructor made all
+        // FINE/FINER diagnostics unreachable.
     }
 
     public void logBadPassword(String msg) {
@@ -215,6 +216,15 @@ public class ConsoleMenu {
                             }
 
                             String mnemonic = CoinInstance.getMnemonicForPw(password);
+                            if (mnemonic == null || mnemonic.isEmpty()) {
+                                // Wrong password (or unusable wallet) must not
+                                // masquerade as success with an empty phrase.
+                                // Wipe BEFORE exiting — System.exit does not
+                                // unwind, so a finally block would be skipped.
+                                LOGGER.severe("Error(BADPASSWORD): could not retrieve mnemonic for the supplied password");
+                                Arrays.fill(password, '\0');
+                                System.exit(4);
+                            }
                             System.out.println(mnemonic);
                         } finally {
                             Arrays.fill(password, '\0');
@@ -391,7 +401,7 @@ public class ConsoleMenu {
     private void completeLogin(char[] password, String userMnemonic, boolean isMnemonic) {
         if (password == null && userMnemonic == null) {
             logBadPassword(null);
-            System.exit(0);
+            System.exit(5);
         }
 
         long startTime = System.currentTimeMillis();
@@ -400,7 +410,12 @@ public class ConsoleMenu {
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.severe(msg);
-            System.exit(0);
+            // Auth/init failure must not exit 0 — scripts and the GUI treat
+            // exit code 0 as success. Wipe the credential before exiting
+            // (System.exit does not unwind caller finally blocks).
+            if (password != null)
+                Arrays.fill(password, '\0');
+            System.exit(5);
         }
 
         List<CoinTicker> otherCoins = new ArrayList<>();

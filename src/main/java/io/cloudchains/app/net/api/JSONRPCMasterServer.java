@@ -41,6 +41,11 @@ public class JSONRPCMasterServer extends Thread {
 
             channel = bootstrap.bind(port).sync().channel();
 
+            // Emitted only after the bind actually succeeded — readiness
+            // consumers (xlite-gui) anchor on this line, NOT on the
+            // pre-bind "Starting" line below.
+            LOGGER.info("[rpc-master] Master RPC server listening on port " + port + ".");
+
             channel.closeFuture().sync();
         } catch (Exception e) {
             if (!stopping) {

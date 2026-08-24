@@ -11,6 +11,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
+import java.util.concurrent.TimeUnit;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -21,6 +22,8 @@ public class JSONRPCServer extends Thread {
     private final CoinInstance coin;
     private final int port;
     private boolean stopping = false;
+    private volatile boolean bound = false;
+    private volatile boolean bindFailed = false;
 
     private Channel channel;
     private EventLoopGroup workerGroup;
@@ -43,14 +46,44 @@ public class JSONRPCServer extends Thread {
 
             channel = bootstrap.bind(port).sync().channel();
 
-            LOGGER.finer("[rpc] Starting RPC server for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " on port " + port + ".");
+            // Emitted only after the bind actually succeeded.
+            LOGGER.info("[rpc] RPC server listening for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " on port " + port + ".");
+            bound = true;
 
             channel.closeFuture().sync();
         } catch (Exception e) {
+            bindFailed = true;
             if (!stopping) {
                 LOGGER.warning("[rpc-server] Error during RPC server operation for " + CoinTickerUtils.tickerToString(coin.getTicker()) + e.getMessage());
             }
         }
+    }
+
+    /**
+     * Blocks until the listener has either bound successfully or failed.
+     * @return true iff the port is bound and accepting.
+     */
+    public boolean awaitBound(long timeoutMillis) {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        while (System.currentTimeMillis() < deadline) {
+            if (bound || bindFailed) return bound;
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return bound;
+            }
+        }
+        return bound;
+    }
+
+    /**
+     * Best-effort wait until the previous listener has released its socket,
+     * so an immediate rebind on the same port cannot race the async close.
+     */
+    public void awaitPortRelease(long timeoutMillis) {
+        if (channel != null)
+            channel.closeFuture().awaitUninterruptibly(timeoutMillis, TimeUnit.MILLISECONDS);
     }
 
     public void deinit() {

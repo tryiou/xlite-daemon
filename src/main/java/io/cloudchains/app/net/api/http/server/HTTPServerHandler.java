@@ -36,6 +36,7 @@ import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -56,6 +57,10 @@ class OutputEntry {
 public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+
+    // RPC methods whose params/responses contain key material — never log them.
+    private static final Set<String> SENSITIVE_METHODS = Set.of(
+            "importprivkey", "dumpprivkey", "signmessage");
 
     private HTTPClient httpClient;
     private CoinInstance coin;
@@ -219,10 +224,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                LOGGER.info("[http-server-handler] RPC CALL: " + coin.getTicker() + " " + method + " PARAMS: " + params.toString().replace(",", ", "));
+                boolean sensitiveMethod = SENSITIVE_METHODS.contains(method);
+                LOGGER.info("[http-server-handler] RPC CALL: " + coin.getTicker() + " " + method
+                        + " PARAMS: " + (sensitiveMethod ? "<redacted>" : params.toString().replace(",", ", ")));
 
                 response = getResponse(method, params);
-                LOGGER.finer(response.toString());
+                if (sensitiveMethod)
+                    LOGGER.finer("[http-server-handler] response withheld (sensitive method)");
+                else
+                    LOGGER.finer(response.toString());
             } else {
                 ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
                 FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
@@ -435,14 +445,27 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 JsonObject txid = httpClient.sendRawTransaction(coin.getTicker(), rawTx);
                 if (txid == null || txid.has("error") && !txid.get("error").isJsonNull()) {
                     int code = -1;
+                    String message = "Error sending transaction!";
 
-                    if (txid != null)
-                        code = txid.get("error").getAsInt();
+                    // Upstream error may be a legacy int (hosted backend) or a
+                    // structured {code,message} object (plugin-adapter) — accept both.
+                    if (txid != null && txid.has("error") && !txid.get("error").isJsonNull()) {
+                        JsonElement errElement = txid.get("error");
+                        if (errElement.isJsonPrimitive()) {
+                            code = errElement.getAsInt();
+                        } else if (errElement.isJsonObject()) {
+                            JsonObject errObj = errElement.getAsJsonObject();
+                            if (errObj.has("code"))
+                                code = errObj.get("code").getAsInt();
+                            if (errObj.has("message"))
+                                message = errObj.get("message").getAsString();
+                        }
+                    }
 
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", code);
-                    errorJSON.addProperty("message", "Error sending transaction!");
+                    errorJSON.addProperty("message", message);
                     response.add("error", errorJSON);
 
                     break;
@@ -462,7 +485,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 break;
             }
             case "getrawtransaction": {
-                if (params.size() > 2) {
+                if (params.size() < 1 || params.size() > 2) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -1);
@@ -857,6 +880,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                 txJSON.add("vin", vin);
                 JsonArray vout = new JsonArray();
+                boolean outputParseFailed = false;
 
                 for (TransactionOutput output : tx.getOutputs()) {
                     try {
@@ -887,6 +911,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                         vout.add(thisVout);
                     } catch (Exception e) {
+                        outputParseFailed = true;
                         LOGGER.warning("[http-server-handler] ERROR: Error while parsing transaction outputs!");
                         LOGGER.warning("[http-server-handler] Error parsing transaction outputs for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
 
@@ -898,6 +923,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         response.add("error", errorJSON);
                     }
                 }
+
+                // A throwing vout must surface as an error, not be silently
+                // dropped from a success-shaped response.
+                if (outputParseFailed)
+                    break;
 
                 txJSON.add("vout", vout);
 
@@ -938,6 +968,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 Transaction signedTx = new Transaction(coin.getNetworkParameters());
 
                 boolean complete = true;
+                boolean inputFailed = false;
 
                 for (TransactionOutput output : tx.getOutputs()) {
                     signedTx.addOutput(output);
@@ -952,6 +983,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     if (utxo == null || signingKey == null) {
                         getInvalidTxResponse(response, new Exception("Transaction contains an utxo/input which does not exist in our wallet."));
+                        inputFailed = true;
                         break;
                     }
 
@@ -961,6 +993,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     signedTx.addSignedInput(outPoint, bUtxo.getScript(), signingKey, Transaction.SigHash.ALL, true);
 //					utxo.setSpent(true);
+                }
+
+                if (inputFailed) {
+                    // An error response is already set — never hand back a
+                    // partially signed hex claiming complete:true.
+                    LOGGER.warning("[http-server-handler] signrawtransaction aborted with unsigned inputs for " + CoinTickerUtils.tickerToString(coin.getTicker()));
+                    break;
                 }
 
                 String signedTxHex = new String(Hex.encode(signedTx.bitcoinSerialize()));
@@ -1427,11 +1466,27 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 boolean isP2SH = false;
                 String scriptPubKey = "";
                 if (isValidAddress) {
-                    LegacyAddress toAddress = LegacyAddress.fromBase58(coin.getNetworkParameters(), address);
-                    if (isP2SHAddress(address)) {
+                    Address parsed;
+                    try {
+                        parsed = LegacyAddress.fromBase58(coin.getNetworkParameters(), address);
+                    } catch (AddressFormatException e) {
+                        // Bech32/segwit: derive the witness scriptPubKey
+                        // (OP_<ver> <push> <program>) instead of crashing —
+                        // isValidAddress legitimately accepted this address.
+                        SegwitAddress segwit = SegwitAddress.fromBech32(coin.getNetworkParameters(), address);
+                        byte[] program = segwit.getWitnessProgram();
+                        int version = segwit.getWitnessVersion();
+                        String opVersion = (version == 0) ? "00"
+                                : Integer.toHexString(0x50 + version);
+                        String pushOpCode = String.format("%02x", program.length);
+                        scriptPubKey = opVersion + pushOpCode
+                                + new String(Hex.encode(program));
+                        parsed = null;
+                    }
+                    if (parsed != null && isP2SHAddress(address)) {
                         isP2SH = true;
 
-                        TransactionOutput output = new TransactionOutput(coin.getNetworkParameters(), null, Coin.valueOf(0), toAddress);
+                        TransactionOutput output = new TransactionOutput(coin.getNetworkParameters(), null, Coin.valueOf(0), parsed);
                         scriptPubKey = new String(Hex.encode(output.getScriptPubKey().getProgram()));
                     }
                 }

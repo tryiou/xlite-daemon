@@ -506,7 +506,10 @@ public class CoinInstance {
 
         if (configHelper.isRpcEnabled() && configHelper.validAuth() && rpcPort != -1) {
             coinRPCServer = JSONRPCController.getRPCServer(this);
-            LOGGER.info("[rpc] Starting JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort());
+            // Readiness is announced by JSONRPCServer itself AFTER a successful
+            // bind ("[rpc] RPC server listening for …") — do not log a
+            // success-shaped line before the socket exists.
+            LOGGER.finer("[rpc] Requesting start of JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort());
 
             if (coinRPCServer.isAlive())
                 coinRPCServer.deinit();
@@ -784,7 +787,16 @@ public class CoinInstance {
                 if (utxo.isSpent())
                     continue;
 
-                org.bitcoinj.core.UTXO bUtxo = utxo.createUTXO();
+                org.bitcoinj.core.UTXO bUtxo;
+                try {
+                    bUtxo = utxo.createUTXO();
+                } catch (Exception e) {
+                    // One malformed/bech32 address must not kill the whole
+                    // listunspent response — skip the row, keep the rest.
+                    LOGGER.warning("[coin] Skipping unparseable UTXO for " + CoinTickerUtils.tickerToString(getTicker())
+                            + " (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
+                    continue;
+                }
 
                 JsonObject utxoJSON = new JsonObject();
                 utxoJSON.addProperty("txid", bUtxo.getHash().toString());
@@ -820,6 +832,9 @@ public class CoinInstance {
                 int confirmations = (totalBlocks - bUtxo.getHeight()) + 1;
                 if (bUtxo.getHeight() == 0)
                     confirmations = 0;
+                // Pre-first-poll the height cache holds a negative sentinel
+                // (-1); clamp so no caller ever sees negative confirmations.
+                confirmations = Math.max(0, confirmations);
 
                 utxoJSON.addProperty("confirmations", confirmations);
 
@@ -891,8 +906,12 @@ public class CoinInstance {
     }
 
     public void addBlockCount(CoinTicker ticker, Integer blockCount) {
+        // Plain set: the cache must track the true tip. The old Math.max
+        // ratchet pinned a stale-high height forever (e.g. after network
+        // switch or a rollback), and pre-first-poll zeros poisoned
+        // confirmation math.
         blockCounts.computeIfAbsent(ticker, k -> new AtomicInteger(0))
-                .updateAndGet(current -> Math.max(current, blockCount));
+                .set(blockCount);
     }
 
     public void addCloudTransaction(CloudTransaction cloudTransaction) {
@@ -970,8 +989,15 @@ public class CoinInstance {
 
         coinRPCServer = JSONRPCController.getRPCServer(this);
 
-        LOGGER.info("[rpc] Starting JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort());
+        LOGGER.finer("[rpc] Requesting start of JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort());
         coinRPCServer.start();
+
+        // Verify the rebind actually took — a silent bind failure used to
+        // leave the coin RPC dead while callers already got success.
+        if (!coinRPCServer.awaitBound(5000)) {
+            LOGGER.severe("[rpc] Failed to rebind JSON-RPC server for coin "
+                    + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort() + " after reloadconfig");
+        }
     }
 
     public KeyHandler getKeyHandler() {
