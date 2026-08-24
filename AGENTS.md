@@ -6,6 +6,28 @@ XLite Daemon — a multi-cryptocurrency wallet daemon built with Java 21 and Mav
 Core packages: `crypto` (wallet encryption/key management), `net` (coin networking, JSON-RPC),
 `util` (config, address discovery, logging), `wallet` (wallet helpers).
 
+## Data Providers
+
+This is the **client-side** daemon behind the XLite wallet GUI: it serves one
+local JSON-RPC port per coin (`net/api/http/master/`) and fetches all blockchain
+data upstream over HTTP (`net/api/http/client/`).
+
+- **EXR mode:** CLI `--exr-endpoint <url>` or env `EXR_ENDPOINT`
+  (comma-separated pool → `EXRServerPool`). Capabilities are probed from GET
+  `/xrs/heights`; health checks every 5 s; requests route to a server that
+  supports the coin. Calls hit `<endpoint>/xrs/<method>` — GET `heights`/`fees`,
+  POST coin-first-param methods (`getutxos`, `sendrawtransaction`, …). Once EXR
+  is configured there is **NO fallback** to BASE_URL — requests for coins no EXR
+  server supports fail hard.
+- **Legacy mode (default):** `BASE_URL` = `https://xliterevp.mywire.org/` in
+  `App.java`; override with `--development-endpoint`. POST `/` with
+  `{method, params}` JSON.
+- Upstream chain: exrproxy `/xrs/<service>` → plugin-adapter xrm methods →
+  utxo-plugin containers.
+- `net/xrouter/` and the `xrm*` handling in `BlocknetPeerGroup` are dead legacy
+  XRouter-over-p2p paths (commented out at `CoinInstance.java:517`) — don't build
+  on them.
+
 # Java — use jabba
 source ~/.jabba/jabba.sh && jabba use graalvm_community@21.0.2
 
