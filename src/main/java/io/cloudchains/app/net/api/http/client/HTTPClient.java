@@ -5,7 +5,9 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.subgraph.orchid.encoders.Hex;
 import io.cloudchains.app.App;
@@ -94,7 +96,7 @@ public class HTTPClient {
      * Helper method to check if EXR pool is available and configured.
      * @return true if EXR pool is configured, false otherwise
      */
-    private boolean useEXR() {
+    boolean useEXR() {
         return App.exrServerPool != null && App.exrServerPool.getServerCount() > 0;
     }
 
@@ -103,7 +105,7 @@ public class HTTPClient {
      * @param endpoint The API endpoint
      * @return true if EXR should be used, false otherwise
      */
-    private boolean shouldUseEXR(String endpoint) {
+    boolean shouldUseEXR(String endpoint) {
         return useEXR() && (endpoint.equals("/fees") ||
                 endpoint.equals("/height") ||
                 endpoint.equals("/"));
@@ -231,20 +233,19 @@ public class HTTPClient {
             }
 
             try {
-                JsonObject result = server.executeGet(method);
-                if (result != null && result.has("result")) {
-                    JsonElement serverResult = result.get("result");
-
-                    if (serverResult.isJsonObject()) {
-                        JsonObject serverObj = serverResult.getAsJsonObject();
+                JsonElement response = server.executeGet(method);
+                if (response != null && response.isJsonObject()) {
+                    JsonObject result = response.getAsJsonObject();
+                    if (result.has("result") && result.get("result").isJsonObject()) {
+                        JsonObject serverObj = result.getAsJsonObject("result");
                         for (String key : serverObj.keySet()) {
                             if (!aggregatedResult.has(key)) {
                                 aggregatedResult.add(key, serverObj.get(key));
                             }
                         }
                     }
-                    server.probeCapabilities();
                 }
+                server.probeCapabilities();
             } catch (Exception e) {
                 aggregatedErrors.add("Failed " + method + " from " + server.getEndpoint());
             }
@@ -268,96 +269,127 @@ public class HTTPClient {
     }
 
     /**
+     * Extract the coin ticker from the first parameter of an EXR request.
+     * @param exrParams The parameter array
+     * @return Ticker or null if the first parameter is not a known coin
+     */
+    static CoinTicker extractCoin(JsonArray exrParams) {
+        if (exrParams.size() == 0 || !exrParams.get(0).isJsonPrimitive()
+                || !exrParams.get(0).getAsJsonPrimitive().isString()) {
+            return null;
+        }
+        return CoinTickerUtils.stringToTicker(exrParams.get(0).getAsString());
+    }
+
+    /**
      * Execute POST request with EXR coin-aware routing
      * @param endpoint The endpoint to POST to
      * @param params The parameters to POST
-     * @return Response from appropriate EXR server
+     * @return Response from appropriate EXR server, or null (FAIL - NO FALLBACK TO BASE_URL)
      */
     private String executeEXRPost(String endpoint, JsonObject params) {
-        if (params.has("method") && params.has("params")) {
-            String method = params.get("method").getAsString();
-            JsonArray exrParams = params.getAsJsonArray("params");
-
-            // Extract coin from first parameter
-            CoinTicker coin = null;
-            if (exrParams.size() > 0) {
-                String coinString = exrParams.get(0).getAsString();
-                coin = CoinTickerUtils.stringToTicker(coinString);
-                if (coin == null) {
-                    // Log the failed coin extraction for debugging
-                    LOGGER.warning("[httpclient] Failed to extract coin from parameter: " + coinString);
-                    // Not a coin-specific request
-                }
-            }
-
-            EXRServer server = null;
-
-            // Route ONLY to EXR servers that support this coin
-            if (coin != null) {
-                // Wait for capabilities to be probed if not already done
-                if (!App.exrServerPool.isCapabilitiesProbed()) {
-                    LOGGER.fine("[httpclient] Waiting for EXR capabilities to be probed for coin: " +
-                            CoinTickerUtils.tickerToString(coin));
-                    if (!waitForCapabilities(HttpClientConfig.CAPABILITY_PROBE_WAIT_TIMEOUT_MS)) { // Wait up to 10 seconds
-                        LOGGER.warning("[httpclient] EXR capabilities not probed yet for coin: " +
-                                CoinTickerUtils.tickerToString(coin));
-                        return null; // FAIL - NO FALLBACK TO BASE_URL
-                    }
-                }
-                if (App.exrServerPool.isCapabilitiesProbed()) {
-                    server = App.exrServerPool.selectServerForCoin(coin);
-                    // LOGGER.info("[httpclient] DEBUG: selectServerForCoin returned: " +
-                    //     (server != null ? server.getEndpoint() : "null"));
-                        
-                    if (server == null) {
-                        LOGGER.warning("[httpclient] NO EXR SERVER SUPPORTS COIN: " +
-                                CoinTickerUtils.tickerToString(coin));
-                        return null; // FAIL - NO FALLBACK TO BASE_URL
-                    } else {
-                        LOGGER.info("[httpclient] DEBUG: Selected server " + server.getEndpoint() +
-                                " for coin " + CoinTickerUtils.tickerToString(coin) +
-                                ", method: " + method);
-                    }
-                } else {
-                    // Capabilities still not probed after waiting
-                    LOGGER.warning("[httpclient] EXR capabilities not probed yet for coin: " +
-                            CoinTickerUtils.tickerToString(coin));
-                    return null; // FAIL - NO FALLBACK TO BASE_URL
-                }
-            } else {
-                // Use round-robin for non-coin-specific requests
-                // But if we have a coin, we MUST use coin-aware selection
-                if (coin != null) {
-                    server = App.exrServerPool.selectServerForCoin(coin);
-                    if (server == null) {
-                        LOGGER.warning("[httpclient] NO EXR SERVER SUPPORTS COIN: " +
-                                CoinTickerUtils.tickerToString(coin));
-                        return null; // FAIL - NO FALLBACK TO BASE_URL
-                    }
-                } else {
-                    // No coin extracted - this should not happen for coin-specific requests
-                    LOGGER.severe("[httpclient] Cannot route request: coin extraction failed");
-                    return null; // FAIL instead of using wrong server
-                }
-            }
-
-            if (server != null) {
-                List<Object> paramList = convertParams(exrParams);
-                JsonObject result = server.execute(method, paramList);
-                if (result != null) {
-                    // Handle wrapped responses from EXR wrapper
-                    // If the result has a "result" field, extract it to maintain backward compatibility
-                    if (result.has("result")) {
-                        JsonElement resultElement = result.get("result");
-                        if (!resultElement.isJsonNull()) {
-                            return resultElement.toString();
-                        }
-                    }
-                    return result.toString();
-                }
-            }
+        if (!params.has("method") || !params.has("params")) {
+            return null;
         }
-        return null;
+        String method = params.get("method").getAsString();
+        JsonArray exrParams = params.getAsJsonArray("params");
+
+        CoinTicker coin = extractCoin(exrParams);
+        if (coin == null) {
+            LOGGER.severe("[httpclient] Cannot route request: no coin extracted from first parameter for method " + method);
+            return null; // FAIL instead of using wrong server
+        }
+
+        if (!App.exrServerPool.isCapabilitiesProbed()
+                && !waitForCapabilities(HttpClientConfig.CAPABILITY_PROBE_WAIT_TIMEOUT_MS)) {
+            LOGGER.warning("[httpclient] EXR capabilities not probed yet for coin: "
+                    + CoinTickerUtils.tickerToString(coin));
+            return null; // FAIL - NO FALLBACK TO BASE_URL
+        }
+
+        EXRServer server = App.exrServerPool.selectServerForCoin(coin);
+        if (server == null) {
+            LOGGER.warning("[httpclient] NO EXR SERVER SUPPORTS COIN: "
+                    + CoinTickerUtils.tickerToString(coin));
+            return null; // FAIL - NO FALLBACK TO BASE_URL
+        }
+        LOGGER.info("[httpclient] Routed " + method + " "
+                + CoinTickerUtils.tickerToString(coin) + " to " + server.getEndpoint());
+
+        List<Object> paramList = convertParams(exrParams);
+        JsonElement response = server.execute(method, paramList);
+        if (response == null) {
+            LOGGER.warning("[httpclient] EXR request failed for " + method + " via " + server.getEndpoint());
+            return null;
+        }
+        return normalizeEXRResponse(response);
+    }
+
+    /**
+     * Normalize a parsed EXR response body into the text form consumers expect.
+     * Upstream payload shapes are preserved verbatim: JSON-RPC style envelopes,
+     * bare objects and bare arrays all pass through unchanged. A JSON text
+     * delivered as a string-typed {@code result} member is unwrapped exactly
+     * once; scalar string results (e.g. broadcast txids) are kept wrapped.
+     * @param response Parsed response element
+     * @return Response text or null if the element carried no content
+     */
+    static String normalizeEXRResponse(JsonElement response) {
+        if (response == null || response.isJsonNull()) {
+            return null;
+        }
+        if (response.isJsonObject()) {
+            JsonObject obj = response.getAsJsonObject();
+            if (obj.has("result") && obj.get("result").isJsonPrimitive()
+                    && obj.get("result").getAsJsonPrimitive().isString()) {
+                try {
+                    JsonElement inner = JsonParser.parseString(obj.get("result").getAsString());
+                    if (inner.isJsonObject() || inner.isJsonArray()) {
+                        return inner.toString();
+                    }
+                } catch (JsonSyntaxException e) {
+                    // Not JSON text — pass the envelope through unchanged
+                }
+            }
+            return obj.toString();
+        }
+        return response.toString();
+    }
+
+    /**
+     * Parse an upstream JSON-RPC style envelope ({@code {"result":…,"error":…}}),
+     * returning null (with a logged reason) when the payload is absent, empty,
+     * an error, malformed, or not an object. Consumers receive the full envelope
+     * so they can read the {@code result} member exactly as with the legacy backend.
+     * @param res Raw response text
+     * @param opName Operation description for log messages
+     * @return Envelope object or null on failure
+     */
+    static JsonObject parseEnvelope(String res, String opName) {
+        if (res == null) {
+            return null;
+        }
+        JsonElement parsed;
+        try {
+            parsed = JsonParser.parseString(res);
+        } catch (JsonSyntaxException e) {
+            LOGGER.warning("[httpclient] " + opName + " invalid upstream JSON - " + e.getMessage());
+            return null;
+        }
+        if (!parsed.isJsonObject()) {
+            LOGGER.warning("[httpclient] " + opName + " unexpected upstream payload shape");
+            return null;
+        }
+        JsonObject obj = parsed.getAsJsonObject();
+        if (obj.has("error") && !obj.get("error").isJsonNull()) {
+            LOGGER.warning("[httpclient] " + opName + " upstream error - " + obj.get("error").toString());
+            return null;
+        }
+        if (!obj.has("result") || obj.get("result").isJsonNull()) {
+            LOGGER.warning("[httpclient] " + opName + " empty upstream result");
+            return null;
+        }
+        return obj;
     }
 
     /**
@@ -366,7 +398,7 @@ public class HTTPClient {
      * @param params Parameters for POST requests, null for GET
      * @return Response string or null on error
      */
-    private String executeRequest(String endpoint, JsonObject params) {
+    String executeRequest(String endpoint, JsonObject params) {
         // When EXR is configured, ONLY use EXR - NO fallback to BASE_URL
         if (shouldUseEXR(endpoint)) {
             if (params == null) {
@@ -410,7 +442,7 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getutxos");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " " + res);
 
 
@@ -489,7 +521,7 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getutxos");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getUtxos " + coinInstance.getTicker() + " " + res);
 
 
@@ -545,13 +577,11 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getrawtransaction");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getRawTransaction " + res);
 
 
-        if (res == null) return null;
-
-        return new Gson().fromJson(res, JsonObject.class);
+        return parseEnvelope(res, "getRawTransaction");
     }
 
     public JsonObject getRawMempool(CoinTicker coinTicker, boolean verbose) {
@@ -564,13 +594,11 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getrawmempool");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getRawMempool " + res);
 
 
-        if (res == null) return null;
-
-        return new Gson().fromJson(res, JsonObject.class);
+        return parseEnvelope(res, "getRawMempool");
     }
 
     public void getBlockCount(CoinTicker coinTicker) {
@@ -584,11 +612,11 @@ public class HTTPClient {
         params.addProperty("method", "getblockcount");
         params.add("params", innerParams);
 
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
 
-        if (res == null) return;
+        JsonObject result = parseEnvelope(res, "getBlockCount " + coinTicker);
+        if (result == null) return;
 
-        JsonObject result = new Gson().fromJson(res, JsonObject.class);
         int blockCount = result.get("result").getAsInt();
 
         coinInstance.addBlockCount(coinTicker, blockCount);
@@ -597,7 +625,7 @@ public class HTTPClient {
     }
 
     public void getAllBlockCounts() {
-        String res = executeGetRequest("/height");
+        String res = executeRequest("/height", null);
 
         if (res == null) return;
 
@@ -632,13 +660,11 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getblock");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getBlock " + res);
 
 
-        if (res == null) return null;
-
-        return new Gson().fromJson(res, JsonObject.class);
+        return parseEnvelope(res, "getBlock");
     }
 
     public JsonObject getBlockHash(CoinTicker coinTicker, int height) {
@@ -649,13 +675,11 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "getblockhash");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getBlockHash " + res);
 
 
-        if (res == null) return null;
-
-        return new Gson().fromJson(res, JsonObject.class);
+        return parseEnvelope(res, "getBlockHash");
     }
 
     public JsonObject getTransaction(CoinTicker coinTicker, String txid, boolean verbose) {
@@ -669,13 +693,11 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "gettransaction");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getTransaction " + res);
 
 
-        if (res == null) return null;
-
-        return new Gson().fromJson(res, JsonObject.class);
+        return parseEnvelope(res, "getTransaction");
     }
 
     public JsonObject sendRawTransaction(CoinTicker coinTicker, String rawTx) {
@@ -688,13 +710,20 @@ public class HTTPClient {
         JsonObject params = new JsonObject();
         params.addProperty("method", "sendrawtransaction");
         params.add("params", innerParams);
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] sendRawTransaction " + res);
 
-
-        if (res == null) return null;
-
-        return new Gson().fromJson(res, JsonObject.class);
+        // Full envelope passthrough (including upstream error member) — the
+        // handler extracts structured {code,message} details for the GUI.
+        if (res == null) {
+            return null;
+        }
+        try {
+            return JsonParser.parseString(res).getAsJsonObject();
+        } catch (JsonSyntaxException | IllegalStateException e) {
+            LOGGER.warning("[httpclient] sendRawTransaction invalid upstream JSON - " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -724,7 +753,7 @@ public class HTTPClient {
         params.addProperty("method", "gethistory");
         params.add("params", innerParams);
 
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
             LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null post result");
@@ -811,14 +840,20 @@ public class HTTPClient {
         params.addProperty("method", "getaddresshistory");
         params.add("params", innerParams);
 
-        String res = executePostRequest("/", params);
+        String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
             LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
-        JsonArray json = new Gson().fromJson(res, JsonArray.class);
+        JsonArray json;
+        try {
+            json = new Gson().fromJson(res, JsonArray.class);
+        } catch (Exception e) {
+            LOGGER.warning("[httpclient] getAddressHistory parsing error - Response: " + res + " - " + e.getMessage());
+            return null;
+        }
         if (json == null) {
             LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null json");
             return null;

@@ -2,7 +2,7 @@ package io.cloudchains.app.net.api.http.client;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
@@ -52,19 +52,18 @@ public class EXRWrapper {
     }
 
     /**
-     * Process response JSON and handle wrapping for different response types.
+     * Parse a response body verbatim. No synthetic wrapping is applied:
+     * arrays and primitives are returned as-is so upstream payload shapes
+     * survive unchanged (callers normalize where needed).
      * @param responseBody The raw response body
-     * @return Processed JsonObject with proper wrapping
+     * @return Parsed JsonElement or null if the body was not valid JSON
      */
-    private JsonObject processResponse(String responseBody) {
-        JsonElement responseElement = gson.fromJson(responseBody, JsonElement.class);
-        if (responseElement.isJsonObject()) {
-            return responseElement.getAsJsonObject();
-        } else {
-            // Wrap non-objects (arrays, primitives) in a result field
-            JsonObject wrapperObj = new JsonObject();
-            wrapperObj.add("result", responseElement);
-            return wrapperObj;
+    private JsonElement parseBody(String responseBody) {
+        try {
+            return gson.fromJson(responseBody, JsonElement.class);
+        } catch (JsonSyntaxException e) {
+            LOGGER.warning(LOG_TAG + " invalid JSON response - " + e.getMessage());
+            return null;
         }
     }
 
@@ -74,9 +73,9 @@ public class EXRWrapper {
      *
      * @param method The method name (e.g., "getblockhash")
      * @param params The parameters as a List of Objects
-     * @return JsonObject response or null on error
+     * @return Parsed response element or null on error
      */
-    public JsonObject execute(String method, List<Object> params) {
+    public JsonElement execute(String method, List<Object> params) {
         String endpoint = exrEndpoint + "/xrs/" + method;
         String currency = params.isEmpty() || !(params.get(0) instanceof String) ?
                 "unknown" : (String) params.get(0);
@@ -87,7 +86,7 @@ public class EXRWrapper {
         try {
             httpPost.setEntity(new StringEntity(requestBody));
             String responseBody = executeHttpRequest(httpPost, "execute POST for " + method + " " + currency);
-            return responseBody != null ? processResponse(responseBody) : null;
+            return responseBody != null ? parseBody(responseBody) : null;
         } catch (IOException e) {
             LOGGER.warning(LOG_TAG + " execute POST failed for " + method + " " + currency + " endpoint: " + endpoint + ", " + e.getMessage());
             return null;
@@ -100,14 +99,14 @@ public class EXRWrapper {
      * Execute a GET request to an EXR endpoint.
      *
      * @param method The method name (e.g., "fees", "heights")
-     * @return JsonObject response or null on error
+     * @return Parsed response element or null on error
      */
-    public JsonObject executeGet(String method) {
+    public JsonElement executeGet(String method) {
         String endpoint = exrEndpoint + "/xrs/" + method;
         HttpGet httpGet = new HttpGet(endpoint);
         httpGet.setHeader("Content-Type", "application/json");
         String responseBody = executeHttpRequest(httpGet, "execute GET for method " + method);
-        return responseBody != null ? processResponse(responseBody) : null;
+        return responseBody != null ? parseBody(responseBody) : null;
     }
 
     /**

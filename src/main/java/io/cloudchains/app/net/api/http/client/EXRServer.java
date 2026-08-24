@@ -53,22 +53,29 @@ public class EXRServer {
                 return false;
             }
             try {
-                JsonObject result = wrapper.executeGet("heights");
-                if (result != null && result.has("result")) {
-                    JsonObject heights = result.getAsJsonObject("result");
-                    for (String coinName : heights.keySet()) {
-                        JsonElement heightValue = heights.get(coinName);
-                        if (heightValue.isJsonNull()) {
-                            continue;
+                JsonElement root = wrapper.executeGet("heights");
+                if (root == null || !root.isJsonObject()) {
+                    // Unusable body — leave capabilitiesProbed false so the
+                    // next probe cycle retries instead of pinning an empty set.
+                    return false;
+                }
+                JsonObject result = root.getAsJsonObject();
+                if (!result.has("result") || !result.get("result").isJsonObject()) {
+                    return false;
+                }
+                JsonObject heights = result.getAsJsonObject("result");
+                for (String coinName : heights.keySet()) {
+                    JsonElement heightValue = heights.get(coinName);
+                    if (heightValue.isJsonNull()) {
+                        continue;
+                    }
+                    try {
+                        CoinTicker coin = CoinTickerUtils.stringToTicker(coinName);
+                        if (coin != null) {
+                            supportedCoins.add(coin);
                         }
-                        try {
-                            CoinTicker coin = CoinTickerUtils.stringToTicker(coinName);
-                            if (coin != null) {
-                                supportedCoins.add(coin);
-                            }
-                        } catch (Exception e) {
-                            LOGGER.finer("[exr-server] Failed to map coin " + coinName + ", " + e.getMessage());
-                        }
+                    } catch (Exception e) {
+                        LOGGER.finer("[exr-server] Failed to map coin " + coinName + ", " + e.getMessage());
                     }
                 }
 
@@ -76,7 +83,7 @@ public class EXRServer {
                 LOGGER.info("[exr-server] Probed capabilities for " + endpoint + ", supports: " + supportedCoins.size() + " coins: " +
                         supportedCoins.stream().map(CoinTickerUtils::tickerToString)
                                 .reduce((a, b) -> a + ", " + b).orElse("none"));
-                return !supportedCoins.isEmpty();
+                return true;
             } catch (Exception e) {
                 LOGGER.warning("[exr-server] Failed to probe capabilities for " + endpoint + ", " + e.getMessage());
                 return false;
@@ -90,7 +97,7 @@ public class EXRServer {
             return healthy;
         }
         try {
-            JsonObject result = wrapper.executeGet("heights");
+            JsonElement result = wrapper.executeGet("heights");
             healthy = result != null && !result.isJsonNull();
         } catch (Exception e) {
             healthy = false;
@@ -100,7 +107,7 @@ public class EXRServer {
         return healthy;
     }
 
-    public JsonObject execute(String method, List<Object> params) {
+    public JsonElement execute(String method, List<Object> params) {
         if (!isHealthy()) {
             return null;
         }
@@ -109,7 +116,7 @@ public class EXRServer {
         return wrapper.execute(method, params);
     }
 
-    public JsonObject executeGet(String method) {
+    public JsonElement executeGet(String method) {
         return isHealthy() ? wrapper.executeGet(method) : null;
     }
 
