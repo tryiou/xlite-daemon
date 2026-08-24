@@ -140,6 +140,16 @@ public class App {
     }
 
     public static void shutdown() {
+        // First-line trace: proves hook entry even if anything below dies.
+        LOGGER.info("[shutdown] hook entered");
+        try {
+            shutdownInner();
+        } catch (Throwable t) {
+            LOGGER.log(Level.SEVERE, "[shutdown] hook failed", t);
+        }
+    }
+
+    private static void shutdownInner() {
         if (masterRPC != null && masterRPC.isAlive()) {
             System.out.println("Shutting down...");
         }

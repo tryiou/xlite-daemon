@@ -249,9 +249,13 @@ public class BackgroundTimerThread implements Runnable {
             if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker()))
                 continue;
 
-            new Thread(() -> {
+            Thread historyThread = new Thread(() -> {
                 App.feeUpdateHttpClient.getHistory(coinInstance.getTicker(), 0, (int) System.currentTimeMillis(), 30000);
-            }).start();
+            }, "history-fetch-" + CoinTickerUtils.tickerToString(coinInstance.getTicker()));
+            // Daemon: a blocking initial-history fetch must never keep the
+            // JVM alive past shutdown.
+            historyThread.setDaemon(true);
+            historyThread.start();
         }
 
         while (!Thread.currentThread().isInterrupted()) {

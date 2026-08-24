@@ -315,12 +315,27 @@ public class CoinInstance {
         }
 
         if (coinRPCServer != null) {
+            boolean interruptedDuringJoin = false;
             try {
                 coinRPCServer.deinit();
-                coinRPCServer.join();
+                // Bounded: an untimeouted join here would stall the JVM
+                // shutdown hook indefinitely on a wedged server thread.
+                coinRPCServer.join(10_000);
+            } catch (InterruptedException e) {
+                // Preserve the flag and say so — a silent swallow here would
+                // hide shutdown-latency facts even when the server dies.
+                Thread.currentThread().interrupt();
+                interruptedDuringJoin = true;
+                LOGGER.warning("[coin] deinit join interrupted for "
+                        + CoinTickerUtils.tickerToString(ticker));
             } catch (Exception e) {
                 LOGGER.warning("[coin] Error deinitializing RPC server for " + CoinTickerUtils.tickerToString(ticker) + e.getMessage());
             }
+            if (coinRPCServer.isAlive())
+                LOGGER.warning("[coin] RPC server thread for "
+                        + CoinTickerUtils.tickerToString(ticker)
+                        + " still alive after deinit"
+                        + (interruptedDuringJoin ? " (join was interrupted)" : ""));
         }
     }
 
@@ -993,10 +1008,15 @@ public class CoinInstance {
         coinRPCServer.start();
 
         // Verify the rebind actually took — a silent bind failure used to
-        // leave the coin RPC dead while callers already got success.
-        if (!coinRPCServer.awaitBound(5000)) {
+        // leave the coin RPC dead while callers already got success. Budget
+        // exceeds the server's own 20x250ms retry window so a slow but
+        // successful late rebind cannot trip this alarm.
+        if (!coinRPCServer.awaitBound(10000)) {
             LOGGER.severe("[rpc] Failed to rebind JSON-RPC server for coin "
-                    + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort() + " after reloadconfig");
+                    + CoinTickerUtils.tickerToString(getTicker())
+                    + " on port " + getRPCPort() + " after reloadconfig"
+                    + "; new-server state: "
+                    + coinRPCServer.lifecycleState());
         }
     }
 

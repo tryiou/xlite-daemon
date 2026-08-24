@@ -8,6 +8,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -23,11 +24,14 @@ public class JSONRPCMasterServer extends Thread {
     private EventLoopGroup workerGroup;
 
     JSONRPCMasterServer(int port) {
+        setDaemon(true);
+        setName("rpc-master");
         this.port = port;
     }
 
     public void run() {
-        workerGroup = new NioEventLoopGroup(2);
+        workerGroup = new NioEventLoopGroup(2,
+                new DefaultThreadFactory("rpc-master", true));
         try {
             LOGGER.info("[rpc] Starting master RPC server on port " + port + ".");
 
