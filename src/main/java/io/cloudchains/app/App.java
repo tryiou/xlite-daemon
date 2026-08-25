@@ -48,16 +48,36 @@ public class App {
         return System.getenv(key);
     }
 
-    public static String getUserConfigDir() {
-        String OS = (System.getProperty("os.name")).toLowerCase();
-        if (OS.contains("win")) {
-            return getEnv("AppData");
-        } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
-            return System.getProperty("user.home") + File.separator + ".config";
-        } else if (OS.contains("mac")) {
-            return System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support";
+    /**
+     * Resolves the platform application-data root shared by the XLite apps.
+     * <p>Precedence: the {@code XLITE_DATA_HOME} environment variable (when
+     * non-blank, normalized to an absolute path) over the per-OS default.
+     * Pure function so the precedence matrix stays unit-testable.</p>
+     *
+     * @param dataHomeEnv value of {@code XLITE_DATA_HOME} (may be null)
+     * @param osName      value of the {@code os.name} system property
+     * @param userHome    value of the {@code user.home} system property
+     * @param appDataEnv  Windows {@code AppData} environment value (may be null)
+     * @return the resolved config-root directory string
+     */
+    public static String resolveUserConfigDir(String dataHomeEnv, String osName, String userHome, String appDataEnv) {
+        if (dataHomeEnv != null && !dataHomeEnv.trim().isEmpty()) {
+            return new File(dataHomeEnv.trim()).getAbsoluteFile().getPath();
         }
-        return System.getProperty("user.home") + File.separator + ".config";
+        String OS = osName.toLowerCase();
+        if (OS.contains("win")) {
+            return appDataEnv;
+        } else if (OS.contains("mac")) {
+            return userHome + File.separator + "Library" + File.separator + "Application Support";
+        }
+        return userHome + File.separator + ".config";
+    }
+
+    public static String getUserConfigDir() {
+        return resolveUserConfigDir(getEnv("XLITE_DATA_HOME"),
+                System.getProperty("os.name"),
+                System.getProperty("user.home"),
+                getEnv("AppData"));
     }
 
     private static Level parseLogLevel(String envValue, Level defaultLevel) {

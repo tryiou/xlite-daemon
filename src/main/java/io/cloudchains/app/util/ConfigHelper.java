@@ -275,14 +275,7 @@ public class ConfigHelper {
     public static String getLocalDataDirectory() {
         String baseDir;
         if (CONFIG_DIR.isEmpty()) {
-            String os = System.getProperty("os.name").toLowerCase();
-            if (os.contains("win")) {
-                baseDir = App.getEnv("AppData");
-            } else if (os.contains("mac")) {
-                baseDir = System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support";
-            } else {
-                baseDir = System.getProperty("user.home") + File.separator + ".config";
-            }
+            baseDir = App.getUserConfigDir();
         } else {
             baseDir = CONFIG_DIR;
         }
