@@ -73,16 +73,6 @@ public class PocketcoinNetworkParameters extends NetworkParameters implements Ha
 
 
     @Override
-    public int getBip32HeaderP2PKHpriv() {
-        return 0x1E88ADE4;
-    }
-
-    @Override
-    public int getBip32HeaderP2PKHpub() {
-        return 0x1E88B21E;
-    }
-
-    @Override
     public int getSubsidyDecreaseBlockCount() {
         return 2100000;
     }

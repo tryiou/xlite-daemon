@@ -73,16 +73,6 @@ public class PivxNetworkParameters extends NetworkParameters implements HasFeePa
 
 
     @Override
-    public int getBip32HeaderP2PKHpriv() {
-        return 0x0221312B;
-    }
-
-    @Override
-    public int getBip32HeaderP2PKHpub() {
-        return 0x022D2533;
-    }
-
-    @Override
     public int getSubsidyDecreaseBlockCount() {
         return 210240;
     }

@@ -131,16 +131,6 @@ public class BlocknetTestnet5NetworkParameters extends BlocknetParameters implem
     }
 
     @Override
-    public int getBip32HeaderP2PKHpub() {
-        return 0x3A8061A0;
-    }
-
-    @Override
-    public int getBip32HeaderP2PKHpriv() {
-        return 0x3A805837;
-    }
-
-    @Override
     public String[] getDnsSeeds() {
         return new String[]{
                 "104.238.198.122",

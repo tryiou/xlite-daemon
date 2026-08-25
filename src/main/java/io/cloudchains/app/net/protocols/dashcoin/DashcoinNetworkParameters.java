@@ -73,16 +73,6 @@ public class DashcoinNetworkParameters extends NetworkParameters implements HasF
 
 
     @Override
-    public int getBip32HeaderP2PKHpriv() {
-        return 0x0488ADE4;
-    }
-
-    @Override
-    public int getBip32HeaderP2PKHpub() {
-        return 0x0488B21E;
-    }
-
-    @Override
     public int getSubsidyDecreaseBlockCount() {
         return 210240;
     }

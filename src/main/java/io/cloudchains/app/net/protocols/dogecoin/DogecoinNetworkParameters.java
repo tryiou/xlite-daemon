@@ -73,16 +73,6 @@ public class DogecoinNetworkParameters extends NetworkParameters implements HasF
 
 
     @Override
-    public int getBip32HeaderP2PKHpriv() {
-        return 0x02fac398;
-    }
-
-    @Override
-    public int getBip32HeaderP2PKHpub() {
-        return 0x02facafd;
-    }
-
-    @Override
     public int getSubsidyDecreaseBlockCount() {
         return 100000;
     }
