@@ -6,6 +6,7 @@ import com.subgraph.orchid.encoders.Base64;
 import com.subgraph.orchid.encoders.Hex;
 import io.cloudchains.app.Version;
 import io.cloudchains.app.net.CoinInstance;
+import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetPeer;
@@ -1566,54 +1567,46 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 .replaceAll("\\([0-9]+\\)", "");
     }
 
-    private byte[] formatMessageForSigning(String message) {
-        String header = null;
-
-        switch (coin.getTicker()) {
+    /**
+     * Returns the coin-specific signed-message header prefix, or null when the
+     * coin has no mapping. Package-private static for testability.
+     */
+    static String signedMessageHeader(CoinTicker ticker) {
+        if (ticker == null)
+            return null;
+        switch (ticker) {
             case BLOCKNET:
             case BLOCKNET_TESTNET5:
-                header = "Blocknet Signed Message:\n";
-                break;
+                return "Blocknet Signed Message:\n";
             case BITCOIN:
-            // case BITCOIN_CASH:
-            // 	header = "Bitcoin Signed Message:\n";
-            // 	break;
+            case BITCOIN_CASH:
+                return "Bitcoin Signed Message:\n";
             case LITECOIN:
-                header = "Litecoin Signed Message:\n";
-                break;
-            // case ALQOCOIN:
-            // case PHORECOIN:
+                return "Litecoin Signed Message:\n";
             case PIVX:
-                header = "DarkNet Signed Message:\n";
-                break;
+                return "DarkNet Signed Message:\n";
             case DASHCOIN:
-                header = "DarkCoin Signed Message:\n";
-                break;
+                return "DarkCoin Signed Message:\n";
             case UNOBTANIUM:
-                header = "Unobtanium Signed Message:\n";
-                break;
+                return "Unobtanium Signed Message:\n";
             case PKOIN:
-                header = "Pocketcoin Signed Message:\n";
-                break;
+                return "Pocketcoin Signed Message:\n";
             case DIGIBYTE:
-                header = "DigiByte Signed Message:\n";
-                break;
-            // case BITBAY:
-            // 	header = "BitBay Signed Message:\n";
-            // 	break;
-           case RAVENCOIN:
-                header = "Raven Signed Message:\n";
-                break;
+                return "DigiByte Signed Message:\n";
+            case RAVENCOIN:
+                return "Raven Signed Message:\n";
             case DOGECOIN:
-                header = "Dogecoin Signed Message:\n";
-                break;
+                return "Dogecoin Signed Message:\n";
             case SYSCOIN:
-                header = "Syscoin Signed Message:\n";
-                break;
+                return "Syscoin Signed Message:\n";
             default:
                 LOGGER.warning("[http-server-handler] ERROR: Unsupported coin. This should never happen.");
-                break;
+                return null;
         }
+    }
+
+    private byte[] formatMessageForSigning(String message) {
+        String header = signedMessageHeader(coin.getTicker());
 
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
