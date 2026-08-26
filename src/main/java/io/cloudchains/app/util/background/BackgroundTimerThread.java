@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,8 +31,6 @@ public class BackgroundTimerThread implements Runnable {
     private static final int KEEPALIVE_INTERVAL = 10000;
     private static final int BALANCE_INTERVAL = 10000;
 
-    private ExecutorService threadPool = Executors.newSingleThreadExecutor();
-
     private BlocknetPeerGroup blocknetPeerGroup;
     private HTTPClient feeUpdateHttpClient;
     private HTTPClient heightUpdateHttpClient;
@@ -48,7 +45,11 @@ public class BackgroundTimerThread implements Runnable {
     private Set<String> lastAvailable = new HashSet<>();
     private Set<String> lastUnavailable = new HashSet<>();
 
-    // Log rotation scheduler fields
+    // Daemon-factory scheduler: the wrapper thread started by ConsoleMenu
+    // is the deliberate sole non-daemon anchor of this application. Worker
+    // threads must never outlive it as liveness anchors — stop() still
+    // releases the scheduler explicitly, but daemon status makes the
+    // single-anchor invariant structural rather than remembered.
     private ScheduledExecutorService logRotationScheduler;
     private static final int DAILY_ROTATION_HOUR = 2; // 2:00 AM
     private static final int DAILY_ROTATION_MINUTE = 0;
@@ -71,7 +72,11 @@ public class BackgroundTimerThread implements Runnable {
      * Initializes the log rotation scheduler to run daily at 2:00 AM.
      */
     private void initializeLogRotationScheduler() {
-        logRotationScheduler = Executors.newSingleThreadScheduledExecutor();
+        logRotationScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "background-timer-log-rotation");
+            t.setDaemon(true);
+            return t;
+        });
         long initialDelay = calculateInitialDelay();
         logRotationScheduler.scheduleAtFixedRate(
                 this::performDailyLogRotation,
@@ -117,17 +122,6 @@ public class BackgroundTimerThread implements Runnable {
         shutdownRequested = true;
         if (workerThread != null) {
             workerThread.interrupt();
-        }
-        if (threadPool != null && !threadPool.isShutdown()) {
-            threadPool.shutdown();
-            try {
-                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
-                    threadPool.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                threadPool.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
         }
         if (logRotationScheduler != null && !logRotationScheduler.isShutdown()) {
             logRotationScheduler.shutdown();

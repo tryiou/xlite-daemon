@@ -161,9 +161,18 @@ public class BlocknetPeerGroup {
         }
     }
 
+    // Dormant path: start() is unreachable today (its only call site is
+    // commented out in CoinInstance). If ever revived, this must NOT
+    // submit a second BackgroundTimerThread — ConsoleMenu already runs
+    // the sole timer anchor; a duplicate would double-keepalive and
+    // double-schedule log rotation. Daemon factory keeps it from becoming
+    // an unplanned liveness anchor.
     private void startBackgroundThreads() {
-        threadPool = Executors.newSingleThreadExecutor();
-        threadPool.submit(new BackgroundTimerThread());
+        threadPool = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "blocknet-peer-group-bg");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     private ListenableFuture<Void> startAsync() {

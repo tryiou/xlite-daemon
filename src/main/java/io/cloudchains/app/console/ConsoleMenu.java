@@ -99,14 +99,7 @@ public class ConsoleMenu {
                             App.EXR_ENDPOINT = exrEndpoint;
                             App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
                             LOGGER.info("[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
-                            new Thread(() -> {
-                                try {
-                                    Thread.sleep(1000);
-                                    App.exrServerPool.probeAllCapabilities();
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                }
-                            }, "EXR-Capability-Prober").start();
+                            spawnExrCapabilityProbe();
                             i++;
                         } else {
                             String envExrEndpoint = App.getEnv("EXR_ENDPOINT");
@@ -114,14 +107,7 @@ public class ConsoleMenu {
                                 App.EXR_ENDPOINT = envExrEndpoint;
                                 App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
                                 LOGGER.info("[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
-                                new Thread(() -> {
-                                    try {
-                                        Thread.sleep(1000);
-                                        App.exrServerPool.probeAllCapabilities();
-                                    } catch (InterruptedException e) {
-                                        Thread.currentThread().interrupt();
-                                    }
-                                }, "EXR-Capability-Prober").start();
+                                spawnExrCapabilityProbe();
                             } else {
                                 LOGGER.warning("Missing EXR endpoint after '--exr-endpoint'");
                             }
@@ -433,7 +419,15 @@ public class ConsoleMenu {
 
         App.masterRPC.start();
         backgroundTimerThread = new BackgroundTimerThread();
-        (new Thread(backgroundTimerThread)).start();
+        // Sole deliberate non-daemon anchor: this named thread is what
+        // keeps the JVM alive while the wallet runs. Every long-lived
+        // pool in the process (RPC, servers, probes, timer scheduler) is
+        // daemonized; the coin-init pool is short-lived, daemon-factory,
+        // and always drained in its finally. deinit()/stop() releases
+        // this anchor on shutdown.
+        Thread timerAnchor = new Thread(backgroundTimerThread,
+                "background-timer-anchor");
+        timerAnchor.start();
         if (App.exrServerPool != null) {
             App.exrServerPool.probeAllCapabilities();
         }
@@ -446,7 +440,14 @@ public class ConsoleMenu {
         }
 
         int threadCount = Math.min(coinTickers.size(), 8);
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        // Daemon factory: init tasks are bounded by their futures and the
+        // pool is drained in finally — it must never become a second
+        // liveness anchor if a task survives shutdownNow's interrupt.
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount, r -> {
+            Thread t = new Thread(r, "coin-init");
+            t.setDaemon(true);
+            return t;
+        });
 
         try {
             List<CoinTicker> enabledCoins = coinTickers.stream()
@@ -483,6 +484,23 @@ public class ConsoleMenu {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    /**
+     * Deferred best-effort capability probe for a freshly configured EXR
+     * pool. Daemon thread: a hung endpoint must never hold the JVM.
+     */
+    private void spawnExrCapabilityProbe() {
+        Thread prober = new Thread(() -> {
+            try {
+                Thread.sleep(1000);
+                App.exrServerPool.probeAllCapabilities();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "EXR-Capability-Prober");
+        prober.setDaemon(true);
+        prober.start();
     }
 
     private void autoGenerateRPCConfig() {

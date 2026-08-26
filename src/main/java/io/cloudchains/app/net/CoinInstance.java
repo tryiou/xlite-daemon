@@ -101,7 +101,9 @@ public class CoinInstance {
     private XRouterPacketManager xRouterPacketManager = null;
     private int rpcPort = -1;
     private boolean testnet = false;
-    private JSONRPCServer coinRPCServer = null;
+    // Volatile: written by reloadconfig on a Netty event-loop thread and
+    // read by lifecycle code (deinit) on other threads.
+    private volatile JSONRPCServer coinRPCServer = null;
     private volatile long lastUtxoUpdate = 0;
     private final AtomicInteger updateFailures = new AtomicInteger(0);
     private int generatedAddressCount;
@@ -1000,9 +1002,9 @@ public class CoinInstance {
         if (coinRPCServer == null)
             return; // no rpc available, skip
 
-        JSONRPCController.removeRPCServer(this);
-
-        coinRPCServer = JSONRPCController.getRPCServer(this);
+        // Atomic retire+create: a concurrent reloadconfig must never
+        // receive the retiring server instance.
+        coinRPCServer = JSONRPCController.rebindRPCServer(this);
 
         LOGGER.finer("[rpc] Requesting start of JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort());
         coinRPCServer.start();

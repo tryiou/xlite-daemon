@@ -4,6 +4,7 @@ import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.util.ConfigHelper;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -12,6 +13,12 @@ public class JSONRPCController {
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private static final ConcurrentHashMap<CoinInstance, JSONRPCServer> servers = new ConcurrentHashMap<>();
+    // Per-coin serialization of every map access: retire→create happens
+    // under the coin's lock, and plain lookups take it too, so no consumer
+    // can observe a mid-retirement server. Per-coin (not global) scope:
+    // a rebinding coin must not stall unrelated coins' event loops behind
+    // its multi-second release-wait.
+    private static final ConcurrentHashMap<CoinInstance, ReentrantLock> locks = new ConcurrentHashMap<>();
     private static JSONRPCMasterServer masterServer = new JSONRPCMasterServer(new ConfigHelper("master").getMasterRpcPort());
 
     public static JSONRPCMasterServer getMasterServer() {
@@ -22,16 +29,47 @@ public class JSONRPCController {
         if (coinInstance == null || coinInstance.getRPCPort() == -1) {
             throw new IllegalArgumentException("Bad coin instance");
         }
+        ReentrantLock lock = lockFor(coinInstance);
+        lock.lock();
+        try {
+            return getOrCreateLocked(coinInstance);
+        } finally {
+            lock.unlock();
+        }
+    }
 
+    /**
+     * Retires the coin's current server and returns a freshly created one
+     * as a single step, serialized against every other controller access
+     * for this coin. Callers must use this instead of an unsynchronized
+     * remove+get pair: between retirement request and map release there
+     * is a bounded wait, and only this lock guarantees no consumer of
+     * this coin observes the retiring instance.
+     */
+    public static JSONRPCServer rebindRPCServer(CoinInstance coinInstance) {
+        if (coinInstance == null || coinInstance.getRPCPort() == -1) {
+            throw new IllegalArgumentException("Bad coin instance");
+        }
+        ReentrantLock lock = lockFor(coinInstance);
+        lock.lock();
+        try {
+            removeLocked(coinInstance);
+            return getOrCreateLocked(coinInstance);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private static ReentrantLock lockFor(CoinInstance coinInstance) {
+        return locks.computeIfAbsent(coinInstance, coin -> new ReentrantLock());
+    }
+
+    private static JSONRPCServer getOrCreateLocked(CoinInstance coinInstance) {
         return servers.computeIfAbsent(coinInstance,
                 coin -> new JSONRPCServer(coin, coin.getRPCPort()));
     }
 
-    public static void removeRPCServer(CoinInstance coinInstance) {
-        if (coinInstance == null || coinInstance.getRPCPort() == -1) {
-            throw new IllegalArgumentException("Bad coin instance");
-        }
-
+    private static void removeLocked(CoinInstance coinInstance) {
         JSONRPCServer server = servers.get(coinInstance);
         if (server == null)
             return;

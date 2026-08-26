@@ -54,8 +54,11 @@ public class EXRServerPool {
             return;
         }
         LOGGER.info("[exr-pool] Starting capability probing for " + servers.size() + " servers");
-        // Start capability probing in background
-        new Thread(this::probeAllCapabilities, "EXR-Capability-Prober").start();
+        // Best-effort network probes: daemon so a hung endpoint can never
+        // hold the JVM past shutdown.
+        Thread prober = new Thread(this::probeAllCapabilities, "EXR-Capability-Prober");
+        prober.setDaemon(true);
+        prober.start();
     }
 
     public void probeAllCapabilities() {
@@ -73,6 +76,7 @@ public class EXRServerPool {
                     LOGGER.warning("[exr-pool] Failed to probe server " + server.getEndpoint() + ", " + e.getMessage());
                 }
             });
+            t.setDaemon(true);
             probeThreads.add(t);
             t.start();
         }
