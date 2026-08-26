@@ -25,10 +25,6 @@ public class CoinTickerUtils {
 //		tickers.put(CoinTicker.BITCOIN_CASH, "BCH");
         tickers.put(CoinTicker.RAVENCOIN, "RVN");
 
-        tickers.put(CoinTicker.ALQOCOIN, "XLQ");
-        // TODO Temporarily disable PHORE until supported
-//        tickers.put(CoinTicker.PHORECOIN, "PHR");
-         tickers.put(CoinTicker.BITBAY, "BAY");
         tickers.put(CoinTicker.UNOBTANIUM, "UNO");
         tickers.put(CoinTicker.PKOIN, "PKOIN");
 
@@ -60,11 +56,6 @@ public class CoinTickerUtils {
 //				CoinTicker.BITCOIN_CASH,
                 CoinTicker.RAVENCOIN,
 
-                CoinTicker.ALQOCOIN,
-                // TODO Temporarily disable PHORE until supported
-//                CoinTicker.PHORECOIN,
-                
-                CoinTicker.BITBAY,
                 CoinTicker.UNOBTANIUM,
                 CoinTicker.PKOIN,
 		};

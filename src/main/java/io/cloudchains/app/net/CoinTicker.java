@@ -15,10 +15,7 @@ public enum CoinTicker {
     DOGECOIN,
     SYSCOIN,
     PIVX,
-    ALQOCOIN,
-    PHORECOIN,
     RAVENCOIN,
-    BITBAY,
     UNOBTANIUM,
     PKOIN
     ;
@@ -42,11 +39,7 @@ public enum CoinTicker {
                 PIVX,
                 UNOBTANIUM,
                 PKOIN,
-//            ALQOCOIN, - not support on backend
-
-//            PHORECOIN, - not support on backend
                 RAVENCOIN
-//            BITBAY - not support on backend
         );
     }
 }

@@ -1,5 +1,3 @@
-import io.cloudchains.app.net.protocols.alqocoin.AlqocoinNetworkParameters;
-import io.cloudchains.app.net.protocols.bitbay.BitbayNetworkParameters;
 import io.cloudchains.app.net.protocols.bitcoin.BitcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetNetworkParameters;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetTestnet5NetworkParameters;
@@ -7,7 +5,6 @@ import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
 import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParameters;
-import io.cloudchains.app.net.protocols.phorecoin.PhorecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
 import io.cloudchains.app.net.protocols.pocketcoin.PocketcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
@@ -106,26 +103,8 @@ class WalletHelperFeeTest extends TestHelper {
     }
 
     @Test
-    void testGetFeePerByte_Alqocoin() {
-        AlqocoinNetworkParameters params = new AlqocoinNetworkParameters();
-        assertEquals(20L, WalletHelper.getFeePerByte(params));
-    }
-
-    @Test
-    void testGetFeePerByte_Bitbay() {
-        BitbayNetworkParameters params = new BitbayNetworkParameters();
-        assertEquals(100L, WalletHelper.getFeePerByte(params));
-    }
-
-    @Test
     void testGetFeePerByte_BlocknetTestnet5() {
         BlocknetTestnet5NetworkParameters params = new BlocknetTestnet5NetworkParameters();
-        assertEquals(20L, WalletHelper.getFeePerByte(params));
-    }
-
-    @Test
-    void testGetFeePerByte_Phorecoin() {
-        PhorecoinNetworkParameters params = new PhorecoinNetworkParameters();
         assertEquals(20L, WalletHelper.getFeePerByte(params));
     }
 
@@ -200,26 +179,8 @@ class WalletHelperFeeTest extends TestHelper {
     }
 
     @Test
-    void testGetMinTxFee_Alqocoin() {
-        AlqocoinNetworkParameters params = new AlqocoinNetworkParameters();
-        assertEquals(10000L, WalletHelper.getMinTxFee(params));
-    }
-
-    @Test
-    void testGetMinTxFee_Bitbay() {
-        BitbayNetworkParameters params = new BitbayNetworkParameters();
-        assertEquals(20000L, WalletHelper.getMinTxFee(params));
-    }
-
-    @Test
     void testGetMinTxFee_BlocknetTestnet5() {
         BlocknetTestnet5NetworkParameters params = new BlocknetTestnet5NetworkParameters();
-        assertEquals(10000L, WalletHelper.getMinTxFee(params));
-    }
-
-    @Test
-    void testGetMinTxFee_Phorecoin() {
-        PhorecoinNetworkParameters params = new PhorecoinNetworkParameters();
         assertEquals(10000L, WalletHelper.getMinTxFee(params));
     }
 

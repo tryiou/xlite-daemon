@@ -9,8 +9,6 @@ import io.cloudchains.app.Version;
 import io.cloudchains.app.crypto.KeyHandler;
 import io.cloudchains.app.net.api.JSONRPCController;
 import io.cloudchains.app.net.api.JSONRPCServer;
-//import io.cloudchains.app.net.protocols.alqocoin.AlqocoinNetworkParameters;
-//import io.cloudchains.app.net.protocols.bitbay.BitbayNetworkParameters;
 //import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParameters;
 import io.cloudchains.app.net.protocols.bitcoin.BitcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.blocknet.*;
@@ -18,7 +16,6 @@ import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
 import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParameters;
-//import io.cloudchains.app.net.protocols.phorecoin.PhorecoinNetworkParameters;
 import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
 import io.cloudchains.app.net.protocols.pocketcoin.PocketcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
@@ -406,11 +403,6 @@ public class CoinInstance {
                 rpcPort = 8370;
                 break;
             }
-            // case BITBAY: {
-            // 	networkParameters = new BitbayNetworkParameters();
-            // 	rpcPort = 19915;
-            // 	break;
-            // }
             case PIVX: {
                 LOGGER.fine("[coin] Initializing for Pivx main network.");
                 networkParameters = new PivxNetworkParameters();
@@ -429,18 +421,6 @@ public class CoinInstance {
                 rpcPort = 37071;
                 break;
             }
-            // case ALQOCOIN: {
-            // 	LOGGER.fine("[coin] Initializing for Alqo main network.");
-            // 	networkParameters = new AlqocoinNetworkParameters();
-            // 	rpcPort = 55000;
-            // 	break;
-            // }
-            // case PHORECOIN: {
-            // 	LOGGER.fine("[coin] Initializing for Phore main network.");
-            // 	networkParameters = new PhorecoinNetworkParameters();
-            // 	rpcPort = 11772;
-            // 	break;
-            // }
             case RAVENCOIN: {
                 LOGGER.fine("[coin] Initializing for Ravencoin main network.");
                 networkParameters = new RavencoinNetworkParameters();
