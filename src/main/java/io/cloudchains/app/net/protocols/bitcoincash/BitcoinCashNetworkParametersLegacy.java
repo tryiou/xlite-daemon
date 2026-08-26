@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.unobtanium;
+package io.cloudchains.app.net.protocols.bitcoincash;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,25 +6,24 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class UnobtaniumNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class BitcoinCashNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public UnobtaniumNetworkParameters() {
+    public BitcoinCashNetworkParametersLegacy() {
         super();
     }
 
     @Override
     public String getPaymentProtocolId() {
-        return "main";
+        return PAYMENT_PROTOCOL_ID_MAINNET;
     }
 
     @Override
     public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {
     }
 
-
     @Override
     public Coin getMaxMoney() {
-        return Coin.valueOf(250000 * Coin.COIN.value);
+        return MAX_MONEY;
     }
 
     @Override
@@ -34,12 +33,12 @@ public class UnobtaniumNetworkParameters extends NetworkParameters implements Ha
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "UNO");
+        return new MonetaryFormat().code(0, "BCH");
     }
 
     @Override
     public String getUriScheme() {
-        return "unobtanium:";
+        return "bch:";
     }
 
     @Override
@@ -54,45 +53,45 @@ public class UnobtaniumNetworkParameters extends NetworkParameters implements Ha
 
     @Override
     public int getProtocolVersionNum(final ProtocolVersion version) {
-        return 70002;
+        return version.getBitcoinProtocolVersion();
     }
 
     @Override
     public int getAddressHeader() {
-        return 130;
+        return 0;
     }
 
     @Override
     public int getP2SHHeader() {
-        return 30;
+        return 5;
     }
 
     @Override
     public int getDumpedPrivateKeyHeader() {
-        return 224;
+        return 128;
     }
 
 
     @Override
     public int getSubsidyDecreaseBlockCount() {
-        return 100000; // Adjusted for UNO
+        return 210240;
     }
 
     @Override
     public int getInterval() {
-        return 60;
+        return INTERVAL;
     }
 
     @Override
     public String getId() {
-        return "UNO";
+        return "BCH";
     }
 
     public long getFeePerByte() {
-        return 3;
+        return 2;
     }
 
     public long getMinTxFee() {
-        return 1000;
+        return 500;
     }
 }

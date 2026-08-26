@@ -114,6 +114,19 @@ public class ConsoleMenu {
                         }
                         break;
                     }
+                    case "--blockchain-configuration-files": {
+                        // Flag already handled in App.initCoinConfigs(); just consume the value here
+                        // to avoid falling through to the interactive menu.
+                        if (i + 1 < arguments.length && !arguments[i + 1].startsWith("--")) {
+                            i++;
+                        } else {
+                            String envVal = App.getEnv("BLOCKCHAIN_CONFIGURATION_FILES");
+                            if (envVal == null || envVal.isEmpty()) {
+                                LOGGER.warning("Missing value after '--blockchain-configuration-files'");
+                            }
+                        }
+                        break;
+                    }
                     case "--version":
                         LOGGER.info(Version.CLIENT_VERSION);
                         System.exit(0);
@@ -574,6 +587,8 @@ public class ConsoleMenu {
                 "                             Example: --development-endpoint <https://url.endpoint.org/>\n" +
                 "  --exr-endpoint             Set EXR endpoint for EXR server\n" +
                 "                             Example: --exr-endpoint <http://exrproxy1.airdns.org:42114>\n" +
+                "  --blockchain-configuration-files  Set blockchain-configuration-files source\n" +
+                "                             Example: --blockchain-configuration-files <path-or-url>\n" +
                 "  --version                  Display the version\n" +
                 "  --createdefaultwallet     Create a default wallet\n" +
                 "  --createwalletmnemonic    Create a wallet with a mnemonic\n" +

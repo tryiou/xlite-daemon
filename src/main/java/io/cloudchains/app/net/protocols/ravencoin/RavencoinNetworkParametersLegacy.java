@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.pivx;
+package io.cloudchains.app.net.protocols.ravencoin;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,9 +6,9 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class PivxNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class RavencoinNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public PivxNetworkParameters() {
+    public RavencoinNetworkParametersLegacy() {
         super();
     }
 
@@ -33,12 +33,12 @@ public class PivxNetworkParameters extends NetworkParameters implements HasFeePa
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "PIVX");
+        return new MonetaryFormat().code(0, "RVN");
     }
 
     @Override
     public String getUriScheme() {
-        return "pivx:";
+        return "ravencoin:";
     }
 
     @Override
@@ -53,22 +53,22 @@ public class PivxNetworkParameters extends NetworkParameters implements HasFeePa
 
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
-        return 70007;
+        return 70026;
     }
 
     @Override
     public int getAddressHeader() {
-        return 30;
+        return 60;
     }
 
     @Override
     public int getP2SHHeader() {
-        return 13;
+        return 122;
     }
 
     @Override
     public int getDumpedPrivateKeyHeader() {
-        return 212;
+        return 128;
     }
 
 
@@ -84,14 +84,14 @@ public class PivxNetworkParameters extends NetworkParameters implements HasFeePa
 
     @Override
     public String getId() {
-        return "PIVX";
+        return "RVN";
     }
 
     public long getFeePerByte() {
-        return 20;
+        return 1000;
     }
 
     public long getMinTxFee() {
-        return 10000;
+        return 100000;
     }
 }

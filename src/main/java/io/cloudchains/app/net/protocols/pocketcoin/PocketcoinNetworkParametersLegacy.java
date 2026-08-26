@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.digibyte;
+package io.cloudchains.app.net.protocols.pocketcoin;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,9 +6,9 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class DigibyteNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class PocketcoinNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public DigibyteNetworkParameters() {
+    public PocketcoinNetworkParametersLegacy() {
         super();
     }
 
@@ -23,22 +23,22 @@ public class DigibyteNetworkParameters extends NetworkParameters implements HasF
 
     @Override
     public Coin getMaxMoney() {
-        return Coin.valueOf(2000000000 * Coin.COIN.value);
+        return Coin.valueOf(21000000 * Coin.COIN.value);
     }
 
     @Override
     public Coin getMinNonDustOutput() {
-        return Coin.valueOf(1000);
+        return Transaction.MIN_NONDUST_OUTPUT;
     }
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "DGB");
+        return new MonetaryFormat().code(0, "PKOIN");
     }
 
     @Override
     public String getUriScheme() {
-        return "digibyte:";
+        return "pocketcoin:";
     }
 
     @Override
@@ -53,45 +53,45 @@ public class DigibyteNetworkParameters extends NetworkParameters implements HasF
 
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
-        return 70002;
+        return 70031;
     }
 
     @Override
     public int getAddressHeader() {
-        return 30;
+        return 55;
     }
 
     @Override
     public int getP2SHHeader() {
-        return 5;
+        return 80;
     }
 
     @Override
     public int getDumpedPrivateKeyHeader() {
-        return 128;
+        return 33;
     }
 
 
     @Override
     public int getSubsidyDecreaseBlockCount() {
-        return 100000;
+        return 2100000;
     }
 
     @Override
     public int getInterval() {
-        return 108;
+        return 60;
     }
 
     @Override
     public String getId() {
-        return "DGB";
+        return "PKOIN";
     }
 
     public long getFeePerByte() {
-        return 200;
+        return 20;
     }
 
     public long getMinTxFee() {
-        return 100000;
+        return 10000;
     }
 }

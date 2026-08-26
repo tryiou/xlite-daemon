@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.ravencoin;
+package io.cloudchains.app.net.protocols.unobtanium;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,9 +6,9 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class RavencoinNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class UnobtaniumNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public RavencoinNetworkParameters() {
+    public UnobtaniumNetworkParametersLegacy() {
         super();
     }
 
@@ -21,9 +21,10 @@ public class RavencoinNetworkParameters extends NetworkParameters implements Has
     public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {
     }
 
+
     @Override
     public Coin getMaxMoney() {
-        return Coin.valueOf(100000000 * Coin.COIN.value);
+        return Coin.valueOf(250000 * Coin.COIN.value);
     }
 
     @Override
@@ -33,12 +34,12 @@ public class RavencoinNetworkParameters extends NetworkParameters implements Has
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "RVN");
+        return new MonetaryFormat().code(0, "UNO");
     }
 
     @Override
     public String getUriScheme() {
-        return "ravencoin:";
+        return "unobtanium:";
     }
 
     @Override
@@ -52,29 +53,29 @@ public class RavencoinNetworkParameters extends NetworkParameters implements Has
     }
 
     @Override
-    public int getProtocolVersionNum(ProtocolVersion version) {
-        return 70026;
+    public int getProtocolVersionNum(final ProtocolVersion version) {
+        return 70002;
     }
 
     @Override
     public int getAddressHeader() {
-        return 60;
+        return 130;
     }
 
     @Override
     public int getP2SHHeader() {
-        return 122;
+        return 30;
     }
 
     @Override
     public int getDumpedPrivateKeyHeader() {
-        return 128;
+        return 224;
     }
 
 
     @Override
     public int getSubsidyDecreaseBlockCount() {
-        return 210240;
+        return 100000; // Adjusted for UNO
     }
 
     @Override
@@ -84,14 +85,14 @@ public class RavencoinNetworkParameters extends NetworkParameters implements Has
 
     @Override
     public String getId() {
-        return "RVN";
+        return "UNO";
     }
 
     public long getFeePerByte() {
-        return 1000;
+        return 3;
     }
 
     public long getMinTxFee() {
-        return 100000;
+        return 1000;
     }
 }

@@ -82,6 +82,18 @@ public class TestHelper {
         clean();
         // Disable address discovery during tests to prevent interference with deterministic address generation
         CoinInstance.setAddressDiscoveryEnabled(false);
+        // Ensure coin configs are available for tests that init migrated coins
+        if (!io.cloudchains.app.coinconfig.CoinConfigRegistry.isLoaded()) {
+            try {
+                String sibling = java.nio.file.Paths.get("..", "blockchain-configuration-files")
+                        .toAbsolutePath().normalize().toString();
+                io.cloudchains.app.coinconfig.CoinConfigRegistry.load(sibling);
+            } catch (Exception e) {
+                java.util.logging.Logger.getLogger(java.util.logging.Logger.GLOBAL_LOGGER_NAME)
+                        .warning("[TestHelper] coin config load failed: " + e.getMessage()
+                                + " — tests requiring migrated coins will get UNSUPPORTEDCOIN");
+            }
+        }
     }
 
     /**

@@ -3,9 +3,9 @@ package io.cloudchains.app.net.protocols.bitcoin;
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.params.MainNetParams;
 
-public class BitcoinNetworkParameters extends MainNetParams implements HasFeeParams {
+public class BitcoinNetworkParametersLegacy extends MainNetParams implements HasFeeParams {
 
-    public BitcoinNetworkParameters() {
+    public BitcoinNetworkParametersLegacy() {
         super();
     }
 

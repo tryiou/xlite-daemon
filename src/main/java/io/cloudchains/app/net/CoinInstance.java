@@ -9,18 +9,7 @@ import io.cloudchains.app.Version;
 import io.cloudchains.app.crypto.KeyHandler;
 import io.cloudchains.app.net.api.JSONRPCController;
 import io.cloudchains.app.net.api.JSONRPCServer;
-//import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParameters;
-import io.cloudchains.app.net.protocols.bitcoin.BitcoinNetworkParameters;
 import io.cloudchains.app.net.protocols.blocknet.*;
-import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParameters;
-import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
-import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParameters;
-import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParameters;
-import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
-import io.cloudchains.app.net.protocols.pocketcoin.PocketcoinNetworkParameters;
-import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
-import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParameters;
-import io.cloudchains.app.net.protocols.unobtanium.UnobtaniumNetworkParameters;
 import io.cloudchains.app.net.xrouter.XRouterMessage;
 import io.cloudchains.app.net.xrouter.XRouterPacketManager;
 import io.cloudchains.app.util.AddressBalance;
@@ -363,67 +352,77 @@ public class CoinInstance {
             }
             case BITCOIN: {
                 LOGGER.fine("[coin] Initializing for Bitcoin main network.");
-                networkParameters = new BitcoinNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 8332;
                 break;
             }
             // case BITCOIN_CASH: {
             // 	LOGGER.fine("[coin] Initializing for BitcoinCash main network.");
-            // 	networkParameters = new BitcoinCashNetworkParameters();
+            // 	networkParameters = new io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParametersLegacy();
             // 	rpcPort = 48332;
             // 	break;
             // }
             case LITECOIN: {
                 LOGGER.fine("[coin] Initializing for Litecoin main network.");
-                networkParameters = new LitecoinNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 9332;
                 break;
             }
             case DASHCOIN: {
                 LOGGER.fine("[coin] Initializing for Dashcoin main network.");
-                networkParameters = new DashcoinNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 9998;
                 break;
             }
             case DIGIBYTE: {
                 LOGGER.fine("[coin] Initializing for Digibyte main network.");
-                networkParameters = new DigibyteNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 14022;
                 break;
             }
             case DOGECOIN: {
                 LOGGER.fine("[coin] Initializing for Dogecoin main network.");
-                networkParameters = new DogecoinNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 22555;
                 break;
             }
             case SYSCOIN: {
                 LOGGER.fine("[coin] Initializing for Syscoin main network.");
-                networkParameters = new SyscoinNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 8370;
                 break;
             }
             case PIVX: {
                 LOGGER.fine("[coin] Initializing for Pivx main network.");
-                networkParameters = new PivxNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 9951;
                 break;
             }
             case UNOBTANIUM: {
                 LOGGER.fine("[coin] Initializing for Unobtanium main network.");
-                networkParameters = new UnobtaniumNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 65111;
                 break;
             }
             case PKOIN: {
                 LOGGER.fine("[coin] Initializing for Pocketcoin main network.");
-                networkParameters = new PocketcoinNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 37071;
                 break;
             }
             case RAVENCOIN: {
                 LOGGER.fine("[coin] Initializing for Ravencoin main network.");
-                networkParameters = new RavencoinNetworkParameters();
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
                 rpcPort = 8766;
                 break;
             }
@@ -557,6 +556,18 @@ public class CoinInstance {
 //		}
 
         return null;
+    }
+
+    private CoinError loadMigratedParams() {
+        try {
+            networkParameters = io.cloudchains.app.coinconfig.ConfigurableNetworkParameters
+                    .from(io.cloudchains.app.coinconfig.CoinConfigRegistry
+                            .get(CoinTickerUtils.tickerToString(ticker)));
+            return null;
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            LOGGER.warning("[coin] [" + ticker + "] missing/invalid config: " + e.getMessage());
+            return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
+        }
     }
 
     private void generateForwardAddresses(boolean fromStartup) {

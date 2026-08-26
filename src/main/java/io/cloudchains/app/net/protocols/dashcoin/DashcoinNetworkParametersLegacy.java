@@ -6,9 +6,9 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class DashcoinNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class DashcoinNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public DashcoinNetworkParameters() {
+    public DashcoinNetworkParametersLegacy() {
         super();
     }
 

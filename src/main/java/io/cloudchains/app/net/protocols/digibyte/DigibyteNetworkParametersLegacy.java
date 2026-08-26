@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.bitcoincash;
+package io.cloudchains.app.net.protocols.digibyte;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,15 +6,15 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class BitcoinCashNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class DigibyteNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public BitcoinCashNetworkParameters() {
+    public DigibyteNetworkParametersLegacy() {
         super();
     }
 
     @Override
     public String getPaymentProtocolId() {
-        return PAYMENT_PROTOCOL_ID_MAINNET;
+        return "main";
     }
 
     @Override
@@ -23,22 +23,22 @@ public class BitcoinCashNetworkParameters extends NetworkParameters implements H
 
     @Override
     public Coin getMaxMoney() {
-        return MAX_MONEY;
+        return Coin.valueOf(2000000000 * Coin.COIN.value);
     }
 
     @Override
     public Coin getMinNonDustOutput() {
-        return Transaction.MIN_NONDUST_OUTPUT;
+        return Coin.valueOf(1000);
     }
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "BCH");
+        return new MonetaryFormat().code(0, "DGB");
     }
 
     @Override
     public String getUriScheme() {
-        return "bch:";
+        return "digibyte:";
     }
 
     @Override
@@ -52,13 +52,13 @@ public class BitcoinCashNetworkParameters extends NetworkParameters implements H
     }
 
     @Override
-    public int getProtocolVersionNum(final ProtocolVersion version) {
-        return version.getBitcoinProtocolVersion();
+    public int getProtocolVersionNum(ProtocolVersion version) {
+        return 70002;
     }
 
     @Override
     public int getAddressHeader() {
-        return 0;
+        return 30;
     }
 
     @Override
@@ -74,24 +74,24 @@ public class BitcoinCashNetworkParameters extends NetworkParameters implements H
 
     @Override
     public int getSubsidyDecreaseBlockCount() {
-        return 210240;
+        return 100000;
     }
 
     @Override
     public int getInterval() {
-        return INTERVAL;
+        return 108;
     }
 
     @Override
     public String getId() {
-        return "BCH";
+        return "DGB";
     }
 
     public long getFeePerByte() {
-        return 2;
+        return 200;
     }
 
     public long getMinTxFee() {
-        return 500;
+        return 100000;
     }
 }

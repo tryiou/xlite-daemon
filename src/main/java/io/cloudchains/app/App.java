@@ -27,6 +27,7 @@ public class App {
     // DEBUG ENDPOINT
     public static volatile String EXR_ENDPOINT = null;
     public static volatile EXRServerPool exrServerPool = null;
+    public static volatile String BLOCKCHAIN_CONFIGURATION_FILES = null;
     public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
     public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
     public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();
@@ -102,6 +103,38 @@ public class App {
         }
     }
 
+    public static void initCoinConfigs(String[] args) {
+        String flagValue = null;
+        if (args != null) {
+            for (int i = 0; i < args.length; i++) {
+                if ("--blockchain-configuration-files".equals(args[i])) {
+                    if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
+                        flagValue = args[i + 1];
+                    } else {
+                        LOGGER.warning("[coinconfig] Missing value after --blockchain-configuration-files");
+                    }
+                    break;
+                }
+            }
+        }
+        String envValue = getEnv("BLOCKCHAIN_CONFIGURATION_FILES");
+        String source;
+        try {
+            source = new io.cloudchains.app.coinconfig.ConfigSourceResolver(flagValue, envValue).resolve();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[coinconfig] invalid source, using default: " + e.getMessage());
+            source = io.cloudchains.app.coinconfig.ConfigSourceResolver.DEFAULT_UPSTREAM;
+        }
+        BLOCKCHAIN_CONFIGURATION_FILES = source;
+        try {
+            io.cloudchains.app.coinconfig.CoinConfigRegistry.load(source);
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING,
+                    "[coinconfig] failed to load from " + source + ": " + e.getMessage()
+                            + " — continuing with no configs; migrated coins will report UNSUPPORTEDCOIN");
+        }
+    }
+
     public static void main(String[] args) {
         for (String arg : args) {
             if (arg.equals("--version")) {
@@ -113,8 +146,6 @@ public class App {
                 System.exit(0);
             }
         }
-
-        initExrEndpoint();
 
         Level logLevel = parseLogLevel(getEnv("CLOUDCHAINS_LOG_LEVEL"), Level.INFO);
         LOGGER.setLevel(logLevel);
@@ -154,6 +185,9 @@ public class App {
         consoleHandler.setLevel(Level.FINE);
 
         LOGGER.addHandler(consoleHandler);
+
+        initExrEndpoint();
+        initCoinConfigs(args);
 
         console = new ConsoleMenu(args);
         console.init();

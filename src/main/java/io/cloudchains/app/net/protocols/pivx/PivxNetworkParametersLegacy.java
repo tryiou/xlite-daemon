@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.dogecoin;
+package io.cloudchains.app.net.protocols.pivx;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,9 +6,9 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class DogecoinNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class PivxNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public DogecoinNetworkParameters() {
+    public PivxNetworkParametersLegacy() {
         super();
     }
 
@@ -23,7 +23,7 @@ public class DogecoinNetworkParameters extends NetworkParameters implements HasF
 
     @Override
     public Coin getMaxMoney() {
-        return Coin.valueOf(2000000000 * Coin.COIN.value);
+        return Coin.valueOf(100000000 * Coin.COIN.value);
     }
 
     @Override
@@ -33,12 +33,12 @@ public class DogecoinNetworkParameters extends NetworkParameters implements HasF
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "DOGE");
+        return new MonetaryFormat().code(0, "PIVX");
     }
 
     @Override
     public String getUriScheme() {
-        return "dogecoin:";
+        return "pivx:";
     }
 
     @Override
@@ -53,7 +53,7 @@ public class DogecoinNetworkParameters extends NetworkParameters implements HasF
 
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
-        return 70004;
+        return 70007;
     }
 
     @Override
@@ -63,35 +63,35 @@ public class DogecoinNetworkParameters extends NetworkParameters implements HasF
 
     @Override
     public int getP2SHHeader() {
-        return 22;
+        return 13;
     }
 
     @Override
     public int getDumpedPrivateKeyHeader() {
-        return 158;
+        return 212;
     }
 
 
     @Override
     public int getSubsidyDecreaseBlockCount() {
-        return 100000;
+        return 210240;
     }
 
     @Override
     public int getInterval() {
-        return 108;
+        return 60;
     }
 
     @Override
     public String getId() {
-        return "DOGE";
+        return "PIVX";
     }
 
     public long getFeePerByte() {
-        return 2500;
+        return 20;
     }
 
     public long getMinTxFee() {
-        return 225000;
+        return 10000;
     }
 }

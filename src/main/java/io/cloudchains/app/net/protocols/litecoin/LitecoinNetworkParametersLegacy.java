@@ -6,9 +6,9 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class LitecoinNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class LitecoinNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public LitecoinNetworkParameters() {
+    public LitecoinNetworkParametersLegacy() {
         super();
     }
 

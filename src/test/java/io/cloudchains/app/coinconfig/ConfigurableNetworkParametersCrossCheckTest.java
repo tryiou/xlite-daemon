@@ -1,16 +1,16 @@
 package io.cloudchains.app.coinconfig;
 
-import io.cloudchains.app.net.protocols.bitcoin.BitcoinNetworkParameters;
-import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParameters;
-import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParameters;
-import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParameters;
-import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParameters;
-import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParameters;
-import io.cloudchains.app.net.protocols.pivx.PivxNetworkParameters;
-import io.cloudchains.app.net.protocols.pocketcoin.PocketcoinNetworkParameters;
-import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParameters;
-import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParameters;
-import io.cloudchains.app.net.protocols.unobtanium.UnobtaniumNetworkParameters;
+import io.cloudchains.app.net.protocols.bitcoin.BitcoinNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.bitcoincash.BitcoinCashNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.pivx.PivxNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.pocketcoin.PocketcoinNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParametersLegacy;
+import io.cloudchains.app.net.protocols.unobtanium.UnobtaniumNetworkParametersLegacy;
 import io.cloudchains.app.wallet.WalletHelper;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -139,27 +139,27 @@ class ConfigurableNetworkParametersCrossCheckTest {
         LegacyFactory factory;
         switch (ticker) {
             case "BTC":
-                factory = BitcoinNetworkParameters::new; break;
+                factory = BitcoinNetworkParametersLegacy::new; break;
             case "BCH":
-                factory = BitcoinCashNetworkParameters::new; break;
+                factory = BitcoinCashNetworkParametersLegacy::new; break;
             case "DASH":
-                factory = DashcoinNetworkParameters::new; break;
+                factory = DashcoinNetworkParametersLegacy::new; break;
             case "DGB":
-                factory = DigibyteNetworkParameters::new; break;
+                factory = DigibyteNetworkParametersLegacy::new; break;
             case "DOGE":
-                factory = DogecoinNetworkParameters::new; break;
+                factory = DogecoinNetworkParametersLegacy::new; break;
             case "LTC":
-                factory = LitecoinNetworkParameters::new; break;
+                factory = LitecoinNetworkParametersLegacy::new; break;
             case "PIVX":
-                factory = PivxNetworkParameters::new; break;
+                factory = PivxNetworkParametersLegacy::new; break;
             case "PKOIN":
-                factory = PocketcoinNetworkParameters::new; break;
+                factory = PocketcoinNetworkParametersLegacy::new; break;
             case "RVN":
-                factory = RavencoinNetworkParameters::new; break;
+                factory = RavencoinNetworkParametersLegacy::new; break;
             case "SYS":
-                factory = SyscoinNetworkParameters::new; break;
+                factory = SyscoinNetworkParametersLegacy::new; break;
             case "UNO":
-                factory = UnobtaniumNetworkParameters::new; break;
+                factory = UnobtaniumNetworkParametersLegacy::new; break;
             default:
                 throw new IllegalArgumentException(ticker);
         }

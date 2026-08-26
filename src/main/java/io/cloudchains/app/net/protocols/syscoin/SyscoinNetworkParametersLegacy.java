@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.pocketcoin;
+package io.cloudchains.app.net.protocols.syscoin;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,11 +6,12 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class PocketcoinNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class SyscoinNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public PocketcoinNetworkParameters() {
+    public SyscoinNetworkParametersLegacy() {
         super();
     }
+
 
     @Override
     public String getPaymentProtocolId() {
@@ -23,22 +24,22 @@ public class PocketcoinNetworkParameters extends NetworkParameters implements Ha
 
     @Override
     public Coin getMaxMoney() {
-        return Coin.valueOf(21000000 * Coin.COIN.value);
+        return Coin.valueOf(888000000 * Coin.COIN.value);
     }
 
     @Override
     public Coin getMinNonDustOutput() {
-        return Transaction.MIN_NONDUST_OUTPUT;
+        return Coin.valueOf(5500);
     }
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "PKOIN");
+        return new MonetaryFormat().code(0, "SYS");
     }
 
     @Override
     public String getUriScheme() {
-        return "pocketcoin:";
+        return "syscoin:";
     }
 
     @Override
@@ -53,45 +54,44 @@ public class PocketcoinNetworkParameters extends NetworkParameters implements Ha
 
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
-        return 70031;
+        return 70227;
     }
 
     @Override
     public int getAddressHeader() {
-        return 55;
+        return 63;
     }
 
     @Override
     public int getP2SHHeader() {
-        return 80;
+        return 5;
     }
 
     @Override
     public int getDumpedPrivateKeyHeader() {
-        return 33;
+        return 128;
     }
-
 
     @Override
     public int getSubsidyDecreaseBlockCount() {
-        return 2100000;
+        return 525600;
     }
 
     @Override
     public int getInterval() {
-        return 60;
+        return 2016;
     }
 
     @Override
     public String getId() {
-        return "PKOIN";
+        return "SYS";
     }
 
     public long getFeePerByte() {
-        return 20;
+        return 40;
     }
 
     public long getMinTxFee() {
-        return 10000;
+        return 20000;
     }
 }

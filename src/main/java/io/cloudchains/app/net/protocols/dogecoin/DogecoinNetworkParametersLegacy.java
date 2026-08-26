@@ -1,4 +1,4 @@
-package io.cloudchains.app.net.protocols.syscoin;
+package io.cloudchains.app.net.protocols.dogecoin;
 
 import io.cloudchains.app.net.HasFeeParams;
 import org.bitcoinj.core.*;
@@ -6,12 +6,11 @@ import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
 
-public class SyscoinNetworkParameters extends NetworkParameters implements HasFeeParams {
+public class DogecoinNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
 
-    public SyscoinNetworkParameters() {
+    public DogecoinNetworkParametersLegacy() {
         super();
     }
-
 
     @Override
     public String getPaymentProtocolId() {
@@ -24,22 +23,22 @@ public class SyscoinNetworkParameters extends NetworkParameters implements HasFe
 
     @Override
     public Coin getMaxMoney() {
-        return Coin.valueOf(888000000 * Coin.COIN.value);
+        return Coin.valueOf(2000000000 * Coin.COIN.value);
     }
 
     @Override
     public Coin getMinNonDustOutput() {
-        return Coin.valueOf(5500);
+        return Transaction.MIN_NONDUST_OUTPUT;
     }
 
     @Override
     public MonetaryFormat getMonetaryFormat() {
-        return new MonetaryFormat().code(0, "SYS");
+        return new MonetaryFormat().code(0, "DOGE");
     }
 
     @Override
     public String getUriScheme() {
-        return "syscoin:";
+        return "dogecoin:";
     }
 
     @Override
@@ -54,44 +53,45 @@ public class SyscoinNetworkParameters extends NetworkParameters implements HasFe
 
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
-        return 70227;
+        return 70004;
     }
 
     @Override
     public int getAddressHeader() {
-        return 63;
+        return 30;
     }
 
     @Override
     public int getP2SHHeader() {
-        return 5;
+        return 22;
     }
 
     @Override
     public int getDumpedPrivateKeyHeader() {
-        return 128;
+        return 158;
     }
+
 
     @Override
     public int getSubsidyDecreaseBlockCount() {
-        return 525600;
+        return 100000;
     }
 
     @Override
     public int getInterval() {
-        return 2016;
+        return 108;
     }
 
     @Override
     public String getId() {
-        return "SYS";
+        return "DOGE";
     }
 
     public long getFeePerByte() {
-        return 40;
+        return 2500;
     }
 
     public long getMinTxFee() {
-        return 20000;
+        return 225000;
     }
 }
