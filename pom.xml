@@ -34,6 +34,7 @@
     <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
     <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
     <exec.maven.plugin.version>3.5.0</exec.maven.plugin.version>
+    <rewrite.maven.plugin.version>6.25.0</rewrite.maven.plugin.version>
   </properties>
 
   <!-- Dependency Management -->
@@ -398,11 +399,13 @@
         </executions>
       </plugin>
 
-      <!-- OpenRewrite Maven Plugin for automatic code cleanup -->
+      <!-- OpenRewrite Maven Plugin for automatic code cleanup.
+           Opt-in via the `rewrite` profile (see Profiles below): it costs
+           ~8s on every build, so routine compile/test runs skip it. -->
       <plugin>
         <groupId>org.openrewrite.maven</groupId>
         <artifactId>rewrite-maven-plugin</artifactId>
-        <version>6.25.0</version>
+        <version>${rewrite.maven.plugin.version}</version>
         <configuration>
           <!-- Active recipes for automatic cleanup during build -->
           <activeRecipes>
@@ -419,7 +422,7 @@
             <recipe>org.openrewrite.maven.OrderPomElements</recipe>
             <recipe>org.openrewrite.maven.ModernizeObsoletePoms</recipe>
             <recipe>org.openrewrite.maven.BestPractices</recipe>
-            
+
             <!-- Java cleanup recipes -->
             <recipe>org.openrewrite.java.RemoveUnusedImports</recipe>
             <recipe>org.openrewrite.java.format.AutoFormat</recipe>
@@ -429,30 +432,17 @@
             <recipe>org.openrewrite.java.ShortenFullyQualifiedTypeReferences</recipe>
             <recipe>org.openrewrite.java.SimplifySingleElementAnnotation</recipe>
           </activeRecipes>
-          
+
           <!-- Code style -->
           <activeStyles>
             <style>org.openrewrite.java.IntelliJ</style>
           </activeStyles>
-          
+
           <!-- Export datatables for analysis -->
           <exportDatatables>true</exportDatatables>
-          
-          <!-- Skip cleanup during certain phases if needed -->
-          <!-- <skip>false</skip> -->
         </configuration>
-        <executions>
-          <!-- Run cleanup during the compile phase -->
-          <execution>
-            <id>cleanup-code</id>
-            <phase>process-classes</phase>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
-      
+
       <!-- Exec Maven Plugin for running the application -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -497,6 +487,32 @@
       <properties>
         <skipTests>true</skipTests>
       </properties>
+    </profile>
+
+    <!-- Opt-in OpenRewrite code cleanup. Binds the rewrite-maven-plugin run
+         goal to the process-classes phase; without this profile the plugin
+         is declared but never executes. -->
+    <profile>
+      <id>rewrite</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.openrewrite.maven</groupId>
+            <artifactId>rewrite-maven-plugin</artifactId>
+            <version>${rewrite.maven.plugin.version}</version>
+            <executions>
+              <!-- Run cleanup during the process-classes phase -->
+              <execution>
+                <id>cleanup-code</id>
+                <phase>process-classes</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>

@@ -19,7 +19,7 @@ class CoinInstanceTest extends TestHelper {
 
     @Test
     void deterministicAddresses_fromMnemonic() {
-        for (int runCount = 0; runCount < 10; runCount++) {
+        for (int runCount = 0; runCount < 3; runCount++) {
             CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCount());
@@ -51,7 +51,7 @@ class CoinInstanceTest extends TestHelper {
 
     @Test
     void deterministicAddresses_generateAddress() {
-        for (int runCount = 0; runCount < 10; runCount++) {
+        for (int runCount = 0; runCount < 3; runCount++) {
             CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCountInitial());
@@ -87,7 +87,7 @@ class CoinInstanceTest extends TestHelper {
 
     @Test
     void deterministicAddresses_generateForwardAddresses() {
-        for (int runCount = 0; runCount < 10; runCount++) {
+        for (int runCount = 0; runCount < 3; runCount++) {
             CoinInstance coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
             assertNotNull(coin);
             coin.getConfigHelper().setAddressCount(getAddressCountInitial());

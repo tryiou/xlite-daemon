@@ -164,12 +164,16 @@ class AddressDiscoveryServiceTest extends TestHelper {
         assertEquals(usedAddressIndex + 1, discoveryService.discoverAddressCount());
     }
 
-    /** All NUM_BATCHES have UTXOs. Scans all batches. */
+    /**
+     * All NUM_BATCHES have UTXOs. Scans all batches.
+     * No wallet address pre-generation is needed: discovery derives each batch
+     * independently via deriveAddressRange(), so the mocked UTXO feed alone
+     * drives the scan.
+     */
     @Test
     void testDiscovery_AllBatchesFunded() {
         int batchSize = AddressDiscoveryService.getBatchSize();
         int numBatches = AddressDiscoveryService.getNumBatches();
-        for (int i = 0; i < numBatches * batchSize; i++) coinInstance.generateAddress(false);
 
         when(mockHttpClient.getUtxosUncached(any(), any(String[].class)))
                 .thenAnswer(inv -> buildUtxoResponse(((String[]) inv.getArgument(1))[0]));

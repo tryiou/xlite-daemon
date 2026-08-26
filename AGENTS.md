@@ -24,9 +24,12 @@ data upstream over HTTP (`net/api/http/client/`).
   `{method, params}` JSON.
 - Upstream chain: exrproxy `/xrs/<service>` → plugin-adapter xrm methods →
   utxo-plugin containers.
-- `net/xrouter/` and the `xrm*` handling in `BlocknetPeerGroup` are dead legacy
-  XRouter-over-p2p paths (commented out at `CoinInstance.java:517`) — don't build
-  on them.
+- `net/xrouter/` and the `xrm*` handling in `BlocknetPeerGroup` are currently
+  disabled XRouter-over-p2p paths (commented out at `CoinInstance.java:517-557`)
+  — **work-in-progress, NOT abandoned**: never delete, prune, or "clean up" them;
+  treat every Blocknet p2p/XRouter extra (serializers, packet magic, peer-group
+  plumbing) as live WIP. Any earlier "dead legacy" wording here was wrong; the
+  workspace-root rule takes precedence.
 
 # Java — use jabba
 source ~/.jabba/jabba.sh && jabba use graalvm_community@21.0.2
@@ -39,6 +42,9 @@ mvn compile -q
 
 # Run all tests
 mvn test
+
+# OpenRewrite code cleanup (opt-in; NOT part of routine builds)
+mvn -Prewrite process-classes
 
 # Run a single test class
 mvn test -pl . -Dtest=KeyHandlerTest
@@ -61,7 +67,7 @@ mvn package -Pnative -Pnative-fast -q
 
 - Group order: third-party libraries, then `java.*`, then `javax.*`
 - Wildcard imports are acceptable for large groups (e.g., `java.io.*`, `org.bitcoinj.core.*`)
-- No unused imports; OpenRewrite cleanup runs on `mvn compile`
+- No unused imports; OpenRewrite cleanup is opt-in via `mvn -Prewrite process-classes`
 
 ### Formatting
 
@@ -146,8 +152,10 @@ Some older commits use `[category] description` style (e.g., `[security] Upgrade
 
 ## Things to Watch For
 
-- The `rewrite-maven-plugin` runs on `mvn compile` and may auto-modify imports and formatting.
-  Always review `git diff` after compiling.
+- The `rewrite-maven-plugin` no longer runs in the default build (it cost ~8s
+  per build); it executes only under the `-Prewrite` profile and may auto-modify
+  imports and formatting. Run it before releases or style sweeps, and always
+  review `git diff` afterwards.
 - `ConfigHelper.CONFIG_DIR` is a mutable static used to override config path in tests.
 - Tests use `@TempDir` (JUnit 5 auto-cleanup); never run with parallel execution
   due to mutable `ConfigHelper.CONFIG_DIR` static state.
