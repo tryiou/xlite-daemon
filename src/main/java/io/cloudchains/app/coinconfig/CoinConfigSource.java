@@ -16,16 +16,27 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Loads every coin's {@link CoinConfig} from a blockchain-configuration-files
  * source (local directory or base URL), resolving once at daemon start.
  *
- * <p>Failure policy is fail-hard: any unreadable manifest, missing conf file,
- * missing conf section or unparsable value throws; the daemon refuses to
- * start rather than guess coin parameters.</p>
+ * <p>Failure policy: manifest shape and required fields are fail-hard (missing
+ * ticker/blockchain/xbridge_conf aborts the whole load). Per-entry
+ * xbridge-conf fetch/parse and missing ticker sections are
+ * fail-open-warn-and-skip for remote sources (upstream may contain stale
+ * entries like {@code oasis--v3.0.0.conf}) and fail-hard for local
+ * directories (developer error). The daemon therefore starts even if a few
+ * remote entries are stale, but a broken local checkout is caught early.</p>
  */
 public final class CoinConfigSource {
+
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final Pattern XBRIDGE_CONF_PATTERN = Pattern.compile("^[A-Za-z0-9_\\-\\.]+\\.conf$");
 
     private final String base;
 
@@ -60,6 +71,7 @@ public final class CoinConfigSource {
             throw new IllegalStateException("manifest lists no coins");
         Map<String, CoinConfig> out = new LinkedHashMap<>();
         int index = 0;
+        int skipped = 0;
         for (JsonElement el : entries) {
             index++;
             JsonObject entry;
@@ -69,22 +81,62 @@ public final class CoinConfigSource {
                 final String blockchain = requiredField(entry, "blockchain", index);
                 final String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
                 final String xbridgeConf = requiredField(entry, "xbridge_conf", index);
-
-                CoinConfig prev = out.get(ticker);
-                if (prev != null)
-                    throw new IllegalStateException("duplicate manifest ticker " + ticker);
-
-                Map<String, Map<String, String>> sections = isLocal()
-                        ? safeParseLocal(localXBridgeConf(xbridgeConf))
-                        : XBridgeConfParser.parse(fetchRemote(xbridgeConfUrl(xbridgeConf)));
+                if (!XBRIDGE_CONF_PATTERN.matcher(xbridgeConf).matches() || xbridgeConf.contains("..")) {
+                    String msg = "xbridge_conf filename fails validation: " + xbridgeConf;
+                    if (isLocal()) {
+                        throw new IllegalStateException(msg);
+                    } else {
+                        LOGGER.warning("[coinconfig] skipping [" + ticker + "] entry #" + index + ": " + msg);
+                        skipped++;
+                        continue;
+                    }
+                }
+                if (out.containsKey(ticker)) {
+                    LOGGER.warning("[coinconfig] duplicate ticker " + ticker + " entry #" + index
+                            + " overwriting previous (keeping last)");
+                }
+                Map<String, Map<String, String>> sections;
+                try {
+                    sections = isLocal()
+                            ? safeParseLocal(localXBridgeConf(xbridgeConf))
+                            : XBridgeConfParser.parse(fetchRemote(xbridgeConfUrl(xbridgeConf)));
+                } catch (RuntimeException fe) {
+                    if (isLocal()) {
+                        throw fe;
+                    } else {
+                        LOGGER.warning("[coinconfig] skipping [" + ticker + "] entry #" + index
+                                + " (" + xbridgeConf + "): " + fe.getMessage());
+                        skipped++;
+                        continue;
+                    }
+                }
                 Map<String, String> section = sections.get(ticker);
-                if (section == null)
-                    throw new IllegalStateException("xbridge conf " + xbridgeConf
-                            + " has no [" + ticker + "] section");
+                if (section == null) {
+                    String msg = "xbridge conf " + xbridgeConf + " has no [" + ticker + "] section";
+                    if (isLocal()) {
+                        throw new IllegalStateException(msg);
+                    } else {
+                        LOGGER.warning("[coinconfig] skipping [" + ticker + "] entry #" + index + ": " + msg);
+                        skipped++;
+                        continue;
+                    }
+                }
                 out.put(ticker, new CoinConfig(ticker, blockchain, verId, section));
             } catch (RuntimeException e) {
+                // Required-field or JSON shape errors are still hard failures;
+                // per-entry fetch/section issues for local are re-thrown above
+                // and will be wrapped here; remote skips are already continued.
+                if (e.getMessage() != null && e.getMessage().startsWith("manifest entry #")) {
+                    throw e;
+                }
                 throw new IllegalStateException("manifest entry #" + index + ": " + e.getMessage(), e);
             }
+        }
+        if (skipped > 0) {
+            LOGGER.warning("[coinconfig] skipped " + skipped + " manifest entries with missing/unreadable xbridge confs");
+        }
+        if (out.isEmpty()) {
+            throw new IllegalStateException("manifest: no loadable entries (all " + skipped + " skipped)");
         }
         return out;
     }

@@ -77,17 +77,19 @@ class CoinConfigSourceLocalTest {
     }
 
     @Test
-    void testDuplicateManifestTickerFailsHard(@TempDir Path dir) throws Exception {
+    void testDuplicateManifestTickerKeepsLast(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
         Files.writeString(dir.resolve("manifest-latest.json"),
                 "[{\"blockchain\":\"A\",\"ticker\":\"DUP\",\"xbridge_conf\":\"a.conf\"},"
                         + "{\"blockchain\":\"B\",\"ticker\":\"DUP\",\"xbridge_conf\":\"b.conf\"}]");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("a.conf"), "[DUP]\nK=V\n");
-        // b.conf deliberately ABSENT: if the loader read confs before the
-        // duplicate check, the failure would be "Cannot read" instead.
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfigSource(dir.toString()).loadAll());
-        assertTrue(e.getMessage().contains("duplicate manifest ticker DUP"), e.getMessage());
+        Files.writeString(dir.resolve("xbridge-confs").resolve("a.conf"), "[DUP]\nK=V1\n");
+        Files.writeString(dir.resolve("xbridge-confs").resolve("b.conf"), "[DUP]\nK=V2\n");
+        // Historical manifests (remote master) contain multiple entries per ticker;
+        // the loader keeps the last occurrence (latest version).
+        Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
+        assertEquals(1, all.size());
+        assertEquals("B", all.get("DUP").getBlockchain());
+        assertEquals("V2", all.get("DUP").getConfEntries().get("K"));
     }
 
     @Test
