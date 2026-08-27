@@ -190,11 +190,10 @@ class WalletHelperFeeTest extends TestHelper {
 
     @Test
     void testGenericFeesMatchLoadedConfigs() {
-        // Load from sibling bcf checkout (same source as CrossCheckTest)
+        // Simple in-memory set — validates logic without filesystem
         java.util.Map<String, io.cloudchains.app.coinconfig.CoinConfig> cfgs =
-                new io.cloudchains.app.coinconfig.CoinConfigSource(
-                        java.nio.file.Paths.get("..", "blockchain-configuration-files")
-                                .toAbsolutePath().normalize().toString()).loadAll();
+                io.cloudchains.app.coinconfig.CoinConfigRegistry.list();
+        org.junit.jupiter.api.Assertions.assertFalse(cfgs.isEmpty(), "registry empty — TestHelper must load LTC/BLOCK");
         for (java.util.Map.Entry<String, io.cloudchains.app.coinconfig.CoinConfig> e : cfgs.entrySet()) {
             String ticker = e.getKey();
             io.cloudchains.app.coinconfig.CoinConfig cfg = e.getValue();

@@ -7,6 +7,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.subgraph.orchid.encoders.Base64;
 import io.cloudchains.app.Version;
+import io.cloudchains.app.coinconfig.CoinConfig;
+import io.cloudchains.app.coinconfig.CoinConfigRegistry;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
@@ -30,7 +32,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     private ConfigHelper configHelper;
 
-    HTTPServerHandler() {
+    public HTTPServerHandler() {
         configHelper = new ConfigHelper("master");
 
         if (configHelper.getRpcUsername().isEmpty() && configHelper.getRpcPassword().isEmpty()) {
@@ -213,7 +215,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
     }
 
-    private JsonObject getResponse(String method, JsonArray params) {
+    public JsonObject getResponse(String method, JsonArray params) {
         JsonObject response = new JsonObject();
         boolean shutdownRequested = false;
 
@@ -294,6 +296,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         + "\n=====RPC Master=====\n"
                         + "stop - Shutdown the server\n"
                         + "reloadconfig <token> - Reload configuration for specified token\n"
+                        + "getCoins - List coin configurations (alias listCoins)\n"
                         + "version - Get version\n";
 //						+ "reloadconfigs - Reload all configuration files\n";
 
@@ -305,6 +308,63 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 shutdownRequested = true;
                 response.addProperty("result", "shutting down...");
                 response.add("error", JsonNull.INSTANCE);
+                break;
+            }
+            case "getcoins":
+            case "listcoins": {
+                if (params == null || params.size() != 0) {
+                    JsonObject err = new JsonObject();
+                    err.addProperty("code", -1);
+                    err.addProperty("message", "Usage: getCoins");
+                    response.add("error", err);
+                    response.add("result", JsonNull.INSTANCE);
+                    break;
+                }
+                // Atomic snapshot — avoids isLoaded()/list() TOCTOU; empty check is the gate.
+                java.util.Map<String, CoinConfig> snap = CoinConfigRegistry.list();
+                if (snap.isEmpty()) {
+                    JsonObject err = new JsonObject();
+                    err.addProperty("code", -1);
+                    err.addProperty("message", "Coin configs not loaded");
+                    response.add("error", err);
+                    response.add("result", JsonNull.INSTANCE);
+                    break;
+                }
+                // Single DTO source — delegate to CoinConfig.toDtoMap() (authenticated via channelRead0)
+                try {
+                    JsonArray arr = new JsonArray();
+                    snap.values().stream()
+                            .sorted(java.util.Comparator.comparing(CoinConfig::getTicker))
+                            .forEach(cfg -> {
+                                java.util.Map<String, Object> dto = cfg.toDtoMap();
+                                JsonObject o = new JsonObject();
+                                o.addProperty("ticker", (String) dto.get("ticker"));
+                                o.addProperty("blockchain", (String) dto.get("blockchain"));
+                                o.addProperty("verId", (String) dto.get("verId"));
+                                o.addProperty("addressPrefix", ((Number) dto.get("addressPrefix")).intValue());
+                                o.addProperty("scriptPrefix", ((Number) dto.get("scriptPrefix")).intValue());
+                                o.addProperty("secretPrefix", ((Number) dto.get("secretPrefix")).intValue());
+                                o.addProperty("coin", ((Number) dto.get("coin")).longValue());
+                                o.addProperty("feePerByte", ((Number) dto.get("feePerByte")).longValue());
+                                o.addProperty("minTxFee", ((Number) dto.get("minTxFee")).longValue());
+                                o.addProperty("port", ((Number) dto.get("port")).intValue());
+                                Object dust = dto.get("dustAmount");
+                                if (dust == null)
+                                    o.add("dustAmount", JsonNull.INSTANCE);
+                                else
+                                    o.addProperty("dustAmount", ((Number) dust).longValue());
+                                arr.add(o);
+                            });
+                    response.add("result", arr);
+                    response.add("error", JsonNull.INSTANCE);
+                } catch (IllegalStateException e) {
+                    LOGGER.warning("[http-master] getCoins DTO error: " + e.getMessage());
+                    JsonObject err = new JsonObject();
+                    err.addProperty("code", -1);
+                    err.addProperty("message", e.getMessage());
+                    response.add("error", err);
+                    response.add("result", JsonNull.INSTANCE);
+                }
                 break;
             }
             default: {

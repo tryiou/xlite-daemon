@@ -115,6 +115,32 @@ public final class CoinConfig {
         return requiredInt("Port");
     }
 
+    /**
+     * DTO map for RPC exposure — 11-field (identity + prefixes/fees/port/dust).
+     * Single source for handler. bcf xbridge-confs DustAmount is canonical source of
+     * truth (blockchain-configuration-files repo); interim data carries DustAmount=0
+     * placeholders meaning unspecified — map 0 to null so GUI fallback (5460) applies
+     * until bcf is populated with real per-coin values, after which hard-coded
+     * CompiledCoinSupplement dust becomes removable.
+     */
+    public Map<String, Object> toDtoMap() {
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+        m.put("ticker", ticker);
+        m.put("blockchain", blockchain);
+        m.put("verId", verId);
+        m.put("addressPrefix", addressPrefix());
+        m.put("scriptPrefix", scriptPrefix());
+        m.put("secretPrefix", secretPrefix());
+        m.put("coin", coinFactor());
+        m.put("feePerByte", feePerByte());
+        m.put("minTxFee", minTxFee());
+        m.put("port", port());
+        Long dust = dustAmountOrNull();
+        if (dust != null && dust == 0L) dust = null;
+        m.put("dustAmount", dust);
+        return Collections.unmodifiableMap(m);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
