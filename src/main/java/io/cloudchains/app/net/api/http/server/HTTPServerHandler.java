@@ -225,9 +225,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                boolean sensitiveMethod = SENSITIVE_METHODS.contains(method);
-                LOGGER.info("[http-server-handler] RPC CALL: " + coin.getTicker() + " " + method
-                        + " PARAMS: " + (sensitiveMethod ? "<redacted>" : params.toString().replace(",", ", ")));
+                String methodLower = method == null ? null : method.toLowerCase(java.util.Locale.ROOT);
+                boolean sensitiveMethod = methodLower != null && SENSITIVE_METHODS.contains(methodLower);
+                boolean pingMethod = "ping".equals(methodLower);
+                if (pingMethod) {
+                    LOGGER.finer("[http-server-handler] RPC CALL: " + coin.getTicker() + " " + method
+                            + " PARAMS: " + params.toString().replace(",", ", "));
+                } else {
+                    LOGGER.info("[http-server-handler] RPC CALL: " + coin.getTicker() + " " + method
+                            + " PARAMS: " + (sensitiveMethod ? "<redacted>" : params.toString().replace(",", ", ")));
+                }
 
                 response = getResponse(method, params);
                 if (sensitiveMethod)
@@ -258,7 +265,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private JsonObject getResponse(String method, JsonArray params) {
         JsonObject response = new JsonObject();
 
-        switch (method.toLowerCase()) {
+        String normalizedMethod = method == null ? "" : method.toLowerCase(java.util.Locale.ROOT);
+        switch (normalizedMethod) {
             case "reloadconfig": {
                 Thread t = new Thread(() -> {
                     try {
@@ -1499,6 +1507,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 response.add("error", JsonNull.INSTANCE);
                 break;
             }
+            case "ping": {
+                response.addProperty("result", 1);
+                response.add("error", JsonNull.INSTANCE);
+                break;
+            }
             case "help": {
                 String helpString = "JSON-RPC server for " + CoinTickerUtils.tickerToString(coin.getTicker()) + "\n"
                         + "This JSON-RPC server is served by " + CoinInstance.getVersionString() + "\n"
@@ -1508,6 +1521,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         + "\n=====Blockchain=====\n"
                         + "gettxout <txid> <vout> - Get info about an unspent transaction output\n"
                         + "\n=====Network=====\n"
+                        + "ping - Lightweight liveness probe (result 1 if RPC listener alive)\n"
                         + "getinfo - Get information such as balances, protocol version, and more.\n"
                         + "getblockcount - Get block count\n"
                         + "getnetworkinfo - Get network information\n"

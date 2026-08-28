@@ -23,6 +23,7 @@ import io.netty.util.CharsetUtil;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.Locale;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -189,8 +190,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
                 // Master surface handles wallet management — params may contain
-                // passwords; never log them verbatim.
-                LOGGER.info("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
+                // passwords; never log them verbatim. Ping is high-frequency liveness.
+                String methodLower = method == null ? null : method.toLowerCase(Locale.ROOT);
+                if ("ping".equals(methodLower)) {
+                    LOGGER.finer("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
+                } else {
+                    LOGGER.info("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
+                }
 
                 response = getResponse(method, params);
                 LOGGER.finer(response.toString());
@@ -219,7 +225,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         JsonObject response = new JsonObject();
         boolean shutdownRequested = false;
 
-        switch (method.toLowerCase()) {
+        String normalizedMethod = method == null ? "" : method.toLowerCase(Locale.ROOT);
+        switch (normalizedMethod) {
             case "reloadconfig": {
                 if (params.size() != 1) {
                     response.add("result", JsonNull.INSTANCE);
@@ -288,12 +295,18 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 //				response.add("error", JsonNull.INSTANCE);
 //				break;
 //			}
+            case "ping": {
+                response.addProperty("result", 1);
+                response.add("error", JsonNull.INSTANCE);
+                break;
+            }
             case "help": {
                 String helpString = "Master JSON-RPC server\n"
                         + "This JSON-RPC server is served by " + CoinInstance.getVersionString() + "\n"
                         + "\n"
                         + "help - Display the help\n"
                         + "\n=====RPC Master=====\n"
+                        + "ping - Lightweight liveness probe (result 1)\n"
                         + "stop - Shutdown the server\n"
                         + "reloadconfig <token> - Reload configuration for specified token\n"
                         + "getCoins - List coin configurations (alias listCoins)\n"
