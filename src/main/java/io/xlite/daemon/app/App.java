@@ -147,7 +147,7 @@ public class App {
             }
         }
 
-        Level logLevel = parseLogLevel(getEnv("CLOUDCHAINS_LOG_LEVEL"), Level.INFO);
+        Level logLevel = parseLogLevel(getEnv("XLITE_DAEMON_LOG_LEVEL"), Level.INFO);
         LOGGER.setLevel(logLevel);
         LOGGER.setUseParentHandlers(false);
 
@@ -157,7 +157,7 @@ public class App {
 
         try {
             String userHomeDir = getUserConfigDir();
-            String logDir = userHomeDir + File.separator + "CloudChains";
+            String logDir = userHomeDir + File.separator + "xlite-daemon";
             DateTimeFormatter timeStampPattern = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             Handler fileHandler = new FileHandler(
                     logDir + File.separator + "error-" + timeStampPattern.format(LocalDateTime.now()) + ".log",

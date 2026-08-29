@@ -5,7 +5,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -202,5 +206,62 @@ class ConfigHelperTest extends TestHelper {
         assertEquals("testpass", loadedConfig.getRpcPassword());
         assertEquals(9000, loadedConfig.getRpcPort());
         assertEquals(25, loadedConfig.getAddressCount());
+    }
+
+    @Test
+    void testMigration_movesLegacyCloudChainsToXliteDaemon(@TempDir Path tmp) throws IOException {
+        // Arrange: create legacy CloudChains directory with a settings file
+        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        try {
+            ConfigHelper.CONFIG_DIR = tmp.toString();
+            Path oldDir = tmp.resolve("CloudChains");
+            Path newDir = tmp.resolve("xlite-daemon");
+            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(newDir), "new dir must not exist before migration");
+            Files.createDirectories(oldDir.resolve("settings"));
+            Path legacyFile = oldDir.resolve("settings").resolve("config-legacy.json");
+            String content = "{\"feeperbyte\":1}";
+            Files.write(legacyFile, content.getBytes(StandardCharsets.UTF_8));
+
+            // Act: trigger migration via getLocalDataDirectory
+            String returned = ConfigHelper.getLocalDataDirectory();
+            org.junit.jupiter.api.Assertions.assertTrue(returned.endsWith("xlite-daemon" + File.separator));
+
+            // Assert: legacy content migrated to new location
+            Path migratedFile = newDir.resolve("settings").resolve("config-legacy.json");
+            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(newDir), "xlite-daemon dir must exist after migration");
+            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(migratedFile), "legacy file must be migrated to new dir");
+            assertEquals(content, new String(Files.readAllBytes(migratedFile), StandardCharsets.UTF_8));
+            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(oldDir), "old CloudChains dir must be moved (not remain)");
+        } finally {
+            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            // Cleanup temp-data dirs created via CONFIG_DIR override so commonCleanup().deleteDir
+            // on the default "." path still succeeds; remove any leftover tmp subdirs eagerly.
+            // JUnit @TempDir will delete tmp itself, but ensure CONFIG_DIR restored.
+        }
+    }
+
+    @Test
+    void testMigration_doesNotOverwriteExistingNewDir(@TempDir Path tmp) throws IOException {
+        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        try {
+            ConfigHelper.CONFIG_DIR = tmp.toString();
+            Path oldDir = tmp.resolve("CloudChains");
+            Path newDir = tmp.resolve("xlite-daemon");
+            Files.createDirectories(oldDir.resolve("settings"));
+            Files.createDirectories(newDir.resolve("settings"));
+            Path oldFile = oldDir.resolve("settings").resolve("config-old.json");
+            Path newFile = newDir.resolve("settings").resolve("config-new.json");
+            Files.write(oldFile, "{\"a\":1}".getBytes(StandardCharsets.UTF_8));
+            Files.write(newFile, "{\"b\":2}".getBytes(StandardCharsets.UTF_8));
+
+            ConfigHelper.getLocalDataDirectory();
+
+            // When new dir already exists, migration must NOT run
+            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(oldDir), "old dir must remain when new dir already exists");
+            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(oldFile));
+            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(newFile));
+        } finally {
+            ConfigHelper.CONFIG_DIR = originalConfigDir;
+        }
     }
 }

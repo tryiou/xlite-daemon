@@ -35,7 +35,7 @@ public class ConsoleMenu {
     public ConsoleMenu(String[] args) {
         this.arguments = args;
         // Do NOT set the logger level here — App owns logging configuration
-        // (CLOUDCHAINS_LOG_LEVEL); clobbering it in this constructor made all
+        // (XLITE_DAEMON_LOG_LEVEL); clobbering it in this constructor made all
         // FINE/FINER diagnostics unreachable.
     }
 

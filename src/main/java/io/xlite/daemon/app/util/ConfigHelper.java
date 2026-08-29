@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -280,12 +281,50 @@ public class ConfigHelper {
             baseDir = CONFIG_DIR;
         }
 
-        String userHomeDir = baseDir + File.separator + "CloudChains" + File.separator;
-        File directory = new File(userHomeDir);
+        String newDirPath = baseDir + File.separator + "xlite-daemon" + File.separator;
+        String oldDirPath = baseDir + File.separator + "CloudChains" + File.separator;
+        File newDir = new File(newDirPath);
+        File oldDir = new File(oldDirPath);
+        if (!newDir.exists() && oldDir.exists()) {
+            try {
+                Files.move(oldDir.toPath(), newDir.toPath());
+                LOGGER.warning("[migrate] moved legacy data directory from " + oldDirPath + " to " + newDirPath);
+            } catch (IOException e) {
+                LOGGER.warning("[migrate] Files.move failed (" + e.getMessage() + "), falling back to copy for " + oldDirPath + " -> " + newDirPath);
+                try {
+                    copyDirectoryRecursively(oldDir, newDir);
+                    LOGGER.warning("[migrate] copied legacy data directory from " + oldDirPath + " to " + newDirPath);
+                } catch (IOException copyEx) {
+                    LOGGER.warning("[migrate] copy fallback failed: " + copyEx.getMessage());
+                }
+            }
+        }
+
+        File directory = new File(newDirPath);
         if (!directory.exists()) {
             directory.mkdirs();
         }
 
-        return userHomeDir;
+        return newDirPath;
+    }
+
+    private static void copyDirectoryRecursively(File source, File target) throws IOException {
+        if (source.isDirectory()) {
+            if (!target.exists() && !target.mkdirs()) {
+                throw new IOException("Failed to create directory " + target);
+            }
+            File[] children = source.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    copyDirectoryRecursively(child, new File(target, child.getName()));
+                }
+            }
+        } else {
+            File parent = target.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+            Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 }

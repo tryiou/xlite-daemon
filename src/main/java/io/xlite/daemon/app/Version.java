@@ -1,7 +1,7 @@
 package io.xlite.daemon.app;
 
 public class Version {
-    private static final String CLIENT_NAME = "CloudChains";
+    private static final String CLIENT_NAME = "xlite-daemon";
     private static final String CLIENT_PROTOCOL_VERSION = "0.5.15";
 
     public static final String CLIENT_TYPE = "CloudPeer";

@@ -15,7 +15,7 @@ public class LogRotationUtil {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private static final int DEFAULT_LOG_RETENTION_DAYS = 30;
-    private static final String LOG_RETENTION_ENV_VAR = "CLOUDCHAINS_LOG_RETENTION_DAYS";
+    private static final String LOG_RETENTION_ENV_VAR = "XLITE_DAEMON_LOG_RETENTION_DAYS";
 
     /**
      * Performs log rotation cleanup.
@@ -24,7 +24,7 @@ public class LogRotationUtil {
     public static void performLogRotation() {
         try {
             String userHomeDir = App.getUserConfigDir();
-            String logDirectoryPath = userHomeDir + File.separator + "CloudChains";
+            String logDirectoryPath = userHomeDir + File.separator + "xlite-daemon";
 
             // Get retention days from environment variable or use default
             int retentionDays = getRetentionDaysFromEnvironment();

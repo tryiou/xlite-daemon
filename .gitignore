@@ -40,6 +40,6 @@ Thumbs.db
 *.temp
 *~
 
-CloudChains/*
+xlite-daemon/*
 .settings
 .project

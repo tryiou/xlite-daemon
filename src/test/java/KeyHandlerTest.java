@@ -67,8 +67,8 @@ public class KeyHandlerTest {
     void setUp() {
         // Point ConfigHelper at the isolated temp directory for every test.
         ConfigHelper.CONFIG_DIR = tempDir.toString();
-        testKeyFile = tempDir.resolve("CloudChains").resolve("key.dat").toFile();
-        testBackupDir = tempDir.resolve("CloudChains").resolve("backups").toFile();
+        testKeyFile = tempDir.resolve("xlite-daemon").resolve("key.dat").toFile();
+        testBackupDir = tempDir.resolve("xlite-daemon").resolve("backups").toFile();
     }
 
     // =========================================================================

@@ -115,7 +115,7 @@ Log messages use bracketed prefixes: `[security]`, `[discovery-BLOCK]`, `[wallet
 ## Project Structure
 
 ```
-src/main/java/io/cloudchains/app/
+src/main/java/io/xlite/daemon/app/
   crypto/        KeyHandler (wallet encryption), LoginUtils (auth)
   net/           CoinInstance (coin lifecycle), JSON-RPC servers, protocols/
   util/          ConfigHelper, AddressDiscoveryService, UTXO, logging

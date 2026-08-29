@@ -117,9 +117,9 @@ export EXR_ENDPOINT="https://server1.example.com,https://server2.example.com"
 
 The daemon stores configuration files in your system's application data directory:
 
-- **Windows**: `%appdata%\CloudChains\settings\config-*.json`
-- **macOS**: `~/Library/Application Support/CloudChains/settings/config-*.json`
-- **Linux**: `~/.config/CloudChains/settings/config-*.json`
+- **Windows**: `%appdata%\xlite-daemon\settings\config-*.json`
+- **macOS**: `~/Library/Application Support/xlite-daemon/settings/config-*.json`
+- **Linux**: `~/.config/xlite-daemon/settings/config-*.json`
 
 ### Configuration Structure
 
@@ -334,10 +334,10 @@ netstat -ano | findstr :9955  # Windows
 **Solution**:
 ```bash
 # Check if wallet file exists
-ls ~/.config/CloudChains/key.dat
+ls ~/.config/xlite-daemon/key.dat
 
 # Verify permissions
-chmod 600 ~/.config/CloudChains/key.dat
+chmod 600 ~/.config/xlite-daemon/key.dat
 ```
 
 #### 3. Network Connection Issues
@@ -370,7 +370,7 @@ java -Xmx2g -jar xlite-daemon.jar
 
 #### Log File Locations
 
-- **Error logs**: `~/.config/CloudChains/error-YYYY-MM-DD.log`
+- **Error logs**: `~/.config/xlite-daemon/error-YYYY-MM-DD.log`
 - **Application logs**: Console output (configurable)
 
 #### Common Log Patterns
@@ -429,7 +429,7 @@ handlers=java.util.logging.ConsoleHandler
 2. **From Backup**:
    ```bash
    # Restore from backup directory
-   cp ~/.config/CloudChains/backups/key-backup-*.dat ~/.config/CloudChains/key.dat
+   cp ~/.config/xlite-daemon/backups/key-backup-*.dat ~/.config/xlite-daemon/key.dat
    ```
 
 #### Configuration Recovery
@@ -437,7 +437,7 @@ handlers=java.util.logging.ConsoleHandler
 1. **Reset Configuration**:
    ```bash
    # Remove config files to reset
-   rm ~/.config/CloudChains/settings/config-*.json
+   rm ~/.config/xlite-daemon/settings/config-*.json
    ```
 
 2. **Rebuild from Source**:
@@ -771,9 +771,9 @@ Secure wallet and configuration files:
 
 ```bash
 # Set restrictive permissions
-chmod 600 ~/.config/CloudChains/key.dat
-chmod 600 ~/.config/CloudChains/settings/config-*.json
-chmod 700 ~/.config/CloudChains/
+chmod 600 ~/.config/xlite-daemon/key.dat
+chmod 600 ~/.config/xlite-daemon/settings/config-*.json
+chmod 700 ~/.config/xlite-daemon/
 ```
 
 ### Monitoring and Logging
@@ -787,7 +787,7 @@ Configure automatic log rotation:
 sudo nano /etc/logrotate.d/xlite-daemon
 
 # Add configuration
-/home/user/.config/CloudChains/error-*.log {
+/home/user/.config/xlite-daemon/error-*.log {
     daily
     rotate 30
     compress
@@ -806,7 +806,7 @@ Monitor daemon health:
 ps aux | grep xlite-daemon
 
 # Monitor logs in real-time
-tail -f ~/.config/CloudChains/error-*.log
+tail -f ~/.config/xlite-daemon/error-*.log
 
 # Check network connections
 netstat -tulpn | grep xlite-daemon
@@ -828,10 +828,10 @@ DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BACKUP_DIR"
 
 # Backup wallet file
-cp ~/.config/CloudChains/key.dat "$BACKUP_DIR/key-$DATE.dat"
+cp ~/.config/xlite-daemon/key.dat "$BACKUP_DIR/key-$DATE.dat"
 
 # Backup configuration
-cp ~/.config/CloudChains/settings/config-*.json "$BACKUP_DIR/"
+cp ~/.config/xlite-daemon/settings/config-*.json "$BACKUP_DIR/"
 
 # Compress backup
 tar -czf "$BACKUP_DIR/backup-$DATE.tar.gz" -C "$BACKUP_DIR" .
@@ -861,7 +861,7 @@ fi
 pkill xlite-daemon
 
 # Backup current data
-mv ~/.config/CloudChains ~/.config/CloudChains.backup
+mv ~/.config/xlite-daemon ~/.config/xlite-daemon.backup
 
 # Extract backup
 tar -xzf "$BACKUP_FILE" -C ~/.config/

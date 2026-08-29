@@ -143,13 +143,13 @@ xlite-daemon (Backend) Configuration Files:
 
 ```
 Windows
-%appdata%\CloudChains\settings\config-*.json
+%appdata%\xlite-daemon\settings\config-*.json
 
 MacOS
-~/Library/Application Support/CloudChains/settings/config-*.json
+~/Library/Application Support/xlite-daemon/settings/config-*.json
 
 Linux
-~/.config/CloudChains/settings/config-*.json
+~/.config/xlite-daemon/settings/config-*.json
 ```
 
 ## Contributing
