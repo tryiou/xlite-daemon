@@ -1,16 +1,16 @@
-import io.cloudchains.app.net.protocols.bitcoin.BitcoinNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.blocknet.BlocknetNetworkParameters;
-import io.cloudchains.app.net.protocols.blocknet.BlocknetTestnet5NetworkParameters;
-import io.cloudchains.app.net.protocols.dashcoin.DashcoinNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.digibyte.DigibyteNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.dogecoin.DogecoinNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.litecoin.LitecoinNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.pivx.PivxNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.pocketcoin.PocketcoinNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.ravencoin.RavencoinNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.syscoin.SyscoinNetworkParametersLegacy;
-import io.cloudchains.app.net.protocols.unobtanium.UnobtaniumNetworkParametersLegacy;
-import io.cloudchains.app.wallet.WalletHelper;
+import io.xlite.daemon.app.net.protocols.bitcoin.BitcoinNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.blocknet.BlocknetNetworkParameters;
+import io.xlite.daemon.app.net.protocols.blocknet.BlocknetTestnet5NetworkParameters;
+import io.xlite.daemon.app.net.protocols.dashcoin.DashcoinNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.digibyte.DigibyteNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.dogecoin.DogecoinNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.litecoin.LitecoinNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.pivx.PivxNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.pocketcoin.PocketcoinNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.ravencoin.RavencoinNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.syscoin.SyscoinNetworkParametersLegacy;
+import io.xlite.daemon.app.net.protocols.unobtanium.UnobtaniumNetworkParametersLegacy;
+import io.xlite.daemon.app.wallet.WalletHelper;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.TestNet3Params;
 import org.junit.jupiter.api.AfterAll;
@@ -191,17 +191,17 @@ class WalletHelperFeeTest extends TestHelper {
     @Test
     void testGenericFeesMatchLoadedConfigs() {
         // Simple in-memory set — validates logic without filesystem
-        java.util.Map<String, io.cloudchains.app.coinconfig.CoinConfig> cfgs =
-                io.cloudchains.app.coinconfig.CoinConfigRegistry.list();
+        java.util.Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs =
+                io.xlite.daemon.app.coinconfig.CoinConfigRegistry.list();
         org.junit.jupiter.api.Assertions.assertFalse(cfgs.isEmpty(), "registry empty — TestHelper must load LTC/BLOCK");
-        for (java.util.Map.Entry<String, io.cloudchains.app.coinconfig.CoinConfig> e : cfgs.entrySet()) {
+        for (java.util.Map.Entry<String, io.xlite.daemon.app.coinconfig.CoinConfig> e : cfgs.entrySet()) {
             String ticker = e.getKey();
-            io.cloudchains.app.coinconfig.CoinConfig cfg = e.getValue();
+            io.xlite.daemon.app.coinconfig.CoinConfig cfg = e.getValue();
             // Only check migrated tickers that WalletHelper knows via HasFeeParams
-            if (!io.cloudchains.app.coinconfig.CompiledCoinSupplement.supports(ticker))
+            if (!io.xlite.daemon.app.coinconfig.CompiledCoinSupplement.supports(ticker))
                 continue;
-            io.cloudchains.app.coinconfig.ConfigurableNetworkParameters generic =
-                    io.cloudchains.app.coinconfig.ConfigurableNetworkParameters.from(cfg);
+            io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters generic =
+                    io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters.from(cfg);
             assertEquals(cfg.feePerByte(), WalletHelper.getFeePerByte(generic),
                     ticker + " generic feePerByte must equal config");
             assertEquals(cfg.minTxFee(), WalletHelper.getMinTxFee(generic),

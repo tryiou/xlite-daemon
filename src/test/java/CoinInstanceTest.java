@@ -1,6 +1,6 @@
-import io.cloudchains.app.net.CoinInstance;
-import io.cloudchains.app.net.CoinTicker;
-import io.cloudchains.app.util.AddressBalance;
+import io.xlite.daemon.app.net.CoinInstance;
+import io.xlite.daemon.app.net.CoinTicker;
+import io.xlite.daemon.app.util.AddressBalance;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

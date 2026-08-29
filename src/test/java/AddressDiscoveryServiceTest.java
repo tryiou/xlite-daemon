@@ -1,9 +1,9 @@
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import io.cloudchains.app.net.CoinInstance;
-import io.cloudchains.app.net.CoinTicker;
-import io.cloudchains.app.net.api.http.client.HTTPClient;
-import io.cloudchains.app.util.AddressDiscoveryService;
+import io.xlite.daemon.app.net.CoinInstance;
+import io.xlite.daemon.app.net.CoinTicker;
+import io.xlite.daemon.app.net.api.http.client.HTTPClient;
+import io.xlite.daemon.app.util.AddressDiscoveryService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

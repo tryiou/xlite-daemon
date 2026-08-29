@@ -2,8 +2,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import io.cloudchains.app.net.CoinInstance;
-import io.cloudchains.app.util.ConfigHelper;
+import io.xlite.daemon.app.net.CoinInstance;
+import io.xlite.daemon.app.util.ConfigHelper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -83,19 +83,19 @@ public class TestHelper {
         // Disable address discovery during tests to prevent interference with deterministic address generation
         CoinInstance.setAddressDiscoveryEnabled(false);
         // Ensure coin configs are available — simple in-memory set, no filesystem
-        if (!io.cloudchains.app.coinconfig.CoinConfigRegistry.isLoaded()) {
-            java.util.Map<String, io.cloudchains.app.coinconfig.CoinConfig> cfgs = new java.util.LinkedHashMap<>();
+        if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {
+            java.util.Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs = new java.util.LinkedHashMap<>();
             java.util.Map<String, String> ltc = new java.util.LinkedHashMap<>();
             ltc.put("AddressPrefix", "48"); ltc.put("ScriptPrefix", "50"); ltc.put("SecretPrefix", "176");
             ltc.put("COIN", "100000000"); ltc.put("FeePerByte", "10"); ltc.put("MinTxFee", "5000");
             ltc.put("Port", "9332"); ltc.put("DustAmount", "0"); ltc.put("Title", "Litecoin");
-            cfgs.put("LTC", new io.cloudchains.app.coinconfig.CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", ltc));
+            cfgs.put("LTC", new io.xlite.daemon.app.coinconfig.CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", ltc));
             java.util.Map<String, String> block = new java.util.LinkedHashMap<>();
             block.put("AddressPrefix", "26"); block.put("ScriptPrefix", "28"); block.put("SecretPrefix", "154");
             block.put("COIN", "100000000"); block.put("FeePerByte", "20"); block.put("MinTxFee", "10000");
             block.put("Port", "41414"); block.put("DustAmount", "0"); block.put("Title", "Blocknet");
-            cfgs.put("BLOCK", new io.cloudchains.app.coinconfig.CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", block));
-            io.cloudchains.app.coinconfig.CoinConfigRegistry.loadForTest(cfgs);
+            cfgs.put("BLOCK", new io.xlite.daemon.app.coinconfig.CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", block));
+            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadForTest(cfgs);
         }
     }
 

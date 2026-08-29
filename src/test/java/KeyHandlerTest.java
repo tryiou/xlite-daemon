@@ -1,5 +1,5 @@
-import io.cloudchains.app.crypto.KeyHandler;
-import io.cloudchains.app.util.ConfigHelper;
+import io.xlite.daemon.app.crypto.KeyHandler;
+import io.xlite.daemon.app.util.ConfigHelper;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 

@@ -1,4 +1,4 @@
-import io.cloudchains.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.ConfigHelper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

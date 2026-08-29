@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <!-- Project Metadata -->
-  <groupId>io.cloudchains</groupId>
+  <groupId>io.xlite.daemon</groupId>
   <artifactId>xlite-daemon</artifactId>
   <version>0.5.15</version>
   <packaging>jar</packaging>
@@ -328,7 +328,7 @@
         <version>${native.maven.plugin.version}</version>
         <configuration>
           <!-- Main class -->
-          <mainClass>io.cloudchains.app.App</mainClass>
+          <mainClass>io.xlite.daemon.app.App</mainClass>
 
           <!-- Image name -->
           <imageName>xlite-daemon</imageName>
@@ -375,13 +375,13 @@
             <arg>--initialize-at-build-time=org.bitcoinj.core.Utils$Runtime</arg>
             <arg>--initialize-at-build-time=org.bitcoinj.core.Sha256Hash</arg>
             <arg>--initialize-at-build-time=org.bitcoinj.crypto.MnemonicCode</arg>
-            <arg>--initialize-at-build-time=io.cloudchains.app.util</arg>
-            <arg>--initialize-at-build-time=io.cloudchains.app.crypto</arg>
-            <arg>--initialize-at-build-time=io.cloudchains.app.console</arg>
-            <arg>--initialize-at-build-time=io.cloudchains.app.net.api</arg>
-            <arg>--initialize-at-build-time=io.cloudchains.app.net.protocols</arg>
-            <arg>--initialize-at-build-time=io.cloudchains.app.net.xrouter</arg>
-            <arg>--initialize-at-build-time=io.cloudchains.app.net.api.http</arg>
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.util</arg>
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.crypto</arg>
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.console</arg>
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.net.api</arg>
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.net.protocols</arg>
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.net.xrouter</arg>
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.net.api.http</arg>
             
             
             <!-- Additional options -->
@@ -449,7 +449,7 @@
         <artifactId>exec-maven-plugin</artifactId>
         <version>${exec.maven.plugin.version}</version>
         <configuration>
-          <mainClass>io.cloudchains.app.App</mainClass>
+          <mainClass>io.xlite.daemon.app.App</mainClass>
           <includePluginDependencies>true</includePluginDependencies>
           <systemProperties>
             <systemProperty>
