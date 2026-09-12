@@ -261,7 +261,7 @@ public class WalletHelper {
 
         ArrayList<UTXO> selectedUtxos = new ArrayList<>();
         ArrayList<UTXO> outputs = new ArrayList<>();
-        outputs.add(createTransactionOutput(coinTicker, address, amount));
+        outputs.add(createTransactionOutput(coinTicker, address, amount, params));
 
         long estimatedFeeSats = Math.max(feePerByte * (192 + 34), minTxFee);
         double estimatedFee = (double) estimatedFeeSats / coinUnit;
@@ -363,8 +363,14 @@ public class WalletHelper {
         return amount * Coin.COIN.value < params.getMinNonDustOutput().value;
     }
 
-    private static UTXO createTransactionOutput(CoinTicker ticker, String address, double amount) {
-        LegacyAddress addr = LegacyAddress.fromBase58(null, address);
+    // Package-private for testing. The params must be the coin's own network
+    // parameters: a null lookup only resolves BTC/testnet version bytes in
+    // bitcoinj's global registry and rejects every altcoin address.
+    static UTXO createTransactionOutput(CoinTicker ticker, String address, double amount, NetworkParameters params) {
+        // Validates the address against this coin's version bytes; throws
+        // AddressFormatException on mismatch. Do not remove: a null-params
+        // lookup here rejects every non-BTC address ("No network found").
+        LegacyAddress.fromBase58(params, address);
         Coin coin = Coin.valueOf((long) (amount * Coin.COIN.value));
         return new UTXO(ticker, address, "", 0, 0, coin.value);
     }
