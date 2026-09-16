@@ -100,10 +100,14 @@ public class TestHelper {
     }
 
     /**
-     * Common cleanup method for all test files.
+     * Common cleanup method for all test files. Pins CONFIG_DIR to the
+     * workdir sandbox: without this, cleanup after a test that restored the
+     * default empty CONFIG_DIR would resolve (and delete!) the real home
+     * data directory, depending on JUnit method order.
      */
     @AfterAll
     public static void commonCleanup() {
+        ConfigHelper.CONFIG_DIR = ".";
         clean();
     }
 
@@ -113,6 +117,17 @@ public class TestHelper {
     protected static void clean() {
         CoinInstance.getCoinInstances().clear();
         assertTrue(deleteDir(new File(ConfigHelper.getLocalDataDirectory())));
+        String base = ConfigHelper.CONFIG_DIR == null || ConfigHelper.CONFIG_DIR.trim().isEmpty()
+                ? io.xlite.daemon.app.App.getUserConfigDir()
+                : ConfigHelper.CONFIG_DIR;
+        File migrationLock = new File(base, ConfigHelper.MIGRATION_LOCK_FILE);
+        if (migrationLock.exists()) {
+            assertTrue(migrationLock.delete());
+        }
+        File staging = new File(base, ConfigHelper.MIGRATION_STAGING_NAME);
+        if (staging.exists()) {
+            assertTrue(deleteDir(staging));
+        }
     }
 
     /**
