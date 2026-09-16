@@ -116,7 +116,7 @@ Log messages use bracketed prefixes: `[security]`, `[discovery-BLOCK]`, `[wallet
 
 ```
 src/main/java/io/xlite/daemon/app/
-  crypto/        KeyHandler (wallet encryption), LoginUtils (auth)
+  crypto/        KeyHandler (wallet encryption/key management)
   net/           CoinInstance (coin lifecycle), JSON-RPC servers, protocols/
   util/          ConfigHelper, AddressDiscoveryService, UTXO, logging
   wallet/        WalletHelper
@@ -124,7 +124,7 @@ src/main/java/io/xlite/daemon/app/
 
 src/test/java/
   KeyHandlerTest, CoinInstanceTest, ConfigHelperTest,
-  AddressDiscoveryServiceTest, LoginUtilsTest, TestHelper
+  AddressDiscoveryServiceTest, TestHelper
 ```
 
 ## Key Dependencies

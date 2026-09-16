@@ -357,6 +357,13 @@
             <arg>--initialize-at-run-time=org.json</arg>
             <arg>--initialize-at-run-time=org.slf4j</arg>
             <arg>--initialize-at-run-time=org.slf4j.impl</arg>
+            <!-- Env/filesystem-touching static initializers must not run at
+                 image-build time (CI builders have no user home/AppData):
+                 JSONRPCController builds a ConfigHelper in its clinit, and
+                 App reaches it from its own clinit. Class entries win over
+                 the package-level build-time entries below. -->
+            <arg>--initialize-at-run-time=io.xlite.daemon.app.App</arg>
+            <arg>--initialize-at-run-time=io.xlite.daemon.app.net.api.JSONRPCController</arg>
             
             <!-- Initialize at build time -->
             <arg>--initialize-at-build-time=com.google.common.base.Charsets</arg>
