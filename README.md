@@ -152,6 +152,11 @@ Linux
 ~/.config/xlite-daemon/settings/config-*.json
 ```
 
+Set `XLITE_DATA_HOME` to override the platform directory above. The
+daemon aborts at startup when no override is set and the platform
+default is missing (Windows with unset `%AppData%`, or an empty
+`user.home`).
+
 ## Contributing
 
 

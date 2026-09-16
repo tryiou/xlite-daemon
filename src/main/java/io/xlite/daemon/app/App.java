@@ -6,6 +6,7 @@ import io.xlite.daemon.app.net.api.JSONRPCMasterServer;
 import io.xlite.daemon.app.net.api.http.client.EXRServerPool;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
 import io.xlite.daemon.app.util.ConsoleFormatter;
+import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.FileFormatter;
 import io.xlite.daemon.app.util.LogRotationUtil;
 import io.github.cdimascio.dotenv.Dotenv;
@@ -57,9 +58,10 @@ public class App {
      *
      * @param dataHomeEnv value of {@code XLITE_DATA_HOME} (may be null)
      * @param osName      value of the {@code os.name} system property
-     * @param userHome    value of the {@code user.home} system property
-     * @param appDataEnv  Windows {@code AppData} environment value (may be null)
+     * @param userHome    value of the {@code user.home} system property (must be non-blank on mac/Linux)
+     * @param appDataEnv  Windows {@code AppData} environment value (must be non-blank on Windows)
      * @return the resolved config-root directory string
+     * @throws IllegalStateException when no override is set and the platform default is missing
      */
     public static String resolveUserConfigDir(String dataHomeEnv, String osName, String userHome, String appDataEnv) {
         if (dataHomeEnv != null && !dataHomeEnv.trim().isEmpty()) {
@@ -67,9 +69,26 @@ public class App {
         }
         String OS = osName.toLowerCase();
         if (OS.contains("win")) {
+            // Fail fast: returning a null AppData would stringify into a
+            // bogus relative "null/xlite-daemon/" dir and fork the wallet.
+            if (appDataEnv == null || appDataEnv.trim().isEmpty()) {
+                throw new IllegalStateException(
+                        "[app] Cannot resolve config dir on Windows: AppData is not set. "
+                                + "Set XLITE_DATA_HOME to an explicit path.");
+            }
             return appDataEnv;
         } else if (OS.contains("mac")) {
+            if (userHome == null || userHome.trim().isEmpty()) {
+                throw new IllegalStateException(
+                        "[app] Cannot resolve config dir on macOS: user.home is not set. "
+                                + "Set XLITE_DATA_HOME to an explicit path.");
+            }
             return userHome + File.separator + "Library" + File.separator + "Application Support";
+        }
+        if (userHome == null || userHome.trim().isEmpty()) {
+            throw new IllegalStateException(
+                    "[app] Cannot resolve config dir: user.home is not set. "
+                            + "Set XLITE_DATA_HOME to an explicit path.");
         }
         return userHome + File.separator + ".config";
     }
@@ -157,7 +176,7 @@ public class App {
 
         try {
             String userHomeDir = getUserConfigDir();
-            String logDir = userHomeDir + File.separator + "xlite-daemon";
+            String logDir = userHomeDir + File.separator + ConfigHelper.DATA_DIR_NAME;
             DateTimeFormatter timeStampPattern = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             Handler fileHandler = new FileHandler(
                     logDir + File.separator + "error-" + timeStampPattern.format(LocalDateTime.now()) + ".log",
@@ -173,6 +192,12 @@ public class App {
 
         } catch (IOException e) {
             LOGGER.warning("[app] Failed to initialize file handler: " + e.getMessage());
+        } catch (IllegalStateException e) {
+            // Fail-fast config errors (unset AppData/user.home, unusable data
+            // dir) abort startup with a clean message and nonzero status
+            // instead of an uncaught stack trace.
+            LOGGER.severe("[app] " + e.getMessage());
+            System.exit(1);
         }
 
         ConsoleHandler consoleHandler = new ConsoleHandler(){

@@ -24,7 +24,7 @@ public class LogRotationUtil {
     public static void performLogRotation() {
         try {
             String userHomeDir = App.getUserConfigDir();
-            String logDirectoryPath = userHomeDir + File.separator + "xlite-daemon";
+            String logDirectoryPath = userHomeDir + File.separator + ConfigHelper.DATA_DIR_NAME;
 
             // Get retention days from environment variable or use default
             int retentionDays = getRetentionDaysFromEnvironment();

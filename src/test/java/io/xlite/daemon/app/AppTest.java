@@ -1,9 +1,14 @@
 package io.xlite.daemon.app;
 
+import io.xlite.daemon.app.util.ConfigHelper;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,6 +21,27 @@ class AppTest {
 
     private static final String USER_HOME = "/home/tester";
     private static final String APPDATA = "C:\\Users\\tester\\AppData\\Roaming";
+
+    @TempDir
+    static Path sandbox;
+    private static String savedConfigDir;
+
+    /**
+     * Isolate from the real home dir: touching {@code App} triggers class
+     * init, which builds live objects against {@code CONFIG_DIR}. Without
+     * this, the suite reads (and previously even migrated) the developer's
+     * real {@code ~/.config}.
+     */
+    @BeforeAll
+    static void isolateConfigDir() {
+        savedConfigDir = ConfigHelper.CONFIG_DIR;
+        ConfigHelper.CONFIG_DIR = sandbox.toString();
+    }
+
+    @AfterAll
+    static void restoreConfigDir() {
+        ConfigHelper.CONFIG_DIR = savedConfigDir;
+    }
 
     @Test
     @DisplayName("XLITE_DATA_HOME overrides the linux default")
@@ -80,8 +106,24 @@ class AppTest {
     }
 
     @Test
-    @DisplayName("windows default keeps legacy verbatim pass-through of AppData (may be null)")
-    void testResolve_WindowsDefaultPassesAppDataVerbatim() {
-        assertNull(App.resolveUserConfigDir(null, "Windows 11", USER_HOME, null));
+    @DisplayName("windows default without AppData fails fast instead of yielding a null dir")
+    void testResolve_WindowsDefaultWithoutAppDataThrows() {
+        for (String blank : new String[]{null, "", "   "}) {
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> App.resolveUserConfigDir(null, "Windows 11", USER_HOME, blank));
+            assertTrue(e.getMessage().contains("XLITE_DATA_HOME"),
+                    "message must point at the override, got: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @DisplayName("mac/linux default without user.home fails fast instead of yielding a null dir")
+    void testResolve_NonWindowsDefaultWithoutUserHomeThrows() {
+        for (String blank : new String[]{null, "", "   "}) {
+            assertThrows(IllegalStateException.class,
+                    () -> App.resolveUserConfigDir(null, "Linux", blank, APPDATA));
+            assertThrows(IllegalStateException.class,
+                    () -> App.resolveUserConfigDir(null, "Mac OS X", blank, null));
+        }
     }
 }

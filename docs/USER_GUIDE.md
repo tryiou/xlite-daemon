@@ -121,6 +121,11 @@ The daemon stores configuration files in your system's application data director
 - **macOS**: `~/Library/Application Support/xlite-daemon/settings/config-*.json`
 - **Linux**: `~/.config/xlite-daemon/settings/config-*.json`
 
+Set `XLITE_DATA_HOME` to override the platform directory above. The
+daemon aborts at startup when no override is set and the platform
+default is missing (Windows with unset `%AppData%`, or an empty
+`user.home`).
+
 ### Configuration Structure
 
 Each cryptocurrency has its own configuration file named `config-{ticker}.json`:
