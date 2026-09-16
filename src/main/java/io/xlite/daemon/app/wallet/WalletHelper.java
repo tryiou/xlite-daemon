@@ -8,6 +8,7 @@ import io.xlite.daemon.app.net.HasFeeParams;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.CloudTransaction;
+import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 import org.bitcoinj.core.*;
 import org.bitcoinj.crypto.DeterministicKey;
@@ -276,11 +277,11 @@ public class WalletHelper {
         Transaction tx = new Transaction(params);
         for (UTXO output : outputs) {
             Address addr = LegacyAddress.fromBase58(params, output.getAddress());
-            tx.addOutput(Coin.valueOf((long) (output.getAmount() * coinUnit)), addr);
+            tx.addOutput(Coin.valueOf(Sats.fromWholeCoins(output.getAmount())), addr);
         }
 
         if (changeAmt > 0 && !isDust(changeAmt, params)) {
-            tx.addOutput(Coin.valueOf((long) (changeAmt * coinUnit)), walletHelper.getChangeAddress());
+            tx.addOutput(Coin.valueOf(Sats.fromWholeCoins(changeAmt)), walletHelper.getChangeAddress());
         }
 
         return walletHelper.signTransactionWithUtxos(tx, selectedUtxos);
@@ -360,7 +361,7 @@ public class WalletHelper {
     }
 
     private static boolean isDust(double amount, NetworkParameters params) {
-        return amount * Coin.COIN.value < params.getMinNonDustOutput().value;
+        return Sats.fromWholeCoins(amount) < params.getMinNonDustOutput().value;
     }
 
     // Package-private for testing. The params must be the coin's own network
@@ -371,7 +372,7 @@ public class WalletHelper {
         // AddressFormatException on mismatch. Do not remove: a null-params
         // lookup here rejects every non-BTC address ("No network found").
         LegacyAddress.fromBase58(params, address);
-        Coin coin = Coin.valueOf((long) (amount * Coin.COIN.value));
+        Coin coin = Coin.valueOf(Sats.fromWholeCoins(amount));
         return new UTXO(ticker, address, "", 0, 0, coin.value);
     }
 

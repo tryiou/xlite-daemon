@@ -16,6 +16,7 @@ import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.AddressDiscoveryService;
 import io.xlite.daemon.app.util.CloudTransaction;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
 import io.xlite.daemon.app.wallet.WalletHelper;
@@ -630,7 +631,7 @@ public class CoinInstance {
 
     public String getAllBalancesFormatted() {
         BtcFormat f = BtcFormat.getInstance(BtcFormat.COIN_SCALE);
-        return f.format(Coin.valueOf((long) (getAllBalances() * Coin.COIN.value)));
+        return f.format(Coin.valueOf(Sats.fromWholeCoins(getAllBalances())));
     }
 
     public void sendXrGetTransaction(BlocknetPeer blocknetPeer, String txid) {

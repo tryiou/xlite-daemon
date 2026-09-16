@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.subgraph.orchid.encoders.Hex;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
+import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.XRouterConfiguration;
 import io.xlite.daemon.app.wallet.WalletHelper;
 import org.bitcoinj.core.*;
@@ -36,7 +37,7 @@ public class XRouterFeeUtils {
 
         double fee = feeMap.get(xRouterCommand);
 
-        Coin xRouterFeeAmt = Coin.valueOf((long) Math.floor(fee * Coin.COIN.value));
+        Coin xRouterFeeAmt = Coin.valueOf(Sats.fromWholeCoins(fee));
         if (xRouterFeeAmt.value == 0) {
             LOGGER.finer("[xrouter-fee-utils] DEBUG: This command is free.");
             return "nohash;nofee";
@@ -53,7 +54,7 @@ public class XRouterFeeUtils {
 
         LegacyAddress xRouterPaymentAddress = LegacyAddress.fromBase58(params, xRouterConfig.getFeeAddress());
         Coin blocknetNetworkFeeAmt = Coin.valueOf(networkFeeSats);
-        Coin xRouterChangeAmt = Coin.valueOf((long) Math.floor(totalAvailable * Coin.COIN.value)).minus(blocknetNetworkFeeAmt).minus(xRouterFeeAmt);
+        Coin xRouterChangeAmt = Coin.valueOf(Sats.fromWholeCoins(totalAvailable)).minus(blocknetNetworkFeeAmt).minus(xRouterFeeAmt);
 
         TransactionOutput feeOutput = new TransactionOutput(params, null, xRouterFeeAmt, xRouterPaymentAddress);
 
@@ -62,7 +63,7 @@ public class XRouterFeeUtils {
 
         if (changeAmt > 0.06) {
             double halvedAmt = changeAmt / 3;
-            Coin halvedChangeAmt = Coin.valueOf((long) Math.floor(halvedAmt * Coin.COIN.value));
+            Coin halvedChangeAmt = Coin.valueOf(Sats.fromWholeCoins(halvedAmt));
             TransactionOutput halvedChangeOutput = new TransactionOutput(params, null, halvedChangeAmt, blocknetWalletHelper.getChangeAddress());
 
             for (int i = 0; i < 3; i++) {
@@ -91,7 +92,7 @@ public class XRouterFeeUtils {
         double fee = feeMap.get("xrSendTransaction");
         String feeAddress = xRouterConfig.getFeeAddress();
 
-        Coin feeAmount = Coin.valueOf((long) Math.floor(fee * Coin.COIN.value));
+        Coin feeAmount = Coin.valueOf(Sats.fromWholeCoins(fee));
 
         return new TransactionOutput(blocknetCoin.getNetworkParameters(), null, feeAmount, LegacyAddress.fromBase58(blocknetCoin.getNetworkParameters(), feeAddress));
     }

@@ -12,6 +12,7 @@ import io.xlite.daemon.app.net.api.http.client.HTTPClient;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.Utility;
 import io.xlite.daemon.app.wallet.WalletHelper;
@@ -784,7 +785,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 for (OutputEntry entry : outputEntries) {
                     try {
                         LegacyAddress address = LegacyAddress.fromBase58(coin.getNetworkParameters(), entry.address);
-                        Coin outputValue = Coin.valueOf((long) Math.floor(entry.amount * Coin.COIN.value));
+                        Coin outputValue = Coin.valueOf(Sats.fromWholeCoins(entry.amount));
                         if (isP2SHAddress(entry.address)) {
                             LOGGER.fine("[http-server-handler] P2SH Address Found: " + entry.address);
                             Script p2shScript = ScriptBuilder.createP2SHOutputScript(address.getHash());
@@ -802,7 +803,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 for (OutputEntry entry : outputEntries) {
                     try {
                         LegacyAddress address = LegacyAddress.fromBase58(coin.getNetworkParameters(), entry.address);
-                        Coin outputValue = Coin.valueOf((long) Math.floor(entry.amount * Coin.COIN.value));
+                        Coin outputValue = Coin.valueOf(Sats.fromWholeCoins(entry.amount));
                         if (!isP2SHAddress(entry.address)) {
                             tx.addOutput(outputValue, address);
                         }

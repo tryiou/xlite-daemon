@@ -15,6 +15,7 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.AddressBalance;
+import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
 import org.apache.http.Header;
@@ -503,7 +504,7 @@ public class HTTPClient {
      * (e.g. 0.00050001 becomes 50000).
      */
     static long satsFromWholeCoins(double whole) {
-        return Math.round(whole * 100000000.0);
+        return Sats.fromWholeCoins(whole);
     }
 
     /**

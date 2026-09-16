@@ -102,4 +102,15 @@ class WalletHelperSendTest {
         assertEquals(p2pkh, out.getAddress());
         assertEquals(5_000_000L, out.getValue());
     }
+
+    @Test
+    void testCreateTransactionOutput_InexactDoubleRoundsToNearest() {
+        // 0.00050001 is not exactly representable in binary; the stored
+        // double sits just below 50001 sats, so (long) truncation yields
+        // 50000. Must round to nearest like the UTXO ingest path.
+        NetworkParameters params = new LitecoinNetworkParametersLegacy();
+        UTXO out = WalletHelper.createTransactionOutput(
+                CoinTicker.LITECOIN, LTC_P2PKH, 0.00050001, params);
+        assertEquals(50_001L, out.getValue());
+    }
 }
