@@ -1,0 +1,97 @@
+package io.xlite.daemon.app.net.protocols.pocketcoin;
+
+import io.xlite.daemon.app.net.HasFeeParams;
+import org.bitcoinj.core.*;
+import org.bitcoinj.store.BlockStore;
+import org.bitcoinj.store.BlockStoreException;
+import org.bitcoinj.utils.MonetaryFormat;
+
+public class PocketcoinNetworkParametersLegacy extends NetworkParameters implements HasFeeParams {
+
+    public PocketcoinNetworkParametersLegacy() {
+        super();
+    }
+
+    @Override
+    public String getPaymentProtocolId() {
+        return "main";
+    }
+
+    @Override
+    public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {
+    }
+
+    @Override
+    public Coin getMaxMoney() {
+        return Coin.valueOf(21000000 * Coin.COIN.value);
+    }
+
+    @Override
+    public Coin getMinNonDustOutput() {
+        return Transaction.MIN_NONDUST_OUTPUT;
+    }
+
+    @Override
+    public MonetaryFormat getMonetaryFormat() {
+        return new MonetaryFormat().code(0, "PKOIN");
+    }
+
+    @Override
+    public String getUriScheme() {
+        return "pocketcoin:";
+    }
+
+    @Override
+    public boolean hasMaxMoney() {
+        return true;
+    }
+
+    @Override
+    public BitcoinSerializer getSerializer(boolean parseRetain) {
+        return new BitcoinSerializer(this, parseRetain);
+    }
+
+    @Override
+    public int getProtocolVersionNum(ProtocolVersion version) {
+        return 70031;
+    }
+
+    @Override
+    public int getAddressHeader() {
+        return 55;
+    }
+
+    @Override
+    public int getP2SHHeader() {
+        return 80;
+    }
+
+    @Override
+    public int getDumpedPrivateKeyHeader() {
+        return 33;
+    }
+
+
+    @Override
+    public int getSubsidyDecreaseBlockCount() {
+        return 2100000;
+    }
+
+    @Override
+    public int getInterval() {
+        return 60;
+    }
+
+    @Override
+    public String getId() {
+        return "PKOIN";
+    }
+
+    public long getFeePerByte() {
+        return 20;
+    }
+
+    public long getMinTxFee() {
+        return 10000;
+    }
+}

@@ -135,10 +135,23 @@ SET "PATH=%SDK_BIN_PATH%;%PATH%"
 SET "INCLUDE=%SDK_INCLUDE_PATH%;%INCLUDE%"
 SET "LIB=%SDK_LIB_PATH%;%LIB%"
 
-echo Building XLite Daemon with nativeCompile...
+echo Building XLite Daemon with Maven native profile...
 
-REM Build the project using Gradle nativeCompile task
-gradlew.bat clean nativeCompile --info
+REM Check if Maven wrapper exists, if not use mvn directly
+if exist mvnw.cmd (
+    echo Using Maven wrapper (mvnw.cmd)...
+    set "MAVEN_CMD=mvnw.cmd"
+) else if exist mvnw.bat (
+    echo Using Maven wrapper (mvnw.bat)...
+    set "MAVEN_CMD=mvnw.bat"
+) else (
+    echo Maven wrapper not found, using system mvn command...
+    set "MAVEN_CMD=mvn"
+)
+
+REM Build the project using Maven with native profile
+echo Running: %MAVEN_CMD% clean compile exec:java -Pnative -DskipTests
+%MAVEN_CMD% clean compile exec:java -Pnative -DskipTests
 
 if %ERRORLEVEL% NEQ 0 (
     echo Build failed!
@@ -146,7 +159,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 REM Additional check for build output
-if not exist build\native\nativeCompile\xlite-daemon.exe (
+if not exist target\xlite-daemon.exe (
     echo Build completed but native image not found at expected location
     exit /b 1
 )
@@ -154,9 +167,9 @@ if not exist build\native\nativeCompile\xlite-daemon.exe (
 echo Build completed successfully!
 
 REM Rename the output file
-if exist build\native\nativeCompile\xlite-daemon.exe (
-    ren build\native\nativeCompile\xlite-daemon.exe xlite-daemon-win64.exe
-    echo Native image created: build\native\nativeCompile\xlite-daemon-win64.exe
+if exist target\xlite-daemon.exe (
+    ren target\xlite-daemon.exe xlite-daemon-win64.exe
+    echo Native image created: target\xlite-daemon-win64.exe
 ) else (
     echo Error: Native image not found at expected location
     exit /b 1
