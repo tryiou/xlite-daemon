@@ -498,6 +498,15 @@ public class HTTPClient {
     }
 
     /**
+     * Whole-coin doubles (backend JSON) to integer base units. Must round to
+     * nearest: truncating the binary representation error loses satoshis
+     * (e.g. 0.00050001 becomes 50000).
+     */
+    static long satsFromWholeCoins(double whole) {
+        return Math.round(whole * 100000000.0);
+    }
+
+    /**
      * Returns all utxos.
      * @param coinTicker Fetch utxos from this coin
      * @param expiry Time in milliseconds until cache expires
@@ -554,7 +563,7 @@ public class HTTPClient {
                     utxoArr.getJSONObject(i).getString("txhash"),
                     utxoArr.getJSONObject(i).getInt("vout"),
                     utxoArr.getJSONObject(i).getInt("block_number"),
-                    (long) Math.floor(utxoArr.getJSONObject(i).getDouble("value") * 100000000.0));
+                    satsFromWholeCoins(utxoArr.getJSONObject(i).getDouble("value")));
 
             utxoList.add(utxo);
         }
