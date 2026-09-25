@@ -1,0 +1,7 @@
+{
+  "resources":[
+    {"pattern":"mozilla/public-suffix-list.txt"},
+    {"pattern":"org/apache/http/client/version.properties"},
+    {"pattern":"org/bitcoinj/crypto/mnemonic/wordlist/english.txt"}
+  ]
+}
