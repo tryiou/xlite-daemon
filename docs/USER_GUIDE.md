@@ -257,7 +257,6 @@ The daemon supports the following cryptocurrencies:
 | Coin | Ticker | Network | RPC Port | Status |
 |------|--------|---------|----------|---------|
 | Blocknet | BLOCK | Mainnet | 41419 | ✅ Active |
-| Blocknet Testnet | TBLOCK | Testnet | 41419 | ✅ Active |
 | Bitcoin | BTC | Mainnet | 8332 | ✅ Active |
 | Litecoin | LTC | Mainnet | 9332 | ✅ Active |
 | Dash | DASH | Mainnet | 9998 | ✅ Active |

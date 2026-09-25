@@ -25,7 +25,6 @@ class HTTPServerHandlerSignedMessageTest {
     @DisplayName("each mapped coin keeps its documented header")
     void testSignedMessageHeader_KnownCoins() {
         assertEquals("Blocknet Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.BLOCKNET));
-        assertEquals("Blocknet Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.BLOCKNET_TESTNET5));
         assertEquals("Bitcoin Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.BITCOIN_CASH));
         assertEquals("Litecoin Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.LITECOIN));
         assertEquals("DarkNet Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.PIVX));

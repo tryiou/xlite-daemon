@@ -1,6 +1,5 @@
 import io.xlite.daemon.app.net.protocols.bitcoin.BitcoinNetworkParametersLegacy;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetNetworkParameters;
-import io.xlite.daemon.app.net.protocols.blocknet.BlocknetTestnet5NetworkParameters;
 import io.xlite.daemon.app.net.protocols.dashcoin.DashcoinNetworkParametersLegacy;
 import io.xlite.daemon.app.net.protocols.digibyte.DigibyteNetworkParametersLegacy;
 import io.xlite.daemon.app.net.protocols.dogecoin.DogecoinNetworkParametersLegacy;
@@ -102,12 +101,6 @@ class WalletHelperFeeTest extends TestHelper {
         assertEquals(1000L, WalletHelper.getFeePerByte(params));
     }
 
-    @Test
-    void testGetFeePerByte_BlocknetTestnet5() {
-        BlocknetTestnet5NetworkParameters params = new BlocknetTestnet5NetworkParameters();
-        assertEquals(20L, WalletHelper.getFeePerByte(params));
-    }
-
     // ========================================================================
     // Happy Path - getMinTxFee() tests
     // ========================================================================
@@ -176,12 +169,6 @@ class WalletHelperFeeTest extends TestHelper {
     void testGetMinTxFee_Ravencoin() {
         RavencoinNetworkParametersLegacy params = new RavencoinNetworkParametersLegacy();
         assertEquals(100000L, WalletHelper.getMinTxFee(params));
-    }
-
-    @Test
-    void testGetMinTxFee_BlocknetTestnet5() {
-        BlocknetTestnet5NetworkParameters params = new BlocknetTestnet5NetworkParameters();
-        assertEquals(10000L, WalletHelper.getMinTxFee(params));
     }
 
     // ========================================================================

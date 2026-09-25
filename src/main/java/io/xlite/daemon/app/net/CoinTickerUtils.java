@@ -2,10 +2,6 @@ package io.xlite.daemon.app.net;
 
 import com.google.common.collect.HashBiMap;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
 public class CoinTickerUtils {
     private static HashBiMap<CoinTicker, String> tickers;
 
@@ -13,7 +9,6 @@ public class CoinTickerUtils {
         tickers = HashBiMap.create();
 
         tickers.put(CoinTicker.BLOCKNET, "BLOCK");
-        tickers.put(CoinTicker.BLOCKNET_TESTNET5, "TBLOCK");
         tickers.put(CoinTicker.BITCOIN, "BTC");
         tickers.put(CoinTicker.LITECOIN, "LTC");
         tickers.put(CoinTicker.DASHCOIN, "DASH");
@@ -38,25 +33,17 @@ public class CoinTickerUtils {
         return tickers.inverse().get(string);
     }
 
-    public static Set<CoinTicker> getNetworkTickers() {
-        return new HashSet<>(Arrays.asList(CoinTicker.BLOCKNET, CoinTicker.BLOCKNET_TESTNET5));
-    }
-
     /**
-     * Active (mainnet, wallet-capable) tickers, derived from the canonical
-     * supported list {@link CoinTicker#coins()} minus testnets. A delisted
-     * coin is excluded from {@code coins()} (its enum variant may linger,
-     * e.g. BITCOIN_CASH); to (re-)add one, restore its {@code coins()}
-     * entry, string mapping, supplement row and CoinInstance init case
-     * together (the source-of-truth test pins the set, mapping and
-     * supplement; wire the init case by hand).
+     * Active (mainnet, wallet-capable) tickers: the canonical supported
+     * list {@link CoinTicker#coins()}. There are no testnet variants; a
+     * delisted coin is excluded from {@code coins()} (its enum variant may
+     * linger, e.g. BITCOIN_CASH). To (re-)add one, restore its
+     * {@code coins()} entry, string mapping, supplement row and CoinInstance
+     * init case together (the source-of-truth test pins the set, mapping
+     * and supplement; wire the init case by hand).
      */
     public static CoinTicker[] getActiveTickers() {
-        // Name-pattern exclusion (not an explicit variant comparison) so a
-        // future TESTNET* is excluded by default rather than silently listed.
-        return CoinTicker.coins().stream()
-                .filter(t -> !t.name().contains("TESTNET"))
-                .toArray(CoinTicker[]::new);
+        return CoinTicker.coins().toArray(new CoinTicker[0]);
     }
 
     public static boolean tickerExists(String string) {

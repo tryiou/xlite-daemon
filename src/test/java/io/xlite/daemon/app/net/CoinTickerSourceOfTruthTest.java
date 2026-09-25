@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class CoinTickerSourceOfTruthTest {
 
     @Test
-    void testActiveTickersDerivedFromEnumMinusTestnets() {
+    void testActiveTickersMatchEnum() {
         // The full explicit active set: a dropped/added middle coin changes
         // this set and fails here (a purely derived expectation would shrink
         // together with production and pass silently).
@@ -47,11 +47,11 @@ public class CoinTickerSourceOfTruthTest {
 
     @Test
     void testEveryActiveCoinHasCompiledSupplement() {
-        // BLOCKNET/TESTNET5 use hardcoded network parameters (CoinInstance
-        // init); all others must have a supplement row or wallet init fails
-        // with UNSUPPORTEDCOIN at runtime.
+        // BLOCKNET uses hardcoded network parameters (CoinInstance init);
+        // all others must have a supplement row or wallet init fails with
+        // UNSUPPORTEDCOIN at runtime.
         for (CoinTicker t : CoinTickerUtils.getActiveTickers()) {
-            if (t == CoinTicker.BLOCKNET || t == CoinTicker.BLOCKNET_TESTNET5) {
+            if (t == CoinTicker.BLOCKNET) {
                 continue;
             }
             assertDoesNotThrow(() -> CompiledCoinSupplement.forTicker(CoinTickerUtils.tickerToString(t)), t.name());

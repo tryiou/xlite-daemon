@@ -419,7 +419,7 @@ public class ConsoleMenu {
 
         List<CoinTicker> otherCoins = new ArrayList<>();
         for (CoinTicker cointicker : CoinTicker.coins()) {
-            if (cointicker != CoinTicker.BLOCKNET && cointicker != CoinTicker.BLOCKNET_TESTNET5) {
+            if (cointicker != CoinTicker.BLOCKNET) {
                 otherCoins.add(cointicker);
             }
         }

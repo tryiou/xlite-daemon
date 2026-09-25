@@ -137,7 +137,7 @@ public class CoinInstance {
     }
 
     public boolean isBlocknetNetwork() {
-        return getTicker() == CoinTicker.BLOCKNET || getTicker() == CoinTicker.BLOCKNET_TESTNET5;
+        return getTicker() == CoinTicker.BLOCKNET;
     }
 
     public static void setActiveCurrency(CoinInstance newActiveCurrency) {
@@ -242,11 +242,11 @@ public class CoinInstance {
                     coinInstances.add(instance);
             }
 
-            if (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5) {
+            if (ticker == CoinTicker.BLOCKNET) {
                 activeBlocknetNetwork = ticker;
             }
 
-            if (getActiveBlocknetNetwork() != null && (ticker == CoinTicker.BLOCKNET || ticker == CoinTicker.BLOCKNET_TESTNET5)) {
+            if (getActiveBlocknetNetwork() != null && ticker == CoinTicker.BLOCKNET) {
                 return getInstanceByTicker(activeBlocknetNetwork);
             }
 
@@ -340,15 +340,6 @@ public class CoinInstance {
                 networkParameters = blocknetNetworkParameters;
                 hasXRouter = true;
                 rpcPort = 41419;
-                break;
-            }
-            case BLOCKNET_TESTNET5: {
-                LOGGER.fine("[coin] Initializing for Blocknet test network v5.");
-                blocknetNetworkParameters = new BlocknetTestnet5NetworkParameters();
-                networkParameters = blocknetNetworkParameters;
-                hasXRouter = true;
-                rpcPort = 41419;
-                testnet = true;
                 break;
             }
             case BITCOIN: {

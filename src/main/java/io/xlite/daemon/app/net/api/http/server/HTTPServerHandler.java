@@ -1591,7 +1591,6 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return null;
         switch (ticker) {
             case BLOCKNET:
-            case BLOCKNET_TESTNET5:
                 return "Blocknet Signed Message:\n";
             case BITCOIN:
             case BITCOIN_CASH:

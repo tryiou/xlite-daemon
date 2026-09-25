@@ -90,7 +90,7 @@ public class ArgMenu {
         }
 
         for (CoinTicker cointicker : CoinTicker.coins()) {
-            if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BLOCKNET_TESTNET5 || cointicker == CoinTicker.BITCOIN)
+            if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BITCOIN)
                 continue;
             coinError = CoinInstance.getInstance(cointicker).init(password, userMnemonic, false);
             if (coinError != null)

@@ -5,7 +5,6 @@ import java.util.List;
 
 public enum CoinTicker {
     BLOCKNET,
-    BLOCKNET_TESTNET5,
 
     BITCOIN,
     BITCOIN_CASH,
@@ -27,7 +26,6 @@ public enum CoinTicker {
     public static List<CoinTicker> coins() {
         return Arrays.asList(
                 BLOCKNET,
-                BLOCKNET_TESTNET5,
                 BITCOIN,
 //            BITCOIN_CASH, - not support on backend
                 LITECOIN,
