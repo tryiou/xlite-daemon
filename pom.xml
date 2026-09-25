@@ -20,8 +20,11 @@
     <maven.compiler.release>21</maven.compiler.release>
     <java.version>21</java.version>
 
-    <!-- Native build architecture (can be overridden from command line) -->
-    <native.march>native</native.march>
+    <!-- Native build architecture (can be overridden from command line).
+         Compatibility is the default because release binaries must run on
+         arbitrary end-user and VM CPUs; -march=native bakes the build
+         host's CPU features into the image and aborts elsewhere. -->
+    <native.march>compatibility</native.march>
 
     <!-- Dependency Versions -->
     <bitcoinj.version>0.15.10</bitcoinj.version>
