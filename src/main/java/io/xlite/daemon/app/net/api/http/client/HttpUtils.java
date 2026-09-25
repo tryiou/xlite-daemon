@@ -43,11 +43,12 @@ public class HttpUtils {
                 EntityUtils.consume(entity);
                 return result;
             } else {
-                LOGGER.warning(HttpClientConfig.LOG_TAG + " " + operation + " failed");
+                LOGGER.warning(HttpClientConfig.LOG_TAG + " " + operation
+                        + " failed with status " + response.getStatusLine().getStatusCode());
                 return null;
             }
         } catch (IOException e) {
-            LOGGER.warning(HttpClientConfig.LOG_TAG + " " + operation + " failed" + e.getMessage());
+            LOGGER.warning(HttpClientConfig.LOG_TAG + " " + operation + " failed: " + e.getMessage());
             return null;
         } finally {
             request.reset();
@@ -55,7 +56,7 @@ public class HttpUtils {
                 try {
                     response.close();
                 } catch (IOException e) {
-                    LOGGER.warning(HttpClientConfig.LOG_TAG + " Failed to close response" + e.getMessage());
+                    LOGGER.warning(HttpClientConfig.LOG_TAG + " Failed to close response: " + e.getMessage());
                 }
             }
         }

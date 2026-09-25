@@ -182,7 +182,32 @@ public class HTTPClient {
             httpPost.reset();
             return null;
         }
-        return HttpUtils.executeHttpRequest(client, httpPost, "POST " + endpoint);
+        return HttpUtils.executeHttpRequest(client, httpPost, describePost(endpoint, params));
+    }
+
+    /**
+     * Builds a context-rich operation label from what's already in hand:
+     * every legacy POST caller sends {method, params:[first, ...]} where
+     * the first param is the ticker for coin-first-param methods. Never
+     * throws: a description must not break the request it describes.
+     */
+    private static String describePost(String endpoint, JsonObject params) {
+        String method = "?";
+        String first = "";
+        try {
+            if (params != null && params.has("method") && params.get("method").isJsonPrimitive()) {
+                method = params.get("method").getAsString();
+            }
+            if (params != null && params.has("params") && params.get("params").isJsonArray()) {
+                JsonArray arr = params.getAsJsonArray("params");
+                if (arr.size() > 0 && arr.get(0).isJsonPrimitive()) {
+                    first = " " + arr.get(0).getAsString();
+                }
+            }
+        } catch (Exception ignored) {
+            // Fall through with whatever was extracted; worst case "?".
+        }
+        return "POST " + endpoint + " [" + method + first + "]";
     }
 
     public HTTPClient(int maximumSockets) {
@@ -450,7 +475,6 @@ public class HTTPClient {
 
 
         if (res == null) {
-            LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
@@ -538,7 +562,6 @@ public class HTTPClient {
 
 
         if (res == null) {
-            LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
@@ -732,26 +755,81 @@ public class HTTPClient {
     public void getAllBlockCounts() {
         String res = executeRequest("/height", null);
 
-        if (res == null) return;
+        if (res == null) {
+            // Total backend outage: every coin misses, not none. The old
+            // early return froze all heights with isInstanceRunning stuck
+            // true and zero log output — the exact blind spot behind a
+            // multi-minute stale tip with a clean log.
+            for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
+                noteHeightMiss(coinInstance, "null /height response");
+            }
+            return;
+        }
 
-        JsonObject result = new Gson().fromJson(res, JsonObject.class);
-        JsonObject blockCounts = result.get("result").getAsJsonObject();
+        final JsonObject blockCounts;
+        try {
+            JsonObject result = new Gson().fromJson(res, JsonObject.class);
+            blockCounts = result.get("result").getAsJsonObject();
+        } catch (RuntimeException e) {
+            // Malformed payload (bad JSON, missing/non-object result):
+            // same accounting as a null response — every coin misses
+            // rather than aborting the update where the generic caller
+            // catch buries it outside streak accounting.
+            for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
+                noteHeightMiss(coinInstance, "unparseable /height response");
+            }
+            return;
+        }
 
         for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
             String ticker = CoinTickerUtils.tickerToString(coinInstance.getTicker());
 
             if (!blockCounts.keySet().contains(ticker) || blockCounts.get(ticker).isJsonNull()) {
-                coinInstance.incrementUpdateFailures();
+                noteHeightMiss(coinInstance, "no " + ticker + " in /height response");
                 continue;
             }
 
-            int blockCount = blockCounts.get(ticker).getAsInt();
+            final int blockCount;
+            try {
+                blockCount = blockCounts.get(ticker).getAsInt();
+            } catch (RuntimeException e) {
+                // Wrong-typed value (string/object/array where a height
+                // belongs): same accounting as a missing entry — this coin
+                // misses, the loop continues for the rest.
+                noteHeightMiss(coinInstance, "bad " + ticker + " in /height response");
+                continue;
+            }
 
             coinInstance.addBlockCount(coinInstance.getTicker(), blockCount);
-            coinInstance.resetUpdateFailures();
+            int recovered = coinInstance.resetUpdateFailures();
+            if (recovered > 0) {
+                LOGGER.warning("[httpclient] " + ticker + " height updates recovered after "
+                        + recovered + " consecutive failures; fresh height " + blockCount);
+            }
 
             LOGGER.finer("[httpclient] Got blockcount for currency " + ticker + " - " + blockCount);
         }
+    }
+
+    /**
+     * Records one missed height update, LOUD exactly twice per episode:
+     * first miss and recovery. Everything between is silent by operator
+     * order — a persistent backend gap re-warning every minute is spam,
+     * not signal. The -1112s in consumer logs are the visible symptom
+     * while a coin is unavailable.
+     */
+    private static void noteHeightMiss(CoinInstance coinInstance, String reason) {
+        String ticker = CoinTickerUtils.tickerToString(coinInstance.getTicker());
+        int streak = coinInstance.incrementUpdateFailures();
+        if (streak != 1) {
+            return;
+        }
+        long ageSec = coinInstance.getLastBlockCountMillis() <= 0 ? -1
+                : (System.currentTimeMillis() - coinInstance.getLastBlockCountMillis()) / 1000;
+        String lastGood = ageSec < 0 ? "no height ever received"
+                : "last-good height age " + ageSec + "s";
+        LOGGER.warning("[httpclient] " + ticker + " height update failed (" + reason
+                + "); streak 1, serving stale height, " + lastGood);
     }
 
     public JsonObject getBlock(CoinTicker coinTicker, String hash, boolean verbose) {
@@ -861,7 +939,6 @@ public class HTTPClient {
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
-            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null post result");
             return null;
         }
 
@@ -948,7 +1025,6 @@ public class HTTPClient {
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
         if (res == null) {
-            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null post result");
             return null;
         }
 

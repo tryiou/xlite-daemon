@@ -93,6 +93,10 @@ public class CoinInstance {
     private volatile JSONRPCServer coinRPCServer = null;
     private volatile long lastUtxoUpdate = 0;
     private final AtomicInteger updateFailures = new AtomicInteger(0);
+    // Last wall-clock time a fresh height was accepted from the backend.
+    // A stuck clock here with a rising failure streak means the served
+    // height is stale — both are now logged, never silent.
+    private volatile long lastBlockCountMillis = 0;
     private int generatedAddressCount;
     private AddressDiscoveryService discoveryService = null;
     private static volatile boolean addressDiscoveryEnabled = true;
@@ -912,6 +916,12 @@ public class CoinInstance {
         // confirmation math.
         blockCounts.computeIfAbsent(ticker, k -> new AtomicInteger(0))
                 .set(blockCount);
+        // The constructor seeds 0: that initializes the map but is not a
+        // backend height — only a real (positive) tip starts the freshness
+        // clock, so "no height ever received" stays reachable and truthful.
+        if (blockCount != null && blockCount > 0) {
+            lastBlockCountMillis = System.currentTimeMillis();
+        }
     }
 
     public void addCloudTransaction(CloudTransaction cloudTransaction) {
@@ -1048,12 +1058,30 @@ public class CoinInstance {
         return Version.SUBVERSION;
     }
 
-    public void incrementUpdateFailures() {
-        updateFailures.incrementAndGet();
+    /**
+     * Records one failed backend height update.
+     * @return the new consecutive-failure streak (drives staleness logging
+     *         and {@link #isInstanceRunning})
+     */
+    public int incrementUpdateFailures() {
+        return updateFailures.incrementAndGet();
     }
 
-    public void resetUpdateFailures() {
-        updateFailures.set(0);
+    /**
+     * Records a successful backend height update.
+     * @return the streak just ended (0 when nothing had failed)
+     */
+    public int resetUpdateFailures() {
+        return updateFailures.getAndSet(0);
+    }
+
+    public int getUpdateFailures() {
+        return updateFailures.get();
+    }
+
+    /** Wall-clock millis of the last accepted backend height (0 = never). */
+    public long getLastBlockCountMillis() {
+        return lastBlockCountMillis;
     }
 
     public void runAddressDiscovery() {
