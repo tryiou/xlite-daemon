@@ -43,8 +43,10 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -558,22 +560,115 @@ public class HTTPClient {
         }
 
         List<UTXO> utxoList = new ArrayList<>();
+        Set<String> returnedAddresses = new HashSet<>();
+        // Backend-declared per-address failures ("errors" array the adapter
+        // attaches): such addresses are treated as omitted entirely — their
+        // rows are neither added below nor kept stored (see eviction).
+        Set<String> failedAddresses = failedAddresses(jsonObject);
         for (int i = 0; i < utxoArr.length(); i++) {
+            String rowAddress = utxoArr.getJSONObject(i).getString("address");
+            if (failedAddresses.contains(rowAddress)) {
+                continue;
+            }
             UTXO utxo = new UTXO(coinTicker,
-                    utxoArr.getJSONObject(i).getString("address"),
+                    rowAddress,
                     utxoArr.getJSONObject(i).getString("txhash"),
                     utxoArr.getJSONObject(i).getInt("vout"),
                     utxoArr.getJSONObject(i).getInt("block_number"),
                     satsFromWholeCoins(utxoArr.getJSONObject(i).getDouble("value")));
 
             utxoList.add(utxo);
+            returnedAddresses.add(rowAddress);
         }
+
+        // Evict rows for requested-but-backend-omitted addresses. A successful
+        // response that omits a tracked address (or flags it in the backend's
+        // "errors" array) means the backend holds no unspent outputs for it —
+        // any stored rows are confirmed-stale (a lagging view re-serves dead
+        // outputs with live-looking confirmations otherwise). processUtxos
+        // below only clears addresses PRESENT in the response, so without this
+        // an omitted address keeps its rows forever. Runs on parsed-success
+        // only: null/parse-error responses return above with stored rows
+        // untouched (an outage must never wipe the wallet).
+        evictOmittedAddresses(coinInstance, utxoParams, returnedAddresses);
 
         // Update last fetch time
         lastFetchTimes.put(lastFetchTimesKey(coinTicker, "getUtxos"), currentTime);
 
         coinInstance.processUtxos(utxoList);
         return coinInstance.getAllUTXOS();
+    }
+
+    /**
+     * Reads the backend-declared per-address failures from a getutxos
+     * response ("errors" array of {address, message} items the adapter
+     * attaches; absent/null on clean responses). Never throws: an
+     * unparseable array degrades to a (possibly partial) set (the omission
+     * diff below still applies).
+     */
+    Set<String> failedAddresses(JSONObject response) {
+        Set<String> failed = new HashSet<>();
+        try {
+            JSONArray errors = response.optJSONArray("errors");
+            if (errors != null) {
+                for (int i = 0; i < errors.length(); i++) {
+                    String addr = errors.getJSONObject(i).optString("address", null);
+                    if (addr != null) {
+                        failed.add(addr);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warning("[httpclient] failedAddresses unparseable errors array - " + e.getMessage());
+        }
+        return failed;
+    }
+
+    /**
+     * Clears stored UTXO rows for tracked addresses the backend omitted from
+     * a successful getutxos response. requestedParams is the
+     * [ticker, "[addr...]"] list built by CoinInstance.getUTXOParams (the
+     * second element is a stringified JSONArray); returned holds the
+     * addresses present in the response. Backend-declared failures never
+     * reach returned (their rows are skipped before recording above), so a
+     * requested address missing from returned is confirmed to hold nothing.
+     * Unknown/non-tracked addresses are ignored (processUtxos
+     * warns on those itself). clearUtxos spares spent-marked rows, so only
+     * live-looking stale rows are dropped.
+     */
+    void evictOmittedAddresses(CoinInstance coinInstance, ArrayList<String> requestedParams,
+            Set<String> returned) {
+        Set<String> requested = new HashSet<>();
+        try {
+            if (requestedParams.size() > 1) {
+                JSONArray arr = new JSONArray(requestedParams.get(1));
+                for (int i = 0; i < arr.length(); i++) {
+                    requested.add(arr.getString(i));
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warning("[httpclient] evictOmittedAddresses unparseable request params - " + e.getMessage());
+            return;
+        }
+        for (String addr : requested) {
+            if (returned.contains(addr)) {
+                continue;
+            }
+            AddressBalance balance = coinInstance.getAddressBalance(addr);
+            if (balance == null) {
+                continue;
+            }
+            balance.clearUtxos();
+            // clearUtxos drops rows but leaves the cached balance behind;
+            // without this the address keeps reporting its old getbalance
+            // after eviction (the normal path always re-adds rows, whose
+            // addUtxo recalculates — the omit path is the first clear with
+            // no following add).
+            balance.calculateBalance();
+        }
+        // Routine success is silent by operator order: this runs on every
+        // GUI poll per coin, and an INFO here is pure log spam. Real
+        // failures (unparseable params above) still warn.
     }
 
     public JsonObject getRawTransaction(CoinTicker coinTicker, String txid, boolean verbose) {
