@@ -146,11 +146,30 @@ public class App {
         }
         BLOCKCHAIN_CONFIGURATION_FILES = source;
         try {
-            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.load(source);
+            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadWithFallback(source, cacheFor(source));
         } catch (Exception e) {
             LOGGER.log(Level.WARNING,
                     "[coinconfig] failed to load from " + source + ": " + e.getMessage()
                             + " — continuing with no configs; migrated coins will report UNSUPPORTEDCOIN");
+        }
+    }
+
+    /**
+     * Write-through cache for remote config sources, rooted in the daemon
+     * data dir. Local checkouts bypass the cache; any failure resolving it
+     * degrades to uncached (a null cache loads exactly as before).
+     */
+    private static io.xlite.daemon.app.coinconfig.CoinConfigCache cacheFor(String source) {
+        try {
+            if (io.xlite.daemon.app.coinconfig.ConfigSourceResolver.isLocalDirectory(source))
+                return null;
+            java.nio.file.Path root = java.nio.file.Paths.get(getUserConfigDir(),
+                    ConfigHelper.DATA_DIR_NAME, "coinconfig-cache");
+            return io.xlite.daemon.app.coinconfig.CoinConfigCache.forSource(root, source);
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING,
+                    "[coinconfig] cache unavailable: " + e.getMessage() + " — continuing uncached");
+            return null;
         }
     }
 

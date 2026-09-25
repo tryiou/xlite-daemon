@@ -82,27 +82,27 @@ class CoinConfigSourceLocalTest {
     void testManifestEntryWithoutSectionFailsHard(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
         Files.writeString(dir.resolve("manifest-latest.json"),
-                "[{\"blockchain\":\"Fake\",\"ticker\":\"FAKE\","
-                        + "\"xbridge_conf\":\"fake--v1.conf\"}]");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("fake--v1.conf"),
+                "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\","
+                        + "\"xbridge_conf\":\"ltc--v1.conf\"}]");
+        Files.writeString(dir.resolve("xbridge-confs").resolve("ltc--v1.conf"),
                 "[OTHER]\nAddressPrefix=1\n");
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> new CoinConfigSource(dir.toString()).loadAll());
-        assertTrue(e.getMessage().contains("has no [FAKE] section"), e.getMessage());
+        assertTrue(e.getMessage().contains("has no [LTC] section"), e.getMessage());
     }
 
     @Test
     void testDuplicateManifestTickerKeepsLast(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
         Files.writeString(dir.resolve("manifest-latest.json"),
-                "[{\"blockchain\":\"A\",\"ticker\":\"DUP\",\"xbridge_conf\":\"a.conf\"},"
-                        + "{\"blockchain\":\"B\",\"ticker\":\"DUP\",\"xbridge_conf\":\"b.conf\"}]");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("a.conf"), "[DUP]\nK=V1\n");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("b.conf"), "[DUP]\nK=V2\n");
+                "[{\"blockchain\":\"A\",\"ticker\":\"LTC\",\"xbridge_conf\":\"a.conf\"},"
+                        + "{\"blockchain\":\"B\",\"ticker\":\"LTC\",\"xbridge_conf\":\"b.conf\"}]");
+        Files.writeString(dir.resolve("xbridge-confs").resolve("a.conf"), "[LTC]\nK=V1\n");
+        Files.writeString(dir.resolve("xbridge-confs").resolve("b.conf"), "[LTC]\nK=V2\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
         assertEquals(1, all.size());
-        assertEquals("B", all.get("DUP").getBlockchain());
-        assertEquals("V2", all.get("DUP").getConfEntries().get("K"));
+        assertEquals("B", all.get("LTC").getBlockchain());
+        assertEquals("V2", all.get("LTC").getConfEntries().get("K"));
     }
 
     @Test
@@ -118,11 +118,11 @@ class CoinConfigSourceLocalTest {
     void testContractsWrappedManifestAlsoAccepted(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
         Files.writeString(dir.resolve("manifest-latest.json"),
-                "{\"contracts\":[{\"blockchain\":\"Wrap\",\"ticker\":\"WRAP\","
-                        + "\"xbridge_conf\":\"w.conf\"}]}");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("w.conf"),
-                "[WRAP]\nAddressPrefix=7\nFeePerByte=1\nMinTxFee=2\nCOIN=3\nPort=4\nScriptPrefix=5\nSecretPrefix=6\n");
+                "{\"contracts\":[{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\","
+                        + "\"xbridge_conf\":\"doge.conf\"}]}");
+        Files.writeString(dir.resolve("xbridge-confs").resolve("doge.conf"),
+                "[DOGE]\nAddressPrefix=30\nFeePerByte=1\nMinTxFee=2\nCOIN=3\nPort=4\nScriptPrefix=22\nSecretPrefix=158\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
-        assertEquals(7, all.get("WRAP").addressPrefix());
+        assertEquals(30, all.get("DOGE").addressPrefix());
     }
 }

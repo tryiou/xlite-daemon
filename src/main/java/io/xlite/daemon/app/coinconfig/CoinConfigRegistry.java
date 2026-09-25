@@ -1,5 +1,7 @@
 package io.xlite.daemon.app.coinconfig;
 
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,8 +33,49 @@ public final class CoinConfigRegistry {
      * ticker.
      */
     public static synchronized void load(String source) {
+        load(source, null);
+    }
+
+    /**
+     * Load with offline fallback: when the upstream load fails and the cache
+     * holds a manifest, serve the stale cache instead of starting coin-less.
+     * Cold cache (or a cache that itself fails to load) propagates the
+     * original failure — first-ever boot with no network still fails
+     * honestly. Staleness is always logged loudly.
+     */
+    public static synchronized void loadWithFallback(String source, CoinConfigCache cache) {
+        try {
+            load(source, cache);
+            return;
+        } catch (RuntimeException first) {
+            if (cache == null)
+                throw first;
+            String warmed = cache.dir().toString();
+            if (!Files.isRegularFile(cache.dir().resolve("manifest-latest.json")))
+                throw first;
+            try {
+                load(warmed);
+            } catch (RuntimeException fallbackFailure) {
+                throw new IllegalStateException("upstream (" + first.getMessage()
+                        + "); cache fallback also failed: " + fallbackFailure.getMessage(), first);
+            }
+            LOGGER.log(Level.WARNING,
+                    "[coinconfig] upstream unreachable (" + first.getMessage()
+                            + ") — serving STALE cached configs from " + warmed
+                            + " (" + cacheAge(cache) + ")");
+        }
+    }
+
+    /**
+     * Load with an optional write-through cache (remote sources). A null
+     * cache behaves exactly like {@link #load(String)}.
+     */
+    public static synchronized void load(String source, CoinConfigCache cache) {
         String resolved = source.replaceAll("/+$", "");
-        Map<String, CoinConfig> all = new CoinConfigSource(resolved).loadAll();
+        CoinConfigSource src = new CoinConfigSource(resolved);
+        if (cache != null)
+            src.setCache(cache);
+        Map<String, CoinConfig> all = src.loadAll();
         LinkedHashMap<String, CoinConfig> filtered = new LinkedHashMap<>();
         int rejected = 0;
         for (Map.Entry<String, CoinConfig> e : all.entrySet()) {
@@ -53,6 +96,20 @@ public final class CoinConfigRegistry {
         loaded = Collections.unmodifiableMap(filtered);
         loadedSource = resolved;
         LOGGER.info("[coinconfig] loaded " + loaded.size() + " ticker(s) from " + resolved);
+    }
+
+    private static String cacheAge(CoinConfigCache cache) {
+        try {
+            FileTime mtime = Files.getLastModifiedTime(cache.dir().resolve("manifest-latest.json"));
+            long hours = (System.currentTimeMillis() - mtime.toMillis()) / 3_600_000L;
+            if (hours < 1)
+                return "under an hour old";
+            if (hours < 48)
+                return hours + "h old";
+            return (hours / 24) + "d old";
+        } catch (Exception e) {
+            return "age unknown";
+        }
     }
 
     public static boolean isLoaded() {
