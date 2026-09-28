@@ -68,6 +68,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private CoinInstance coin;
     private ConfigHelper configHelper;
 
+    /**
+     * How long a unspent-output fetch stays fresh. Shared by the two callers
+     * that need the set current, so a send and a balance query cannot disagree
+     * about how stale the set is allowed to be.
+     */
+    private static final int UTXO_FETCH_EXPIRY_MS = 30000;
+
     HTTPServerHandler(CoinInstance coin) {
         this.coin = coin;
         this.configHelper = coin.getConfigHelper();
@@ -341,7 +348,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 break;
             }
             case "listunspent": {
-                JsonArray unspent = httpClient.getUtxos(coin.getTicker(), 30000);
+                JsonArray unspent = httpClient.getUtxos(coin.getTicker(), UTXO_FETCH_EXPIRY_MS);
                 if (unspent == null) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject err = new JsonObject();
@@ -1385,6 +1392,22 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     response.add("error", errorJSON);
 
                     LOGGER.warning("[http-server-handler] Error parsing JSON in sendtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
+                    break;
+                }
+
+                // The wallet's unspent set is populated only by a UTXO fetch, and
+                // that fetch is cached. Nothing else fills it, so on a freshly
+                // started daemon — or once the cache has expired — input
+                // selection would run against an empty set and report "no UTXOs
+                // available" on a wallet that holds plenty. Refresh first, the
+                // same way listunspent does, so a send does not depend on some
+                // earlier unrelated call having happened to populate it.
+                if (httpClient.getUtxos(coin.getTicker(), UTXO_FETCH_EXPIRY_MS) == null) {
+                    response.add("result", JsonNull.INSTANCE);
+                    JsonObject notReady = new JsonObject();
+                    notReady.addProperty("message", "wallet not ready: could not load unspent outputs");
+                    notReady.addProperty("code", 3002);
+                    response.add("error", notReady);
                     break;
                 }
 
