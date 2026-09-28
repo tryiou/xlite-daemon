@@ -47,13 +47,10 @@ public class CoinTickerSourceOfTruthTest {
 
     @Test
     void testEveryActiveCoinHasCompiledSupplement() {
-        // BLOCKNET uses hardcoded network parameters (CoinInstance init);
-        // all others must have a supplement row or wallet init fails with
-        // UNSUPPORTEDCOIN at runtime.
+        // Every active coin is configured from the configuration repository,
+        // which needs a supplement row for the values that repository does not
+        // carry. A coin without one fails wallet init with UNSUPPORTEDCOIN.
         for (CoinTicker t : CoinTickerUtils.getActiveTickers()) {
-            if (t == CoinTicker.BLOCKNET) {
-                continue;
-            }
             assertDoesNotThrow(() -> CompiledCoinSupplement.forTicker(CoinTickerUtils.tickerToString(t)), t.name());
         }
     }

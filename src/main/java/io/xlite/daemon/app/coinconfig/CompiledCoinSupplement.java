@@ -7,11 +7,12 @@ import java.util.Map;
  * blockchain-configuration-files repository does not carry: max supply,
  * wire protocol version, network id string and dust threshold.
  *
- * <p>Values were lifted verbatim from the legacy per-coin parameter classes
- * they replace (BTC from bitcoinj's MainNetParams inheritance). They are
- * consensus-era constants that essentially never move — unlike the bcf-carried
- * data (prefixes, fees), which is exactly why they live here and not in a
- * conf file.</p>
+ * <p>Values were lifted verbatim from the per-coin hardcoded parameter classes
+ * these replace, and from bitcoinj's MainNetParams for BTC. Those classes
+ * have since been deleted, so this table is now their only remaining record.
+ * They are consensus-era constants that essentially never move — unlike the
+ * bcf-carried data (prefixes, fees), which is exactly why they live here and
+ * not in a conf file.</p>
  */
 public final class CompiledCoinSupplement {
 
@@ -35,6 +36,12 @@ public final class CompiledCoinSupplement {
     private static final long BTC_DUST = 546; // Transaction.MIN_NONDUST_OUTPUT
 
     private static final Map<String, Supplement> BY_TICKER = Map.ofEntries(
+            // Blocknet: supply, dust floor, protocol version and network id are
+            // consensus constants the configuration repository does not carry,
+            // so they stay compiled in. Its prefixes, fees and port
+            // are NOT here — they come from its configuration file like any
+            // other coin's.
+            Map.entry("BLOCK", new Supplement(43_199_500L, 5_500L, 70_712, "BLOCK", "main")),
             Map.entry("BTC", new Supplement(21_000_000L, BTC_DUST, 70012, "org.bitcoin.production", "main")),
             Map.entry("BCH", new Supplement(21_000_000L, BTC_DUST, 70012, "BCH", "main")),
             Map.entry("DASH", new Supplement(22_000_000L, 5460L, 70210, "DASH", "main")),

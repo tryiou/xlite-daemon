@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Validates CoinConfigSource logic with simple synthetic sets — no committed
- * fixture, no ../ sibling. Production bcf is validated via gate and cross-check.
+ * fixture, no ../ sibling. The gate is unit-tested against synthetic configurations; real production
+ * bcf is not read by any test in this repository.
  */
 class CoinConfigSourceLocalTest {
 

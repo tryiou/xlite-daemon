@@ -13,6 +13,14 @@ import java.util.logging.Logger;
  * Process-wide holder for the loaded {@link CoinConfig} map. Initialized once
  * at startup from the resolved blockchain-configuration-files source; tests
  * may reload with a different source between cases.
+ *
+ * <p>This is the single source of per-coin configuration: an address's
+ * prefixes and a coin's fee rate and minimum fee all come from here, from the
+ * configuration repository. The values that repository does not carry — the
+ * supply ceiling, dust floor, protocol version, network id and payment
+ * protocol id — live in
+ * {@link CompiledCoinSupplement}. A coin missing from here fails loudly rather
+ * than falling back to constants.</p>
  */
 public final class CoinConfigRegistry {
 
@@ -133,7 +141,16 @@ public final class CoinConfigRegistry {
         return list();
     }
 
-    /** Fail-fast when registry has not been loaded yet. */
+    /**
+     * The configuration for a ticker.
+     *
+     * @param ticker the coin's manifest ticker
+     * @return its configuration
+     * @throws IllegalStateException if no configuration was loaded at all, or
+     *         if the loaded set does not carry this coin. Fails loudly rather
+     *         than substituting constants, so a missing coin is visible instead
+     *         of being priced from stale in-code values.
+     */
     public static CoinConfig get(String ticker) {
         Map<String, CoinConfig> m = loaded;
         if (m == null)

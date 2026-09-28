@@ -14,20 +14,24 @@ import java.util.Objects;
  * {@link CoinConfig} (blockchain-configuration-files data) plus the small
  * {@link CompiledCoinSupplement} constants bcf does not carry.
  *
- * <p>Replaces the per-coin hardcoded parameter classes. Behavior is
- * byte-compatible with those classes except where the loaded config
- * intentionally differs (e.g. DGB ScriptPrefix 63, RVN FeePerByte 3000).</p>
+ * <p>Replaced the per-coin hardcoded parameter classes, which have since been
+ * deleted; their values are now split between the configuration repository and
+ * {@link CompiledCoinSupplement}. Where a loaded config differs from what
+ * those classes hardcoded, the config wins (e.g. DGB ScriptPrefix 63, RVN
+ * FeePerByte 3000).</p>
  *
  * <p>Deliberately preserved status quo: the segwit HRP stays unset — bech32
  * address validation keeps failing for these coins (segwit is unsupported);
  * difficulty/interval/subsidy overrides remain inert stubs (no BlockChain is
  * ever constructed in this daemon); monetary format and URI scheme are dead
  * stubs returning ticker-derived values; {@code getPort()} is likewise not
- * overridden — only BTC's legacy class carried a real p2p port (8333 via
- * MainNetParams); all other legacy classes left the same base default this
- * class returns. Safe because nothing in this daemon reads a migrated coin's
- * params-port: the local RPC port comes from {@code CoinInstance} and the
- * only params-port consumer ({@code BlocknetPeerGroup}) is BLOCK-only.</p>
+ * overridden, so it returns bitcoinj's base default rather than any coin's p2p
+ * port. That is not safe by construction — it is safe because of who asks:
+ * the local RPC port comes from {@code CoinInstance}, and the one consumer of
+ * a coin's params-port ({@code BlocknetPeerGroup}) is handed the separate
+ * Blocknet p2p parameter object, not this one. A second caller asking this
+ * class for a port would get the base default, so overriding it is a change
+ * to make deliberately, with that caller in mind.</p>
  */
 public final class ConfigurableNetworkParameters extends NetworkParameters implements HasFeeParams {
 
@@ -45,7 +49,21 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
         this.config = Objects.requireNonNull(config, "config");
         this.supplement = Objects.requireNonNull(supplement, "supplement");
         CoinConfigGate.validate(config);
-        this.maxMoney = Coin.valueOf(Math.multiplyExact(supplement.maxMoneyCoins, Coin.COIN.value));
+        // The multiplier is the coin's own configured factor, so the product is
+        // only as representable as the configuration is sane. A factor large
+        // enough to overflow is a bad configuration, and is reported as one:
+        // IllegalStateException is what the coin-loading path already catches
+        // and turns into a coin error, so this way it cannot escape as an
+        // unchecked arithmetic failure from init().
+        try {
+            this.maxMoney = Coin.valueOf(
+                    Math.multiplyExact(supplement.maxMoneyCoins, config.coinFactor()));
+        } catch (ArithmeticException e) {
+            throw new IllegalStateException("[" + config.getTicker()
+                    + "] COIN is too large to express the coin's supply in base units: COIN="
+                    + config.coinFactor(), e);
+        }
+
         this.minNonDustOutput = Coin.valueOf(supplement.dustSat);
     }
 

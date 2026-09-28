@@ -340,8 +340,22 @@ public class CoinInstance {
         switch (ticker) {
             case BLOCKNET: {
                 LOGGER.fine("[coin] Initializing for Blocknet main network.");
+                // Blocknet is configured like every other coin: its address
+                // prefixes and fee rates come from its configuration file. It
+                // used to take a hardcoded parameter class instead, whose fee
+                // constants had drifted from what that file specifies.
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
+                // The XRouter-over-p2p parameters are separate and still
+                // hardcoded: they carry the p2p serializer that the config
+                // does not model. Nothing in the money or address paths reads
+                // them; only the Blocknet p2p peer plumbing does.
+                //
+                // Order matters: constructing this object consults the loaded
+                // configuration, so it has to come after the load above has
+                // succeeded. Moving it above that check would throw out of
+                // init() instead of returning the coin error callers handle.
                 blocknetNetworkParameters = new BlocknetNetworkParameters();
-                networkParameters = blocknetNetworkParameters;
                 hasXRouter = true;
                 rpcPort = 41419;
                 break;
@@ -353,12 +367,6 @@ public class CoinInstance {
                 rpcPort = 8332;
                 break;
             }
-            // case BITCOIN_CASH: {
-            // 	LOGGER.fine("[coin] Initializing for BitcoinCash main network.");
-            // 	networkParameters = new io.xlite.daemon.app.net.protocols.bitcoincash.BitcoinCashNetworkParametersLegacy();
-            // 	rpcPort = 48332;
-            // 	break;
-            // }
             case LITECOIN: {
                 LOGGER.fine("[coin] Initializing for Litecoin main network.");
                 CoinError err = loadMigratedParams();
