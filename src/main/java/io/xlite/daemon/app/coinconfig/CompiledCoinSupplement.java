@@ -19,40 +19,36 @@ public final class CompiledCoinSupplement {
     /** A coin's non-bcf-carried constants. */
     public static final class Supplement {
         public final long maxMoneyCoins;
-        public final long dustSat;
         public final int protocolVersion;
         public final String id;
         public final String chainName;
 
-        public Supplement(long maxMoneyCoins, long dustSat, int protocolVersion, String id, String chainName) {
+        public Supplement(long maxMoneyCoins, int protocolVersion, String id, String chainName) {
             this.maxMoneyCoins = maxMoneyCoins;
-            this.dustSat = dustSat;
             this.protocolVersion = protocolVersion;
             this.id = id;
             this.chainName = chainName;
         }
     }
 
-    private static final long BTC_DUST = 546; // Transaction.MIN_NONDUST_OUTPUT
-
     private static final Map<String, Supplement> BY_TICKER = Map.ofEntries(
-            // Blocknet: supply, dust floor, protocol version and network id are
-            // consensus constants the configuration repository does not carry,
-            // so they stay compiled in. Its prefixes, fees and port
+            // Blocknet: supply, protocol version, network id and payment protocol
+            // id are consensus constants the configuration repository does not
+            // carry, so they stay compiled in. Its prefixes, fees, port and dust
             // are NOT here — they come from its configuration file like any
             // other coin's.
-            Map.entry("BLOCK", new Supplement(43_199_500L, 5_500L, 70_712, "BLOCK", "main")),
-            Map.entry("BTC", new Supplement(21_000_000L, BTC_DUST, 70012, "org.bitcoin.production", "main")),
-            Map.entry("BCH", new Supplement(21_000_000L, BTC_DUST, 70012, "BCH", "main")),
-            Map.entry("DASH", new Supplement(22_000_000L, 5460L, 70210, "DASH", "main")),
-            Map.entry("DGB", new Supplement(2_000_000_000L, 1000L, 70002, "DGB", "main")),
-            Map.entry("DOGE", new Supplement(2_000_000_000L, BTC_DUST, 70004, "DOGE", "main")),
-            Map.entry("LTC", new Supplement(84_000_000L, 100_000L, 70015, "LTC", "main")),
-            Map.entry("PIVX", new Supplement(100_000_000L, BTC_DUST, 70007, "PIVX", "main")),
-            Map.entry("PKOIN", new Supplement(21_000_000L, BTC_DUST, 70031, "PKOIN", "main")),
-            Map.entry("RVN", new Supplement(100_000_000L, BTC_DUST, 70026, "RVN", "main")),
-            Map.entry("SYS", new Supplement(888_000_000L, 5500L, 70227, "SYS", "main")),
-            Map.entry("UNO", new Supplement(250_000L, BTC_DUST, 70002, "UNO", "main"))
+            Map.entry("BLOCK", new Supplement(43_199_500L, 70_712, "BLOCK", "main")),
+            Map.entry("BTC", new Supplement(21_000_000L, 70012, "org.bitcoin.production", "main")),
+            Map.entry("BCH", new Supplement(21_000_000L, 70012, "BCH", "main")),
+            Map.entry("DASH", new Supplement(22_000_000L, 70210, "DASH", "main")),
+            Map.entry("DGB", new Supplement(2_000_000_000L, 70002, "DGB", "main")),
+            Map.entry("DOGE", new Supplement(2_000_000_000L, 70004, "DOGE", "main")),
+            Map.entry("LTC", new Supplement(84_000_000L, 70015, "LTC", "main")),
+            Map.entry("PIVX", new Supplement(100_000_000L, 70007, "PIVX", "main")),
+            Map.entry("PKOIN", new Supplement(21_000_000L, 70031, "PKOIN", "main")),
+            Map.entry("RVN", new Supplement(100_000_000L, 70026, "RVN", "main")),
+            Map.entry("SYS", new Supplement(888_000_000L, 70227, "SYS", "main")),
+            Map.entry("UNO", new Supplement(250_000L, 70002, "UNO", "main"))
     );
 
     /**

@@ -40,6 +40,8 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
     private final Coin maxMoney;
     private final Coin minNonDustOutput;
 
+
+
     public static ConfigurableNetworkParameters from(CoinConfig config) {
         return new ConfigurableNetworkParameters(config,
                 CompiledCoinSupplement.forTicker(config.getTicker()));
@@ -63,8 +65,27 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
                     + "] COIN is too large to express the coin's supply in base units: COIN="
                     + config.coinFactor(), e);
         }
-
-        this.minNonDustOutput = Coin.valueOf(supplement.dustSat);
+        // The dust floor is the configuration's value and nothing else. It used
+        // to come from a per-coin constant compiled into this repository while
+        // the configuration carried its own and went unread: Litecoin's stale
+        // constant was 100000 satoshis, eighteen times every other coin's, so a
+        // smaller change was dropped and charged as fee instead of returned.
+        // There is deliberately no fallback constant here — a value invented on
+        // this side would be a second source of truth wearing the first one's
+        // clothes, which is the bug being removed. An absent value means no
+        // floor, and the configuration repository is where a real per-coin dust
+        // threshold belongs.
+        Long configuredDust = config.dustAmountOrNull();
+        try {
+            this.minNonDustOutput = Coin.valueOf(configuredDust == null ? 0L : configuredDust);
+        } catch (ArithmeticException e) {
+            // Same reasoning as the ceiling above: this value arrives from a
+            // fetch, so one too large to represent is a bad configuration and
+            // is reported as one rather than thrown as raw arithmetic.
+            throw new IllegalStateException("[" + config.getTicker()
+                    + "] DustAmount is too large to represent in base units: DustAmount="
+                    + configuredDust, e);
+        }
     }
 
     public CoinConfig getConfig() {

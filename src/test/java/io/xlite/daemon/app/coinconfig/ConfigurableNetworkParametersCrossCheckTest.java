@@ -83,8 +83,8 @@ class ConfigurableNetworkParametersCrossCheckTest {
      * The values the configuration repository does NOT carry come from the
      * compiled supplement instead. Those are in-repo constants, not
      * configuration, so they are asserted here: an edit to the supplement that
-     * changed a coin's dust floor, protocol version or network id has to be
-     * deliberate, not a side effect.
+     * changed a coin's protocol version or network id has to be deliberate, not
+     * a side effect. The dust floor is no longer here: it is configuration.
      */
     @Test
     void testSupplementDerivedValuesComeFromTheSupplement() {
@@ -102,7 +102,6 @@ class ConfigurableNetworkParametersCrossCheckTest {
         assertEquals(s.protocolVersion,
                 p.getProtocolVersionNum(NetworkParameters.ProtocolVersion.CURRENT),
                 "protocol version");
-        assertEquals(Coin.valueOf(s.dustSat), p.getMinNonDustOutput(), "dust floor");
         assertNotNull(p.getSerializer(false), "serializer");
         // The supply ceiling is deliberately not asserted here: it is the one
         // supplement value that scales with the coin's configured divisor, and
@@ -158,6 +157,62 @@ class ConfigurableNetworkParametersCrossCheckTest {
         }
     }
 
+    /**
+     * The dust floor comes from the configuration, not from a constant compiled
+     * per coin.
+     *
+     * <p>This is a money path: a change output below the floor is dropped and its
+     * value is charged as fee instead of being returned to the sender. A stale
+     * per-coin constant is therefore not a cosmetic defect — Litecoin carried
+     * 100000 satoshis, eighteen times the fallback used for an unspecified
+     * value, so a 0.0001 change was charged as fee rather than returned.
+     */
+    @Test
+    void testDustFloorComesFromTheConfiguration() {
+        // This is a money path: a change output below the floor is dropped and
+        // its value is charged as fee rather than returned to the sender. A
+        // per-coin constant here is therefore not cosmetic, and the compiler
+        // must invent nothing when the configuration is silent.
+        CoinConfig zero = config("LTC", 30, 63, 128, 100_000_000L, 10L, 5_000L, 9332);
+        assertEquals(0L,
+                ConfigurableNetworkParameters.from(zero).getMinNonDustOutput().getValue(),
+                "a zero dust floor means no floor, not an invented one");
+
+        // Genuinely absent, as opposed to zero: the key is not in the map at all.
+        Map<String, String> withoutKey = new LinkedHashMap<>(zero.getConfEntries());
+        withoutKey.remove("DustAmount");
+        CoinConfig absent = new CoinConfig(zero.getTicker(), zero.getBlockchain(),
+                zero.getVerId(), withoutKey);
+        assertEquals(0L,
+                ConfigurableNetworkParameters.from(absent).getMinNonDustOutput().getValue(),
+                "an absent dust floor means no floor, not an invented one");
+
+        // A negative floor is a money bug, not a cosmetic one: every change
+        // output would sit "above" it, so nothing would be trimmed and the
+        // change would be paid to the miner as fee instead of returned.
+        Map<String, String> negative = new LinkedHashMap<>(zero.getConfEntries());
+        negative.put("DustAmount", "-1");
+        CoinConfig bad = new CoinConfig(zero.getTicker(), zero.getBlockchain(),
+                zero.getVerId(), negative);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> ConfigurableNetworkParameters.from(bad),
+                "a negative dust floor must be rejected, not silently disable trimming");
+        // Asserting on "negative" rather than just the key name pins where the
+        // rejection comes from: the gate's rule, checked in the constructor
+        // before the value is read. The other DustAmount failure this code can
+        // produce is "too large to represent", which is a different condition
+        // and would not match.
+        assertTrue(e.getMessage().contains("negative"),
+                "the failure must come from the negative-dust rule, got: " + e.getMessage());
+
+        assertEquals(1_234L, ConfigurableNetworkParameters.from(
+                        configWithDust("LTC", 1_234L)).getMinNonDustOutput().getValue(),
+                "a configured dust floor is used verbatim");
+        assertEquals(0L, ConfigurableNetworkParameters.from(
+                        configWithDust("LTC", 0L)).getMinNonDustOutput().getValue(),
+                "zero is honoured as stated");
+    }
+
     @Test
     @DisplayName("every required key is required: a missing one fails, naming itself")
     void testEachRequiredKeyIsRequired() {
@@ -205,6 +260,14 @@ class ConfigurableNetworkParametersCrossCheckTest {
                 good.getVerId(), broken);
         assertThrows(IllegalStateException.class,
                 () -> ConfigurableNetworkParameters.from(bad));
+    }
+
+    /** The same synthetic configuration, with an explicit dust floor. */
+    private static CoinConfig configWithDust(String ticker, long dust) {
+        CoinConfig base = config(ticker, 30, 63, 128, 100_000_000L, 10L, 5_000L, 9332);
+        Map<String, String> e = new LinkedHashMap<>(base.getConfEntries());
+        e.put("DustAmount", Long.toString(dust));
+        return new CoinConfig(ticker, ticker, ticker.toLowerCase() + "--test", e);
     }
 
     /** A synthetic configuration: every value chosen by the test, none claimed
