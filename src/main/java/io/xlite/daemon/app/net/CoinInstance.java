@@ -512,6 +512,12 @@ public class CoinInstance {
         }
 
         if (configHelper.isRpcEnabled() && configHelper.validAuth() && rpcPort != -1) {
+            if (!configHelper.validBindAddress()) {
+                LOGGER.severe("[rpc] Refusing to start JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker())
+                        + ": rpcBindAddress '" + configHelper.getRpcBindAddress() + "' is not a specific interface"
+                        + " (config: " + configHelper.getFilePath() + "). Set it to 127.0.0.1 or a named local address.");
+                return null;
+            }
             coinRPCServer = JSONRPCController.getRPCServer(this);
             // Readiness is announced by JSONRPCServer itself AFTER a successful
             // bind ("[rpc] RPC server listening for …") — do not log a
@@ -1053,6 +1059,15 @@ public class CoinInstance {
         if (coinRPCServer == null)
             return; // no rpc available, skip
 
+        // Same fail-closed gate as initial start: a config edited to a
+        // wildcard between reloads must not rebind onto every interface.
+        if (!configHelper.validBindAddress()) {
+            LOGGER.severe("[rpc] Refusing to rebind JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker())
+                    + ": rpcBindAddress '" + configHelper.getRpcBindAddress() + "' is not a specific interface"
+                    + " (config: " + configHelper.getFilePath() + "). Set it to 127.0.0.1 or a named local address.");
+            return;
+        }
+
         // Atomic retire+create: a concurrent reloadconfig must never
         // receive the retiring server instance.
         coinRPCServer = JSONRPCController.rebindRPCServer(this);
@@ -1106,6 +1121,10 @@ public class CoinInstance {
 
     public int getRPCPort() {
         return rpcPort;
+    }
+
+    public String getRpcBindAddress() {
+        return configHelper.getRpcBindAddress();
     }
 
     public boolean isTestnet() {

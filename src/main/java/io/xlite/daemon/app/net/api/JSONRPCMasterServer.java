@@ -10,6 +10,11 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
+import io.xlite.daemon.app.util.ConfigHelper;
+
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -18,18 +23,35 @@ public class JSONRPCMasterServer extends Thread {
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private final int port;
+    private final String bindAddress;
     private boolean stopping = false;
 
     private Channel channel;
     private EventLoopGroup workerGroup;
 
-    JSONRPCMasterServer(int port) {
+    JSONRPCMasterServer(int port, String bindAddress) {
         setDaemon(true);
         setName("rpc-master");
         this.port = port;
+        this.bindAddress = bindAddress;
     }
 
     public void run() {
+        if (!ConfigHelper.isBindAddressValid(bindAddress)) {
+            LOGGER.severe("[rpc-master] Refusing to bind master RPC server: rpcBindAddress '"
+                    + bindAddress + "' is not a specific interface. Set it to 127.0.0.1"
+                    + " or a named local address in config-master.json.");
+            return;
+        }
+        InetSocketAddress bindSocketAddress;
+        try {
+            bindSocketAddress = new InetSocketAddress(
+                    InetAddress.getByName(bindAddress), port);
+        } catch (UnknownHostException e) {
+            LOGGER.severe("[rpc-master] Unresolvable bind address '" + bindAddress
+                    + "' for master RPC server on port " + port + "; refusing to start");
+            return;
+        }
         workerGroup = new NioEventLoopGroup(2,
                 new DefaultThreadFactory("rpc-master", true));
         try {
@@ -43,7 +65,7 @@ public class JSONRPCMasterServer extends Thread {
                     .channel(NioServerSocketChannel.class)
                     .childHandler(new HTTPServerInitializer());
 
-            channel = bootstrap.bind(port).sync().channel();
+            channel = bootstrap.bind(bindSocketAddress).sync().channel();
 
             // Emitted only after the bind actually succeeded — readiness
             // consumers (xlite-gui) anchor on this line, NOT on the

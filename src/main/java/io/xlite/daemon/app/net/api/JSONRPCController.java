@@ -3,6 +3,7 @@ package io.xlite.daemon.app.net.api;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.ConfigHelper;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.LogManager;
@@ -19,7 +20,9 @@ public class JSONRPCController {
     // a rebinding coin must not stall unrelated coins' event loops behind
     // its multi-second release-wait.
     private static final ConcurrentHashMap<CoinInstance, ReentrantLock> locks = new ConcurrentHashMap<>();
-    private static JSONRPCMasterServer masterServer = new JSONRPCMasterServer(new ConfigHelper("master").getMasterRpcPort());
+    private static final ConfigHelper masterConfig = new ConfigHelper("master");
+    private static JSONRPCMasterServer masterServer = new JSONRPCMasterServer(
+            masterConfig.getMasterRpcPort(), masterConfig.getRpcBindAddress());
 
     public static JSONRPCMasterServer getMasterServer() {
         return masterServer;
@@ -66,7 +69,7 @@ public class JSONRPCController {
 
     private static JSONRPCServer getOrCreateLocked(CoinInstance coinInstance) {
         return servers.computeIfAbsent(coinInstance,
-                coin -> new JSONRPCServer(coin, coin.getRPCPort()));
+                coin -> new JSONRPCServer(coin, coin.getRPCPort(), coin.getRpcBindAddress()));
     }
 
     private static void removeLocked(CoinInstance coinInstance) {
@@ -83,17 +86,19 @@ public class JSONRPCController {
         // real kernel bindability, not Netty close-completion — the fd can
         // lag the closeFuture by ~1s.
         server.awaitPortRelease(3000);
-        if (server.port() == coinInstance.getRPCPort()) {
+        if (server.port() == coinInstance.getRPCPort()
+                && Objects.equals(coinInstance.getRpcBindAddress(), server.bindAddress())) {
             if (!server.awaitPortBindable(5000)) {
                 LOGGER.warning("[rpc] rebind: port " + server.port()
                         + " still not bindable after release-wait; retrying at bind");
             }
         } else {
-            // Config changed the port — the old port's bindability is
-            // irrelevant to where we are about to bind.
-            LOGGER.finer("[rpc] rebind: RPC port changed "
-                    + server.port() + " -> " + coinInstance.getRPCPort()
-                    + ", skipping old-port bindability wait");
+            // Config changed the port or the bind address — the old socket's
+            // bindability is irrelevant to where we are about to bind.
+            LOGGER.finer("[rpc] rebind: RPC endpoint changed "
+                    + server.bindAddress() + ":" + server.port() + " -> "
+                    + coinInstance.getRpcBindAddress() + ":" + coinInstance.getRPCPort()
+                    + ", skipping old-endpoint bindability wait");
         }
         LOGGER.info("[rpc] rebind: after release-wait "
                 + server.lifecycleState());

@@ -3,6 +3,7 @@ package io.xlite.daemon.app.net.api;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.server.HTTPServerInitializer;
+import io.xlite.daemon.app.util.ConfigHelper;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
@@ -17,6 +18,7 @@ import java.net.BindException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -27,6 +29,7 @@ public class JSONRPCServer extends Thread {
 
     private final CoinInstance coin;
     private final int port;
+    private final String bindAddress;
     private volatile boolean stopping = false;
     private volatile boolean bound = false;
     private volatile boolean bindFailed = false;
@@ -34,9 +37,10 @@ public class JSONRPCServer extends Thread {
     private Channel channel;
     private EventLoopGroup workerGroup;
 
-    JSONRPCServer(CoinInstance coin, int port) {
+    JSONRPCServer(CoinInstance coin, int port, String bindAddress) {
         this.coin = coin;
         this.port = port;
+        this.bindAddress = bindAddress;
         // Servant thread: must never block JVM termination on its own
         // liveness; lifecycle is governed by deinit()+bounded join.
         setDaemon(true);
@@ -47,7 +51,35 @@ public class JSONRPCServer extends Thread {
         return port;
     }
 
+    String bindAddress() {
+        return bindAddress;
+    }
+
     public void run() {
+        // Defense in depth: the CoinInstance start/reload gates refuse
+        // wildcards first, but the bind site enforces it too — no caller
+        // path can put a wildcard listener on the wire by omission.
+        if (!ConfigHelper.isBindAddressValid(bindAddress)) {
+            LOGGER.severe("[rpc-server] Refusing to bind for "
+                    + CoinTickerUtils.tickerToString(coin.getTicker())
+                    + ": rpcBindAddress '" + bindAddress + "' is not a specific"
+                    + " interface. Set it to 127.0.0.1 or a named local address.");
+            bindFailed = true;
+            return;
+        }
+        // Resolve before allocating the event loop: a bad address refuses
+        // here without leaking a worker group.
+        InetSocketAddress bindSocketAddress;
+        try {
+            bindSocketAddress = new InetSocketAddress(
+                    InetAddress.getByName(bindAddress), port);
+        } catch (UnknownHostException e) {
+            LOGGER.severe("[rpc-server] Unresolvable bind address '" + bindAddress
+                    + "' for " + CoinTickerUtils.tickerToString(coin.getTicker())
+                    + " on port " + port + "; refusing to start");
+            bindFailed = true;
+            return;
+        }
         // Daemon threads: the JVM must never be held hostage by an event
         // loop draining its graceful-shutdown quiet period after SIGINT
         // (DestroyJavaVM waited on these for the full grace window).
@@ -71,7 +103,7 @@ public class JSONRPCServer extends Thread {
             for (int attempt = 0; attempt < 20 && boundChannel == null && !stopping; attempt++) {
                 ChannelFuture bindFuture = null;
                 try {
-                    bindFuture = bootstrap.bind(port);
+                    bindFuture = bootstrap.bind(bindSocketAddress);
                     bindFuture.sync();
                     boundChannel = bindFuture.channel();
                 } catch (InterruptedException e) {
@@ -168,24 +200,23 @@ public class JSONRPCServer extends Thread {
     }
 
     /**
-     * Poll ACTUAL kernel bindability of the port. Netty's closeFuture can
-     * complete while the old LISTEN socket is still being torn down
-     * (observed ~1s lag), so close-completion alone is not a safe gate for
-     * an immediate rebind. Succeeds as soon as a probe listener can take
-     * either wildcard family; gives up after the timeout.
-     * @return true if the port became bindable in time
+     * Poll ACTUAL kernel bindability of the configured address and port.
+     * Netty's closeFuture can complete while the old LISTEN socket is still
+     * being torn down (observed ~1s lag), so close-completion alone is not a
+     * safe gate for an immediate rebind.
+     * @return true if the address became bindable in time
      */
     public boolean awaitPortBindable(long timeoutMillis) {
-        return awaitPortBindable(port, timeoutMillis);
+        return awaitPortBindable(bindAddress, port, timeoutMillis);
     }
 
     /**
      * Static form usable without an instance (also unit-testable).
      */
-    static boolean awaitPortBindable(int port, long timeoutMillis) {
+    static boolean awaitPortBindable(String bindAddress, int port, long timeoutMillis) {
         long deadline = System.currentTimeMillis() + timeoutMillis;
         while (System.currentTimeMillis() < deadline) {
-            if (portBindable(port)) {
+            if (portBindable(bindAddress, port)) {
                 return true;
             }
             try {
@@ -195,24 +226,24 @@ public class JSONRPCServer extends Thread {
                 return false;
             }
         }
-        return portBindable(port);
+        return portBindable(bindAddress, port);
     }
 
     /**
-     * Probe whether a listening socket could be opened on this port right now.
+     * Probe whether a listening socket could be opened on this address and
+     * port right now. Probes the configured address, never the wildcard:
+     * a loopback-held port can still look wildcard-bindable.
      */
-    static boolean portBindable(int port) {
-        for (String host : new String[]{"0.0.0.0", "::"}) {
-            try (ServerSocket probe = new ServerSocket()) {
-                probe.setReuseAddress(true);
-                probe.bind(new InetSocketAddress(
-                        InetAddress.getByName(host), port), 1);
-                return true;
-            } catch (Exception e) {
-                // probe failed (held or blocked) — try the next family
-            }
+    static boolean portBindable(String bindAddress, int port) {
+        try (ServerSocket probe = new ServerSocket()) {
+            probe.setReuseAddress(true);
+            probe.bind(new InetSocketAddress(
+                    InetAddress.getByName(bindAddress), port), 1);
+            return true;
+        } catch (Exception e) {
+            // probe failed (held, blocked or unresolvable)
+            return false;
         }
-        return false;
     }
 
     /**

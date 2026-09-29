@@ -51,6 +51,7 @@ public class JSONRPCControllerRebindTest {
         CoinInstance coin = mock(CoinInstance.class);
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
+        when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
 
         JSONRPCServer first = JSONRPCController.getRPCServer(coin);
         JSONRPCServer rebound = JSONRPCController.rebindRPCServer(coin);
@@ -65,6 +66,7 @@ public class JSONRPCControllerRebindTest {
         CoinInstance coin = mock(CoinInstance.class);
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
+        when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
 
         JSONRPCServer live = JSONRPCController.getRPCServer(coin);
         live.start();
@@ -90,6 +92,7 @@ public class JSONRPCControllerRebindTest {
         CoinInstance coin = mock(CoinInstance.class);
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
+        when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
 
         final int threads = 8;
         final int cyclesPerThread = 25;

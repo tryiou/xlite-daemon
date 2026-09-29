@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.net.InetAddress;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
@@ -36,7 +37,15 @@ public class ConfigHelper {
     private String rpcUsername;
     private String rpcPassword;
     private int rpcPort;
+    private String rpcBindAddress;
     private int addressCount;
+
+    /**
+     * Bind address written into fresh configs and used when the key is absent:
+     * loopback only, so a wallet RPC never listens on a network interface
+     * unless the operator names one explicitly.
+     */
+    public static final String DEFAULT_RPC_BIND_ADDRESS = "127.0.0.1";
 
     // Override specific configuration directory (useful in unit tests)
     public static String CONFIG_DIR = ""; // Must not end with [/], e.g. /home/user/.config, not /home/user/.config/
@@ -83,6 +92,7 @@ public class ConfigHelper {
                 rpcUsername = "";
                 rpcPassword = "";
                 rpcPort = defaultRpcPort();
+                rpcBindAddress = DEFAULT_RPC_BIND_ADDRESS;
                 addressCount = 0;
 
                 writeConfig();
@@ -98,6 +108,7 @@ public class ConfigHelper {
                     "rpcUsername",
                     "rpcPassword",
                     "rpcPort",
+                    "rpcBindAddress",
                     "addressCount"
             };
 
@@ -151,6 +162,16 @@ public class ConfigHelper {
                     rpcPort = -1000;
                     needsWrite = true;
                 }
+            }
+
+            if (!config.has("rpcBindAddress")) {
+                rpcBindAddress = DEFAULT_RPC_BIND_ADDRESS;
+                needsWrite = true;
+            } else {
+                // Normalize once: validation trims, and the servers resolve
+                // the stored value verbatim — padded input must not pass one
+                // and fail the other.
+                rpcBindAddress = config.getString("rpcBindAddress").trim();
             }
 
             if (!config.has("addressCount")) {
@@ -306,6 +327,48 @@ public class ConfigHelper {
         return rpcPort;
     }
 
+    public synchronized String getRpcBindAddress() {
+        return rpcBindAddress;
+    }
+
+    /**
+     * Absolute path of this coin's config file, for error messages that must
+     * name the file the operator has to fix.
+     * @return Config file path, or empty string when unknown
+     */
+    public synchronized String getFilePath() {
+        return file == null ? "" : file.getAbsolutePath();
+    }
+
+    /**
+     * Whether the configured bind address names one specific interface.
+     * Wildcards ({@code 0.0.0.0}, {@code ::}), blanks and unresolvable names
+     * are rejected: a wallet RPC must never listen on every interface.
+     * @return true iff the configured address is bindable as a single interface
+     */
+    public synchronized boolean validBindAddress() {
+        return isBindAddressValid(rpcBindAddress);
+    }
+
+    /**
+     * Pure address check, unit-testable without a config file.
+     * @param address Candidate bind address
+     * @return true iff specific, non-blank and resolvable
+     */
+    public static boolean isBindAddressValid(String address) {
+        if (address == null || address.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            if (InetAddress.getByName(address.trim()).isAnyLocalAddress()) {
+                return false;
+            }
+        } catch (java.net.UnknownHostException e) {
+            return false;
+        }
+        return true;
+    }
+
     public synchronized int getAddressCount() {
         return addressCount;
     }
@@ -318,6 +381,7 @@ public class ConfigHelper {
         config.put("rpcUsername", rpcUsername);
         config.put("rpcPassword", rpcPassword);
         config.put("rpcPort", rpcPort);
+        config.put("rpcBindAddress", rpcBindAddress);
         config.put("addressCount", addressCount);
         return config;
     }
