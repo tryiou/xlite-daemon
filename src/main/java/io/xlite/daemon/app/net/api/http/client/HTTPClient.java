@@ -59,6 +59,127 @@ public class HTTPClient {
     private int logCount = 0;
 
     /**
+     * Upstream method families for per-coin support tracking. A family groups the
+     * read methods served by the same backend capability, so one definitive
+     * rejection covers every method in the family.
+     */
+    static final String UPSTREAM_FAMILY_UTXO = "utxo";
+    static final String UPSTREAM_FAMILY_HISTORY = "history";
+    static final String UPSTREAM_FAMILY_TX = "tx";
+    static final String UPSTREAM_FAMILY_BLOCK = "block";
+
+    /**
+     * Distinctive backend message proving a coin has no upstream plugin. Matched
+     * as a substring, deliberately biased toward precision: a missed match
+     * degrades to today's retry behavior, while a false positive would suppress
+     * a working coin.
+     * <p>
+     * The code alone ({@code -32000}) is not sufficient: the backend reuses it for
+     * transient failures ({@code "utxo-plugin unreachable …"}, batch failures) and
+     * for address-level failures ({@code "All addresses failed"}), none of which
+     * may be cached.
+     */
+    static final String NO_UPSTREAM_MARKER = "No utxo-plugin configured for coin ";
+
+    /**
+     * (family, ticker) pairs the backend definitively rejected this session. The
+     * backend reads its coin list once at startup, so it cannot gain a plugin
+     * without a restart; a daemon restart clears this with it. Legacy mode only:
+     * the backend is singular there, while EXR selects among multiple servers and
+     * a global record could suppress a working one.
+     */
+    private static final Set<String> UNSUPPORTED_UPSTREAM = ConcurrentHashMap.newKeySet();
+
+    static String upstreamRejectionKey(String family, CoinTicker ticker) {
+        return family + "|" + CoinTickerUtils.tickerToString(ticker);
+    }
+
+    /**
+     * Whether this (family, coin) was definitively rejected upstream. Legacy-mode
+     * callers check this before opening a socket and return null, the existing
+     * "not ready" contract every caller already handles.
+     * @param family One of the {@code UPSTREAM_FAMILY_*} constants
+     * @param ticker Coin to look up
+     * @return true when no request should be issued
+     */
+    static boolean isUpstreamRejected(String family, CoinTicker ticker) {
+        return UNSUPPORTED_UPSTREAM.contains(upstreamRejectionKey(family, ticker));
+    }
+
+    /**
+     * Test-only reset for the session rejection memory.
+     */
+    static void clearUpstreamRejectionsForTest() {
+        UNSUPPORTED_UPSTREAM.clear();
+    }
+
+    /**
+     * Record a definitive no-upstream rejection carried by a raw upstream response.
+     * Accepts the producer envelope
+     * ({@code {"result":null,"error":{"code":…,"message":…}}}) and, tolerantly, a
+     * bare ({@code {"code":…,"message":…}}) object.
+     * @param family One of the {@code UPSTREAM_FAMILY_*} constants
+     * @param ticker Coin the response was fetched for
+     * @param res Raw upstream response text
+     * @return true iff the response is definitive (caller returns null); false on
+     *         any doubt, preserving today's retry behavior (fail-open)
+     */
+    static boolean recordUpstreamRejection(String family, CoinTicker ticker, String res) {
+        JsonObject error = upstreamError(res);
+        if (error == null || !error.has("code") || !error.has("message")) {
+            return false;
+        }
+        try {
+            if (!error.get("code").isJsonPrimitive()
+                    || !error.get("code").getAsJsonPrimitive().isNumber()
+                    || error.get("code").getAsInt() != -32000) {
+                return false;
+            }
+            if (!error.get("message").isJsonPrimitive()
+                    || !error.get("message").getAsJsonPrimitive().isString()
+                    || !error.get("message").getAsString().contains(NO_UPSTREAM_MARKER)) {
+                return false;
+            }
+        } catch (RuntimeException e) {
+            // Deliberately broad: a fail-open helper must never throw on odd shapes.
+            return false;
+        }
+        String key = upstreamRejectionKey(family, ticker);
+        if (UNSUPPORTED_UPSTREAM.add(key)) {
+            LOGGER.info("[httpclient] " + CoinTickerUtils.tickerToString(ticker)
+                    + " has no upstream for " + family + " - will not retry this session");
+        }
+        return true;
+    }
+
+    /**
+     * Extract the candidate error object from a raw upstream response: the
+     * {@code error} member of an envelope, else the object itself for bare-shape
+     * tolerance (the caller decides via {@code has("code")}). Null when absent
+     * or unparseable. Never throws.
+     * @param res Raw upstream response text
+     * @return Error object or null
+     */
+    static JsonObject upstreamError(String res) {
+        if (res == null) {
+            return null;
+        }
+        try {
+            JsonElement parsed = JsonParser.parseString(res);
+            if (!parsed.isJsonObject()) {
+                return null;
+            }
+            JsonObject obj = parsed.getAsJsonObject();
+            if (obj.has("error") && obj.get("error").isJsonObject()) {
+                return obj.getAsJsonObject("error");
+            }
+            return obj;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
      * Helper method to wait for EXR capabilities to be probed with a timeout.
      * @param timeoutMs Maximum time to wait in milliseconds
      * @return true if capabilities are probed within timeout, false otherwise
@@ -460,6 +581,10 @@ public class HTTPClient {
      * @return JsonArray or null on error
      */
     public JsonArray getUtxosUncached(CoinTicker coinTicker, String[] addresses) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_UTXO, coinTicker)) {
+            return null;
+        }
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
 
         JsonArray innerParams = new JsonArray();
@@ -474,6 +599,10 @@ public class HTTPClient {
 
 
         if (res == null) {
+            return null;
+        }
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_UTXO, coinTicker, res)) {
             return null;
         }
 
@@ -531,6 +660,10 @@ public class HTTPClient {
      * @return JsonArray or null on error
      */
     public JsonArray getUtxos(CoinTicker coinTicker, int expiry) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_UTXO, coinTicker)) {
+            return null;
+        }
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
         long lastFetchTime = lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getUtxos"), 0L);
         long currentTime = System.currentTimeMillis();
@@ -553,6 +686,10 @@ public class HTTPClient {
 
 
         if (res == null) {
+            return null;
+        }
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_UTXO, coinTicker, res)) {
             return null;
         }
 
@@ -686,6 +823,10 @@ public class HTTPClient {
     }
 
     public JsonObject getRawTransaction(CoinTicker coinTicker, String txid, boolean verbose) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_TX, coinTicker)) {
+            return null;
+        }
         ArrayList<String> rawTxParams = new ArrayList<>();
         rawTxParams.add(0, CoinTickerUtils.tickerToString(coinTicker));
         rawTxParams.add(1, txid);
@@ -700,10 +841,18 @@ public class HTTPClient {
         LOGGER.finer("[httpclient] getRawTransaction " + res);
 
 
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_TX, coinTicker, res)) {
+            return null;
+        }
         return parseEnvelope(res, "getRawTransaction");
     }
 
     public JsonObject getRawMempool(CoinTicker coinTicker, boolean verbose) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_TX, coinTicker)) {
+            return null;
+        }
         ArrayList<String> rawMempoolParams = new ArrayList<>();
         rawMempoolParams.add(0, CoinTickerUtils.tickerToString(coinTicker));
         rawMempoolParams.add(1, String.valueOf(verbose));
@@ -717,6 +866,10 @@ public class HTTPClient {
         LOGGER.finer("[httpclient] getRawMempool " + res);
 
 
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_TX, coinTicker, res)) {
+            return null;
+        }
         return parseEnvelope(res, "getRawMempool");
     }
 
@@ -824,6 +977,10 @@ public class HTTPClient {
     }
 
     public JsonObject getBlock(CoinTicker coinTicker, String hash, boolean verbose) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_BLOCK, coinTicker)) {
+            return null;
+        }
         ArrayList<String> rawParams = new ArrayList<>();
         rawParams.add(0, CoinTickerUtils.tickerToString(coinTicker));
         rawParams.add(1, hash);
@@ -838,10 +995,18 @@ public class HTTPClient {
         LOGGER.finer("[httpclient] getBlock " + res);
 
 
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_BLOCK, coinTicker, res)) {
+            return null;
+        }
         return parseEnvelope(res, "getBlock");
     }
 
     public JsonObject getBlockHash(CoinTicker coinTicker, int height) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_BLOCK, coinTicker)) {
+            return null;
+        }
         JsonArray innerParams = new JsonArray();
         innerParams.add(CoinTickerUtils.tickerToString(coinTicker));
         innerParams.add(height);
@@ -853,10 +1018,18 @@ public class HTTPClient {
         LOGGER.finer("[httpclient] getBlockHash " + res);
 
 
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_BLOCK, coinTicker, res)) {
+            return null;
+        }
         return parseEnvelope(res, "getBlockHash");
     }
 
     public JsonObject getTransaction(CoinTicker coinTicker, String txid, boolean verbose) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_TX, coinTicker)) {
+            return null;
+        }
         ArrayList<String> rawParams = new ArrayList<>();
         rawParams.add(0, CoinTickerUtils.tickerToString(coinTicker));
         rawParams.add(1, txid);
@@ -871,6 +1044,10 @@ public class HTTPClient {
         LOGGER.finer("[httpclient] getTransaction " + res);
 
 
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_TX, coinTicker, res)) {
+            return null;
+        }
         return parseEnvelope(res, "getTransaction");
     }
 
@@ -909,6 +1086,10 @@ public class HTTPClient {
      * @return JsonArray or null on error
      */
     public JsonArray getHistory(CoinTicker coinTicker, int startTime, int endTime, int expiry) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_HISTORY, coinTicker)) {
+            return null;
+        }
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
         long lastFetchTime = lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getHistory"), 0L);
         long currentTime = System.currentTimeMillis();
@@ -928,10 +1109,14 @@ public class HTTPClient {
         params.add("params", innerParams);
 
         String res = executeRequest("/", params);
-        LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
-        if (res == null) {
-            return null;
-        }
+          LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
+          if (res == null) {
+              return null;
+          }
+          // Definitive no-upstream rejection becomes this session's answer.
+          if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_HISTORY, coinTicker, res)) {
+              return null;
+          }
 
         JsonArray json;
         try {
@@ -995,6 +1180,10 @@ public class HTTPClient {
      * @return JsonArray or null on error
      */
     public JsonArray getTransactionHistory(CoinTicker coinTicker, int startTime, int endTime, int expiry) {
+        // Coin has no upstream plugin: skip the request entirely (legacy mode only).
+        if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_HISTORY, coinTicker)) {
+            return null;
+        }
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
         long lastFetchTime = lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getAddressHistory"), 0L);
         long currentTime = System.currentTimeMillis() / 1000;
@@ -1014,10 +1203,14 @@ public class HTTPClient {
         params.add("params", innerParams);
 
         String res = executeRequest("/", params);
-        LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
-        if (res == null) {
-            return null;
-        }
+          LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
+          if (res == null) {
+              return null;
+          }
+          // Definitive no-upstream rejection becomes this session's answer.
+          if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_HISTORY, coinTicker, res)) {
+              return null;
+          }
 
         JsonArray json;
         try {
