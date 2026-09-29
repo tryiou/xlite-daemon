@@ -168,12 +168,44 @@ public class ConfigHelper {
         }
     }
 
-    private File getFile() {
+    /**
+     * Path resolution for a coin's config file that creates no config file.
+     *
+     * <p>Package-private for the config ensurer, which must probe existence
+     * without {@link #getFile()}'s createNewFile side effect.
+     *
+     * <p>"Creates no config file" is the whole promise, not "creates nothing":
+     * this resolves through {@link #getLocalDataDirectory()}, which creates the
+     * data directory, takes the inter-process migration lock and re-runs
+     * {@code migrateLegacyDirectory} on every call. A caller looping this over
+     * many coins therefore re-locks and re-checks the migration per coin. That is
+     * cheap in the common case -- once the lock is held the reconcile finds
+     * nothing to move -- but it is a real per-call cost and not a one-off.
+     */
+    static File settingsFile(String tickerStr) {
         String userHome = getLocalDataDirectory();
         Preconditions.checkNotNull(userHome);
+        return new File(new File(userHome, "settings"), "config-" + tickerStr + ".json");
+    }
 
-        File home = new File(userHome);
-        File settingsDirectory = new File(home, "settings");
+    /**
+     * Existence probe: true only when a regular config file is present. Creates
+     * no config file, unlike the constructor path. Resolving the path itself
+     * goes through {@link #getLocalDataDirectory()}, which creates the data
+     * directory and re-runs the migration reconcile on every call — see
+     * {@link #settingsFile}.
+     */
+    static boolean configExists(String tickerStr) {
+        try {
+            return settingsFile(tickerStr).isFile();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private File getFile() {
+        File configFile = settingsFile(tickerStr);
+        File settingsDirectory = configFile.getParentFile();
         if (!settingsDirectory.exists()) {
             if (!settingsDirectory.isDirectory() && !settingsDirectory.mkdirs()
                     && !settingsDirectory.isDirectory()) {
@@ -188,7 +220,6 @@ public class ConfigHelper {
             return null;
         }
 
-        File configFile = new File(settingsDirectory, "config-" + tickerStr + ".json");
         try {
             if (!configFile.createNewFile() && !configFile.exists())
                 return null;

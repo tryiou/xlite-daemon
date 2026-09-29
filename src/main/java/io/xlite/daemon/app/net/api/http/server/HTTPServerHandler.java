@@ -5,6 +5,7 @@ import com.google.gson.*;
 import com.subgraph.orchid.encoders.Base64;
 import com.subgraph.orchid.encoders.Hex;
 import io.xlite.daemon.app.Version;
+import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
@@ -13,6 +14,8 @@ import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.Sats;
+import io.xlite.daemon.app.util.TxTimeField;
+import io.xlite.daemon.app.util.TxTimeFieldSigner;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.Utility;
 import io.xlite.daemon.app.wallet.WalletHelper;
@@ -60,20 +63,43 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
+    /**
+     * How long a fetched unspent set stays usable before a caller refreshes it.
+     * Shared so every path that reads unspent outputs ages the cache the same
+     * way; a send that used a different window would either over-fetch or read
+     * a staler set than the one listunspent just showed.
+     */
+    private static final int UTXO_FETCH_EXPIRY_MS = 30000;
+
     // RPC methods whose params/responses contain key material — never log them.
     private static final Set<String> SENSITIVE_METHODS = Set.of(
             "importprivkey", "dumpprivkey", "signmessage");
 
+    /**
+     * Serializes sends for this coin across every connection.
+     *
+     * <p>Inputs are marked spent only after the broadcast succeeds, so between
+     * selecting them and marking them another request could select the same
+     * outputs and build a second transaction spending them. Netty creates a
+     * handler per accepted channel, so a field on this class would be a
+     * different lock per connection and would never exclude anything; the lock
+     * is therefore per coin, held on the coin's own state.
+     *
+     * <p>Held across the network round trip on purpose. Releasing before the
+     * broadcast reopens exactly the window this closes, and a send is not
+     * latency-critical enough to trade a double spend for.
+     */
+    private static final java.util.Map<CoinTicker, java.util.concurrent.locks.ReentrantLock> SEND_LOCKS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static java.util.concurrent.locks.ReentrantLock sendLockFor(CoinTicker ticker) {
+        return SEND_LOCKS.computeIfAbsent(ticker,
+                k -> new java.util.concurrent.locks.ReentrantLock());
+    }
+
     private HTTPClient httpClient;
     private CoinInstance coin;
     private ConfigHelper configHelper;
-
-    /**
-     * How long a unspent-output fetch stays fresh. Shared by the two callers
-     * that need the set current, so a send and a balance query cannot disagree
-     * about how stale the set is allowed to be.
-     */
-    private static final int UTXO_FETCH_EXPIRY_MS = 30000;
 
     HTTPServerHandler(CoinInstance coin) {
         this.coin = coin;
@@ -306,7 +332,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 infoJSON.addProperty("keypoololdest", 0.0);
 
                 long relayFeeSats = WalletHelper.getFeePerByte(coin.getNetworkParameters()) * 1000;
-                BigDecimal relayFeeDecimal = new BigDecimal(relayFeeSats).divide(new BigDecimal(Coin.COIN.value), 8, RoundingMode.DOWN);
+                long relayCoinUnit = CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coin.getTicker())).coinFactor();
+                BigDecimal relayFeeDecimal = new BigDecimal(relayFeeSats).divide(new BigDecimal(relayCoinUnit),
+                        Sats.decimalPlaces(relayCoinUnit), RoundingMode.DOWN);
                 infoJSON.addProperty("relayfee", relayFeeDecimal);
 
                 infoJSON.addProperty("networkactive", true);
@@ -331,7 +359,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 networkInfoJSON.addProperty("localservices", "0000000000000000");
 
                 long relayFeeSats = WalletHelper.getFeePerByte(coin.getNetworkParameters()) * 1000;
-                BigDecimal relayFeeDecimal = new BigDecimal(relayFeeSats).divide(new BigDecimal(Coin.COIN.value), 8, RoundingMode.DOWN);
+                long networkCoinUnit = CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coin.getTicker())).coinFactor();
+                BigDecimal relayFeeDecimal = new BigDecimal(relayFeeSats).divide(new BigDecimal(networkCoinUnit),
+                        Sats.decimalPlaces(networkCoinUnit), RoundingMode.DOWN);
 
                 networkInfoJSON.addProperty("relayfee", relayFeeDecimal);
 
@@ -447,7 +477,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 Transaction transaction;
                 try {
                     rawTx = params.get(0).getAsString();
-                    transaction = new Transaction(coin.getNetworkParameters(), Hex.decode(rawTx));
+                    transaction = parseForCoin(coin.getTicker(), coin.getNetworkParameters(),
+                            Hex.decode(rawTx));
                 } catch (RuntimeException e) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
@@ -488,7 +519,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     break;
                 }
 
-                WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
+                try {
+                    WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
+                } catch (RuntimeException e) {
+                    // The broadcast already happened, so this must not turn a
+                    // successful send into an error response. Report it and carry
+                    // on to the txid the caller actually asked for.
+                    LOGGER.warning("[http-server-handler] post-broadcast bookkeeping failed for "
+                            + CoinTickerUtils.tickerToString(coin.getTicker()) + ": " + e.getMessage());
+                }
 
                 if (txid.has("result")) {
                     response.add("result", txid.get("result"));
@@ -789,10 +828,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 boolean outputSuccess = true;
 
                 // First, add P2SH outputs.
+                long outputCoinUnit = CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coin.getTicker())).coinFactor();
                 for (OutputEntry entry : outputEntries) {
                     try {
                         LegacyAddress address = LegacyAddress.fromBase58(coin.getNetworkParameters(), entry.address);
-                        Coin outputValue = Coin.valueOf(Sats.fromWholeCoins(entry.amount));
+                        Coin outputValue = Coin.valueOf(Sats.fromWholeCoins(entry.amount, outputCoinUnit));
                         if (isP2SHAddress(entry.address)) {
                             LOGGER.fine("[http-server-handler] P2SH Address Found: " + entry.address);
                             Script p2shScript = ScriptBuilder.createP2SHOutputScript(address.getHash());
@@ -810,7 +850,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 for (OutputEntry entry : outputEntries) {
                     try {
                         LegacyAddress address = LegacyAddress.fromBase58(coin.getNetworkParameters(), entry.address);
-                        Coin outputValue = Coin.valueOf(Sats.fromWholeCoins(entry.amount));
+                        Coin outputValue = Coin.valueOf(Sats.fromWholeCoins(entry.amount, outputCoinUnit));
                         if (!isP2SHAddress(entry.address)) {
                             tx.addOutput(outputValue, address);
                         }
@@ -826,7 +866,19 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 if (!outputSuccess)
                     break;
 
-                String hexTx = new String(Hex.encode(tx.bitcoinSerialize()));
+                String hexTx;
+                if (hasTxTimeField(coin.getTicker())) {
+                    // An unsigned transaction handed to an external signer must
+                    // still decode on a time-field chain, so the field is
+                    // stamped here. It is wall-clock only, and sendrawtransaction
+                    // forwards the bytes it is given unchanged, so a caller whose
+                    // inputs carry a newer nTime must re-time and re-sign before
+                    // broadcasting.
+                    hexTx = new String(Hex.encode(TxTimeField.insertNTime(tx.bitcoinSerialize(),
+                            System.currentTimeMillis() / 1000)));
+                } else {
+                    hexTx = new String(Hex.encode(tx.bitcoinSerialize()));
+                }
                 LOGGER.finer("[http-server-handler] DEBUG: Raw transaction = " + hexTx);
                 response.addProperty("result", hexTx);
                 response.add("error", JsonNull.INSTANCE);
@@ -844,10 +896,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 }
 
                 String rawTx = params.get(0).getAsString();
+                byte[] rawBytes = Hex.decode(rawTx);
                 Transaction tx;
 
                 try {
-                    tx = new Transaction(coin.getNetworkParameters(), Hex.decode(rawTx));
+                    tx = parseForCoin(coin.getTicker(), coin.getNetworkParameters(), rawBytes);
                 } catch (Exception e) {
                     LOGGER.warning("[http-server-handler] Error decoding raw transaction in decoderawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
                     getInvalidTxResponse(response, e);
@@ -856,7 +909,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                 JsonObject txJSON = new JsonObject();
 
-                txJSON.addProperty("txid", tx.getHashAsString());
+                txJSON.addProperty("txid", txidForDecoded(coin.getTicker(), rawBytes, tx));
                 txJSON.addProperty("version", tx.getVersion());
                 txJSON.addProperty("locktime", tx.getLockTime());
                 JsonArray vin = new JsonArray();
@@ -905,7 +958,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                         JsonObject thisVout = new JsonObject();
 
-                        thisVout.addProperty("value", (double) output.getValue().value / 100000000.0);
+                        thisVout.addProperty("value", Sats.toWholeCoins(output.getValue().value,
+                                CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coin.getTicker())).coinFactor()));
                         thisVout.addProperty("n", output.getIndex());
 
                         JsonObject scriptPubKey = new JsonObject();
@@ -966,6 +1020,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                 String rawTx = params.get(0).getAsString();
                 Transaction tx;
+                // Incoming nTime of time-field coins, preserved across re-signing.
+                long preservedNTime = -1;
 //				JsonArray prevtxs;
 //				JsonArray privkeys;
 //
@@ -975,7 +1031,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 //				}
 
                 try {
-                    tx = new Transaction(coin.getNetworkParameters(), Hex.decode(rawTx));
+                    byte[] rawBytes = Hex.decode(rawTx);
+                    if (hasTxTimeField(coin.getTicker())) {
+                        // Preserve the incoming nTime across re-signing.
+                        preservedNTime = TxTimeField.parentNTime(rawBytes);
+                    }
+                    tx = parseForCoin(coin.getTicker(), coin.getNetworkParameters(), rawBytes);
                 } catch (Exception e) {
                     LOGGER.warning("[http-server-handler] Error decoding raw tx in signrawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
                     getInvalidTxResponse(response, e);
@@ -991,6 +1052,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     signedTx.addOutput(output);
                 }
 
+                List<ECKey> signingKeys = new ArrayList<>();
+                List<TransactionOutPoint> outPoints = new ArrayList<>();
+                List<Script> spentScripts = new ArrayList<>();
+
                 for (TransactionInput input : tx.getInputs()) {
                     Sha256Hash txid = input.getOutpoint().getHash();
                     long vout = input.getOutpoint().getIndex();
@@ -1005,10 +1070,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     }
 
                     org.bitcoinj.core.UTXO bUtxo = utxo.createUTXO();
-
-                    TransactionOutPoint outPoint = new TransactionOutPoint(coin.getNetworkParameters(), bUtxo.getIndex(), bUtxo.getHash());
-
-                    signedTx.addSignedInput(outPoint, bUtxo.getScript(), signingKey, Transaction.SigHash.ALL, true);
+                    signingKeys.add(signingKey);
+                    outPoints.add(new TransactionOutPoint(coin.getNetworkParameters(),
+                            bUtxo.getIndex(), bUtxo.getHash()));
+                    spentScripts.add(bUtxo.getScript());
 //					utxo.setSpent(true);
                 }
 
@@ -1019,7 +1084,40 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     break;
                 }
 
-                String signedTxHex = new String(Hex.encode(signedTx.bitcoinSerialize()));
+                // All inputs are attached before any signature is computed:
+                // the chain's preimage covers every input, so signing as we
+                // went would invalidate each earlier signature.
+                try {
+                    if (preservedNTime >= 0) {
+                        // The chain signs nTime, so the preserved value belongs
+                        // in the preimage, not spliced in afterwards.
+                        TxTimeFieldSigner.addSignedInputs(coin.getNetworkParameters(), signedTx,
+                                signingKeys, outPoints, spentScripts, Transaction.SigHash.ALL,
+                                preservedNTime);
+                    } else {
+                        for (int i = 0; i < signingKeys.size(); i++) {
+                            signedTx.addSignedInput(outPoints.get(i), spentScripts.get(i),
+                                    signingKeys.get(i), Transaction.SigHash.ALL, true);
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    // Never let a signing refusal escape: this switch has no
+                    // outer handler, so the caller would get no response.
+                    getInvalidTxResponse(response, e);
+                    LOGGER.warning("[http-server-handler] signrawtransaction could not sign inputs for "
+                            + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
+                    break;
+                }
+
+                // Serialized once. A time-field chain signs an nTime-bearing
+                // preimage, so what has to go on the wire is those bytes with
+                // nTime reinserted; for every other chain the plain
+                // serialization already is them.
+                byte[] signedBytes = signedTx.bitcoinSerialize();
+                if (hasTxTimeField(coin.getTicker()) && preservedNTime >= 0) {
+                    signedBytes = TxTimeField.insertNTime(signedBytes, preservedNTime);
+                }
+                String signedTxHex = new String(Hex.encode(signedBytes));
                 JsonObject resultJSON = new JsonObject();
                 resultJSON.addProperty("hex", signedTxHex);
                 resultJSON.addProperty("complete", complete);
@@ -1063,7 +1161,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     resultJSON.addProperty("confirmations",
                             (CoinInstance.getBlockCountByTicker(coin.getTicker()) - utxo.getHeight()) + 1);
-                    resultJSON.addProperty("value", utxo.getValue().value / 100000000.0);
+                    resultJSON.addProperty("value", Sats.toWholeCoins(utxo.getValue().value,
+                            CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coin.getTicker())).coinFactor()));
 
                     JsonObject scriptPubKey = new JsonObject();
                     scriptPubKey.addProperty("asm", utxo.getScript().toString());
@@ -1369,109 +1468,183 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 break;
             }
             case "sendtransaction": {
-                if (params.size() != 2) {
+                if (params.size() < 2 || params.size() > 3) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -1);
-                    errorJSON.addProperty("message", "Usage: sendtransaction address amount\n\naddress (string, required)\namount (number, required)");
+                    errorJSON.addProperty("message", "Usage: sendtransaction address amount [dryrun]\n\naddress (string, required)\namount (number, required)\ndryrun (boolean, optional) - build and sign the transaction and return it with its fee breakdown instead of broadcasting it. For a chain whose transactions carry nTime (Verge, Emercoin, Pocketcoin) the nTime is taken as the later of the current time and the times of the parent transactions, so each input's parent is fetched over the network first: this call is slower, and spending an output whose parent is not yet available upstream fails rather than being sent without a valid nTime.");
 
                     response.add("error", errorJSON);
                     break;
                 }
 
+
                 String address;
                 double amount;
+                io.xlite.daemon.app.wallet.WalletHelper.BuildFailure[] buildFailure =
+                        new io.xlite.daemon.app.wallet.WalletHelper.BuildFailure[1];
+                boolean dryRun;
                 try {
                     address = params.get(0).getAsString();
                     amount = params.get(1).getAsDouble();
+                    dryRun = parseDryRunFlag(params, 2);
                 } catch (RuntimeException e) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -1);
-                    errorJSON.addProperty("message", "Error parsing JSON!");
+                    // The cause, not a generic "Error parsing JSON!". This is a
+                    // send, so a caller told only that parsing failed cannot tell a
+                    // malformed address from a bad dryrun value, and the latter is
+                    // the reason this response exists.
+                    errorJSON.addProperty("message", e.getMessage() != null
+                            ? e.getMessage() : "invalid sendtransaction arguments");
                     response.add("error", errorJSON);
 
                     LOGGER.warning("[http-server-handler] Error parsing JSON in sendtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
                     break;
                 }
 
-                // The wallet's unspent set is populated only by a UTXO fetch, and
-                // that fetch is cached. Nothing else fills it, so on a freshly
-                // started daemon — or once the cache has expired — input
-                // selection would run against an empty set and report "no UTXOs
-                // available" on a wallet that holds plenty. Refresh first, the
-                // same way listunspent does, so a send does not depend on some
-                // earlier unrelated call having happened to populate it.
-                if (httpClient.getUtxos(coin.getTicker(), UTXO_FETCH_EXPIRY_MS) == null) {
-                    response.add("result", JsonNull.INSTANCE);
-                    JsonObject notReady = new JsonObject();
-                    notReady.addProperty("message", "wallet not ready: could not load unspent outputs");
-                    notReady.addProperty("code", 3002);
-                    response.add("error", notReady);
-                    break;
-                }
-
-                Transaction transaction;
+                // Serializes the input-selecting part of this send against every
+                // other send on this coin, including one on another connection.
+                java.util.concurrent.locks.ReentrantLock sendLock =
+                        sendLockFor(coin.getTicker());
+                sendLock.lock();
                 try {
-                    transaction = WalletHelper.createTransactionSimple(coin.getTicker(), address, amount);
-                    if (transaction == null) {
+                    // The wallet's unspent set is populated only by a UTXO fetch, and
+                    // that fetch is cached. Nothing else fills it, so on a freshly
+                    // started daemon — or once the cache has expired — input
+                    // selection would run against an empty set and report "no UTXOs
+                    // available" on a wallet that holds plenty. Refresh first, the
+                    // same way listunspent does, so a send does not depend on some
+                    // earlier unrelated call having happened to populate it.
+                    if (httpClient.getUtxos(coin.getTicker(), UTXO_FETCH_EXPIRY_MS) == null) {
+                        response.add("result", JsonNull.INSTANCE);
+                        JsonObject notReady = new JsonObject();
+                        notReady.addProperty("message", "wallet not ready: could not load unspent outputs");
+                        notReady.addProperty("code", 3002);
+                        response.add("error", notReady);
+                        break;
+                    }
+
+                    WalletHelper.BuiltTransaction built;
+                    try {
+                        built = WalletHelper.createTransactionSimpleWithFee(coin.getTicker(), address, amount,
+                                this::resolveNTimeForInputs, buildFailure);
+                        if (built == null) {
+                            response.add("result", JsonNull.INSTANCE);
+                            JsonObject errorJSON = new JsonObject();
+                            errorJSON.addProperty("code", -6);
+                            errorJSON.addProperty("message", "Failed to create transaction");
+                            // buildSimple fails for several unrelated reasons, so the
+                            // actual one is reported rather than assumed. Naming an nTime
+                            // failure for an empty wallet would send the caller looking
+                            // for an upstream problem that was never involved.
+                            errorJSON.addProperty("failureReason",
+                                    buildFailure[0] == null ? "UNKNOWN" : buildFailure[0].name());
+                            if (buildFailure[0] == io.xlite.daemon.app.wallet.WalletHelper
+                                    .BuildFailure.NTIME_UNRESOLVED) {
+                                errorJSON.addProperty("nTimeResolved", false);
+                            }
+                            response.add("error", errorJSON);
+                            break;
+                        }
+                    } catch (RuntimeException e) {
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
                         errorJSON.addProperty("code", -6);
-                        errorJSON.addProperty("message", "Failed to create transaction");
+                        errorJSON.addProperty("message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                        response.add("error", errorJSON);
+
+                        LOGGER.warning("[http-server-handler] Error creating transaction in sendtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
+                        break;
+                    }
+
+                    Transaction transaction = built.transaction();
+                    String rawTxHex;
+                    try {
+                        rawTxHex = serializeForBroadcast(coin.getTicker(), transaction, built.nTime());
+                    } catch (RuntimeException e) {
+                        // In a try because this throws a RuntimeException naming its
+                        // cause; outside one it would surface as a channel error with
+                        // no body instead of the JSON-RPC error the caller expects.
+                        response.add("result", JsonNull.INSTANCE);
+                        JsonObject errorJSON = new JsonObject();
+                        errorJSON.addProperty("code", -6);
+                        errorJSON.addProperty("message", e.getMessage() != null
+                                ? e.getMessage() : e.getClass().getSimpleName());
+                        response.add("error", errorJSON);
+                        LOGGER.warning("[http-server-handler] Error serializing sendtransaction for "
+                                + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
+                        break;
+                    }
+                    LOGGER.fine("[http-server-handler] sendtransaction: rawTx size=" + rawTxHex.length() + " bytes");
+                    LOGGER.finer("[http-server-handler] sendtransaction: rawTx hex=" + rawTxHex);
+
+                    // Dry run: built, signed and serialized exactly as it would be
+                    // for the network, but nothing leaves the wallet -- no
+                    // broadcast, and the inputs stay unspent so the same funds can
+                    // still be sent afterwards. The returned hex can be checked
+                    // against the node's testmempoolaccept, or handed to
+                    // sendrawtransaction to broadcast those exact bytes later.
+                    if (dryRun) {
+                        response.add("result", buildDryRunResult(coin.getNetworkParameters(),
+                                CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coin.getTicker())).coinFactor(),
+                                built.feeSats(), rawTxHex, transaction));
+                        response.add("error", JsonNull.INSTANCE);
+                        break;
+                    }
+
+                    JsonObject txid = httpClient.sendRawTransaction(coin.getTicker(), rawTxHex);
+                    if (txid == null || txid.has("error") && !txid.get("error").isJsonNull()) {
+                        int code = -1;
+                        String errorMsg = "Error sending transaction!";
+                        if (txid != null) {
+                            JsonElement errorNode = txid.get("error");
+                            if (errorNode.isJsonPrimitive()) {
+                                code = errorNode.getAsInt();
+                            } else if (errorNode.isJsonObject()) {
+                                JsonObject errObj = errorNode.getAsJsonObject();
+                                if (errObj.has("code")) code = errObj.get("code").getAsInt();
+                                if (errObj.has("message")) errorMsg = errObj.get("message").getAsString();
+                            }
+                        }
+                        LOGGER.warning("[http-server-handler] sendrawtransaction failed for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " code=" + code + " message=" + errorMsg);
+                        response.add("result", JsonNull.INSTANCE);
+                        JsonObject errorJSON = new JsonObject();
+                        errorJSON.addProperty("code", code);
+                        errorJSON.addProperty("message", errorMsg);
                         response.add("error", errorJSON);
                         break;
                     }
-                } catch (RuntimeException e) {
-                    response.add("result", JsonNull.INSTANCE);
-                    JsonObject errorJSON = new JsonObject();
-                    errorJSON.addProperty("code", -6);
-                    errorJSON.addProperty("message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-                    response.add("error", errorJSON);
 
-                    LOGGER.warning("[http-server-handler] Error creating transaction in sendtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
-                    break;
-                }
-
-                String rawTxHex = new String(Hex.encode(transaction.bitcoinSerialize()));
-                LOGGER.fine("[http-server-handler] sendtransaction: rawTx size=" + rawTxHex.length() + " bytes");
-                LOGGER.finer("[http-server-handler] sendtransaction: rawTx hex=" + rawTxHex);
-                JsonObject txid = httpClient.sendRawTransaction(coin.getTicker(), rawTxHex);
-                if (txid == null || txid.has("error") && !txid.get("error").isJsonNull()) {
-                    int code = -1;
-                    String errorMsg = "Error sending transaction!";
-                    if (txid != null) {
-                        JsonElement errorNode = txid.get("error");
-                        if (errorNode.isJsonPrimitive()) {
-                            code = errorNode.getAsInt();
-                        } else if (errorNode.isJsonObject()) {
-                            JsonObject errObj = errorNode.getAsJsonObject();
-                            if (errObj.has("code")) code = errObj.get("code").getAsInt();
-                            if (errObj.has("message")) errorMsg = errObj.get("message").getAsString();
-                        }
+                    try {
+                        WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
+                    } catch (RuntimeException e) {
+                        // The broadcast already happened, so this must not turn a
+                        // successful send into an error response. Report it and carry
+                        // on to the txid the caller actually asked for.
+                        LOGGER.warning("[http-server-handler] post-broadcast bookkeeping failed for "
+                                + CoinTickerUtils.tickerToString(coin.getTicker()) + ": " + e.getMessage());
                     }
-                    LOGGER.warning("[http-server-handler] sendrawtransaction failed for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " code=" + code + " message=" + errorMsg);
-                    response.add("result", JsonNull.INSTANCE);
-                    JsonObject errorJSON = new JsonObject();
-                    errorJSON.addProperty("code", code);
-                    errorJSON.addProperty("message", errorMsg);
-                    response.add("error", errorJSON);
-                    break;
+
+                    if (txid.has("result")) {
+                        response.add("result", txid.get("result"));
+                        response.add("error", JsonNull.INSTANCE);
+
+                        break;
+                    }
+
+                    buildSendFallbackResult(response, txid);
+                } finally {
+                    sendLock.unlock();
                 }
-
-                WalletHelper.setAsSpent(coin.getTicker(), transaction, true);
-
-                if (txid.has("result")) {
-                    response.add("result", txid.get("result"));
-                    response.add("error", JsonNull.INSTANCE);
-
-                    break;
-                }
-
-                response.add("result", txid);
-                response.add("error", JsonNull.INSTANCE);
+                // Without this the switch falls through to "version", which
+                // overwrites the txid with a version string. The broadcast has
+                // already happened and cannot be undone, so the caller would be
+                // told it sent something it never sent.
                 break;
             }
+
             case "version": {
                 response.addProperty("result", Version.CLIENT_VERSION);
                 response.add("error", JsonNull.INSTANCE);
@@ -1606,6 +1779,222 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     /**
+     * Whether the coin's wire format carries nTime (the BCF TxWithTimeField
+     * flag, set by Peercoin-derived chains). All nTime handling below keys
+     * off this flag; there are no per-coin branches anywhere. Delegates
+     * rather than reading the config itself, so the flag has exactly one
+     * implementation.
+     */
+    private static boolean hasTxTimeField(CoinTicker ticker) {
+        return io.xlite.daemon.app.util.TxTimeField.appliesTo(ticker);
+    }
+
+    /**
+     * Serialize a signed transaction for broadcast, inserting nTime for
+     * time-field coins. nTime is max(wall-clock, parent nTimes) to satisfy
+     * the input-time consensus rule. Throws RuntimeException naming the
+     * cause: an unsendable tx must fail here, never broadcast malformed.
+     *
+     * <p>Static and package-private so a test can assert the bytes it returns
+     * carry exactly the nTime that was signed. That equality is the property
+     * deciding whether the node accepts the broadcast, and nothing else in
+     * the suite can observe it.
+     */
+    static String serializeForBroadcast(CoinTicker ticker, Transaction transaction, long signedNTime) {
+        byte[] standard = transaction.bitcoinSerialize();
+        if (!hasTxTimeField(ticker))
+            return new String(Hex.encode(standard));
+        if (signedNTime < 0 || signedNTime > 0xFFFFFFFFL)
+            throw new RuntimeException(
+                    "cannot serialize: no nTime was signed for this transaction");
+        return new String(Hex.encode(TxTimeField.insertNTime(standard, signedNTime)));
+    }
+
+    /**
+     * The nTime a transaction spending {@code selected} must carry: the
+     * newest of wall-clock time and every input parent's nTime.
+     *
+     * <p>Runs inside the wallet's build, after the inputs are chosen and
+     * before signing, because the chain signs nTime -- the value has to be
+     * known while signing and must be the same one spliced into the wire
+     * bytes afterwards. Throws on any fetch or parse failure so the send
+     * fails rather than being signed against a guessed time.
+     */
+    private long resolveNTimeForInputs(List<UTXO> selected) {
+        List<String> parentTxids = new ArrayList<>();
+        for (UTXO utxo : selected) {
+            if (!utxo.isSpent())
+                parentTxids.add(utxo.getTxid());
+        }
+        List<Long> parentNTimes = fetchParentNTimes(coin.getTicker(), parentTxids);
+        return TxTimeField.spendNTime(System.currentTimeMillis() / 1000, parentNTimes);
+    }
+
+    /**
+     * Optional trailing boolean flag, accepting the same true/1 spellings as
+     * the getrawtransaction verbose flag. Read with getAsString rather than
+     * toString so a quoted {@code "true"} works as well as a bare JSON
+     * boolean -- toString on a string primitive keeps the quotes. A missing
+     * or unrecognized value means false, so an existing two-parameter call
+     * keeps its behavior.
+     */
+    static boolean parseDryRunFlag(JsonArray params, int index) {
+        if (params.size() <= index)
+            return false;
+        JsonElement element = params.get(index);
+        // A JSON null is an omitted flag: that is how an explicit null reads to
+        // every JSON caller, and it is how a pre-flag two-argument call arrives.
+        if (element == null || element.isJsonNull())
+            return false;
+        // A non-primitive here is not a boolean in any encoding, it is a wrong
+        // argument. It used to be read as "not a dry run", which meant an object
+        // or array in that position silently produced a real broadcast -- the one
+        // outcome that must not be reached by guessing, since the caller asked
+        // to have the transaction reviewed before it was spent.
+        if (!element.isJsonPrimitive())
+            throw new IllegalArgumentException(
+                    "dryrun must be true or false, got " + element);
+        String value = element.getAsString();
+        if (value.equalsIgnoreCase("true") || value.equals("1"))
+            return true;
+        if (value.equalsIgnoreCase("false") || value.equals("0"))
+            return false;
+        // Anything else is a typo, and here the cost of guessing is asymmetric:
+        // the verbose flag degrades output, whereas a misspelled dryrun that
+        // resolved to false would spend the money the caller asked to have
+        // reviewed first. Refuse rather than assume. The caller's existing catch
+        // turns this into a normal error response.
+        throw new IllegalArgumentException(
+                "dryrun must be true or false, got '" + value + "'");
+    }
+
+    /**
+     * The {@code sendtransaction} success response when the upstream envelope
+     * carries no {@code "result"} member.
+     *
+     * <p>Some upstreams return the txid as the whole envelope rather than
+     * nested under {@code "result"}. The caller still asked for a txid, so
+     * the envelope itself is the result. Extracted so the fallback is
+     * directly testable: it sits two lines above a switch fall-through into
+     * {@code "version"} that once overwrote this result with a version
+     * string, and only a test that drives this exact path can prove the
+     * response shape survives.
+     */
+    static void buildSendFallbackResult(JsonObject response, JsonObject envelope) {
+        response.add("result", envelope);
+        response.add("error", JsonNull.INSTANCE);
+    }
+
+    /**
+     * Dry-run review payload: the exact bytes that would be broadcast, the
+     * txid those bytes hash to, and the fee the wallet is charging.
+     *
+     * <p>The txid is derived from the returned hex, not from
+     * {@code transaction.getHash()}: time-field coins serialize an nTime that
+     * bitcoinj's in-memory hash does not cover, so the object hash belongs to
+     * a different transaction than the bytes on the wire. Reporting that value
+     * would hand back a txid the network will never produce.
+     *
+     * <p>The fee is passed in rather than recomputed from the transaction's
+     * input and output counts: {@code fundTransaction} charges for one input
+     * more than the finished transaction has, so the formula understates the
+     * real charge whenever the linear term, rather than the minimum, wins.
+     */
+    static JsonObject buildDryRunResult(NetworkParameters params, long coinUnit, long feeSats,
+            String rawTxHex, Transaction transaction) {
+        JsonObject result = new JsonObject();
+        result.addProperty("dryRun", true);
+        result.addProperty("txid", txidForHex(rawTxHex));
+        result.addProperty("hex", rawTxHex);
+        result.addProperty("sizeBytes", Hex.decode(rawTxHex).length);
+        result.addProperty("inputs", transaction.getInputs().size());
+        result.addProperty("outputs", transaction.getOutputs().size());
+        result.addProperty("feeSats", feeSats);
+        result.addProperty("fee", io.xlite.daemon.app.util.Sats.toWholeCoins(feeSats, coinUnit));
+        result.addProperty("feePerByte", WalletHelper.getFeePerByte(params));
+        result.addProperty("minTxFee", WalletHelper.getMinTxFee(params));
+        result.addProperty("coinUnit", coinUnit);
+        return result;
+    }
+
+    /** The txid the network will use for exactly these bytes. */
+    private static String txidForHex(String rawTxHex) {
+        return Sha256Hash.wrapReversed(Sha256Hash.hashTwice(Hex.decode(rawTxHex))).toString();
+    }
+
+    /**
+     * Read every input parent's nTime from chain (bytes 4-8 of the parent
+     * raw tx). Any fetch/parse failure aborts the send: without parent
+     * times nTime cannot satisfy the input-time rule.
+     */
+    private List<Long> fetchParentNTimes(CoinTicker ticker, List<String> parentTxids) {
+        List<Long> parents = new ArrayList<>();
+        for (String parentTxid : parentTxids) {
+            JsonObject parent = httpClient.getRawTransaction(ticker, parentTxid, false);
+            if (parent == null || !parent.has("result") || parent.get("result").isJsonNull())
+                throw new RuntimeException(
+                        "Cannot fetch parent " + parentTxid + " for nTime");
+            try {
+                parents.add(TxTimeField.parentNTime(
+                        Hex.decode(parent.get("result").getAsString())));
+            } catch (RuntimeException e) {
+                throw new RuntimeException(
+                        "Cannot parse parent " + parentTxid + " nTime: " + e.getMessage(), e);
+            }
+        }
+        return parents;
+    }
+
+    /**
+     * Decode raw tx bytes for bitcoinj parsing, stripping nTime for
+     * time-field coins. Throws IllegalArgumentException on undersized
+     * input (handled by callers as an invalid-tx response).
+     */
+    private static byte[] decodeForParsing(CoinTicker ticker, byte[] rawBytes) {
+        if (!hasTxTimeField(ticker))
+            return rawBytes;
+        // A standard-layout transaction has no nTime, so reading one would
+        // shift every remaining field and yield a transaction that parses into
+        // something else. No length threshold can tell the layouts apart -- a
+        // real standard transaction is far longer than any minimum -- so the
+        // only sound check is structural: after stripping, the result must
+        // parse as a transaction whose fields are self-consistent. Callers
+        // surface the IllegalArgumentException as an invalid-tx response.
+        return TxTimeField.stripNTime(rawBytes);
+    }
+
+    static String txidForDecoded(CoinTicker ticker, byte[] wireBytes, Transaction parsed) {
+        return hasTxTimeField(ticker)
+                ? io.xlite.daemon.app.util.TxTimeField.txidOfWireBytes(wireBytes)
+                : parsed.getHashAsString();
+    }
+
+    /**
+     * Parse raw transaction bytes for a time-field coin, rejecting a hex that
+     * is in the wrong wire layout.
+     *
+     * <p>Stripping nTime from a standard-layout transaction leaves the vin
+     * count read from the wrong offset, so the parse either fails outright or
+     * produces a transaction whose input count disagrees with the bytes that
+     * were supplied. Comparing the re-serialized form against the input
+     * catches the second case, which a plain parse would not.
+     *
+     * <p>Package-private static for testability, like {@link #txidForDecoded}:
+     * this is the one check that decides whether a hex blob is in the right
+     * layout for its chain, so it is worth pinning directly.
+     */
+    static Transaction parseForCoin(CoinTicker ticker, NetworkParameters params,
+            byte[] rawBytes) {
+        byte[] parsed = decodeForParsing(ticker, rawBytes);
+        Transaction tx = new Transaction(params, parsed);
+        if (hasTxTimeField(ticker) && !java.util.Arrays.equals(tx.bitcoinSerialize(), parsed))
+            throw new IllegalArgumentException(
+                    "raw transaction is not in this chain's wire layout: it re-serializes "
+                            + "differently, so it carries no nTime");
+        return tx;
+    }
+
+    /**
      * Returns the coin-specific signed-message header prefix, or null when the
      * coin has no mapping. Package-private static for testability.
      */
@@ -1636,6 +2025,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return "Dogecoin Signed Message:\n";
             case SYSCOIN:
                 return "Syscoin Signed Message:\n";
+            case VERGE:
+                return "VERGE Signed Message:\n";
             default:
                 LOGGER.warning("[http-server-handler] ERROR: Unsupported coin. This should never happen.");
                 return null;

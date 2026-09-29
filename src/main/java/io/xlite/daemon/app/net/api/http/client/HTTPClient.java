@@ -15,7 +15,6 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.AddressBalance;
-import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
 import org.apache.http.Header;
@@ -524,14 +523,6 @@ public class HTTPClient {
         return utxoList;
     }
 
-    /**
-     * Whole-coin doubles (backend JSON) to integer base units. Must round to
-     * nearest: truncating the binary representation error loses satoshis
-     * (e.g. 0.00050001 becomes 50000).
-     */
-    static long satsFromWholeCoins(double whole) {
-        return Sats.fromWholeCoins(whole);
-    }
 
     /**
      * Returns all utxos.
@@ -598,7 +589,7 @@ public class HTTPClient {
                     utxoArr.getJSONObject(i).getString("txhash"),
                     utxoArr.getJSONObject(i).getInt("vout"),
                     utxoArr.getJSONObject(i).getInt("block_number"),
-                    satsFromWholeCoins(utxoArr.getJSONObject(i).getDouble("value")));
+                    UTXO.baseUnitsForTicker(coinTicker, utxoArr.getJSONObject(i).getDouble("value")));
 
             utxoList.add(utxo);
             returnedAddresses.add(rowAddress);

@@ -95,6 +95,23 @@ public final class CoinConfig {
     }
 
     /**
+     * Whether the coin's wire format carries an nTime field after nVersion
+     * (Peercoin-derived chains set TxWithTimeField=true in BCF). Opt-in:
+     * absent/blank yields false; a present-but-unparseable value throws.
+     */
+    public boolean txWithTimeField() {
+        String v = confEntries.get("TxWithTimeField");
+        if (v == null || v.trim().isEmpty())
+            return false;
+        if (v.trim().equalsIgnoreCase("true"))
+            return true;
+        if (v.trim().equalsIgnoreCase("false"))
+            return false;
+        throw new IllegalStateException("[" + ticker + "] config key 'TxWithTimeField"
+                + "' is not true/false: '" + v + "'");
+    }
+
+    /**
      * Optional in current bcf data: every coin carries DustAmount=0 placeholders.
      * Absent/blank yields null; a present-but-malformed value throws.
      */

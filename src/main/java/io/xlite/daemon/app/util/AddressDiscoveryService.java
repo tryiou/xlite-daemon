@@ -262,7 +262,7 @@ public class AddressDiscoveryService {
                         txidElement.getAsString(),
                         voutElement.getAsInt(),
                         confirmationsElement.getAsInt(),
-                        Sats.fromWholeCoins(valueElement.getAsDouble())
+                        UTXO.baseUnitsForTicker(coinInstance.getTicker(), valueElement.getAsDouble())
                 );
                 utxos.add(utxo);
             } catch (Exception e) {

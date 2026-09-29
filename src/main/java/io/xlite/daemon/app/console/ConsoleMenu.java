@@ -7,15 +7,15 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.EXRServerPool;
+import io.xlite.daemon.app.util.CoinConfigEnsurer;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.background.BackgroundTimerThread;
 
 import java.io.Console;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -70,6 +70,9 @@ public class ConsoleMenu {
                     case "--enablerpcandconfigure":
                         autoGenerateRPCConfig();
                         System.exit(0);
+                        break; // unreachable: System.exit never returns, but the
+                               // compiler cannot prove it; without this the new
+                               // -Xlint:fallthrough flags a false positive here.
                     case "--development-endpoint": {
                         if (i + 1 < arguments.length) {
                             String customEndpoint = arguments[i + 1];
@@ -156,6 +159,7 @@ public class ConsoleMenu {
 
                         System.exit(0);
                     }
+                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
                     case "--createwalletmnemonic": {
                         if (KeyHandler.existsBaseECKeyFromLocal()) {
                             LOGGER.info("Wallet already exists");
@@ -185,6 +189,7 @@ public class ConsoleMenu {
 
                         System.exit(0);
                     }
+                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
                     case "--xliterpc": {
                         xliteRPC = true;
                         break;
@@ -230,6 +235,7 @@ public class ConsoleMenu {
                         }
                         System.exit(0);
                     }
+                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
                     case "--changepassword": {
                         if (!KeyHandler.existsBaseECKeyFromLocal()) {
                             logBadChangePass("Wallet not found");
@@ -266,9 +272,11 @@ public class ConsoleMenu {
 
                         System.exit(0);
                     }
+                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
                     case "--help":
                         displayHelp();
                         System.exit(0);
+                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
                 }
             }
         }
@@ -380,6 +388,7 @@ public class ConsoleMenu {
                     LOGGER.info("Exiting...");
                     System.exit(0);
                 }
+                break; // unreachable (System.exit above); silences -Xlint:fallthrough.
                 default: {
                     LOGGER.info("Unknown Option.");
                 }
@@ -404,6 +413,22 @@ public class ConsoleMenu {
         }
 
         long startTime = System.currentTimeMillis();
+
+        // Self-healing for newly listed coins on stale datadirs. A missing config
+        // is created with RPC ENABLED and a freshly generated random password,
+        // which is not what the daemon's own first run does (it writes
+        // rpcEnabled=false), and it is what turns such a coin from "not
+        // initialised, no listener" into "initialised, port bound" on the next
+        // login. Existing configs are never touched, so no configured coin's
+        // credentials or port change.
+        Map<CoinTicker, CoinConfigEnsurer.Outcome> ensureReport =
+                CoinConfigEnsurer.ensureMissing(CoinTicker.coins());
+        long repaired = ensureReport.values().stream()
+                .filter(o -> o == CoinConfigEnsurer.Outcome.CREATED
+                        || o == CoinConfigEnsurer.Outcome.CORRUPT_QUARANTINED).count();
+        if (repaired > 0) {
+            LOGGER.info("[coin] Coin config self-healing repaired " + repaired + " coin(s): " + ensureReport);
+        }
 
         CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, null, isMnemonic, xliteRPC);
         if (coinError != null) {
@@ -533,12 +558,7 @@ public class ConsoleMenu {
     }
 
     private String generateRandomString(int length) {
-        SecureRandom secureRandom = new SecureRandom();
-
-        byte[] token = new byte[length];
-        secureRandom.nextBytes(token);
-
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
+        return CoinConfigEnsurer.randomToken(length);
     }
 
     private String readPassword(Scanner input, String[] args, int argPos, String msg, String envVar) {

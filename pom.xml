@@ -213,6 +213,7 @@
           <compilerArgs>
             <arg>-Xlint:unchecked</arg>
             <arg>-Xlint:deprecation</arg>
+            <arg>-Xlint:fallthrough</arg>
           </compilerArgs>
         </configuration>
       </plugin>

@@ -1,5 +1,6 @@
 package io.xlite.daemon.app.coinconfig;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -50,6 +51,26 @@ class CoinConfigTest {
     }
 
     @Test
+    void testTxWithTimeFieldAbsentFalseTrueFalseMalformedThrows() {
+        // Opt-in flag: 33 fleet confs lack the key entirely.
+        assertFalse(sample().txWithTimeField());
+
+        Map<String, String> on = new LinkedHashMap<>();
+        on.put("TxWithTimeField", "true");
+        assertTrue(new CoinConfig("X", "X", "", on).txWithTimeField());
+
+        Map<String, String> off = new LinkedHashMap<>();
+        off.put("TxWithTimeField", "false");
+        assertFalse(new CoinConfig("X", "X", "", off).txWithTimeField());
+
+        Map<String, String> bad = new LinkedHashMap<>();
+        bad.put("TxWithTimeField", "yes");
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new CoinConfig("X", "X", "", bad).txWithTimeField());
+        assertTrue(e.getMessage().contains("'TxWithTimeField' is not true/false"), e.getMessage());
+    }
+
+    @Test
     void testDustAbsentNullMalformedThrows() {
         assertNull(sample().dustAmountOrNull());
 
@@ -77,5 +98,47 @@ class CoinConfigTest {
     void testConfEntriesUnmodifiable() {
         assertThrows(UnsupportedOperationException.class,
                 () -> sample().getConfEntries().put("New", "1"));
+    }
+
+    /** A config the gate accepts, so a test can break exactly one thing. */
+    private static Map<String, String> gateValid(String ticker, String timeField) {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("AddressPrefix", "30");
+        m.put("ScriptPrefix", "63");
+        m.put("SecretPrefix", "128");
+        m.put("COIN", "100000000");
+        m.put("FeePerByte", "10");
+        m.put("MinTxFee", "5000");
+        m.put("Port", "9332");
+        m.put("DustAmount", "0");
+        m.put("TxWithTimeField", timeField);
+        return m;
+    }
+
+    @Test
+    @DisplayName("the gate refuses a malformed TxWithTimeField at load, not on first use")
+    void testGateRejectsMalformedTxWithTimeField() {
+        // The gate runs when configurations load, so a coin with a malformed flag
+        // is dropped from the registry there rather than at first send. That
+        // matters: this flag decides whether signatures are computed over an
+        // nTime-bearing preimage, and a coin that only discovers it mid-send has
+        // already built a transaction by the wrong rules.
+        CoinConfig bad = new CoinConfig("LTC", "Litecoin", "ltc--test", gateValid("LTC", "yes"));
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> CoinConfigGate.validate(bad),
+                "a malformed TxWithTimeField must be rejected at load");
+        assertTrue(e.getMessage().contains("coin config rejected"), e.getMessage());
+        assertTrue(e.getMessage().contains("TxWithTimeField"), e.getMessage());
+    }
+
+    @Test
+    @DisplayName("the gate accepts both spellings of the flag")
+    void testGateAcceptsValidTxWithTimeField() {
+        for (String value : new String[]{"true", "false"}) {
+            CoinConfig cfg = new CoinConfig("LTC", "Litecoin", "ltc--test", gateValid("LTC", value));
+            assertDoesNotThrow(() -> CoinConfigGate.validate(cfg),
+                    "TxWithTimeField=" + value + " must be accepted");
+        }
     }
 }

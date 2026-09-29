@@ -25,7 +25,8 @@ public class CoinTickerSourceOfTruthTest {
         // together with production and pass silently).
         Set<CoinTicker> expected = EnumSet.of(CoinTicker.BLOCKNET, CoinTicker.BITCOIN, CoinTicker.LITECOIN,
                 CoinTicker.DASHCOIN, CoinTicker.DOGECOIN, CoinTicker.SYSCOIN, CoinTicker.PIVX,
-                CoinTicker.DIGIBYTE, CoinTicker.RAVENCOIN, CoinTicker.UNOBTANIUM, CoinTicker.PKOIN);
+                CoinTicker.DIGIBYTE, CoinTicker.RAVENCOIN, CoinTicker.UNOBTANIUM, CoinTicker.PKOIN,
+                CoinTicker.VERGE);
         Set<CoinTicker> active = new HashSet<>(Arrays.asList(CoinTickerUtils.getActiveTickers()));
         assertEquals(expected, active);
         // Spare rows for inactive coins (e.g. the BCH supplement entry, kept

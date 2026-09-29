@@ -114,9 +114,10 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 
     @Override
     public Coin getMinNonDustOutput() {
-        // Delegated for the same reason as the ceiling: reading the supplement
-        // here as well would be a second copy of a conversion the config-driven
-        // object already performs.
+        // Delegated for the same reason as the ceiling above: reading the
+        // supplement here as well would be a second copy of a conversion the
+        // config-driven object already performs, and the class comment claims
+        // there is no such copy.
         return coin().getMinNonDustOutput();
     }
 

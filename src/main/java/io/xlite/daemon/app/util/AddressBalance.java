@@ -2,6 +2,8 @@ package io.xlite.daemon.app.util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
+import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
+import io.xlite.daemon.app.net.CoinTickerUtils;
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.LegacyAddress;
 
@@ -95,16 +97,33 @@ public class AddressBalance {
 
     public void calculateBalance() {
         Preconditions.checkNotNull(utxos);
-        double balance = 0;
+        // UTXO values are integer base units, so the sum stays integral and
+        // is converted to whole coins exactly once. The divisor comes from the
+        // first row's coin, which is this address's coin because an address
+        // only ever tracks one. Never a hardcoded universal divisor: dividing
+        // by a fixed 1e8 reports every 6-decimal coin 100x too small.
+        long baseUnits = 0;
+        // The divisor is taken from a row this loop actually counted, and in
+        // the same pass. A second read of the list would race a concurrent
+        // clearUtxos(), which empties it, and could also pick a spent or
+        // mis-tagged row and price the whole balance at the wrong factor.
+        String coinTicker = null;
 
         for (UTXO utxo : utxos) {
             if (!utxo.isSpent()) {
-                balance += utxo.getValue();
+                baseUnits += utxo.getValue();
+                if (coinTicker == null) {
+                    coinTicker = CoinTickerUtils.tickerToString(utxo.ticker);
+                }
             }
         }
 
-        balance /= 100000000.0;
-        setBalanceProp(balance);
+        if (baseUnits == 0) {
+            setBalanceProp(0.0);
+            return;
+        }
+        long coinFactor = CoinConfigRegistry.get(coinTicker).coinFactor();
+        setBalanceProp(Sats.toWholeCoins(baseUnits, coinFactor));
     }
 
 }

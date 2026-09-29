@@ -1,5 +1,7 @@
 package io.xlite.daemon.app.coinconfig;
 
+import io.xlite.daemon.app.util.Sats;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,8 +25,20 @@ public final class CoinConfigGate {
         if (cfg.scriptPrefix() == cfg.secretPrefix())
             v.add("ScriptPrefix equals SecretPrefix (" + cfg.scriptPrefix() + ")");
 
-        if (cfg.coinFactor() <= 0)
+        if (cfg.coinFactor() <= 0) {
             v.add("COIN must be positive, got " + cfg.coinFactor());
+        } else {
+            // COIN is base units per whole coin, so it must be a power of
+            // ten. Any other value cannot be rendered as a decimal at all and
+            // would silently misprice every amount, so it is rejected here,
+            // where every other bad value is reported, rather than at first
+            // use deep in the wallet.
+            try {
+                Sats.decimalPlaces(cfg.coinFactor());
+            } catch (IllegalArgumentException e) {
+                v.add("COIN is not a power of ten: " + cfg.coinFactor());
+            }
+        }
         if (cfg.feePerByte() <= 0)
             v.add("FeePerByte must be positive, got " + cfg.feePerByte());
         if (cfg.minTxFee() <= 0)
@@ -42,6 +56,16 @@ public final class CoinConfigGate {
         int port = cfg.port();
         if (port < 1024 || port > 65_535)
             v.add("Port out of range 1024..65535: " + port);
+
+        // TxWithTimeField decides whether signatures are computed over an
+        // nTime-bearing preimage. A malformed value throws when the send path
+        // first reads it, i.e. as a per-send failure; report it here instead,
+        // where every other bad value is reported.
+        try {
+            cfg.txWithTimeField();
+        } catch (RuntimeException e) {
+            v.add("TxWithTimeField invalid: " + e.getMessage());
+        }
 
         if (!v.isEmpty()) {
             throw new IllegalStateException("["

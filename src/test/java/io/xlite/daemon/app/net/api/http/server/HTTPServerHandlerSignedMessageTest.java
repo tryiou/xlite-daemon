@@ -35,6 +35,7 @@ class HTTPServerHandlerSignedMessageTest {
         assertEquals("Raven Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.RAVENCOIN));
         assertEquals("Dogecoin Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.DOGECOIN));
         assertEquals("Syscoin Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.SYSCOIN));
+        assertEquals("VERGE Signed Message:\n", HTTPServerHandler.signedMessageHeader(CoinTicker.VERGE));
     }
 
     @Test

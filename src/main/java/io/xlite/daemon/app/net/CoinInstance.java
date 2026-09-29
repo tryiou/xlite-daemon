@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.subgraph.orchid.encoders.Hex;
 //import com.subgraph.orchid.encoders.Hex;
 import io.xlite.daemon.app.Version;
+import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.crypto.KeyHandler;
 import io.xlite.daemon.app.net.api.JSONRPCController;
 import io.xlite.daemon.app.net.api.JSONRPCServer;
@@ -21,7 +22,6 @@ import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
 import io.xlite.daemon.app.wallet.WalletHelper;
 import org.bitcoinj.core.*;
-import org.bitcoinj.utils.BtcFormat;
 import org.bitcoinj.utils.ListenerRegistration;
 import org.bitcoinj.utils.MonetaryFormat;
 import org.bitcoinj.utils.Threading;
@@ -430,6 +430,13 @@ public class CoinInstance {
                 rpcPort = 8766;
                 break;
             }
+            case VERGE: {
+                LOGGER.fine("[coin] Initializing for Verge main network.");
+                CoinError err = loadMigratedParams();
+                if (err != null) return err;
+                rpcPort = 20102;
+                break;
+            }
             default: {
                 LOGGER.fine("[coin] ERROR: Invalid/unsupported network: " + ticker.toString());
                 return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
@@ -632,9 +639,49 @@ public class CoinInstance {
         return balance;
     }
 
+    /**
+     * Plain-amount rendering for a value held in base units of {@code coinFactor}.
+     *
+     * <p>The divisor comes from the {@link Monetary}'s
+     * {@code smallestUnitExponent()}, not from the format. bitcoinj's
+     * {@code Coin.smallestUnitExponent()} is the constant 8, so passing
+     * {@code Coin.valueOf(...)} to a 6-decimal coin's format renders it 100x
+     * small no matter what the format is configured with -- {@code
+     * minDecimals} only controls how many trailing digits are shown.
+     */
+    // Package-private for tests: the 6-decimal rendering is the whole point of
+    // this change and must be pinned against the real implementation, not a
+    // copy of it.
+    static String formatBaseUnits(long baseUnits, long coinFactor) {
+        final int decimals = Sats.decimalPlaces(coinFactor);
+        Monetary amount = new Monetary() {
+            @Override
+            public int smallestUnitExponent() {
+                return decimals;
+            }
+
+            @Override
+            public long getValue() {
+                return baseUnits;
+            }
+
+            @Override
+            public int signum() {
+                return Long.signum(baseUnits);
+            }
+        };
+        return MonetaryFormat.BTC.withLocale(Locale.ROOT).minDecimals(decimals)
+                .repeatOptionalDecimals(1, 0).noCode().format(amount).toString();
+    }
+
     public String getAllBalancesFormatted() {
-        BtcFormat f = BtcFormat.getInstance(BtcFormat.COIN_SCALE);
-        return f.format(Coin.valueOf(Sats.fromWholeCoins(getAllBalances())));
+        // Plain amount at the coin's own decimal places. Replacing
+        // BtcFormat.COIN_SCALE, a fixed two-decimal format that truncated
+        // every balance -- 100000 base units as "0.00" -- and used the
+        // locale's decimal mark.
+        long coinFactor = CoinConfigRegistry.get(
+                CoinTickerUtils.tickerToString(getTicker())).coinFactor();
+        return formatBaseUnits(Sats.fromWholeCoins(getAllBalances(), coinFactor), coinFactor);
     }
 
     public void sendXrGetTransaction(BlocknetPeer blocknetPeer, String txid) {
@@ -791,7 +838,10 @@ public class CoinInstance {
     }
 
     public JsonArray getAllUTXOS() {
-        MonetaryFormat PLAIN_FORMAT = MonetaryFormat.BTC.minDecimals(8).repeatOptionalDecimals(1, 0).noCode();
+        final int coinDecimals = Sats.decimalPlaces(
+                CoinConfigRegistry.get(CoinTickerUtils.tickerToString(getTicker())).coinFactor());
+        MonetaryFormat PLAIN_FORMAT = MonetaryFormat.BTC.withLocale(Locale.ROOT)
+                .minDecimals(coinDecimals).repeatOptionalDecimals(1, 0).noCode();
 
         JsonArray unspentTxsJSON = new JsonArray();
         for (AddressBalance addressBalance : getAddressKeyPairs()) {
@@ -818,7 +868,7 @@ public class CoinInstance {
                 Monetary monetary = new Monetary() {
                     @Override
                     public int smallestUnitExponent() {
-                        return 8;
+                        return coinDecimals;
                     }
 
                     @Override

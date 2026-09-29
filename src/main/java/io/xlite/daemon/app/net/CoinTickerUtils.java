@@ -22,6 +22,7 @@ public class CoinTickerUtils {
 
         tickers.put(CoinTicker.UNOBTANIUM, "UNO");
         tickers.put(CoinTicker.PKOIN, "PKOIN");
+        tickers.put(CoinTicker.VERGE, "XVG");
 
     }
 

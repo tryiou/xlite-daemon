@@ -14,7 +14,6 @@ import io.xlite.daemon.app.net.protocols.blocknet.messagequeue.QueueItem;
 import io.xlite.daemon.app.net.xrouter.XRouterCommandUtils;
 import io.xlite.daemon.app.net.xrouter.XRouterInitialMessagesSentListener;
 import io.xlite.daemon.app.net.xrouter.XRouterMessage;
-import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.XRouterConfiguration;
 import io.xlite.daemon.app.util.background.BackgroundTimerThread;
@@ -375,7 +374,7 @@ public class BlocknetPeerGroup {
                                     String txid = utxoJson.getString("txhash");
                                     int vout = utxoJson.getInt("vout");
                                     int height = utxoJson.getInt("block_number");
-                                    long value = Sats.fromWholeCoins(utxoJson.getDouble("value"));
+                                    long value = UTXO.baseUnitsForTicker(coinTicker, utxoJson.getDouble("value"));
 
                                     UTXO utxo = new UTXO(coinTicker, addressB58, txid, vout, height, value);
                                     utxoList.add(utxo);

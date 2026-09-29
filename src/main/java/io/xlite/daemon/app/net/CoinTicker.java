@@ -16,7 +16,8 @@ public enum CoinTicker {
     PIVX,
     RAVENCOIN,
     UNOBTANIUM,
-    PKOIN
+    PKOIN,
+    VERGE
     ;
 
     /**
@@ -37,7 +38,8 @@ public enum CoinTicker {
                 PIVX,
                 UNOBTANIUM,
                 PKOIN,
-                RAVENCOIN
+                RAVENCOIN,
+                VERGE
         );
     }
 }
