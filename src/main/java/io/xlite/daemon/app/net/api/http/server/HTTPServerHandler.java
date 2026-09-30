@@ -232,8 +232,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                 Preconditions.checkNotNull(jsonReq);
 
-                if (!jsonReq.has("method") || !jsonReq.has("params")) {
-                    ctx.close();
+                if (!jsonReq.has("method") || !jsonReq.get("method").isJsonPrimitive()
+                        || !jsonReq.get("method").getAsJsonPrimitive().isString()) {
+                    throw new IllegalArgumentException("Bad JSON-RPC request by client.");
+                }
+                if (!jsonReq.has("params") || jsonReq.get("params").isJsonNull()) {
+                    jsonReq.add("params", new JsonArray());
+                } else if (!jsonReq.get("params").isJsonArray()) {
                     throw new IllegalArgumentException("Bad JSON-RPC request by client.");
                 }
             } catch (Exception e) {
@@ -270,7 +275,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             + " PARAMS: " + (sensitiveMethod ? "<redacted>" : params.toString().replace(",", ", ")));
                 }
 
-                response = getResponse(method, params);
+                try {
+                    response = getResponse(method, params);
+                } catch (RuntimeException e) {
+                    LOGGER.warning("[http-server-handler] Invalid params for " + CoinTickerUtils.tickerToString(coin.getTicker()) + " " + method + ", " + e.getMessage());
+                    JsonObject invalidParams = new JsonObject();
+                    invalidParams.addProperty("code", -1);
+                    invalidParams.addProperty("message", "Invalid params: " + e.getMessage());
+                    response.add("error", invalidParams);
+                    response.add("result", JsonNull.INSTANCE);
+                }
                 if (sensitiveMethod)
                     LOGGER.finer("[http-server-handler] response withheld (sensitive method)");
                 else
@@ -895,11 +909,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     break;
                 }
 
-                String rawTx = params.get(0).getAsString();
-                byte[] rawBytes = Hex.decode(rawTx);
+                String rawTx;
+                byte[] rawBytes;
                 Transaction tx;
 
                 try {
+                    rawTx = params.get(0).getAsString();
+                    rawBytes = Hex.decode(rawTx);
                     tx = parseForCoin(coin.getTicker(), coin.getNetworkParameters(), rawBytes);
                 } catch (Exception e) {
                     LOGGER.warning("[http-server-handler] Error decoding raw transaction in decoderawtransaction for " + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
