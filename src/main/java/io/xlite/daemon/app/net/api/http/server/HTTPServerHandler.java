@@ -707,7 +707,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                 JsonObject transaction = httpClient.getTransaction(coin.getTicker(), txid, true);
 
-                if (transaction == null || transaction.has("error") && !transaction.get("error").isJsonNull()) {
+                if (transaction == null || !transaction.has("result") || transaction.get("result").isJsonNull()) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -1);
@@ -1153,7 +1153,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             "\\n" + //
                             "txid (string, required) - The transaction ID\\n" + //
                             "n (numeric, required) - The vout value\\n" + //
-                            "include_mempool (boolean, optional, default=true) - Whether to include the mempool (WARNING: This can block execution for several seconds)");
+                            "include_mempool (boolean, optional, default=true) - Whether to include the mempool");
 
                     response.add("error", errorJSON);
                     break;
@@ -1211,27 +1211,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     break;
                 }
 
-                // considering mempool, find/wait for the transaction
-                JsonObject transaction = null;
-                int retries = includeMempool ? 5 : 1;
-                for (int i = 0; i < retries; i++) {
-                    transaction = httpClient.getTransaction(coin.getTicker(), txid, true);
-                    if (transaction == null || transaction.has("result") && transaction.get("result").isJsonNull()) {
-                        if (i < retries - 1) {
-                            try {
-                                Thread.sleep(2000);
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                break;
-                            }
-                            continue;
-                        }
-                    } else {
-                        break;
-                    }
-                }
+                // One upstream ask, no wait loop: a missing transaction is
+                // code -5 at once; the wait for fresh broadcasts belongs to
+                // the callers, which poll on their own cadence.
+                JsonObject transaction =
+                        httpClient.getTransaction(coin.getTicker(), txid, true);
 
-                if (transaction == null || transaction.has("error") && !transaction.get("error").isJsonNull()) {
+                if (transaction == null || !transaction.has("result") || transaction.get("result").isJsonNull()) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
 

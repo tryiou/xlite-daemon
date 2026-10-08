@@ -19,9 +19,10 @@ data upstream over HTTP (`net/api/http/client/`).
   POST coin-first-param methods (`getutxos`, `sendrawtransaction`, …). Once EXR
   is configured there is **NO fallback** to BASE_URL — requests for coins no EXR
   server supports fail hard.
-- **Legacy mode (default):** `BASE_URL` = `https://xliterevp.mywire.org/` in
-  `App.java`; override with `--development-endpoint`. POST `/` with
-  `{method, params}` JSON.
+- **BASE_URL path (used when `EXR_ENDPOINT`/`--exr-endpoint` is not set):**
+  an alternative path to reach the providers — `BASE_URL` =
+  `https://xliterevp.mywire.org/` in `App.java`; override with
+  `--development-endpoint`. POST `/` with `{method, params}` JSON.
 - Upstream chain: exrproxy `/xrs/<service>` → plugin-adapter xrm methods →
   utxo-plugin containers.
 - `net/xrouter/` and the `xrm*` handling in `BlocknetPeerGroup` are currently
