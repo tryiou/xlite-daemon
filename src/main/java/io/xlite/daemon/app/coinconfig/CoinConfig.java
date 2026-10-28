@@ -112,19 +112,11 @@ public final class CoinConfig {
     }
 
     /**
-     * Optional in current bcf data: every coin carries DustAmount=0 placeholders.
-     * Absent/blank yields null; a present-but-malformed value throws.
+     * The coin's dust floor in base units, from BCF. Required; 0 means the
+     * coin's daemon has no dust gate (Firo), not "unspecified".
      */
-    public Long dustAmountOrNull() {
-        String v = confEntries.get("DustAmount");
-        if (v == null || v.trim().isEmpty())
-            return null;
-        try {
-            return Long.parseLong(v.trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException("[" + ticker + "] config key 'DustAmount"
-                    + "' is not a number: '" + v + "'", e);
-        }
+    public long dustAmount() {
+        return requiredLong("DustAmount");
     }
 
     /** Wallet listen port from the xbridge conf; wallet-conf rpcport may override per user settings. */
@@ -134,11 +126,7 @@ public final class CoinConfig {
 
     /**
      * DTO map for RPC exposure — 11-field (identity + prefixes/fees/port/dust).
-     * Single source for handler. bcf xbridge-confs DustAmount is canonical source of
-     * truth (blockchain-configuration-files repo); interim data carries DustAmount=0
-     * placeholders meaning unspecified — map 0 to null so GUI fallback (5460) applies
-     * until bcf is populated with real per-coin values, after which hard-coded
-     * CompiledCoinSupplement dust becomes removable.
+     * dustAmount passes through verbatim: 0 is a real value, not an absence.
      */
     public Map<String, Object> toDtoMap() {
         LinkedHashMap<String, Object> m = new LinkedHashMap<>();
@@ -152,9 +140,7 @@ public final class CoinConfig {
         m.put("feePerByte", feePerByte());
         m.put("minTxFee", minTxFee());
         m.put("port", port());
-        Long dust = dustAmountOrNull();
-        if (dust != null && dust == 0L) dust = null;
-        m.put("dustAmount", dust);
+        m.put("dustAmount", dustAmount());
         return Collections.unmodifiableMap(m);
     }
 

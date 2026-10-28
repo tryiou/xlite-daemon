@@ -19,6 +19,7 @@ class CoinConfigTest {
         entries.put("FeePerByte", "10");
         entries.put("MinTxFee", "5000");
         entries.put("Port", "9332");
+        entries.put("DustAmount", "0");
         return new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", entries);
     }
 
@@ -71,17 +72,25 @@ class CoinConfigTest {
     }
 
     @Test
-    void testDustAbsentNullMalformedThrows() {
-        assertNull(sample().dustAmountOrNull());
+    void testDustAmountRequiredZeroIsAValueAndMalformedThrows() {
+        // Zero is a real floor: Firo's daemon rejects nothing, and its conf
+        // carries DustAmount=0. Only a missing key is "unspecified".
+        assertEquals(0L, sample().dustAmount());
 
         Map<String, String> withDust = new LinkedHashMap<>();
         withDust.put("DustAmount", "5460");
-        assertEquals(5460L, new CoinConfig("X", "X", "", withDust).dustAmountOrNull());
+        assertEquals(5460L, new CoinConfig("X", "X", "", withDust).dustAmount());
+
+        Map<String, String> absent = new LinkedHashMap<>();
+        IllegalStateException missing = assertThrows(IllegalStateException.class,
+                () -> new CoinConfig("X", "X", "", absent).dustAmount());
+        assertTrue(missing.getMessage().contains("missing required config key 'DustAmount'"),
+                missing.getMessage());
 
         Map<String, String> badDust = new LinkedHashMap<>();
         badDust.put("DustAmount", "zero");
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "X", "", badDust).dustAmountOrNull());
+                () -> new CoinConfig("X", "X", "", badDust).dustAmount());
         assertTrue(e.getMessage().contains("'DustAmount' is not a number"), e.getMessage());
     }
 

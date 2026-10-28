@@ -44,7 +44,7 @@ class CoinConfigSourceLocalTest {
         assertEquals(10L, ltc.feePerByte());
         assertEquals(5000L, ltc.minTxFee());
         assertEquals(9332, ltc.port());
-        assertEquals(0L, ltc.dustAmountOrNull());
+        assertEquals(0L, ltc.dustAmount());
     }
 
     @Test

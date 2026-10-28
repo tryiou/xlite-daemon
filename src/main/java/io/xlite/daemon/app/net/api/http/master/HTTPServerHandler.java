@@ -361,11 +361,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                 o.addProperty("feePerByte", ((Number) dto.get("feePerByte")).longValue());
                                 o.addProperty("minTxFee", ((Number) dto.get("minTxFee")).longValue());
                                 o.addProperty("port", ((Number) dto.get("port")).intValue());
-                                Object dust = dto.get("dustAmount");
-                                if (dust == null)
-                                    o.add("dustAmount", JsonNull.INSTANCE);
-                                else
-                                    o.addProperty("dustAmount", ((Number) dust).longValue());
+                                o.addProperty("dustAmount", ((Number) dto.get("dustAmount")).longValue());
                                 arr.add(o);
                             });
                     response.add("result", arr);

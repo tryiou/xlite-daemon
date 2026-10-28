@@ -396,6 +396,8 @@ public class WalletHelper {
      * upstream problem that was never involved.
      */
     public enum BuildFailure {
+        /** The requested output is below the coin's dust threshold. */
+        DUST_OUTPUT,
         /** The wallet holds nothing spendable. */
         NO_UTXOS,
         /** The selected inputs cannot cover the amount plus fee. */
@@ -528,6 +530,21 @@ public class WalletHelper {
         // Never Coin.COIN.value: that hardcodes 8 decimals and misprices
         // every 6-decimal coin 100x in fee, output and dust math below.
         long coinUnit = CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coinTicker)).coinFactor();
+
+        // A recipient output below the coin's threshold cannot be relayed: every
+        // node rejects the transaction at mempool acceptance. Refuse it here,
+        // before inputs are selected and signed, so the caller is told the amount
+        // is unspendable instead of only learning it when the broadcast fails.
+        // The comparison matches the change gate below (and the node): an output
+        // exactly at the threshold is spendable.
+        long dustLimit = params.getMinNonDustOutput().value;
+        long outputSats = Sats.fromWholeCoins(amount, coinUnit);
+        if (outputSats < dustLimit) {
+            LOGGER.warning("[wallet-" + CoinTickerUtils.tickerToString(coinTicker) + "] createTransactionSimple: output "
+                    + outputSats + " is below the dust threshold " + dustLimit);
+            failureOut[0] = BuildFailure.DUST_OUTPUT;
+            return null;
+        }
 
         ArrayList<UTXO> allUtxos = walletHelper.sortLeastToGreatest();
         allUtxos.removeIf(UTXO::isSpent);

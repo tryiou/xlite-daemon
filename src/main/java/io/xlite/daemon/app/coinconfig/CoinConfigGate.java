@@ -44,14 +44,16 @@ public final class CoinConfigGate {
         if (cfg.minTxFee() <= 0)
             v.add("MinTxFee must be positive, got " + cfg.minTxFee());
 
-        // Absent or zero means no dust floor, which is a legitimate choice and
-        // is honoured as such. Negative does not: a negative floor sits below
-        // every output, so nothing is ever trimmed and change is paid to the
-        // miner as fee instead of returned. That is silent money loss, so it
-        // is rejected here rather than becoming a runtime surprise.
-        Long dust = cfg.dustAmountOrNull();
-        if (dust != null && dust < 0)
-            v.add("DustAmount must not be negative, got " + dust);
+        // A dust floor is required: absent fails here rather than silently
+        // meaning "no floor". Zero is legal (Firo has no dust gate); negative
+        // would let every change output through, paying it to the miner.
+        try {
+            long dust = cfg.dustAmount();
+            if (dust < 0)
+                v.add("DustAmount must not be negative, got " + dust);
+        } catch (RuntimeException e) {
+            v.add("DustAmount invalid: " + e.getMessage());
+        }
 
         int port = cfg.port();
         if (port < 1024 || port > 65_535)

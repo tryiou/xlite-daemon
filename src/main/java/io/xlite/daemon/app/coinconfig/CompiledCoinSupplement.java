@@ -5,7 +5,8 @@ import java.util.Map;
 /**
  * The per-coin values a config-driven parameter set needs that the
  * blockchain-configuration-files repository does not carry: max supply,
- * wire protocol version, network id string and dust threshold.
+ * wire protocol version and network id string. The dust threshold is carried
+ * by the configuration repository and read from it, never from here.
  *
  * <p>Values were lifted verbatim from the per-coin hardcoded parameter classes
  * these replace, and from bitcoinj's MainNetParams for BTC. Those classes

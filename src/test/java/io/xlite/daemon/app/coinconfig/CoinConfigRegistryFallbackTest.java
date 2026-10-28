@@ -24,9 +24,9 @@ class CoinConfigRegistryFallbackTest {
             "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\",\"ver_id\":\"litecoin--v1\",\"xbridge_conf\":\"litecoin--v1.conf\"},"
                     + "{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\",\"ver_id\":\"doge--v1\",\"xbridge_conf\":\"doge--v1.conf\"}]";
     private static final String LTC_CONF =
-            "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\n";
+            "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nDustAmount=5460\n";
     private static final String DOGE_CONF =
-            "[DOGE]\nTitle=Dogecoin\nAddressPrefix=30\nScriptPrefix=22\nSecretPrefix=158\nCOIN=100000000\nFeePerByte=10\nMinTxFee=1000\nPort=22555\n";
+            "[DOGE]\nTitle=Dogecoin\nAddressPrefix=30\nScriptPrefix=22\nSecretPrefix=158\nCOIN=100000000\nFeePerByte=10\nMinTxFee=1000\nPort=22555\nDustAmount=1000000\n";
 
     @BeforeEach
     void reset() {

@@ -70,22 +70,9 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
         // the configuration carried its own and went unread: Litecoin's stale
         // constant was 100000 satoshis, eighteen times every other coin's, so a
         // smaller change was dropped and charged as fee instead of returned.
-        // There is deliberately no fallback constant here — a value invented on
-        // this side would be a second source of truth wearing the first one's
-        // clothes, which is the bug being removed. An absent value means no
-        // floor, and the configuration repository is where a real per-coin dust
-        // threshold belongs.
-        Long configuredDust = config.dustAmountOrNull();
-        try {
-            this.minNonDustOutput = Coin.valueOf(configuredDust == null ? 0L : configuredDust);
-        } catch (ArithmeticException e) {
-            // Same reasoning as the ceiling above: this value arrives from a
-            // fetch, so one too large to represent is a bad configuration and
-            // is reported as one rather than thrown as raw arithmetic.
-            throw new IllegalStateException("[" + config.getTicker()
-                    + "] DustAmount is too large to represent in base units: DustAmount="
-                    + configuredDust, e);
-        }
+        // The key is required, so an absent value fails at load instead of
+        // meaning "no floor"; 0 remains a real floor.
+        this.minNonDustOutput = Coin.valueOf(config.dustAmount());
     }
 
     public CoinConfig getConfig() {

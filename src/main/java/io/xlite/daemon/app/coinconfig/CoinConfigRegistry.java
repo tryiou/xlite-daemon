@@ -16,9 +16,9 @@ import java.util.logging.Logger;
  *
  * <p>This is the single source of per-coin configuration: an address's
  * prefixes and a coin's fee rate and minimum fee all come from here, from the
- * configuration repository. The values that repository does not carry — the
- * supply ceiling, dust floor, protocol version, network id and payment
- * protocol id — live in
+ * configuration repository, dust floor included. The values that repository
+ * does not carry — the supply ceiling, protocol version, network id and
+ * payment protocol id — live in
  * {@link CompiledCoinSupplement}. A coin missing from here fails loudly rather
  * than falling back to constants.</p>
  */

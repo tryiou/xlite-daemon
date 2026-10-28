@@ -179,13 +179,17 @@ class ConfigurableNetworkParametersCrossCheckTest {
                 "a zero dust floor means no floor, not an invented one");
 
         // Genuinely absent, as opposed to zero: the key is not in the map at all.
+        // A missing required key must fail loudly rather than silently become a
+        // zero floor.
         Map<String, String> withoutKey = new LinkedHashMap<>(zero.getConfEntries());
         withoutKey.remove("DustAmount");
         CoinConfig absent = new CoinConfig(zero.getTicker(), zero.getBlockchain(),
                 zero.getVerId(), withoutKey);
-        assertEquals(0L,
-                ConfigurableNetworkParameters.from(absent).getMinNonDustOutput().getValue(),
-                "an absent dust floor means no floor, not an invented one");
+        IllegalStateException missing = assertThrows(IllegalStateException.class,
+                () -> ConfigurableNetworkParameters.from(absent),
+                "an absent DustAmount must be rejected, not read as no floor");
+        assertTrue(missing.getMessage().contains("DustAmount"),
+                "the failure must name the key, got: " + missing.getMessage());
 
         // A negative floor is a money bug, not a cosmetic one: every change
         // output would sit "above" it, so nothing would be trimmed and the

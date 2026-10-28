@@ -86,7 +86,8 @@ public class CoinConfigRpcTest {
         assertEquals(10, ltc.get("feePerByte").getAsLong());
         assertEquals(5000, ltc.get("minTxFee").getAsLong());
         assertEquals(9332, ltc.get("port").getAsInt());
-        assertTrue(ltc.get("dustAmount").isJsonNull(), "interim bcf 0 placeholder maps to null until bcf populated");
+        assertEquals(0, ltc.get("dustAmount").getAsLong(),
+                "a real 0 (no dust gate) must be passed through, not nulled");
     }
 
     @Test
