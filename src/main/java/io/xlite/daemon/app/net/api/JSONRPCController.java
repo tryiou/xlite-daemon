@@ -2,6 +2,7 @@ package io.xlite.daemon.app.net.api;
 
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.netty.util.concurrent.Future;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +27,22 @@ public class JSONRPCController {
 
     public static JSONRPCMasterServer getMasterServer() {
         return masterServer;
+    }
+
+    /**
+     * Releases the worker group shared by every listener. This is the only
+     * place allowed to stop it: individual servers close their own channel
+     * and leave the group alone, so retiring one coin cannot take another
+     * coin's RPC endpoint down.
+     *
+     * <p>Call after every coin instance and the master server have been
+     * deinitialized; waits at most {@code timeoutMillis} for termination.</p>
+     */
+    public static void shutdownEventLoops(long timeoutMillis) {
+        Future<?> termination = NettyEventLoops.shutdown(0, timeoutMillis);
+        if (termination != null) {
+            termination.awaitUninterruptibly(timeoutMillis);
+        }
     }
 
     public static JSONRPCServer getRPCServer(CoinInstance coinInstance) {

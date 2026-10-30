@@ -272,6 +272,11 @@ public class App {
             masterRPC.deinit();
         }
 
+        // Every listener is retired by now; release the worker group they
+        // all borrowed. Bounded so a wedged event loop cannot stall exit
+        // (the threads are daemons either way).
+        JSONRPCController.shutdownEventLoops(2000);
+
         for (Handler handler : LOGGER.getHandlers()) {
             LOGGER.removeHandler(handler);
             handler.close();

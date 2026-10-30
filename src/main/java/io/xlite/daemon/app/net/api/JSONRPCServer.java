@@ -10,9 +10,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.util.concurrent.DefaultThreadFactory;
 
 import java.net.BindException;
 import java.net.InetAddress;
@@ -35,7 +33,6 @@ public class JSONRPCServer extends Thread {
     private volatile boolean bindFailed = false;
 
     private Channel channel;
-    private EventLoopGroup workerGroup;
 
     JSONRPCServer(CoinInstance coin, int port, String bindAddress) {
         this.coin = coin;
@@ -82,10 +79,10 @@ public class JSONRPCServer extends Thread {
         }
         // Daemon threads: the JVM must never be held hostage by an event
         // loop draining its graceful-shutdown quiet period after SIGINT
-        // (DestroyJavaVM waited on these for the full grace window).
-        workerGroup = new NioEventLoopGroup(5,
-                new DefaultThreadFactory(
-                        "rpc-coin-" + CoinTickerUtils.tickerToString(coin.getTicker()), true));
+        // (DestroyJavaVM waited on these for the full grace window). The
+        // group is shared by every listener and outlives this server — it
+        // is released once, by application shutdown.
+        EventLoopGroup workerGroup = NettyEventLoops.shared();
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.group(workerGroup)
@@ -270,8 +267,7 @@ public class JSONRPCServer extends Thread {
         if (channel != null) {
             channel.close();
         }
-        if (workerGroup != null) {
-            workerGroup.shutdownGracefully();
-        }
+        // The worker group is shared and owned by application shutdown —
+        // shutting it down here would retire every other coin's listener.
     }
 }

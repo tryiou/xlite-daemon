@@ -6,9 +6,7 @@ import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.util.concurrent.DefaultThreadFactory;
 
 import io.xlite.daemon.app.util.ConfigHelper;
 
@@ -27,7 +25,6 @@ public class JSONRPCMasterServer extends Thread {
     private boolean stopping = false;
 
     private Channel channel;
-    private EventLoopGroup workerGroup;
 
     JSONRPCMasterServer(int port, String bindAddress) {
         setDaemon(true);
@@ -52,8 +49,8 @@ public class JSONRPCMasterServer extends Thread {
                     + "' for master RPC server on port " + port + "; refusing to start");
             return;
         }
-        workerGroup = new NioEventLoopGroup(2,
-                new DefaultThreadFactory("rpc-master", true));
+        // Shared with every coin listener; released once at app shutdown.
+        EventLoopGroup workerGroup = NettyEventLoops.shared();
         try {
             LOGGER.info("[rpc] Starting master RPC server on port " + port + ".");
 
@@ -87,8 +84,6 @@ public class JSONRPCMasterServer extends Thread {
         if (channel != null) {
             channel.close();
         }
-        if (workerGroup != null) {
-            workerGroup.shutdownGracefully();
-        }
+        // Shared group: its lifecycle belongs to application shutdown.
     }
 }
