@@ -6,8 +6,10 @@ import java.util.Collections;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Time-field wire adapter: standard {@code version + vin + vout +
@@ -113,5 +115,18 @@ class TxTimeFieldTest {
         assertEquals(1790540887L,
                 TxTimeField.spendNTime(1790540887L, Collections.emptyList()));
         assertEquals(1790540887L, TxTimeField.spendNTime(1790540887L, null));
+    }
+
+    @Test
+    void testRequiresParentNTimeIsRecordedPerChain() {
+        // Verge rejects a spend older than its input's origin time; Pocketcoin
+        // signs nTime but does not enforce that rule. The distinction is not
+        // expressible in BCF's single TxWithTimeField flag.
+        assertTrue(TxTimeField.requiresParentNTime(
+                io.xlite.daemon.app.net.CoinTicker.VERGE));
+        assertFalse(TxTimeField.requiresParentNTime(
+                io.xlite.daemon.app.net.CoinTicker.PKOIN));
+        assertFalse(TxTimeField.requiresParentNTime(
+                io.xlite.daemon.app.net.CoinTicker.LITECOIN));
     }
 }

@@ -1,6 +1,7 @@
 package io.xlite.daemon.app.util;
 
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
+import io.xlite.daemon.app.coinconfig.CompiledCoinSupplement;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 
@@ -75,6 +76,21 @@ public final class TxTimeField {
      */
     public static boolean appliesTo(CoinTicker ticker) {
         return CoinConfigRegistry.get(CoinTickerUtils.tickerToString(ticker)).txWithTimeField();
+    }
+
+    /**
+     * Whether spending an output on this chain requires the spending
+     * transaction's nTime to be at least every input parent's nTime.
+     *
+     * <p>Verge enforces it ({@code XVG src/consensus/tx_verify.cpp},
+     * {@code nOriginTransactionTime > tx.nTime}); Pocketcoin does not, so a
+     * PKOIN spend carries nTime (it is signed) but is not bounded by its
+     * parents. BCF's {@code TxWithTimeField} covers only the field's presence,
+     * so the rule travels with the coin's non-BCF constants.
+     */
+    public static boolean requiresParentNTime(CoinTicker ticker) {
+        return CompiledCoinSupplement.forTicker(
+                CoinTickerUtils.tickerToString(ticker)).requiresParentNTime;
     }
 
     /**

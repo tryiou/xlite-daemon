@@ -12,6 +12,7 @@ import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.AddressBalance;
+import io.xlite.daemon.app.util.CoinTransactions;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.TxTimeField;
@@ -40,6 +41,7 @@ import java.security.MessageDigest;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -816,7 +818,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     break;
                 }
 
-                Transaction tx = new Transaction(coin.getNetworkParameters());
+                Transaction tx = CoinTransactions.newTransaction(
+                        coin.getNetworkParameters(), coin.getTicker());
                 if (locktime > 0 && !tx.isTimeLocked()) {
                     tx.setLockTime(locktime);
                 }
@@ -1059,7 +1062,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     break;
                 }
 
-                Transaction signedTx = new Transaction(coin.getNetworkParameters());
+                Transaction signedTx = CoinTransactions.forSigning(
+                        coin.getNetworkParameters(), tx);
 
                 boolean complete = true;
                 boolean inputFailed = false;
@@ -1100,16 +1104,35 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     break;
                 }
 
+                List<String> inputTxids = new ArrayList<>();
+                for (TransactionOutPoint outPoint : outPoints)
+                    inputTxids.add(outPoint.getHash().toString());
+
+                // The chain signs nTime, so the value must be final before any
+                // signature is computed. The value carried by the unsigned
+                // transaction is the floor; only a newer parent may raise it,
+                // and only on chains that enforce the input-time rule. Any
+                // failure is fatal -- a guessed time signs bytes no node hashes.
+                long signedNTime;
+                try {
+                    signedNTime = resolveSignedNTime(preservedNTime, inputTxids);
+                } catch (RuntimeException e) {
+                    nTimeFailure(response, e.getMessage());
+                    LOGGER.warning("[http-server-handler] signrawtransaction could not resolve nTime for "
+                            + CoinTickerUtils.tickerToString(coin.getTicker()) + ", " + e.getMessage());
+                    break;
+                }
+
                 // All inputs are attached before any signature is computed:
                 // the chain's preimage covers every input, so signing as we
                 // went would invalidate each earlier signature.
                 try {
-                    if (preservedNTime >= 0) {
-                        // The chain signs nTime, so the preserved value belongs
+                    if (signedNTime >= 0) {
+                        // The chain signs nTime, so the chosen value belongs
                         // in the preimage, not spliced in afterwards.
                         TxTimeFieldSigner.addSignedInputs(coin.getNetworkParameters(), signedTx,
                                 signingKeys, outPoints, spentScripts, Transaction.SigHash.ALL,
-                                preservedNTime);
+                                signedNTime);
                     } else {
                         for (int i = 0; i < signingKeys.size(); i++) {
                             signedTx.addSignedInput(outPoints.get(i), spentScripts.get(i),
@@ -1130,8 +1153,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 // nTime reinserted; for every other chain the plain
                 // serialization already is them.
                 byte[] signedBytes = signedTx.bitcoinSerialize();
-                if (hasTxTimeField(coin.getTicker()) && preservedNTime >= 0) {
-                    signedBytes = TxTimeField.insertNTime(signedBytes, preservedNTime);
+                if (hasTxTimeField(coin.getTicker()) && signedNTime >= 0) {
+                    signedBytes = TxTimeField.insertNTime(signedBytes, signedNTime);
                 }
                 String signedTxHex = new String(Hex.encode(signedBytes));
                 JsonObject resultJSON = new JsonObject();
@@ -1830,6 +1853,57 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
         List<Long> parentNTimes = fetchParentNTimes(coin.getTicker(), parentTxids);
         return TxTimeField.spendNTime(System.currentTimeMillis() / 1000, parentNTimes);
+    }
+
+    /**
+     * The newest nTime among the given parent transactions, or -1 when there
+     * are none. Used while signing, where wall-clock time must not be injected:
+     * the unsigned transaction's own nTime is the floor, and only a newer
+     * parent may raise it. Throws on any fetch or parse failure.
+     */
+    private long resolveParentNTimeMax(List<String> parentTxids) {
+        // Several inputs may spend different outputs of the same parent, and
+        // its nTime is a property of that transaction: fetch each parent once.
+        List<Long> parentNTimes = fetchParentNTimes(coin.getTicker(),
+                new ArrayList<>(new LinkedHashSet<>(parentTxids)));
+        long max = -1;
+        for (Long parent : parentNTimes) {
+            if (parent != null && parent > max)
+                max = parent;
+        }
+        return max;
+    }
+
+    /**
+     * The nTime to sign, or -1 for a coin whose transactions carry none.
+     *
+     * <p>The value carried by the unsigned transaction is the floor. A chain
+     * that enforces the input-time rule may raise it to the newest parent's
+     * time; one that only signs the field keeps it. Throws when a time-field
+     * transaction has no nTime at all: emitting standard-layout bytes there is
+     * undecodable, and guessing a time would sign bytes no node hashes.
+     */
+    private long resolveSignedNTime(long preservedNTime, List<String> inputTxids) {
+        if (!hasTxTimeField(coin.getTicker()))
+            return -1;
+        long parentMax = -1;
+        if (TxTimeField.requiresParentNTime(coin.getTicker())
+                && !inputTxids.isEmpty()) {
+            parentMax = resolveParentNTimeMax(inputTxids);
+        }
+        long signedNTime = Math.max(preservedNTime, parentMax);
+        if (signedNTime < 0)
+            throw new RuntimeException("the unsigned transaction has no nTime");
+        return signedNTime;
+    }
+
+    /** The single error envelope for a signing-time nTime failure. */
+    private static void nTimeFailure(JsonObject response, String detail) {
+        response.add("result", JsonNull.INSTANCE);
+        JsonObject error = new JsonObject();
+        error.addProperty("code", -6);
+        error.addProperty("message", "Cannot resolve nTime: " + detail);
+        response.add("error", error);
     }
 
     /**

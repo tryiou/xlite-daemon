@@ -5,8 +5,10 @@ import java.util.Map;
 /**
  * The per-coin values a config-driven parameter set needs that the
  * blockchain-configuration-files repository does not carry: max supply,
- * wire protocol version and network id string. The dust threshold is carried
- * by the configuration repository and read from it, never from here.
+ * wire protocol version, network id string, and the input-time rule for
+ * chains whose transaction nTime is bounded by its parents' nTime. The dust
+ * threshold is carried by the configuration repository and read from it,
+ * never from here.
  *
  * <p>Values were lifted verbatim from the per-coin hardcoded parameter classes
  * these replace, and from bitcoinj's MainNetParams for BTC. Those classes
@@ -23,17 +25,33 @@ public final class CompiledCoinSupplement {
         public final int protocolVersion;
         public final String id;
         public final String chainName;
+        /**
+         * Whether spending an output requires the spending transaction's nTime
+         * to be at least every input parent's nTime. BCF's
+         * {@code TxWithTimeField} covers only the field's presence, so the
+         * input-time rule is recorded here, from the chain's own source.
+         */
+        public final boolean requiresParentNTime;
 
         public Supplement(long maxMoneyCoins, int protocolVersion, String id, String chainName) {
+            this(maxMoneyCoins, protocolVersion, id, chainName, false);
+        }
+
+        public Supplement(long maxMoneyCoins, int protocolVersion, String id, String chainName,
+                boolean requiresParentNTime) {
             this.maxMoneyCoins = maxMoneyCoins;
             this.protocolVersion = protocolVersion;
             this.id = id;
             this.chainName = chainName;
+            this.requiresParentNTime = requiresParentNTime;
         }
     }
 
     private static final Map<String, Supplement> BY_TICKER = Map.ofEntries(
-            Map.entry("XVG", new Supplement(16_555_000_000L, 90009, "XVG", "main")),
+            // Verge rejects a spend whose nTime is older than any input's
+            // origin time (XVG src/consensus/tx_verify.cpp,
+            // "bad-txs-and-input-times"), so its parents must be read.
+            Map.entry("XVG", new Supplement(16_555_000_000L, 90009, "XVG", "main", true)),
             // Blocknet: supply, protocol version, network id and payment protocol
             // id are consensus constants the configuration repository does not
             // carry, so they stay compiled in. Its prefixes, divisor, fees, port
