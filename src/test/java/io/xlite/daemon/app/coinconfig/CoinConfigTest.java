@@ -20,6 +20,7 @@ class CoinConfigTest {
         entries.put("MinTxFee", "5000");
         entries.put("Port", "9332");
         entries.put("DustAmount", "0");
+        entries.put("TxVersion", "2");
         return new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", entries);
     }
 
@@ -104,13 +105,66 @@ class CoinConfigTest {
     }
 
     @Test
+    @DisplayName("TxVersion is read from configuration, never defaulted")
+    void testTxVersionRequiredAndReadFromConfiguration() {
+        assertEquals(2, sample().txVersion());
+
+        Map<String, String> absent = new LinkedHashMap<>();
+        IllegalStateException missing = assertThrows(IllegalStateException.class,
+                () -> new CoinConfig("X", "X", "", absent).txVersion());
+        assertTrue(missing.getMessage().contains("missing required config key 'TxVersion'"),
+                missing.getMessage());
+
+        Map<String, String> bad = new LinkedHashMap<>();
+        bad.put("TxVersion", "one");
+        IllegalStateException malformed = assertThrows(IllegalStateException.class,
+                () -> new CoinConfig("X", "X", "", bad).txVersion());
+        assertTrue(malformed.getMessage().contains("'TxVersion' is not a number"),
+                malformed.getMessage());
+    }
+
+    @Test
     void testConfEntriesUnmodifiable() {
         assertThrows(UnsupportedOperationException.class,
                 () -> sample().getConfEntries().put("New", "1"));
     }
 
-    /** A config the gate accepts, so a test can break exactly one thing. */
+    @Test
+    @DisplayName("the gate refuses a missing or non-positive TxVersion at load")
+    void testGateRejectsMissingOrNonPositiveTxVersion() {
+        Map<String, String> missing = gateValid("LTC", "false");
+        missing.remove("TxVersion");
+        IllegalStateException absent = assertThrows(IllegalStateException.class,
+                () -> CoinConfigGate.validate(new CoinConfig("LTC", "Litecoin", "ltc--test", missing)),
+                "TxVersion is a BCF-supplied value, not something the daemon may default");
+        assertTrue(absent.getMessage().contains("TxVersion"), absent.getMessage());
+
+        for (String value : new String[]{"0", "-1", "two"}) {
+            Map<String, String> bad = gateValid("LTC", "false");
+            bad.put("TxVersion", value);
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> CoinConfigGate.validate(new CoinConfig("LTC", "Litecoin", "ltc--test", bad)),
+                    "TxVersion=" + value + " must be rejected");
+            assertTrue(e.getMessage().contains("TxVersion"), e.getMessage());
+        }
+    }
+
+    @Test
+    @DisplayName("the gate accepts a configured TxVersion, including values above 2")
+    void testGateAcceptsConfiguredTxVersion() {
+        for (String value : new String[]{"1", "2", "160"}) {
+            CoinConfig cfg = new CoinConfig("LTC", "Litecoin", "ltc--test",
+                    gateValid("LTC", "false", value));
+            assertDoesNotThrow(() -> CoinConfigGate.validate(cfg),
+                    "TxVersion=" + value + " must be accepted");
+        }
+    }
+
     private static Map<String, String> gateValid(String ticker, String timeField) {
+        return gateValid(ticker, timeField, "1");
+    }
+
+    private static Map<String, String> gateValid(String ticker, String timeField, String txVersion) {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("AddressPrefix", "30");
         m.put("ScriptPrefix", "63");
@@ -120,6 +174,7 @@ class CoinConfigTest {
         m.put("MinTxFee", "5000");
         m.put("Port", "9332");
         m.put("DustAmount", "0");
+        m.put("TxVersion", txVersion);
         m.put("TxWithTimeField", timeField);
         return m;
     }

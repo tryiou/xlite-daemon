@@ -95,6 +95,15 @@ public final class CoinConfig {
     }
 
     /**
+     * The coin's transaction version from the BCF xbridge conf. Required, never
+     * defaulted: the value is the one the chain's own wallet writes, and the
+     * daemon has no basis for choosing a different one.
+     */
+    public int txVersion() {
+        return requiredInt("TxVersion");
+    }
+
+    /**
      * Whether the coin's wire format carries an nTime field after nVersion
      * (Peercoin-derived chains set TxWithTimeField=true in BCF). Opt-in:
      * absent/blank yields false; a present-but-unparseable value throws.

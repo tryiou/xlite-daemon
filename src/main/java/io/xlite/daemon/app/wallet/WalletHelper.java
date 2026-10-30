@@ -9,6 +9,7 @@ import io.xlite.daemon.app.net.HasFeeParams;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.CloudTransaction;
+import io.xlite.daemon.app.util.CoinTransactions;
 import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.TxTimeFieldSigner;
@@ -228,7 +229,7 @@ public class WalletHelper {
     }
 
     public Transaction createRawTransactionWithAllUTXOs(ArrayList<TransactionOutput> outputs, double amount) {
-        Transaction tx = new Transaction(networkParameters);
+        Transaction tx = CoinTransactions.newTransaction(networkParameters, coin.getTicker());
 
         for (TransactionOutput output : outputs) {
             tx.addOutput(output);
@@ -582,7 +583,7 @@ public class WalletHelper {
             return null;
         }
 
-        Transaction tx = new Transaction(params);
+        Transaction tx = CoinTransactions.newTransaction(params, coinTicker);
         for (UTXO output : outputs) {
             Address addr = LegacyAddress.fromBase58(params, output.getAddress());
             tx.addOutput(Coin.valueOf(Sats.fromWholeCoins(output.getAmount(), coinUnit)), addr);

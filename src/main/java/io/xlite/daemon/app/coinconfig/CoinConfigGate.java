@@ -69,6 +69,19 @@ public final class CoinConfigGate {
             v.add("TxWithTimeField invalid: " + e.getMessage());
         }
 
+        // TxVersion is the coin's own transaction version. It is required for
+        // exactly the same reason as the wire-format flag: building a version
+        // the chain's wallet does not use is a deviation the caller cannot see.
+        // Only a positive value is meaningful, but the range is deliberately
+        // not capped at 2 -- BCF carries larger values (Particl's 160).
+        try {
+            int txVersion = cfg.txVersion();
+            if (txVersion < 1)
+                v.add("TxVersion must be positive, got " + txVersion);
+        } catch (RuntimeException e) {
+            v.add("TxVersion invalid: " + e.getMessage());
+        }
+
         if (!v.isEmpty()) {
             throw new IllegalStateException("["
                     + cfg.getTicker() + "] coin config rejected: " + String.join("; ", v));
