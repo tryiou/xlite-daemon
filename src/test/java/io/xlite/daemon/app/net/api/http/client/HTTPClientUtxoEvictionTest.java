@@ -73,6 +73,7 @@ public class HTTPClientUtxoEvictionTest {
         block.put("MinTxFee", "10000");
         block.put("Port", "41414");
         block.put("DustAmount", "0");
+        block.put("TxVersion", "1");
         block.put("Title", "Blocknet");
         cfgs.put("BLOCK", new io.xlite.daemon.app.coinconfig.CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", block));
         if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {

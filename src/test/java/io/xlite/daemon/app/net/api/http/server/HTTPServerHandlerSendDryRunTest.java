@@ -61,6 +61,7 @@ class HTTPServerHandlerSendDryRunTest {
         entries.put("MinTxFee", Long.toString(XVG_MIN_TX_FEE));
         entries.put("Port", "20102");
         entries.put("DustAmount", "0");
+        entries.put("TxVersion", "1");
         entries.put("Title", "Verge");
         return new CoinConfig("XVG", "Verge", "verge--test", entries);
     }

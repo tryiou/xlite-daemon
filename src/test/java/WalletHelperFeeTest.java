@@ -143,6 +143,7 @@ class WalletHelperFeeTest extends TestHelper {
         e.put("MinTxFee", Long.toString(22_000L + index));
         e.put("Port", Integer.toString(34567 + index));
         e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
         e.put("Title", ticker);
         return new CoinConfig(ticker, ticker, ticker.toLowerCase() + "--test", e);
     }

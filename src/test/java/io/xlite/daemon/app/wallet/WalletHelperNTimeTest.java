@@ -59,6 +59,7 @@ class WalletHelperNTimeTest {
         entries.put("MinTxFee", "100000");
         entries.put("Port", Integer.toString(port));
         entries.put("DustAmount", "0");
+        entries.put("TxVersion", "1");
         entries.put("Title", blockchain);
         entries.put("TxWithTimeField", txWithTimeField);
         return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", entries);

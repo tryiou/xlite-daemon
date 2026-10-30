@@ -78,6 +78,7 @@ public class TestHelper {
         e.put("MinTxFee", Long.toString(minTxFee));
         e.put("Port", Integer.toString(port));
         e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
         e.put("Title", blockchain);
         return new io.xlite.daemon.app.coinconfig.CoinConfig(
                 ticker, blockchain, ticker.toLowerCase() + "--test", e);

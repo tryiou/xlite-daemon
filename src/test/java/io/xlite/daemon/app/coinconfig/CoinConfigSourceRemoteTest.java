@@ -91,9 +91,9 @@ class CoinConfigSourceRemoteTest {
     // --- cache / compare / parallel ---
 
     private static final String LTC_CONF_V1 =
-            "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\n";
+            "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nTxVersion=2\n";
     private static final String DOGE_CONF =
-            "[DOGE]\nTitle=Dogecoin\nAddressPrefix=30\nScriptPrefix=22\nSecretPrefix=158\nCOIN=100000000\nFeePerByte=10\nMinTxFee=1000\nPort=22555\n";
+            "[DOGE]\nTitle=Dogecoin\nAddressPrefix=30\nScriptPrefix=22\nSecretPrefix=158\nCOIN=100000000\nFeePerByte=10\nMinTxFee=1000\nPort=22555\nTxVersion=1\n";
 
     private static String manifestOf(String... entries) {
         return "[" + String.join(",", entries) + "]";

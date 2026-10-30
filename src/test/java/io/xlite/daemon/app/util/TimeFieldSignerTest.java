@@ -79,6 +79,7 @@ class TimeFieldSignerTest {
         e.put("MinTxFee", "10000");
         e.put("Port", "41414");
         e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
         io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadForTest(
                 java.util.Map.of("BLOCK", new io.xlite.daemon.app.coinconfig.CoinConfig(
                         "BLOCK", "Blocknet", "block--test", e)));

@@ -69,6 +69,7 @@ class WalletHelperNoHiddenSpendTest {
             block.put("MinTxFee", "10000");
             block.put("Port", "41414");
             block.put("DustAmount", "0");
+            block.put("TxVersion", "1");
             block.put("Title", "Blocknet");
             java.util.Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs =
                     new java.util.LinkedHashMap<>();

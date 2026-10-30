@@ -56,6 +56,7 @@ class CoinInstanceDivisorTest {
         e.put("MinTxFee", "5000");
         e.put("Port", "20102");
         e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
         e.put("Title", "Test");
         return new CoinConfig(ticker, "Test", ticker.toLowerCase() + "--test", e);
     }

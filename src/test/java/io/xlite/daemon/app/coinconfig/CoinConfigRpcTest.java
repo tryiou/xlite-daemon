@@ -21,12 +21,12 @@ public class CoinConfigRpcTest {
         Map<String, String> ltc = new LinkedHashMap<>();
         ltc.put("AddressPrefix", "48"); ltc.put("ScriptPrefix", "50"); ltc.put("SecretPrefix", "176");
         ltc.put("COIN", "100000000"); ltc.put("FeePerByte", "10"); ltc.put("MinTxFee", "5000");
-        ltc.put("Port", "9332"); ltc.put("DustAmount", "0");
+        ltc.put("Port", "9332"); ltc.put("DustAmount", "0"); ltc.put("TxVersion", "2");
         m.put("LTC", new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", ltc));
         Map<String, String> block = new LinkedHashMap<>();
         block.put("AddressPrefix", "26"); block.put("ScriptPrefix", "28"); block.put("SecretPrefix", "154");
         block.put("COIN", "100000000"); block.put("FeePerByte", "20"); block.put("MinTxFee", "10000");
-        block.put("Port", "41414"); block.put("DustAmount", "0");
+        block.put("Port", "41414"); block.put("DustAmount", "0"); block.put("TxVersion", "1");
         m.put("BLOCK", new CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", block));
         return m;
     }

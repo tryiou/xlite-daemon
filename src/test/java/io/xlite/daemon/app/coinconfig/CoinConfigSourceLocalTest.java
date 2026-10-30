@@ -61,9 +61,9 @@ class CoinConfigSourceLocalTest {
                 "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\",\"xbridge_conf\":\"ltc.conf\"},"
                         + "{\"blockchain\":\"Blocknet\",\"ticker\":\"BLOCK\",\"xbridge_conf\":\"block.conf\"}]");
         Files.writeString(dir.resolve("xbridge-confs").resolve("ltc.conf"),
-                "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nDustAmount=0\n");
+                "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nDustAmount=0\nTxVersion=1\n");
         Files.writeString(dir.resolve("xbridge-confs").resolve("block.conf"),
-                "[BLOCK]\nTitle=Blocknet\nAddressPrefix=26\nScriptPrefix=28\nSecretPrefix=154\nCOIN=100000000\nFeePerByte=20\nMinTxFee=10000\nPort=41414\n");
+                "[BLOCK]\nTitle=Blocknet\nAddressPrefix=26\nScriptPrefix=28\nSecretPrefix=154\nCOIN=100000000\nFeePerByte=20\nMinTxFee=10000\nPort=41414\nTxVersion=1\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
         assertEquals(2, all.size());
         assertTrue(all.containsKey("LTC"));
@@ -122,7 +122,7 @@ class CoinConfigSourceLocalTest {
                 "{\"contracts\":[{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\","
                         + "\"xbridge_conf\":\"doge.conf\"}]}");
         Files.writeString(dir.resolve("xbridge-confs").resolve("doge.conf"),
-                "[DOGE]\nAddressPrefix=30\nFeePerByte=1\nMinTxFee=2\nCOIN=3\nPort=4\nScriptPrefix=22\nSecretPrefix=158\n");
+                "[DOGE]\nAddressPrefix=30\nFeePerByte=1\nMinTxFee=2\nCOIN=3\nPort=4\nScriptPrefix=22\nSecretPrefix=158\nTxVersion=1\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
         assertEquals(30, all.get("DOGE").addressPrefix());
     }

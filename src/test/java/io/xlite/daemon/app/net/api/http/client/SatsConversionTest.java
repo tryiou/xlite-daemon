@@ -55,6 +55,7 @@ class SatsConversionTest {
         e.put("MinTxFee", "678");
         e.put("Port", "9332");
         e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
         return new CoinConfig(ticker, name, ticker.toLowerCase() + "--test", e);
     }
 

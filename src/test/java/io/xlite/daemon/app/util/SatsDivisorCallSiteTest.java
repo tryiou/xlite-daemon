@@ -54,6 +54,7 @@ class SatsDivisorCallSiteTest {
         e.put("MinTxFee", "5000");
         e.put("Port", "10000");
         e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
         e.put("Title", blockchain);
         return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", e);
     }

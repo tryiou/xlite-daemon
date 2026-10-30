@@ -67,6 +67,7 @@ class HTTPServerHandlerWireLayoutTest {
         e.put("MinTxFee", "678");
         e.put("Port", "9332");
         e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
         e.put("TxWithTimeField", Boolean.toString(timeField));
         return new CoinConfig(ticker, name, ticker.toLowerCase() + "--test", e);
     }

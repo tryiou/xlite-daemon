@@ -80,6 +80,7 @@ class WalletHelperSendTest {
         entries.put("MinTxFee", "5000");
         entries.put("Port", Integer.toString(port));
         entries.put("DustAmount", "0");
+        entries.put("TxVersion", "1");
         entries.put("Title", blockchain);
         return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", entries);
     }
