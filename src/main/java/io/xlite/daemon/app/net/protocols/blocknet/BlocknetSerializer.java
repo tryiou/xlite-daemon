@@ -95,8 +95,6 @@ public final class BlocknetSerializer extends BitcoinSerializer {
     @Override
     public Message deserializePayload(BitcoinSerializer.BitcoinPacketHeader header, ByteBuffer in)
             throws ProtocolException, BufferUnderflowException {
-        // in.position(0);
-        // seekPastMagicBytes(in);
         if (!(header instanceof BlocknetPacketHeader blocknetPacketHeader)) {
             throw new ProtocolException("Expected a Blocknet packet header");
         }
@@ -108,80 +106,124 @@ public final class BlocknetSerializer extends BitcoinSerializer {
             throw new ProtocolException("Checksum failed to verify.");
         }
 
-        switch (blocknetPacketHeader.getCommand().toLowerCase()) {
-            case "xrouter":
-                LOGGER.finer(
-                        "[blocknet-serializer] Received XRouter packet, at position: "
-                                + in.position());
-                return new XRouterMessage(payloadBytes);
+        int length = blocknetPacketHeader.getLength();
+        String command = blocknetPacketHeader.getCommand().toLowerCase();
+        Deserialized result = deserializeControl(command, payloadBytes, length);
+        if (!result.handled()) {
+            result = deserializeChainData(command, payloadBytes, length);
+        }
+        if (!result.handled()) {
+            result = deserializeRequests(command, payloadBytes, length);
+        }
+        if (!result.handled()) {
+            result = deserializeIgnored(command);
+        }
+        if (result.handled()) {
+            return result.message();
+        }
+        LOGGER.finer(
+                "[blocknet-serializer] Warning: This serializer does not support deserializing "
+                        + blocknetPacketHeader.getCommand()
+                        + " packets (yet).");
+        return new UnknownMessage(params, blocknetPacketHeader.getCommand(), payloadBytes);
+    }
+
+    /** Whether a command was recognised, and the message it produced (null when ignored). */
+    private record Deserialized(boolean handled, Message message) {
+
+        static Deserialized handled(Message message) {
+            return new Deserialized(true, message);
+        }
+
+        static Deserialized ignored() {
+            return new Deserialized(true, null);
+        }
+
+        static Deserialized unhandled() {
+            return new Deserialized(false, null);
+        }
+    }
+
+    private Deserialized deserializeControl(String command, byte[] payload, int length)
+            throws ProtocolException {
+        switch (command) {
             case "version":
-                //				LOGGER.finer("[blocknet-serializer] Version message received");
-                return new VersionMessage(params, payloadBytes);
+                return Deserialized.handled(new VersionMessage(params, payload));
             case "inv":
-                //				LOGGER.finer("[blocknet-serializer] Warning: Inventory messages are ignored");
-                return null;
-            case "block":
-                return new Block(params, payloadBytes, 0, this, blocknetPacketHeader.getLength());
-            case "merkleblock":
-                return new FilteredBlock(params, payloadBytes);
-            case "getdata":
-                return new GetDataMessage(
-                        params, payloadBytes, this, blocknetPacketHeader.getLength());
-            case "getblocks":
-                return new GetBlocksMessage(params, payloadBytes);
-            case "getheaders":
-                return new GetHeadersMessage(params, payloadBytes);
-            case "tx":
-                return new Transaction(
-                        params,
-                        payloadBytes,
-                        0,
-                        null,
-                        this,
-                        blocknetPacketHeader.getLength(),
-                        null);
+                // Inventory messages are ignored.
+                return Deserialized.ignored();
             case "addr":
-                return makeAddressMessage(payloadBytes, blocknetPacketHeader.getLength());
+                return Deserialized.handled(makeAddressMessage(payload, length));
             case "alert":
-                return new AlertMessage(params, payloadBytes);
+                return Deserialized.handled(new AlertMessage(params, payload));
             case "ping":
-                return new Ping(params, payloadBytes);
+                return Deserialized.handled(new Ping(params, payload));
             case "pong":
-                return new Pong(params, payloadBytes);
+                return Deserialized.handled(new Pong(params, payload));
             case "verack":
-                return new VersionAck(params, payloadBytes);
-            case "headers":
-                return new HeadersMessage(params, payloadBytes);
-            case "filterload":
-                return new BloomFilter(params, payloadBytes);
-            case "notfound":
-                return new NotFoundMessage(params, payloadBytes);
-            case "mempool":
-                return new MemoryPoolMessage();
+                return Deserialized.handled(new VersionAck(params, payload));
             case "reject":
-                return new RejectMessage(params, payloadBytes);
+                return Deserialized.handled(new RejectMessage(params, payload));
+            case "mempool":
+                return Deserialized.handled(new MemoryPoolMessage());
+            default:
+                return Deserialized.unhandled();
+        }
+    }
+
+    private Deserialized deserializeChainData(String command, byte[] payload, int length)
+            throws ProtocolException {
+        switch (command) {
+            case "xrouter":
+                LOGGER.finer("[blocknet-serializer] Received XRouter packet");
+                return Deserialized.handled(new XRouterMessage(payload));
+            case "block":
+                return Deserialized.handled(new Block(params, payload, 0, this, length));
+            case "merkleblock":
+                return Deserialized.handled(new FilteredBlock(params, payload));
+            case "tx":
+                return Deserialized.handled(
+                        new Transaction(params, payload, 0, null, this, length, null));
+            case "headers":
+                return Deserialized.handled(new HeadersMessage(params, payload));
+            default:
+                return Deserialized.unhandled();
+        }
+    }
+
+    private Deserialized deserializeRequests(String command, byte[] payload, int length)
+            throws ProtocolException {
+        switch (command) {
+            case "getdata":
+                return Deserialized.handled(new GetDataMessage(params, payload, this, length));
+            case "getblocks":
+                return Deserialized.handled(new GetBlocksMessage(params, payload));
+            case "getheaders":
+                return Deserialized.handled(new GetHeadersMessage(params, payload));
+            case "filterload":
+                return Deserialized.handled(new BloomFilter(params, payload));
+            case "notfound":
+                return Deserialized.handled(new NotFoundMessage(params, payload));
             case "utxos":
-                return new UTXOsMessage(params, payloadBytes);
+                return Deserialized.handled(new UTXOsMessage(params, payload));
             case "getutxos":
-                return new GetUTXOsMessage(params, payloadBytes);
+                return Deserialized.handled(new GetUTXOsMessage(params, payload));
+            default:
+                return Deserialized.unhandled();
+        }
+    }
+
+    /** Packet types this serializer recognises but does not model yet. */
+    private static Deserialized deserializeIgnored(String command) {
+        switch (command) {
             case "getsporks":
             case "ssc":
             case "mnget":
             case "xbridge":
-                //				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support
-                // deserializing xbridge/ssc/mnget/getsporks packets yet.");
-                return null;
             case "dseg":
-                //				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support
-                // deserializing dseg packets yet.");
-                return null;
+                return Deserialized.ignored();
             default:
-                LOGGER.finer(
-                        "[blocknet-serializer] Warning: This serializer does not support"
-                                + " deserializing "
-                                + blocknetPacketHeader.getCommand()
-                                + " packets (yet).");
-                return new UnknownMessage(params, blocknetPacketHeader.getCommand(), payloadBytes);
+                return Deserialized.unhandled();
         }
     }
 

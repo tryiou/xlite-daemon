@@ -90,6 +90,22 @@ public final class CoinInstance {
 
     private static final int MINIMUM_UTXO_UPDATE_INTERVAL = 500;
 
+    /** The display name each supported mainnet uses in its startup line. */
+    private static final Map<CoinTicker, String> MAINNET_NAMES =
+            Map.ofEntries(
+                    Map.entry(CoinTicker.BLOCKNET, "Blocknet"),
+                    Map.entry(CoinTicker.BITCOIN, "Bitcoin"),
+                    Map.entry(CoinTicker.LITECOIN, "Litecoin"),
+                    Map.entry(CoinTicker.DASHCOIN, "Dashcoin"),
+                    Map.entry(CoinTicker.DIGIBYTE, "Digibyte"),
+                    Map.entry(CoinTicker.DOGECOIN, "Dogecoin"),
+                    Map.entry(CoinTicker.SYSCOIN, "Syscoin"),
+                    Map.entry(CoinTicker.PIVX, "Pivx"),
+                    Map.entry(CoinTicker.UNOBTANIUM, "Unobtanium"),
+                    Map.entry(CoinTicker.PKOIN, "Pocketcoin"),
+                    Map.entry(CoinTicker.RAVENCOIN, "Ravencoin"),
+                    Map.entry(CoinTicker.VERGE, "Verge"));
+
     private static final int FORWARD_ADDRESS_COUNT = 0;
 
     private static final List<CoinInstance> COIN_INSTANCES = new CopyOnWriteArrayList<>();
@@ -397,235 +413,19 @@ public final class CoinInstance {
     }
 
     public CoinError init(char[] pw, String userMnemonic, boolean isMnemonic) {
-        switch (ticker) {
-            case BLOCKNET:
-                {
-                    LOGGER.fine("[coin] Initializing for Blocknet main network.");
-                    // Blocknet is configured like every other coin: its address
-                    // prefixes and fee rates come from its configuration file. It
-                    // used to take a hardcoded parameter class instead, whose fee
-                    // constants had drifted from what that file specifies.
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    // The XRouter-over-p2p parameters are separate and still
-                    // hardcoded: they carry the p2p serializer that the config
-                    // does not model. Nothing in the money or address paths reads
-                    // them; only the Blocknet p2p peer plumbing does.
-                    //
-                    // Order matters: constructing this object consults the loaded
-                    // configuration, so it has to come after the load above has
-                    // succeeded. Moving it above that check would throw out of
-                    // init() instead of returning the coin error callers handle.
-                    blocknetNetworkParameters = new BlocknetNetworkParameters();
-                    break;
-                }
-            case BITCOIN:
-                {
-                    LOGGER.fine("[coin] Initializing for Bitcoin main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case LITECOIN:
-                {
-                    LOGGER.fine("[coin] Initializing for Litecoin main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case DASHCOIN:
-                {
-                    LOGGER.fine("[coin] Initializing for Dashcoin main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case DIGIBYTE:
-                {
-                    LOGGER.fine("[coin] Initializing for Digibyte main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case DOGECOIN:
-                {
-                    LOGGER.fine("[coin] Initializing for Dogecoin main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case SYSCOIN:
-                {
-                    LOGGER.fine("[coin] Initializing for Syscoin main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case PIVX:
-                {
-                    LOGGER.fine("[coin] Initializing for Pivx main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case UNOBTANIUM:
-                {
-                    LOGGER.fine("[coin] Initializing for Unobtanium main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case PKOIN:
-                {
-                    LOGGER.fine("[coin] Initializing for Pocketcoin main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case RAVENCOIN:
-                {
-                    LOGGER.fine("[coin] Initializing for Ravencoin main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            case VERGE:
-                {
-                    LOGGER.fine("[coin] Initializing for Verge main network.");
-                    CoinError err = loadMigratedParams();
-                    if (err != null) {
-                        return err;
-                    }
-                    break;
-                }
-            default:
-                {
-                    LOGGER.fine("[coin] ERROR: Invalid/unsupported network: " + ticker.toString());
-                    return new CoinError(
-                            "Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
-                }
+        CoinError parameterError = loadCoinParameters();
+        if (parameterError != null) {
+            return parameterError;
         }
 
         configHelper.writeConfig();
-
         Context.propagate(new Context(networkParameters));
 
-        List<String> baseSeed;
-
-        if (isMnemonic) {
-            baseSeed = splitMnemonicChars(pw);
-        } else {
-            if (KeyHandler.existsBaseECKeyFromLocal()) {
-                if (userMnemonic != null) {
-                    LOGGER.warning(
-                            "[wallet] Wallet already exists on disk, ignoring provided mnemonic");
-                }
-            } else if (userMnemonic != null
-                    && !KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), pw)) {
-                LOGGER.warning("[wallet] Unable to create wallet from mnemonic");
-                return new CoinError(
-                        "Unable to create wallet from mnemonic",
-                        CoinError.CoinErrorCode.BADMNEMONIC);
-            }
-
-            baseSeed = KeyHandler.getBaseSeed(pw);
+        CoinError walletError = initializeWallet(pw, userMnemonic, isMnemonic);
+        if (walletError != null) {
+            return walletError;
         }
-
-        if (baseSeed == null) {
-            LOGGER.warning("[wallet] Possible Bad password: Unable to import or create base seed!");
-            return new CoinError("Bad password", CoinError.CoinErrorCode.BADPASSWORD);
-        }
-
-        // In-memory wallet only
-        DeterministicSeed seed =
-                new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
-        wallet = Wallet.fromSeed(networkParameters, seed, ScriptType.P2PKH);
-        if (isBlocknetNetwork()) {
-            LOGGER.fine(
-                    "[wallet] Mnemonic generated for " + CoinTickerUtils.tickerToString(ticker));
-        }
-
-        // RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
-        // This ensures discovery runs once at wallet startup in ANY case
-        if (addressDiscoveryEnabled) {
-            LOGGER.fine("[coinAddressDiscoveryService created] Running address discovery");
-            runAddressDiscovery();
-        } else {
-            LOGGER.fine("[coin] Address discovery disabled");
-        }
-
-        // Make sure wallet addresses are available
-        generateForwardAddresses(true);
-
-        resolveRpcPort();
-
-        if (configHelper.isRpcEnabled() && configHelper.validAuth() && rpcPort != -1) {
-            if (!configHelper.validBindAddress()) {
-                LOGGER.severe(
-                        "[rpc] Refusing to start JSON-RPC server for coin "
-                                + CoinTickerUtils.tickerToString(getTicker())
-                                + ": rpcBindAddress '"
-                                + configHelper.getRpcBindAddress()
-                                + "' is not a specific interface"
-                                + " (config: "
-                                + configHelper.getFilePath()
-                                + "). Set it to 127.0.0.1 or a named local address.");
-                return null;
-            }
-            coinRPCServer = JSONRPCController.getRPCServer(this);
-            // Readiness is announced by JSONRPCServer itself AFTER a successful
-            // bind ("[rpc] RPC server listening for …") — do not log a
-            // success-shaped line before the socket exists.
-            LOGGER.finer(
-                    "[rpc] Requesting start of JSON-RPC server for coin "
-                            + CoinTickerUtils.tickerToString(getTicker())
-                            + " on port "
-                            + getRPCPort());
-
-            if (coinRPCServer.isAlive()) {
-                coinRPCServer.deinit();
-            }
-
-            coinRPCServer.start();
-
-            // Block until bound: the GUI reads configs after master RPC
-            // announces readiness, so a late write would be a dead port.
-            if (!coinRPCServer.awaitBound(8000)) {
-                int[] candidates = getRpcCandidates();
-                LOGGER.severe(
-                        "[rpc] Failed to start JSON-RPC server for coin "
-                                + CoinTickerUtils.tickerToString(getTicker())
-                                + " on ports "
-                                + describePorts(candidates)
-                                + "; RPC will be unavailable for this coin. State: "
-                                + coinRPCServer.lifecycleState());
-                rpcPort = -1;
-            } else {
-                recordBoundPort();
-            }
-        }
+        startRpcIfConfigured();
 
         // Blocknet Network / XRouter not used (Dec 10)
         //		if (isBlocknetNetwork() && hasXRouter()) {
@@ -678,6 +478,141 @@ public final class CoinInstance {
         //		}
 
         return null;
+    }
+
+    /**
+     * Loads the coin's address and money parameters, and for Blocknet its p2p parameters.
+     *
+     * <p>Blocknet is configured like every other coin: its address prefixes and fee rates come from
+     * its configuration file. It used to take a hardcoded parameter class instead, whose fee
+     * constants had drifted from what that file specifies. The XRouter-over-p2p parameters are
+     * separate and still hardcoded: they carry the p2p serializer the config does not model, and
+     * nothing in the money or address paths reads them.
+     */
+    private CoinError loadCoinParameters() {
+        if (!CoinTicker.coins().contains(ticker)) {
+            LOGGER.fine("[coin] ERROR: Invalid/unsupported network: " + ticker);
+            return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
+        }
+        LOGGER.fine("[coin] Initializing for " + MAINNET_NAMES.get(ticker) + " main network.");
+        CoinError error = loadMigratedParams();
+        if (error != null) {
+            return error;
+        }
+        if (ticker == CoinTicker.BLOCKNET) {
+            // Constructing this object consults the loaded configuration, so it has to come
+            // after the load succeeded: moving it up would throw out of init() instead of
+            // returning the coin error callers handle.
+            blocknetNetworkParameters = new BlocknetNetworkParameters();
+        }
+        return null;
+    }
+
+    private CoinError initializeWallet(char[] pw, String userMnemonic, boolean isMnemonic) {
+        List<String> baseSeed;
+        if (isMnemonic) {
+            baseSeed = splitMnemonicChars(pw);
+        } else {
+            CoinError importError = importOrReuseWallet(pw, userMnemonic);
+            if (importError != null) {
+                return importError;
+            }
+            baseSeed = KeyHandler.getBaseSeed(pw);
+        }
+        if (baseSeed == null) {
+            LOGGER.warning("[wallet] Possible Bad password: Unable to import or create base seed!");
+            return new CoinError("Bad password", CoinError.CoinErrorCode.BADPASSWORD);
+        }
+        createWallet(baseSeed);
+        return null;
+    }
+
+    private static CoinError importOrReuseWallet(char[] pw, String userMnemonic) {
+        if (KeyHandler.existsBaseECKeyFromLocal()) {
+            if (userMnemonic != null) {
+                LOGGER.warning(
+                        "[wallet] Wallet already exists on disk, ignoring provided mnemonic");
+            }
+            return null;
+        }
+        if (userMnemonic != null
+                && !KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), pw)) {
+            LOGGER.warning("[wallet] Unable to create wallet from mnemonic");
+            return new CoinError(
+                    "Unable to create wallet from mnemonic", CoinError.CoinErrorCode.BADMNEMONIC);
+        }
+        return null;
+    }
+
+    private void createWallet(List<String> baseSeed) {
+        // In-memory wallet only
+        DeterministicSeed seed =
+                new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
+        wallet = Wallet.fromSeed(networkParameters, seed, ScriptType.P2PKH);
+        if (isBlocknetNetwork()) {
+            LOGGER.fine(
+                    "[wallet] Mnemonic generated for " + CoinTickerUtils.tickerToString(ticker));
+        }
+
+        // Discovery runs once at wallet startup, in every case.
+        if (addressDiscoveryEnabled) {
+            LOGGER.fine("[coinAddressDiscoveryService created] Running address discovery");
+            runAddressDiscovery();
+        } else {
+            LOGGER.fine("[coin] Address discovery disabled");
+        }
+
+        // Make sure wallet addresses are available
+        generateForwardAddresses(true);
+    }
+
+    private void startRpcIfConfigured() {
+        resolveRpcPort();
+        if (!configHelper.isRpcEnabled() || !configHelper.validAuth() || rpcPort == -1) {
+            return;
+        }
+        if (!configHelper.validBindAddress()) {
+            LOGGER.severe(
+                    "[rpc] Refusing to start JSON-RPC server for coin "
+                            + CoinTickerUtils.tickerToString(getTicker())
+                            + ": rpcBindAddress '"
+                            + configHelper.getRpcBindAddress()
+                            + "' is not a specific interface"
+                            + " (config: "
+                            + configHelper.getFilePath()
+                            + "). Set it to 127.0.0.1 or a named local address.");
+            return;
+        }
+        coinRPCServer = JSONRPCController.getRPCServer(this);
+        // Readiness is announced by JSONRPCServer itself AFTER a successful bind
+        // ("[rpc] RPC server listening for …") — do not log a success-shaped line before
+        // the socket exists.
+        LOGGER.finer(
+                "[rpc] Requesting start of JSON-RPC server for coin "
+                        + CoinTickerUtils.tickerToString(getTicker())
+                        + " on port "
+                        + getRPCPort());
+
+        if (coinRPCServer.isAlive()) {
+            coinRPCServer.deinit();
+        }
+        coinRPCServer.start();
+
+        // Block until bound: the GUI reads configs after master RPC announces readiness, so a
+        // late write would be a dead port.
+        if (coinRPCServer.awaitBound(8000)) {
+            recordBoundPort();
+            return;
+        }
+        int[] candidates = getRpcCandidates();
+        LOGGER.severe(
+                "[rpc] Failed to start JSON-RPC server for coin "
+                        + CoinTickerUtils.tickerToString(getTicker())
+                        + " on ports "
+                        + describePorts(candidates)
+                        + "; RPC will be unavailable for this coin. State: "
+                        + coinRPCServer.lifecycleState());
+        rpcPort = -1;
     }
 
     /** Configured port, else BCF Port + 3. */
@@ -883,140 +818,66 @@ public final class CoinInstance {
 
     public String sendXrMessage(
             BlocknetPeer blocknetPeer, String uuid, String command, Map<String, Object> params) {
-        XRouterMessage message = null;
-
         if (blocknetPeer == null || !blocknetPeer.getHaveConfig().get()) {
             LOGGER.fine("[sendXrMessage] Config not received yet");
             return null;
         }
+        XRouterMessage message = buildXrMessage(blocknetPeer, uuid, command, params);
+        if (message == null) {
+            return null;
+        }
+        blocknetPeerGroup.sendMessage(blocknetPeer, message);
+        return uuid;
+    }
 
+    private XRouterMessage buildXrMessage(
+            BlocknetPeer blocknetPeer, String uuid, String command, Map<String, Object> params) {
+        XRouterPacketManager.XRouterRequest request =
+                new XRouterPacketManager.XRouterRequest(
+                        blocknetPeer, uuid, keyHandler.getBaseECKey(), keyHandler.getPublicKey());
         switch (command) {
             case "xrGetBlockCount":
-                {
-                    String currency = (String) params.get("currency");
-
-                    message =
-                            getXRouterPacketManager()
-                                    .getXrGetBlockCount(
-                                            blocknetPeer,
-                                            uuid,
-                                            currency,
-                                            keyHandler.getBaseECKey(),
-                                            keyHandler.getPublicKey());
-                    break;
-                }
+                return getXRouterPacketManager()
+                        .getXrGetBlockCount(request, (String) params.get("currency"));
             case "xrService":
-                {
-                    String xrCustomCmd = (String) params.get("command");
-
-                    ArrayList paramsList = (ArrayList) params.get("params");
-
-                    message =
-                            getXRouterPacketManager()
-                                    .getXrService(
-                                            blocknetPeer,
-                                            uuid,
-                                            xrCustomCmd,
-                                            paramsList,
-                                            keyHandler.getBaseECKey(),
-                                            keyHandler.getPublicKey());
-                    break;
-                }
+                return getXRouterPacketManager()
+                        .getXrService(
+                                request,
+                                (String) params.get("command"),
+                                (List<?>) params.get("params"));
             case "xrSendTransaction":
-                {
-                    String feePayment = (String) params.get("feetx");
-                    String transaction = (String) params.get("transaction");
-                    String currency = (String) params.get("currency");
-
-                    message =
-                            getXRouterPacketManager()
-                                    .getXrSendTransaction(
-                                            blocknetPeer,
-                                            uuid,
-                                            feePayment,
-                                            currency,
-                                            transaction,
-                                            keyHandler.getBaseECKey(),
-                                            keyHandler.getPublicKey());
-                    break;
-                }
+                return getXRouterPacketManager()
+                        .getXrSendTransaction(
+                                request,
+                                (String) params.get("feetx"),
+                                (String) params.get("currency"),
+                                (String) params.get("transaction"));
             case "xrGetBlockHash":
-                {
-                    String feePayment = (String) params.get("feetx");
-                    String blockIndex = (String) params.get("blockIndex");
-                    String currency = (String) params.get("currency");
-
-                    message =
-                            getXRouterPacketManager()
-                                    .getXrGetBlockHash(
-                                            blocknetPeer,
-                                            uuid,
-                                            feePayment,
-                                            currency,
-                                            blockIndex,
-                                            keyHandler.getBaseECKey(),
-                                            keyHandler.getPublicKey());
-                    break;
-                }
+                return getXRouterPacketManager()
+                        .getXrGetBlockHash(
+                                request,
+                                (String) params.get("feetx"),
+                                (String) params.get("currency"),
+                                (String) params.get("blockIndex"));
             case "xrGetBlock":
-                {
-                    String feePayment = (String) params.get("feetx");
-                    String blockHash = (String) params.get("blockHash");
-                    String currency = (String) params.get("currency");
-
-                    message =
-                            getXRouterPacketManager()
-                                    .getXrGetBlock(
-                                            blocknetPeer,
-                                            uuid,
-                                            feePayment,
-                                            currency,
-                                            blockHash,
-                                            keyHandler.getBaseECKey(),
-                                            keyHandler.getPublicKey());
-                    break;
-                }
+                return getXRouterPacketManager()
+                        .getXrGetBlock(
+                                request,
+                                (String) params.get("feetx"),
+                                (String) params.get("currency"),
+                                (String) params.get("blockHash"));
             case "xrGetTransaction":
-                {
-                    String txid = (String) params.get("txid");
-                    String currency = (String) params.get("currency");
-
-                    message =
-                            getXRouterPacketManager()
-                                    .getXrGetTransaction(
-                                            blocknetPeer,
-                                            uuid,
-                                            currency,
-                                            txid,
-                                            keyHandler.getBaseECKey(),
-                                            keyHandler.getPublicKey());
-                    break;
-                }
+                return getXRouterPacketManager()
+                        .getXrGetTransaction(
+                                request,
+                                (String) params.get("currency"),
+                                (String) params.get("txid"));
             case "xrGetConfig":
-                {
-                    message =
-                            getXRouterPacketManager()
-                                    .getXrGetConfig(
-                                            blocknetPeer,
-                                            uuid,
-                                            "self",
-                                            keyHandler.getBaseECKey(),
-                                            keyHandler.getPublicKey());
-                    break;
-                }
+                return getXRouterPacketManager().getXrGetConfig(request, "self");
             default:
-                {
-                    LOGGER.fine("[coin] ERROR: Unknown XRouter Message! Command: " + command);
-                    uuid = null;
-                    break;
-                }
+                LOGGER.fine("[coin] ERROR: Unknown XRouter Message! Command: " + command);
+                return null;
         }
-
-        if (message != null) {
-            blocknetPeerGroup.sendMessage(blocknetPeer, message);
-        }
-
-        return uuid;
     }
 
     public JsonArray getAllUTXOS() {
@@ -1037,76 +898,75 @@ public final class CoinInstance {
                 if (utxo.isSpent()) {
                     continue;
                 }
-
-                org.bitcoinj.core.UTXO bUtxo;
-                try {
-                    bUtxo = utxo.createUTXO();
-                } catch (Exception e) {
-                    // One malformed/bech32 address must not kill the whole
-                    // listunspent response — skip the row, keep the rest.
-                    LOGGER.warning(
-                            "[coin] Skipping unparseable UTXO for "
-                                    + CoinTickerUtils.tickerToString(getTicker())
-                                    + " ("
-                                    + e.getClass().getSimpleName()
-                                    + ": "
-                                    + e.getMessage()
-                                    + ")");
-                    continue;
+                JsonObject row = utxoJson(utxo, coinDecimals, plainFormat);
+                if (row != null) {
+                    unspentTxsJSON.add(row);
                 }
-
-                JsonObject utxoJSON = new JsonObject();
-                utxoJSON.addProperty("txid", bUtxo.getHash().toString());
-                utxoJSON.addProperty("vout", bUtxo.getIndex());
-                utxoJSON.addProperty("address", bUtxo.getAddress());
-
-                Monetary monetary =
-                        new Monetary() {
-                            @Override
-                            public int smallestUnitExponent() {
-                                return coinDecimals;
-                            }
-
-                            @Override
-                            public long getValue() {
-                                return utxo.getValue();
-                            }
-
-                            @Override
-                            public int signum() {
-                                if (this.getValue() == 0) {
-                                    return 0;
-                                }
-                                return this.getValue() < 0 ? -1 : 1;
-                            }
-                        };
-
-                BigDecimal amountDecimal = new BigDecimal(plainFormat.format(monetary).toString());
-
-                utxoJSON.addProperty("amount", amountDecimal);
-                utxoJSON.addProperty(
-                        "scriptPubKey",
-                        new String(
-                                Hex.encode(bUtxo.getScript().getProgram()),
-                                StandardCharsets.UTF_8));
-                utxoJSON.addProperty("spendable", true);
-
-                int totalBlocks = getBlockCountByTicker(getTicker());
-                int confirmations = totalBlocks - bUtxo.getHeight() + 1;
-                if (bUtxo.getHeight() == 0) {
-                    confirmations = 0;
-                }
-                // Pre-first-poll the height cache holds a negative sentinel
-                // (-1); clamp so no caller ever sees negative confirmations.
-                confirmations = Math.max(0, confirmations);
-
-                utxoJSON.addProperty("confirmations", confirmations);
-
-                unspentTxsJSON.add(utxoJSON);
             }
         }
-
         return unspentTxsJSON;
+    }
+
+    /** One unspent output as the RPC surface states it, or null when the address cannot parse. */
+    private JsonObject utxoJson(UTXO utxo, int coinDecimals, MonetaryFormat plainFormat) {
+        org.bitcoinj.core.UTXO bUtxo;
+        try {
+            bUtxo = utxo.createUTXO();
+        } catch (RuntimeException e) {
+            // One malformed/bech32 address must not kill the whole listunspent response —
+            // skip the row, keep the rest.
+            LOGGER.warning(
+                    "[coin] Skipping unparseable UTXO for "
+                            + CoinTickerUtils.tickerToString(getTicker())
+                            + " ("
+                            + e.getClass().getSimpleName()
+                            + ": "
+                            + e.getMessage()
+                            + ")");
+            return null;
+        }
+
+        JsonObject row = new JsonObject();
+        row.addProperty("txid", bUtxo.getHash().toString());
+        row.addProperty("vout", bUtxo.getIndex());
+        row.addProperty("address", bUtxo.getAddress());
+        row.addProperty("amount", wholeCoins(utxo.getValue(), coinDecimals, plainFormat));
+        row.addProperty(
+                "scriptPubKey",
+                new String(Hex.encode(bUtxo.getScript().getProgram()), StandardCharsets.UTF_8));
+        row.addProperty("spendable", true);
+
+        int confirmations =
+                bUtxo.getHeight() == 0
+                        ? 0
+                        : getBlockCountByTicker(getTicker()) - bUtxo.getHeight() + 1;
+        // Pre-first-poll the height cache holds a negative sentinel (-1); clamp so no caller
+        // ever sees negative confirmations.
+        row.addProperty("confirmations", Math.max(0, confirmations));
+        return row;
+    }
+
+    /** A base-unit value as whole coins, with the coin's own number of decimals. */
+    private static BigDecimal wholeCoins(
+            long valueSats, int coinDecimals, MonetaryFormat plainFormat) {
+        Monetary monetary =
+                new Monetary() {
+                    @Override
+                    public int smallestUnitExponent() {
+                        return coinDecimals;
+                    }
+
+                    @Override
+                    public long getValue() {
+                        return valueSats;
+                    }
+
+                    @Override
+                    public int signum() {
+                        return Long.signum(valueSats);
+                    }
+                };
+        return new BigDecimal(plainFormat.format(monetary).toString());
     }
 
     public JsonArray getAllTransactions() {

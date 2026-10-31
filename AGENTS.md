@@ -75,7 +75,16 @@ Do not hand-format; run `./mvnw spotless:apply` and review the result.
 Checkstyle deliberately does **not** duplicate layout rules (indentation,
 whitespace, import order, line length) — two tools answering the same question
 produced 15 000 conflicts. It enforces only what a formatter cannot see:
-braces, naming, banned imports, file shape, class structure.
+braces, naming, banned imports, file shape, class structure, and method size.
+
+### Method size
+
+A method may have at most cyclomatic complexity 10, nesting depth 4, four
+parameters, 25 executable statements and 100 lines. Over any of them, split it
+into the phases it already has: name each step rather than moving code into a
+helper that only the same method calls. A constructor may take as many
+arguments as its value object has fields; that is its schema, not a call-site
+readability problem.
 
 ### Imports
 

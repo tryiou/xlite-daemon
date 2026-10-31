@@ -39,14 +39,9 @@
             <property name="tokens"
                       value="CLASS_DEF,INTERFACE_DEF,ENUM_DEF,ANNOTATION_DEF,RECORD_DEF,CTOR_DEF,METHOD_DEF,COMPACT_CTOR_DEF,LITERAL_SWITCH,LITERAL_TRY,LITERAL_CATCH,LITERAL_FINALLY,LITERAL_SYNCHRONIZED,LITERAL_IF,LITERAL_ELSE,LITERAL_FOR,LITERAL_WHILE,LITERAL_DO,STATIC_INIT"/>
         </module>
-        <!-- A `case` body that declares locals is wrapped in a block by the
-             formatter, which puts the brace on its own line; accept that
-             placement rather than fight the formatter. -->
-        <module name="LeftCurly">
-            <property name="id" value="LeftCurlyCase"/>
-            <property name="option" value="nl"/>
-            <property name="tokens" value="LITERAL_CASE,LITERAL_DEFAULT"/>
-        </module>
+        <!-- A `case` body's brace is the formatter's call: colon-style cases
+             get it on its own line, arrow-style cases keep it on the arrow's
+             line. Neither placement is enforced here. -->
         <module name="RightCurly">
             <property name="option" value="same"/>
             <property name="tokens"
@@ -108,5 +103,35 @@
             <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
         </module>
         <module name="ConstantName"/>
+
+        <!-- Size. A method over these limits has to be decomposed, not
+             annotated: they are the amount a reader can hold at once. -->
+        <module name="MethodLength">
+            <property name="max" value="100"/>
+            <property name="countEmpty" value="false"/>
+            <property name="tokens" value="METHOD_DEF,CTOR_DEF"/>
+        </module>
+        <module name="ExecutableStatementCount">
+            <property name="max" value="25"/>
+        </module>
+        <module name="CyclomaticComplexity">
+            <property name="max" value="10"/>
+        </module>
+        <module name="NestedIfDepth">
+            <property name="max" value="4"/>
+        </module>
+        <module name="NestedForDepth">
+            <property name="max" value="4"/>
+        </module>
+        <module name="NestedTryDepth">
+            <property name="max" value="4"/>
+        </module>
+        <!-- Method arity only: a value object's constructor takes as many
+             arguments as the object has fields, and that is its schema, not
+             a readability problem at the call site. -->
+        <module name="ParameterNumber">
+            <property name="max" value="4"/>
+            <property name="tokens" value="METHOD_DEF"/>
+        </module>
     </module>
 </module>

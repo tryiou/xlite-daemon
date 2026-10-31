@@ -25,30 +25,44 @@ public class XRouterPacketHeader {
     private int headerLength;
 
     public XRouterPacketHeader(ByteBuffer in) {
-        byte compactSize = in.get();
-        byte[] rawHeader;
-        in.rewind();
-        int cursor = 1;
+        RawHeader raw = readRawHeader(in);
+        compactSizeBytes = raw.compactSizeBytes();
 
+        int cursor = readFixedFields(raw.rawHeader(), raw.cursor());
+        cursor = readIdentity(raw.rawHeader(), cursor);
+
+        headerLength = cursor;
+        LOGGER.finer("[xrouter] XRouter header read complete, at position: " + cursor);
+        // should have read 157 bytes at this point (excluding compact size)
+    }
+
+    /** The header bytes as read, the compact-size prefix, and where the fields start. */
+    private record RawHeader(byte[] rawHeader, byte[] compactSizeBytes, int cursor) {}
+
+    private static RawHeader readRawHeader(ByteBuffer in) {
+        byte compactSize = in.get();
+        in.rewind();
+        byte[] rawHeader;
+        byte[] compactSizeBytes;
+        int cursor;
         if (compactSize == (byte) 253) {
             rawHeader = new byte[160];
-            in.get(rawHeader, 0, rawHeader.length);
             compactSizeBytes = new byte[2];
+            cursor = 1;
         } else if (compactSize == (byte) 254) {
             rawHeader = new byte[162];
-            in.get(rawHeader, 0, rawHeader.length);
             compactSizeBytes = new byte[4];
+            cursor = 1;
         } else if (compactSize == (byte) 255) {
             rawHeader = new byte[166];
-            in.get(rawHeader, 0, rawHeader.length);
             compactSizeBytes = new byte[8];
+            cursor = 1;
         } else {
             rawHeader = new byte[158];
-            in.get(rawHeader, 0, rawHeader.length);
             compactSizeBytes = new byte[1];
             cursor = 0;
         }
-
+        in.get(rawHeader, 0, rawHeader.length);
         System.arraycopy(rawHeader, cursor, compactSizeBytes, 0, compactSizeBytes.length);
         cursor += compactSizeBytes.length;
 
@@ -58,7 +72,10 @@ public class XRouterPacketHeader {
         LOGGER.finer(
                 "[xrouter] Retrieved compact size bytes: "
                         + new String(Hex.encode(compactSizeBytes), StandardCharsets.UTF_8));
+        return new RawHeader(rawHeader, compactSizeBytes, cursor);
+    }
 
+    private int readFixedFields(byte[] rawHeader, int cursor) {
         version = (int) Utils.readUint32(rawHeader, cursor);
         cursor += 4;
         LOGGER.finer("[xrouter] Retrieved version: " + version);
@@ -72,14 +89,14 @@ public class XRouterPacketHeader {
         cursor += 4;
         LOGGER.finer("[xrouter] Retrieved size: " + size);
 
-        // reserved header fields
-        // we don't use these fields, so we skip them
-        cursor += 8;
+        // reserved header fields, unused
+        return cursor + 8;
+    }
 
+    private int readIdentity(byte[] rawHeader, int cursor) {
         byte[] uuidArr = new byte[36];
         System.arraycopy(rawHeader, cursor, uuidArr, 0, uuidArr.length);
         cursor += 36;
-
         uuid = new String(uuidArr, StandardCharsets.UTF_8);
         LOGGER.finer("[xrouter] Retrieved UUID: " + uuid);
 
@@ -98,10 +115,7 @@ public class XRouterPacketHeader {
                 "[xrouter] Retrieved signature: "
                         + new String(Hex.encode(sigArr), StandardCharsets.UTF_8));
         signature = sigArr;
-
-        LOGGER.finer("[xrouter] XRouter header read complete, at position: " + cursor);
-        headerLength = cursor;
-        // should have read 157 bytes at this point (excluding compact size)
+        return cursor;
     }
 
     byte[] getCompactSizeBytes() {

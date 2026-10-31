@@ -364,56 +364,71 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     @Override
     protected void processMessage(Message message) {
+        message = applyPreMessageListeners(message);
+        if (message == null) {
+            return;
+        }
+        finishPendingFilteredBlock(message);
+        requireHandshakeComplete(message);
+        dispatchMessage(message);
+        // TODO process other message types
+    }
+
+    /** Runs the pre-message listeners, stopping at the first that consumes the message. */
+    private Message applyPreMessageListeners(Message message) {
         for (ListenerRegistration<BlocknetPreMessageReceivedEventListener> registration :
                 preMessageReceivedEventListeners) {
             if (registration.executor == Threading.SAME_THREAD) {
                 message = registration.listener.onPreMessageReceived(this, message);
             }
-
             if (message == null) {
                 break;
             }
         }
+        return message;
+    }
 
-        if (message == null) {
-            return;
-        }
-
+    private void finishPendingFilteredBlock(Message message) {
         if (currentFilteredBlock != null && !(message instanceof Transaction)) {
             endFilteredBlock(currentFilteredBlock);
             currentFilteredBlock = null;
         }
+    }
 
-        if (!(message instanceof VersionMessage
+    private void requireHandshakeComplete(Message message) {
+        if (message instanceof VersionMessage
                 || message instanceof Ping
                 || message instanceof VersionAck
-                || (versionHandshakeFuture.isDone() && !versionHandshakeFuture.isCancelled()))) {
-            throw new ProtocolException(
-                    "Received "
-                            + message.getClass().getSimpleName()
-                            + " before version handshake was complete.");
+                || (versionHandshakeFuture.isDone() && !versionHandshakeFuture.isCancelled())) {
+            return;
         }
+        throw new ProtocolException(
+                "Received "
+                        + message.getClass().getSimpleName()
+                        + " before version handshake was complete.");
+    }
 
-        if (message instanceof VersionMessage) {
-            processVersionMessage((VersionMessage) message);
-        } else if (message instanceof VersionAck) {
-            processVersionAck((VersionAck) message);
-        } else if (message instanceof Ping) {
+    private void dispatchMessage(Message message) {
+        if (message instanceof VersionMessage versionMessage) {
+            processVersionMessage(versionMessage);
+        } else if (message instanceof VersionAck versionAck) {
+            processVersionAck(versionAck);
+        } else if (message instanceof Ping ping) {
             LOGGER.finer(
                     "[blocknet-peer] Received ping message from "
                             + getAddress().toString()
                             + ", sending pong.");
-            processPing((Ping) message);
+            processPing(ping);
         } else if (message instanceof RejectMessage) {
             LOGGER.finer(
                     "[blocknet-peer] ERROR: Received rejection message from "
                             + getAddress().toString()
                             + ": "
                             + message.toString());
-        } else if (message instanceof FilteredBlock) {
-            currentFilteredBlock = (FilteredBlock) message;
-        } else if (message instanceof XRouterMessage) {
-            processXRouterMessage((XRouterMessage) message);
+        } else if (message instanceof FilteredBlock filteredBlock) {
+            currentFilteredBlock = filteredBlock;
+        } else if (message instanceof XRouterMessage xRouterMessage) {
+            processXRouterMessage(xRouterMessage);
         } else {
             LOGGER.finer(
                     "[blocknet-peer] Warning: Received unhandled message from "
@@ -421,8 +436,6 @@ public class BlocknetPeer extends PeerSocketHandler {
                             + ": "
                             + message.toString());
         }
-
-        // TODO process other message types
     }
 
     private void processPing(Ping pingMessage) throws ProtocolException {
@@ -594,9 +607,6 @@ public class BlocknetPeer extends PeerSocketHandler {
         if (!lock.isHeldByCurrentThread()) {
             throw new IllegalStateException("Lock is not held by current thread.");
         }
-
-        List<Sha256Hash> blockLocatorHashes = new ArrayList<>(51);
-
         if (blockChain == null) {
             throw new NullPointerException("Blockchain object is null.");
         }
@@ -605,28 +615,41 @@ public class BlocknetPeer extends PeerSocketHandler {
         StoredBlock chainHead = blockChain.getChainHead();
         Sha256Hash chainHeadHash = chainHead.getHeader().getHash();
 
-        if (Objects.equals(chainHeadHash, lastGetBlocksBegin)
-                || Objects.equals(toHash, lastGetBlocksEnd)) {
-            LOGGER.finer(
-                    "[blocknet-peer] Ignoring dupliated request: chainHeadHash = "
-                            + chainHeadHash.toString()
-                            + ", toHash = "
-                            + toHash.toString());
-
-            for (Sha256Hash hash : pendingBlockDownloads) {
-                LOGGER.finer("[blocknet-peer] Pending block download: " + hash.toString());
-            }
-
-            LOGGER.finer(Throwables.getStackTraceAsString(new Throwable()));
+        if (alreadyRequested(chainHeadHash, toHash)) {
             return;
         }
-
         LOGGER.finer(
                 "[blocknet-peer] blockChainDownloadLocked("
                         + toHash.toString()
                         + "): Current head = "
                         + chainHeadHash.toString());
 
+        BlockLocator blockLocator = buildLocator(blockStore, chainHead);
+
+        lastGetBlocksBegin = chainHeadHash;
+        lastGetBlocksEnd = toHash;
+        sendBlockRequest(blockLocator, toHash);
+    }
+
+    private boolean alreadyRequested(Sha256Hash chainHeadHash, Sha256Hash toHash) {
+        if (!Objects.equals(chainHeadHash, lastGetBlocksBegin)
+                && !Objects.equals(toHash, lastGetBlocksEnd)) {
+            return false;
+        }
+        LOGGER.finer(
+                "[blocknet-peer] Ignoring dupliated request: chainHeadHash = "
+                        + chainHeadHash.toString()
+                        + ", toHash = "
+                        + toHash.toString());
+        for (Sha256Hash hash : pendingBlockDownloads) {
+            LOGGER.finer("[blocknet-peer] Pending block download: " + hash.toString());
+        }
+        LOGGER.finer(Throwables.getStackTraceAsString(new Throwable()));
+        return true;
+    }
+
+    private BlockLocator buildLocator(BlockStore blockStore, StoredBlock chainHead) {
+        List<Sha256Hash> blockLocatorHashes = new ArrayList<>(51);
         StoredBlock cursor = chainHead;
         for (int i = 100; cursor != null && i > 0; i--) {
             blockLocatorHashes.add(cursor.getHeader().getHash());
@@ -638,23 +661,17 @@ public class BlocknetPeer extends PeerSocketHandler {
                                 + e.getMessage());
             }
         }
-
         if (cursor != null) {
             blockLocatorHashes.add(params.getGenesisBlockHash());
         }
+        return new BlockLocator(ImmutableList.copyOf(blockLocatorHashes));
+    }
 
-        BlockLocator blockLocator = new BlockLocator(ImmutableList.copyOf(blockLocatorHashes));
-
-        lastGetBlocksBegin = chainHeadHash;
-        lastGetBlocksEnd = toHash;
-
+    private void sendBlockRequest(BlockLocator blockLocator, Sha256Hash toHash) {
         if (downloadBlockBodies) {
-            GetBlocksMessage getBlocksMessage = new GetBlocksMessage(params, blockLocator, toHash);
-            sendMessage(getBlocksMessage);
+            sendMessage(new GetBlocksMessage(params, blockLocator, toHash));
         } else {
-            GetHeadersMessage getHeadersMessage =
-                    new GetHeadersMessage(params, blockLocator, toHash);
-            sendMessage(getHeadersMessage);
+            sendMessage(new GetHeadersMessage(params, blockLocator, toHash));
         }
     }
 
@@ -667,7 +684,6 @@ public class BlocknetPeer extends PeerSocketHandler {
                             + filteredBlock.getHash().toString());
             return;
         }
-
         if (blockChain == null) {
             LOGGER.finer(
                     "[blocknet-peer] WARNING: Received a block, but a blockchain object was not"
@@ -677,42 +693,14 @@ public class BlocknetPeer extends PeerSocketHandler {
 
         pendingBlockDownloads.remove(filteredBlock.getBlockHeader().getHash());
         try {
-            lock.lock();
-
-            try {
-                if (awaitingFreshFilter != null) {
-                    LOGGER.finer(
-                            "[blocknet-peer] Discarding this block because we are waiting for a"
-                                    + " fresh filter. Hash: "
-                                    + filteredBlock.getHash().toString());
-
-                    awaitingFreshFilter.add(filteredBlock.getHash());
-                    return;
-                } else if (checkForFilterExhaustion(filteredBlock)) {
-                    awaitingFreshFilter = new LinkedList<>();
-                    awaitingFreshFilter.add(filteredBlock.getHash());
-                    awaitingFreshFilter.addAll(blockChain.drainOrphanBlocks());
-                    return;
-                }
-            } finally {
-                lock.unlock();
+            if (discardFilteredBlock(filteredBlock)) {
+                return;
             }
-
             if (blockChain.add(filteredBlock)) {
                 invokeOnBlocksDownloaded(filteredBlock.getBlockHeader(), filteredBlock);
-            } else {
-                lock.lock();
-                try {
-                    final Block orphanRoot = blockChain.getOrphanRoot(filteredBlock.getHash());
-                    if (orphanRoot == null) {
-                        throw new NullPointerException("Orphan root is null.");
-                    }
-
-                    blockChainDownloadLocked(orphanRoot.getHash());
-                } finally {
-                    lock.unlock();
-                }
+                return;
             }
+            downloadFromOrphanRoot(filteredBlock);
         } catch (VerificationException e) {
             LOGGER.warning("[blocknet] Block failed to properly verify" + e.getMessage());
         } catch (PrunedException e) {
@@ -720,6 +708,43 @@ public class BlocknetPeer extends PeerSocketHandler {
                     "[blocknet-peer] Some data needed to handle this block was pruned! Hash: "
                             + filteredBlock.getHash().toString());
             throw new RuntimeException(e);
+        }
+    }
+
+    /** Whether the block is deferred: a fresh filter is pending, or this one is exhausted. */
+    private boolean discardFilteredBlock(FilteredBlock filteredBlock) {
+        lock.lock();
+        try {
+            if (awaitingFreshFilter != null) {
+                LOGGER.finer(
+                        "[blocknet-peer] Discarding this block because we are waiting for a"
+                                + " fresh filter. Hash: "
+                                + filteredBlock.getHash().toString());
+                awaitingFreshFilter.add(filteredBlock.getHash());
+                return true;
+            }
+            if (!checkForFilterExhaustion(filteredBlock)) {
+                return false;
+            }
+            awaitingFreshFilter = new LinkedList<>();
+            awaitingFreshFilter.add(filteredBlock.getHash());
+            awaitingFreshFilter.addAll(blockChain.drainOrphanBlocks());
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void downloadFromOrphanRoot(FilteredBlock filteredBlock) {
+        lock.lock();
+        try {
+            Block orphanRoot = blockChain.getOrphanRoot(filteredBlock.getHash());
+            if (orphanRoot == null) {
+                throw new NullPointerException("Orphan root is null.");
+            }
+            blockChainDownloadLocked(orphanRoot.getHash());
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -755,70 +780,84 @@ public class BlocknetPeer extends PeerSocketHandler {
 
         try {
             boolean firstMessage = true;
-
             while (true) {
                 if (largeReadBuffer.get() != null) {
                     if (!firstMessage) {
                         throw new IllegalStateException("Bad firstMessage state.");
                     }
-
-                    int bytesToGet =
-                            Math.min(
-                                    buff.remaining(),
-                                    largeReadBuffer.get().length - largeReadBufferPos.get());
-                    byte[] buf = largeReadBuffer.get();
-                    buff.get(buf, largeReadBufferPos.get(), bytesToGet);
-
-                    largeReadBuffer.set(buf);
-
-                    largeReadBufferPos.set(largeReadBufferPos.get() + bytesToGet);
-
-                    if (largeReadBufferPos.get() == largeReadBuffer.get().length) {
-                        processMessage(
-                                serializer.deserializePayload(
-                                        header.get(), ByteBuffer.wrap(largeReadBuffer.get())));
-
-                        largeReadBuffer.set(null);
-                        header.set(null);
-                        firstMessage = false;
-                    } else {
+                    if (!finishLargeRead(buff)) {
                         return buff.position();
                     }
+                    firstMessage = false;
                 }
-
-                Message message;
-                int preSerializePos = buff.position();
-                try {
-                    message = serializer.deserialize(buff);
-                } catch (BufferUnderflowException e) {
-                    if (firstMessage && buff.limit() == buff.capacity()) {
-                        buff.position(0);
-
-                        try {
-                            serializer.seekPastMagicBytes(buff);
-                            header.set(serializer.deserializeHeader(buff));
-
-                            largeReadBufferPos.set(buff.remaining());
-                            byte[] buf = new byte[header.get().getLength()];
-                            buff.get(buf, 0, largeReadBufferPos.get());
-                            largeReadBuffer.set(buf);
-                        } catch (BufferUnderflowException e1) {
-                            throw new ProtocolException(
-                                    "No magic/header after reading " + buff.capacity() + " bytes.");
-                        }
-                    } else {
-                        buff.position(preSerializePos);
-                    }
-
-                    return buff.position();
+                int stopAt = readAvailableMessage(buff, firstMessage);
+                if (stopAt >= 0) {
+                    return stopAt;
                 }
-
-                processMessage(message);
                 firstMessage = false;
             }
         } catch (Exception e) {
             LOGGER.warning("[blocknet] Error closing peer connection" + e.getMessage());
             return -1;
+        }
+    }
+
+    /** Consumes the rest of a large message; true when it was completed and processed. */
+    private boolean finishLargeRead(ByteBuffer buff) {
+        int bytesToGet =
+                Math.min(buff.remaining(), largeReadBuffer.get().length - largeReadBufferPos.get());
+        byte[] buffer = largeReadBuffer.get();
+        buff.get(buffer, largeReadBufferPos.get(), bytesToGet);
+        largeReadBuffer.set(buffer);
+        largeReadBufferPos.set(largeReadBufferPos.get() + bytesToGet);
+
+        if (largeReadBufferPos.get() != largeReadBuffer.get().length) {
+            return false;
+        }
+        processMessage(
+                serializer.deserializePayload(
+                        header.get(), ByteBuffer.wrap(largeReadBuffer.get())));
+        largeReadBuffer.set(null);
+        header.set(null);
+        return true;
+    }
+
+    /**
+     * Reads one message from the buffer.
+     *
+     * @return -1 when a message was processed, else the position the caller should stop at
+     */
+    private int readAvailableMessage(ByteBuffer buff, boolean firstMessage) {
+        int preSerializePos = buff.position();
+        Message message;
+        try {
+            message = serializer.deserialize(buff);
+        } catch (BufferUnderflowException e) {
+            if (firstMessage && buff.limit() == buff.capacity()) {
+                startLargeRead(buff);
+            } else {
+                buff.position(preSerializePos);
+            }
+            return buff.position();
+        }
+        processMessage(message);
+        return -1;
+    }
+
+    /** A header that did not fit: read the header alone, then collect the payload in pieces. */
+    private void startLargeRead(ByteBuffer buff) {
+        buff.position(0);
+        try {
+            serializer.seekPastMagicBytes(buff);
+            header.set(serializer.deserializeHeader(buff));
+
+            largeReadBufferPos.set(buff.remaining());
+            byte[] buffer = new byte[header.get().getLength()];
+            buff.get(buffer, 0, largeReadBufferPos.get());
+            largeReadBuffer.set(buffer);
+        } catch (BufferUnderflowException e) {
+            throw new ProtocolException(
+                    "No magic/header after reading " + buff.capacity() + " bytes.");
         }
     }
 

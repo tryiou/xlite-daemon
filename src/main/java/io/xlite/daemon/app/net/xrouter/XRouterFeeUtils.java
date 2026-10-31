@@ -29,6 +29,9 @@ public final class XRouterFeeUtils {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
+    /** Change above this many whole coins is split into three outputs. */
+    private static final double CHANGE_SPLIT_THRESHOLD = 0.06;
+
     public static String getXRouterFeeTx(BlocknetPeer blocknetPeer, String xRouterCommand) {
         CoinInstance blocknetCoin =
                 CoinInstance.getInstance(CoinInstance.getActiveBlocknetNetwork());
@@ -39,84 +42,45 @@ public final class XRouterFeeUtils {
         Preconditions.checkNotNull(xRouterConfig, "XRouter config was not received yet!");
 
         Map<String, Double> feeMap = xRouterConfig.getFeeMap();
-
         if (!feeMap.containsKey(xRouterCommand)) {
             LOGGER.finer(
                     "[xrouter-fee-utils] WARNING: Invalid/unknown XRouter command supplied to"
                             + " getXRouterFeeTx()! Assuming this command is free.");
             LOGGER.finer("[xrouter-fee-utils] Command: " + xRouterCommand);
-
             return "nohash;nofee";
         }
 
-        double fee = feeMap.get(xRouterCommand);
-
-        // All XRouter fees settle in the active Blocknet network coin:
-        // convert with its own BCF COIN factor, never a hardcoded constant.
+        // All XRouter fees settle in the active Blocknet network coin: convert with its own
+        // BCF COIN factor, never a hardcoded constant.
         long feeCoinUnit =
                 CoinConfigRegistry.get(CoinTickerUtils.tickerToString(blocknetCoin.getTicker()))
                         .coinFactor();
+        double fee = feeMap.get(xRouterCommand);
         Coin xRouterFeeAmt = Coin.valueOf(Sats.fromWholeCoins(fee, feeCoinUnit));
         if (xRouterFeeAmt.value == 0) {
             LOGGER.finer("[xrouter-fee-utils] DEBUG: This command is free.");
             return "nohash;nofee";
         }
 
-        long feePerByte = WalletHelper.getFeePerByte(blocknetCoin.getNetworkParameters());
-        long minTxFee = WalletHelper.getMinTxFee(blocknetCoin.getNetworkParameters());
-        long networkFeeSats = Math.max(feePerByte * (192 + 34), minTxFee);
+        long networkFeeSats =
+                Math.max(
+                        WalletHelper.getFeePerByte(blocknetCoin.getNetworkParameters())
+                                * (192 + 34),
+                        WalletHelper.getMinTxFee(blocknetCoin.getNetworkParameters()));
         double networkFee = Sats.toWholeCoins(networkFeeSats, feeCoinUnit);
+        double totalAvailable = blocknetWalletHelper.getSpendBalance(fee + networkFee);
 
-        double totalSpending = fee + networkFee;
-        double totalAvailable = blocknetWalletHelper.getSpendBalance(totalSpending);
-        double changeAmt = totalAvailable - networkFee - fee;
-
-        LegacyAddress xRouterPaymentAddress =
-                LegacyAddress.fromBase58(params, xRouterConfig.getFeeAddress());
-        Coin blocknetNetworkFeeAmt = Coin.valueOf(networkFeeSats);
-        Coin xRouterChangeAmt =
-                Coin.valueOf(Sats.fromWholeCoins(totalAvailable, feeCoinUnit))
-                        .minus(blocknetNetworkFeeAmt)
-                        .minus(xRouterFeeAmt);
-
-        TransactionOutput feeOutput =
-                new TransactionOutput(params, null, xRouterFeeAmt, xRouterPaymentAddress);
-
-        ArrayList<TransactionOutput> outputs = new ArrayList<>();
-        outputs.add(feeOutput);
-
-        if (changeAmt > 0.06) {
-            double halvedAmt = changeAmt / 3;
-            Coin halvedChangeAmt = Coin.valueOf(Sats.fromWholeCoins(halvedAmt, feeCoinUnit));
-            TransactionOutput halvedChangeOutput =
-                    new TransactionOutput(
-                            params, null, halvedChangeAmt, blocknetWalletHelper.getChangeAddress());
-
-            for (int i = 0; i < 3; i++) {
-                outputs.add(halvedChangeOutput);
-            }
-        } else {
-            TransactionOutput changeOutput =
-                    new TransactionOutput(
-                            params,
-                            null,
-                            xRouterChangeAmt,
-                            blocknetWalletHelper.getChangeAddress());
-            outputs.add(changeOutput);
-        }
-
-        Transaction xRouterFeeTx =
-                blocknetWalletHelper.createRawTransactionWithAllUTXOs(outputs, totalAvailable);
-        if (xRouterFeeTx == null) {
-            // The builder reports failure by returning null, and it does so for a
-            // coin whose transactions need an nTime this path cannot supply. Left
-            // unchecked that is a NullPointerException here; naming it keeps the
-            // cause visible to whoever is wiring XRouter fees up.
-            throw new IllegalStateException(
-                    "cannot build the XRouter fee transaction: the builder returned no "
-                            + "transaction, meaning it could not select inputs to cover the fee "
-                            + "or could not sign them. The reason is logged as a warning above.");
-        }
+        FeeContext context =
+                new FeeContext(
+                        params,
+                        blocknetWalletHelper,
+                        xRouterConfig,
+                        feeCoinUnit,
+                        xRouterFeeAmt,
+                        networkFeeSats,
+                        totalAvailable - networkFee - fee,
+                        totalAvailable);
+        Transaction xRouterFeeTx = buildFeeTransaction(context);
 
         String feetx =
                 new String(Hex.encode(xRouterFeeTx.bitcoinSerialize()), StandardCharsets.UTF_8);
@@ -124,6 +88,65 @@ public final class XRouterFeeUtils {
         LOGGER.finer(xRouterFeeTx.toString());
         LOGGER.finer("[xrouter-fee-utils] DEBUG: Feetx: " + feetx);
         return feetx;
+    }
+
+    /** Everything the fee transaction is assembled from. */
+    private record FeeContext(
+            NetworkParameters params,
+            WalletHelper wallet,
+            XRouterConfiguration config,
+            long coinUnit,
+            Coin feeAmount,
+            long networkFeeSats,
+            double changeAmount,
+            double totalAvailable) {}
+
+    private static Transaction buildFeeTransaction(FeeContext context) {
+        LegacyAddress xRouterPaymentAddress =
+                LegacyAddress.fromBase58(context.params(), context.config().getFeeAddress());
+
+        ArrayList<TransactionOutput> outputs = new ArrayList<>();
+        outputs.add(
+                new TransactionOutput(
+                        context.params(), null, context.feeAmount(), xRouterPaymentAddress));
+        addChangeOutputs(outputs, context);
+
+        Transaction xRouterFeeTx =
+                context.wallet()
+                        .createRawTransactionWithAllUTXOs(outputs, context.totalAvailable());
+        if (xRouterFeeTx == null) {
+            // The builder reports failure by returning null, and it does so for a coin whose
+            // transactions need an nTime this path cannot supply. Left unchecked that is a
+            // NullPointerException here; naming it keeps the cause visible to whoever is wiring
+            // XRouter fees up.
+            throw new IllegalStateException(
+                    "cannot build the XRouter fee transaction: the builder returned no "
+                            + "transaction, meaning it could not select inputs to cover the fee "
+                            + "or could not sign them. The reason is logged as a warning above.");
+        }
+        return xRouterFeeTx;
+    }
+
+    private static void addChangeOutputs(ArrayList<TransactionOutput> outputs, FeeContext context) {
+        if (context.changeAmount() > CHANGE_SPLIT_THRESHOLD) {
+            Coin third =
+                    Coin.valueOf(
+                            Sats.fromWholeCoins(context.changeAmount() / 3, context.coinUnit()));
+            TransactionOutput thirdOutput =
+                    new TransactionOutput(
+                            context.params(), null, third, context.wallet().getChangeAddress());
+            for (int i = 0; i < 3; i++) {
+                outputs.add(thirdOutput);
+            }
+            return;
+        }
+        Coin change =
+                Coin.valueOf(Sats.fromWholeCoins(context.totalAvailable(), context.coinUnit()))
+                        .minus(Coin.valueOf(context.networkFeeSats()))
+                        .minus(context.feeAmount());
+        outputs.add(
+                new TransactionOutput(
+                        context.params(), null, change, context.wallet().getChangeAddress()));
     }
 
     public static TransactionOutput createXrSendTransactionFeeOutput(BlocknetPeer blocknetPeer) {

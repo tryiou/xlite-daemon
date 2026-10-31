@@ -21,6 +21,7 @@ import io.xlite.daemon.app.net.protocols.blocknet.messagequeue.QueueItem;
 import io.xlite.daemon.app.net.xrouter.XRouterCommandUtils;
 import io.xlite.daemon.app.net.xrouter.XRouterInitialMessagesSentListener;
 import io.xlite.daemon.app.net.xrouter.XRouterMessage;
+import io.xlite.daemon.app.net.xrouter.XRouterPacketManager;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.XRouterConfiguration;
 import io.xlite.daemon.app.util.background.BackgroundTimerThread;
@@ -322,199 +323,183 @@ public class BlocknetPeerGroup {
         LOGGER.finer("[blocknet-peer-group] Sending initial XRouter messages!");
 
         CoinInstance activeBlocknetNetwork = blocknetInstance;
+        XRouterPacketManager.XRouterRequest request =
+                new XRouterPacketManager.XRouterRequest(
+                        peer,
+                        UUID.randomUUID().toString(),
+                        activeBlocknetNetwork.getKeyHandler().getBaseECKey(),
+                        activeBlocknetNetwork.getKeyHandler().getPublicKey());
+        XRouterMessage configMessage =
+                activeBlocknetNetwork.getXRouterPacketManager().getXrGetConfig(request, "self");
 
-        XRouterMessage getXRouterConfigMessage =
-                activeBlocknetNetwork
-                        .getXRouterPacketManager()
-                        .getXrGetConfig(
-                                peer,
-                                UUID.randomUUID().toString(),
-                                "self",
-                                activeBlocknetNetwork.getKeyHandler().getBaseECKey(),
-                                activeBlocknetNetwork.getKeyHandler().getPublicKey());
+        peer.addXRouterMessageReceivedEventListener((message, original) ->
+                handleInitialXRouterReply(peer, activeBlocknetNetwork, message, original));
 
-        peer.addXRouterMessageReceivedEventListener((message, original) -> {
-            Preconditions.checkNotNull(message);
-            if (original == null) {
+        sendMessage(peer, configMessage);
+    }
+
+    /** One reply to the initial message burst, dispatched by the command that caused it. */
+    private void handleInitialXRouterReply(
+            BlocknetPeer peer,
+            CoinInstance activeBlocknetNetwork,
+            XRouterMessage message,
+            XRouterMessage original) {
+        Preconditions.checkNotNull(message);
+        if (original == null) {
+            return;
+        }
+        int originalCommand = original.getXRouterHeader().getCommand();
+        String reply = (String) message.getParsedData().get("reply");
+
+        switch (XRouterCommandUtils.commandIdToString(originalCommand)) {
+            case "xrGetConfig":
+                applyXRouterConfig(peer, activeBlocknetNetwork, reply);
+                return;
+            case "xrGetBlockCount":
+                applyBlockCount(activeBlocknetNetwork, original, reply);
+                return;
+            case "xrService":
+                applyServiceReply(activeBlocknetNetwork, original, reply);
+                return;
+            default:
+                LOGGER.finer(
+                        "[xrouter] WARNING: Core received reply to unexpected packet type."
+                                + " This is probably not a bug. Original command: "
+                                + XRouterCommandUtils.commandIdToString(originalCommand));
+        }
+    }
+
+    private void applyXRouterConfig(
+            BlocknetPeer peer, CoinInstance activeBlocknetNetwork, String reply) {
+        try {
+            JSONObject replyJson = new JSONObject(reply);
+            if (!replyJson.has("config")) {
+                // The peer answered without a configuration: it is not usable, and the
+                // readiness marker below must not be set.
                 return;
             }
+            setXRouterConfig(peer, replyJson);
+        } catch (RuntimeException e) {
+            LOGGER.warning(
+                    "[blocknet] Error processing XRouter config/plugin list" + e.getMessage());
+        }
+        markConfigReceived(peer, activeBlocknetNetwork);
+    }
 
-            int originalCmd = original.getXRouterHeader().getCommand();
-            String reply = (String) message.getParsedData().get("reply");
+    private static void setXRouterConfig(BlocknetPeer peer, JSONObject replyJson) {
+        XRouterConfiguration xRouterConfiguration =
+                new XRouterConfiguration(replyJson.getString("config"));
+        xRouterConfiguration.parseConfig();
 
-            switch (XRouterCommandUtils.commandIdToString(originalCmd)) {
-                case "xrGetConfig":
-                    {
-                        try {
-                            JSONObject replyJson = new JSONObject(reply);
-                            if (!replyJson.has("config")) {
-                                break;
-                            }
+        peer.setxRouterConfiguration(xRouterConfiguration);
 
-                            XRouterConfiguration xRouterConfiguration =
-                                    new XRouterConfiguration(replyJson.getString("config"));
-                            xRouterConfiguration.parseConfig();
+        if (replyJson.has("plugins")) {
+            peer.parsePlugins(replyJson.getJSONObject("plugins"));
+        }
 
-                            peer.setxRouterConfiguration(xRouterConfiguration);
+        if (peer.getPluginConfig("xrmgetutxos") == null) {
+            LOGGER.finer(
+                    "[xrouter] ERROR: Node missing required configuration..."
+                            + " Falling back to HTTP if no available nodes. ");
+            peer.setHasRequiredPlugins(false);
+        }
+    }
 
-                            if (replyJson.has("plugins")) {
-                                peer.parsePlugins(replyJson.getJSONObject("plugins"));
-                            }
+    private static void markConfigReceived(BlocknetPeer peer, CoinInstance activeBlocknetNetwork) {
+        if (peer.getHaveConfig().get()) {
+            return;
+        }
+        peer.setHaveConfig(true);
+        peer.setPastConnectionSuccess(true);
 
-                            if (peer.getPluginConfig("xrmgetutxos") == null) {
-                                LOGGER.finer(
-                                        "[xrouter] ERROR: Node missing required configuration..."
-                                                + " Falling back to HTTP if no available nodes. ");
-                                peer.setHasRequiredPlugins(false);
-                                //                            peer.close();
-                            }
-
-                        } catch (Exception e) {
-                            LOGGER.warning(
-                                    "[blocknet] Error processing XRouter config/plugin list"
-                                            + e.getMessage());
-                        }
-
-                        if (!peer.getHaveConfig().get()) {
-                            peer.setHaveConfig(true);
-                            peer.setPastConnectionSuccess(true);
-
-                            for (ListenerRegistration<XRouterInitialMessagesSentListener>
-                                    registration : peer.getInitialMessagesSentListeners()) {
-                                if (registration.executor == Threading.SAME_THREAD) {
-                                    registration.listener.initialMessagesSent(
-                                            activeBlocknetNetwork);
-                                }
-                            }
-                        }
-                        break;
-                    }
-                case "xrGetBlockCount":
-                    {
-                        try {
-                            String originalTicker =
-                                    (String) original.getParsedData().get("currency");
-                            int blockCount = Integer.parseInt(reply);
-
-                            activeBlocknetNetwork.addBlockCount(
-                                    CoinTickerUtils.stringToTicker(originalTicker), blockCount);
-                            LOGGER.finer("Blocks for currency " + originalTicker + ": " + reply);
-                        } catch (RuntimeException e) {
-                            LOGGER.finer(
-                                    "[xrouter] ERROR: Error while parsing XRouter reply to"
-                                            + " xrGetBlockCount! Dumping reply and stack trace.");
-                            LOGGER.finer(reply);
-                        }
-                        break;
-                    }
-                case "xrService":
-                    {
-                        String originalCustomCmd = (String) original.getParsedData().get("command");
-                        try {
-                            JSONObject replyJson = new JSONObject(reply);
-                            switch (originalCustomCmd) {
-                                case "xrmgetutxos":
-                                    {
-                                        if (replyJson.has("error")) {
-                                            LOGGER.finer(
-                                                    "[utxo-parser] ERROR: Error while retrieving"
-                                                            + " UTXOs!");
-                                            LOGGER.finer(replyJson.getString("error"));
-                                            break;
-                                        }
-
-                                        if (!replyJson.has("utxos")) {
-                                            break;
-                                        }
-
-                                        ArrayList originalList =
-                                                (ArrayList) original.getParsedData().get("params");
-                                        String originalTicker = (String) originalList.get(0);
-                                        LOGGER.finer(originalTicker);
-                                        CoinTicker coinTicker =
-                                                CoinTickerUtils.stringToTicker(
-                                                        originalTicker.toUpperCase());
-                                        CoinInstance inst = CoinInstance.getInstance(coinTicker);
-
-                                        JSONArray utxosJson = replyJson.getJSONArray("utxos");
-                                        List<UTXO> utxoList = new ArrayList<>();
-
-                                        for (int i = 0; i < utxosJson.length(); i++) {
-                                            JSONObject utxoJson = utxosJson.getJSONObject(i);
-                                            LOGGER.finer(
-                                                    "[utxo-parser] UTXO "
-                                                            + i
-                                                            + ": "
-                                                            + utxoJson.toString());
-
-                                            String addressB58 = utxoJson.getString("address");
-                                            String txid = utxoJson.getString("txhash");
-                                            int vout = utxoJson.getInt("vout");
-                                            int height = utxoJson.getInt("block_number");
-                                            long value =
-                                                    UTXO.baseUnitsForTicker(
-                                                            coinTicker,
-                                                            utxoJson.getDouble("value"));
-
-                                            UTXO utxo =
-                                                    new UTXO(
-                                                            coinTicker,
-                                                            addressB58,
-                                                            txid,
-                                                            vout,
-                                                            height,
-                                                            value);
-                                            utxoList.add(utxo);
-                                        }
-
-                                        inst.processUtxos(utxoList);
-                                        break;
-                                    }
-                                case "xrmgetbalance":
-                                    {
-                                        LOGGER.finer(
-                                                "[xrouter] ERROR: xrmgetbalance is not implemented"
-                                                        + " yet!");
-                                        break;
-                                    }
-                                case "xrmgetrawtransaction":
-                                case "xrmgetrawmempool":
-                                    {
-                                        break;
-                                    }
-                                default:
-                                    {
-                                        LOGGER.finer(
-                                                "[xrouter] ERROR: Received reply for command we"
-                                                    + " don't recognize! Original custom command: "
-                                                        + originalCustomCmd
-                                                        + ". Dumping reply.");
-                                        LOGGER.finer(reply);
-                                        break;
-                                    }
-                            }
-                        } catch (RuntimeException e) {
-                            LOGGER.finer(
-                                    "[xrouter] ERROR: Error while parsing XRouter reply to"
-                                            + " xrService! Original custom command: "
-                                            + originalCustomCmd
-                                            + ". Dumping reply and stack trace.");
-                            LOGGER.finer(reply);
-                        }
-                        break;
-                    }
-                default:
-                    {
-                        LOGGER.finer(
-                                "[xrouter] WARNING: Core received reply to unexpected packet type."
-                                        + " This is probably not a bug. Original command: "
-                                        + XRouterCommandUtils.commandIdToString(originalCmd));
-                        break;
-                    }
+        for (ListenerRegistration<XRouterInitialMessagesSentListener> registration :
+                peer.getInitialMessagesSentListeners()) {
+            if (registration.executor == Threading.SAME_THREAD) {
+                registration.listener.initialMessagesSent(activeBlocknetNetwork);
             }
-        });
+        }
+    }
 
-        sendMessage(peer, getXRouterConfigMessage);
+    private static void applyBlockCount(
+            CoinInstance activeBlocknetNetwork, XRouterMessage original, String reply) {
+        try {
+            String originalTicker = (String) original.getParsedData().get("currency");
+            int blockCount = Integer.parseInt(reply);
+            activeBlocknetNetwork.addBlockCount(
+                    CoinTickerUtils.stringToTicker(originalTicker), blockCount);
+            LOGGER.finer("Blocks for currency " + originalTicker + ": " + reply);
+        } catch (RuntimeException e) {
+            LOGGER.finer(
+                    "[xrouter] ERROR: Error while parsing XRouter reply to xrGetBlockCount!"
+                            + " Dumping reply and stack trace.");
+            LOGGER.finer(reply);
+        }
+    }
+
+    private static void applyServiceReply(
+            CoinInstance activeBlocknetNetwork, XRouterMessage original, String reply) {
+        String originalCustomCmd = (String) original.getParsedData().get("command");
+        try {
+            JSONObject replyJson = new JSONObject(reply);
+            switch (originalCustomCmd) {
+                case "xrmgetutxos":
+                    applyUtxosReply(activeBlocknetNetwork, original, replyJson);
+                    return;
+                case "xrmgetbalance":
+                    LOGGER.finer("[xrouter] ERROR: xrmgetbalance is not implemented yet!");
+                    return;
+                case "xrmgetrawtransaction":
+                case "xrmgetrawmempool":
+                    return;
+                default:
+                    LOGGER.finer(
+                            "[xrouter] ERROR: Received reply for command we don't recognize!"
+                                    + " Original custom command: "
+                                    + originalCustomCmd
+                                    + ". Dumping reply.");
+                    LOGGER.finer(reply);
+            }
+        } catch (RuntimeException e) {
+            LOGGER.finer(
+                    "[xrouter] ERROR: Error while parsing XRouter reply to xrService! Original"
+                            + " custom command: "
+                            + originalCustomCmd
+                            + ". Dumping reply and stack trace.");
+            LOGGER.finer(reply);
+        }
+    }
+
+    private static void applyUtxosReply(
+            CoinInstance activeBlocknetNetwork, XRouterMessage original, JSONObject replyJson) {
+        if (replyJson.has("error")) {
+            LOGGER.finer("[utxo-parser] ERROR: Error while retrieving UTXOs!");
+            LOGGER.finer(replyJson.getString("error"));
+            return;
+        }
+        if (!replyJson.has("utxos")) {
+            return;
+        }
+        List<?> originalParams = (List<?>) original.getParsedData().get("params");
+        String originalTicker = (String) originalParams.get(0);
+        LOGGER.finer(originalTicker);
+        CoinTicker coinTicker = CoinTickerUtils.stringToTicker(originalTicker.toUpperCase());
+        CoinInstance instance = CoinInstance.getInstance(coinTicker);
+
+        JSONArray utxosJson = replyJson.getJSONArray("utxos");
+        List<UTXO> utxoList = new ArrayList<>();
+        for (int i = 0; i < utxosJson.length(); i++) {
+            JSONObject utxoJson = utxosJson.getJSONObject(i);
+            LOGGER.finer("[utxo-parser] UTXO " + i + ": " + utxoJson.toString());
+            utxoList.add(
+                    new UTXO(
+                            coinTicker,
+                            utxoJson.getString("address"),
+                            utxoJson.getString("txhash"),
+                            utxoJson.getInt("vout"),
+                            utxoJson.getInt("block_number"),
+                            UTXO.baseUnitsForTicker(coinTicker, utxoJson.getDouble("value"))));
+        }
+        instance.processUtxos(utxoList);
     }
 
     private final class PeerStartupListener
@@ -681,74 +666,77 @@ public class BlocknetPeerGroup {
 
             LOGGER.finer("[blocknet-peer-group] processing message queue");
 
-            if (messageQueue.size() == 0) {
+            if (messageQueue.isEmpty()) {
                 return;
             }
-
             for (QueueItem queueItem : messageQueue) {
-                if (!queueItem.isValidItem()) {
-                    messageQueue.remove(queueItem);
-                }
-
-                BlocknetPeer blocknetPeer = queueItem.getOriginalPeer();
-
-                if (!blocknetPeer.isActivePeer()) {
-                    blocknetPeer =
-                            createPeer(
-                                    blocknetNetworkParameters,
-                                    blockChain,
-                                    blocknetPeer.getBlocknetSeed());
-
-                    if (blocknetPeer == null) {
-                        continue;
-                    }
-
-                    lock.lock();
-                    try {
-                        attemptReconnect(blocknetPeer);
-                        pendingPeers.remove(queueItem.getOriginalPeer());
-                    } finally {
-                        lock.unlock();
-                    }
-
-                    queueItem.setNewPeer(blocknetPeer);
-
-                    if (!waitForConnection(blocknetPeer, 15)) {
-                        blocknetPeer.close();
-                        continue;
-                    }
-                }
-
-                String uuid;
-                if (queueItem.getCustomUUID() != null) {
-                    coinInstance.sendXrMessage(
-                            blocknetPeer,
-                            queueItem.getCustomUUID(),
-                            queueItem.getCommmand(),
-                            queueItem.getParams());
-                    uuid = queueItem.getCustomUUID();
-                } else {
-                    uuid =
-                            coinInstance.sendXrMessage(
-                                    blocknetPeer, queueItem.getCommmand(), queueItem.getParams());
-                }
-
-                if (queueItem.getCommmand().equals("xrSendTransaction")
-                        && queueItem.getMessageSource() == MessageSource.SOURCE_GUI) {
-                    BlocknetPeer finalBlocknetPeer = blocknetPeer;
-                    LOGGER.finer("Transaction successful!");
-                } else if (queueItem.getNewPeer() != null) {
-                    for (ListenerRegistration<BlocknetOnXRouterMessageReceivedListener> listener :
-                            queueItem.getOriginalPeer().getXRouterMessageListeners()) {
-                        queueItem
-                                .getNewPeer()
-                                .addXRouterMessageReceivedEventListener(listener.listener);
-                    }
-                }
-
-                messageQueue.remove(queueItem);
+                processQueuedItem(coinInstance, queueItem);
             }
         };
+    }
+
+    private void processQueuedItem(CoinInstance coinInstance, QueueItem queueItem) {
+        if (!queueItem.isValidItem()) {
+            messageQueue.remove(queueItem);
+        }
+        BlocknetPeer blocknetPeer = ensureConnected(queueItem);
+        if (blocknetPeer == null) {
+            return;
+        }
+        sendQueuedMessage(coinInstance, queueItem, blocknetPeer);
+        messageQueue.remove(queueItem);
+    }
+
+    /** The queue item's peer, reconnecting it first when it is no longer active. */
+    private BlocknetPeer ensureConnected(QueueItem queueItem) {
+        BlocknetPeer blocknetPeer = queueItem.getOriginalPeer();
+        if (blocknetPeer.isActivePeer()) {
+            return blocknetPeer;
+        }
+        blocknetPeer =
+                createPeer(blocknetNetworkParameters, blockChain, blocknetPeer.getBlocknetSeed());
+        if (blocknetPeer == null) {
+            return null;
+        }
+        lock.lock();
+        try {
+            attemptReconnect(blocknetPeer);
+            pendingPeers.remove(queueItem.getOriginalPeer());
+        } finally {
+            lock.unlock();
+        }
+        queueItem.setNewPeer(blocknetPeer);
+        if (!waitForConnection(blocknetPeer, 15)) {
+            blocknetPeer.close();
+            return null;
+        }
+        return blocknetPeer;
+    }
+
+    private void sendQueuedMessage(
+            CoinInstance coinInstance, QueueItem queueItem, BlocknetPeer blocknetPeer) {
+        if (queueItem.getCustomUUID() == null) {
+            coinInstance.sendXrMessage(
+                    blocknetPeer, queueItem.getCommmand(), queueItem.getParams());
+        } else {
+            coinInstance.sendXrMessage(
+                    blocknetPeer,
+                    queueItem.getCustomUUID(),
+                    queueItem.getCommmand(),
+                    queueItem.getParams());
+        }
+
+        if (queueItem.getCommmand().equals("xrSendTransaction")
+                && queueItem.getMessageSource() == MessageSource.SOURCE_GUI) {
+            LOGGER.finer("Transaction successful!");
+            return;
+        }
+        if (queueItem.getNewPeer() != null) {
+            for (ListenerRegistration<BlocknetOnXRouterMessageReceivedListener> listener :
+                    queueItem.getOriginalPeer().getXRouterMessageListeners()) {
+                queueItem.getNewPeer().addXRouterMessageReceivedEventListener(listener.listener);
+            }
+        }
     }
 
     private boolean waitForConnection(BlocknetPeer blocknetPeer, int maxWaitSeconds) {

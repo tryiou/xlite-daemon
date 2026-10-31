@@ -185,6 +185,25 @@
          Disabled XRouter background mode
          ============================================================ -->
 
+    <!-- An XRouter request bundle carries a live peer and the signing key by
+         reference. Copying the peer would break its message routing, and ECKey
+         is a signing identity rather than data; the record exists to keep one
+         packet's construction arguments together. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.xrouter.XRouterPacketManager$XRouterRequest"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- keyHandler is the XRouter signing key. It is created only by the p2p
+         startup block that is commented out in CoinInstance.init, so the field
+         is legitimately unwritten while that mode stays disabled; the same
+         unfinished path reads it here. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.CoinInstance"/>
+        <Method name="buildXrMessage"/>
+        <Bug pattern="NP_UNWRITTEN_FIELD"/>
+    </Match>
+
     <!-- The peer group is read only in the p2p block-count branch, which is off
          while HTTP_BLOCK_COUNT_UPDATES is true. The field and the branch are the
          unfinished XRouter mode and are kept until that work resumes. -->

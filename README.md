@@ -36,10 +36,14 @@ lifecycle:
 | check | phase | what it enforces |
 |---|---|---|
 | Spotless + google-java-format (AOSP) | `process-sources` | layout: 4-space indent, 100 columns, import order |
-| Checkstyle 14.4 | `validate` | semantics: braces, naming, import bans, file shape |
+| Checkstyle 14.4 | `validate` | semantics: braces, naming, import bans, file shape, method size |
 | Error Prone 2.43 | `compile` | compiler-level bug patterns |
 | SpotBugs 4.9 | `process-classes` | bytecode-level bug patterns |
 | JUnit 5 | `test` | unit tests |
+
+Checkstyle also holds method size: cyclomatic complexity 10, nesting depth 4,
+four parameters, 25 executable statements, 100 lines. A method over those is
+decomposed, not annotated.
 
 SpotBugs runs at maximum effort and the Medium threshold. Its reviewed
 deviations live in `config/spotbugs/spotbugs-exclude.xml`, one entry per case
