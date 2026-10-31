@@ -117,55 +117,60 @@ public class ConsoleMenu {
     }
 
     private int handleStartupFlag(String argument, int index) {
-        switch (argument) {
-            case "--enablerpcandconfigure":
+        return switch (argument) {
+            case "--enablerpcandconfigure" -> {
                 autoGenerateRPCConfig();
                 System.exit(0);
-                return index;
-            case "--development-endpoint":
-                return setDevelopmentEndpoint(index);
-            case "--exr-endpoint":
-                return setExrEndpoint(index);
-            case "--blockchain-configuration-files":
-                return consumeConfigSourceValue(index);
-            case "--version":
+                yield index;
+            }
+            case "--development-endpoint" -> setDevelopmentEndpoint(index);
+            case "--exr-endpoint" -> setExrEndpoint(index);
+            case "--blockchain-configuration-files" -> consumeConfigSourceValue(index);
+            case "--version" -> {
                 LOGGER.info(Version.CLIENT_VERSION);
                 System.exit(0);
-                return index;
-            case "--help":
+                yield index;
+            }
+            case "--help" -> {
                 displayHelp();
                 System.exit(0);
-                return index;
-            default:
-                throw new IllegalStateException("Not a startup flag: " + argument);
-        }
+                yield index;
+            }
+            default -> throw new IllegalStateException("Not a startup flag: " + argument);
+        };
     }
 
     private int handleWalletAction(String argument, Scanner input, int index) {
-        switch (argument) {
-            case "--createdefaultwallet":
+        return switch (argument) {
+            case "--createdefaultwallet" -> {
                 createDefaultWallet(input, index);
                 System.exit(0);
-                return index;
-            case "--createwalletmnemonic":
+                yield index;
+            }
+            case "--createwalletmnemonic" -> {
                 createWalletFromMnemonic(input, index);
                 System.exit(0);
-                return index;
-            case "--password":
+                yield index;
+            }
+            case "--password" -> {
                 loginWithPassword(input, index);
-                return END_OF_ARGUMENTS;
-            case "--getmnemonic":
+                yield END_OF_ARGUMENTS;
+            }
+            case "--getmnemonic" -> {
                 printMnemonic(input, index);
                 System.exit(0);
-                return index;
-            case "--changepassword":
+                yield index;
+            }
+            case "--changepassword" -> {
                 changePassword(input, index);
                 System.exit(0);
-                return index;
-            default:
+                yield index;
+            }
+            default -> {
                 LOGGER.warning("Unrecognized argument: " + argument);
-                return index;
-        }
+                yield index;
+            }
+        };
     }
 
     private int setDevelopmentEndpoint(int index) {
@@ -412,24 +417,29 @@ public class ConsoleMenu {
 
     /** Runs one menu selection; returns true when the menu is done. */
     private boolean runMenuSelection(Scanner input, int selection) {
-        switch (selection) {
-            case 1:
+        return switch (selection) {
+            case 1 -> {
                 createWallet(input);
-                return true;
-            case 2:
+                yield true;
+            }
+            case 2 -> {
                 unlockWallet(input);
-                return true;
-            case 3:
+                yield true;
+            }
+            case 3 -> {
                 importMnemonic(input);
-                return true;
-            case 4:
+                yield true;
+            }
+            case 4 -> {
                 LOGGER.info("Exiting...");
                 System.exit(0);
-                return true;
-            default:
+                yield true;
+            }
+            default -> {
                 LOGGER.info("Unknown Option.");
-                return false;
-        }
+                yield false;
+            }
+        };
     }
 
     private void createWallet(Scanner input) {

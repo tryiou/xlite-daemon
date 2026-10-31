@@ -203,23 +203,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     public JsonObject getResponse(String method, JsonArray params) {
         String normalized = method == null ? "" : method.toLowerCase(Locale.ROOT);
-        switch (normalized) {
-            case "reloadconfig":
-                return reloadConfig(params);
-            case "version":
-                return ok(new JsonPrimitive(Version.CLIENT_VERSION));
-            case "ping":
-                return ok(new JsonPrimitive(1));
-            case "help":
-                return help();
-            case "stop":
-                return stop();
-            case "getcoins":
-            case "listcoins":
-                return coinConfigs(params);
-            default:
-                return error(-32601, "Method not found.");
-        }
+        return switch (normalized) {
+            case "reloadconfig" -> reloadConfig(params);
+            case "version" -> ok(new JsonPrimitive(Version.CLIENT_VERSION));
+            case "ping" -> ok(new JsonPrimitive(1));
+            case "help" -> help();
+            case "stop" -> stop();
+            case "getcoins", "listcoins" -> coinConfigs(params);
+            default -> error(-32601, "Method not found.");
+        };
     }
 
     private static JsonObject help() {

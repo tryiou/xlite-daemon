@@ -1435,13 +1435,14 @@ public class HTTPClient {
             String address, String txid, int vout, double value, String category) {}
 
     /**
-     * Return all transaction hashes associated with the coin.
+     * Drops the transactions outside a requested time frame.
      *
-     * @param coinTicker Coin
-     * @param startTime Beginning of the time frame in unix time
-     * @param endTime End of the time frame in unix time
-     * @param expiry Time in milliseconds until cache expires
-     * @return JsonArray or null on error
+     * <p>A zero {@code endTime} means "no frame requested": the list is returned untouched.
+     *
+     * @param txs the stored transaction list, filtered in place
+     * @param startTime transactions on or after this time
+     * @param endTime transactions on or before this time
+     * @return the same list, for the caller to return
      */
     private JsonArray filterHistory(JsonArray txs, int startTime, int endTime) {
         if (endTime <= 0) {

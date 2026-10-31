@@ -1,5 +1,6 @@
 package io.xlite.daemon.app.util;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.HashBiMap;
 
 import java.io.IOException;
@@ -85,7 +86,7 @@ public class XRouterConfiguration {
             }
             String declared =
                     properties.getProperty("parameters", properties.getProperty("paramsType", ""));
-            for (String rawParamType : declared.split(",")) {
+            for (String rawParamType : Splitter.on(',').split(declared)) {
                 if (!rawParamType.isEmpty()) {
                     paramTypes.add(requireKnownParamType(rawParamType));
                 }

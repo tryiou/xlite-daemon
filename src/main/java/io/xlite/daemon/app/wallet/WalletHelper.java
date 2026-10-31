@@ -493,7 +493,7 @@ public class WalletHelper {
     }
 
     /**
-     * Why {@link #buildSimple} returned no transaction.
+     * Why {@link #build} returned no transaction.
      *
      * <p>The builder reports several unrelated failures the same way, and a caller that only sees
      * null has to guess: telling an empty wallet "nTime could not be resolved" would send the

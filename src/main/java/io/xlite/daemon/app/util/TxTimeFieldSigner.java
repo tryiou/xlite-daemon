@@ -84,12 +84,8 @@ public final class TxTimeFieldSigner {
      * input invalidates every signature already made. Signing one input at a time therefore yields
      * a transaction whose earlier inputs no longer verify.
      *
-     * @param keys one key per input, in input order
-     * @param outpoints one outpoint per input, in input order
-     * @param scripts the spent output's script per input, in input order -- the script the chain
-     *     substitutes for that input
-     * @param sigHash sighash flags, applied to every input
-     * @param nTime the nTime to sign, and the one the caller must later splice into the wire bytes
+     * @param inputs one key, outpoint and spent script per input
+     * @param policy the sighash flags and the nTime to sign
      */
     public static void addSignedInputs(
             NetworkParameters params,

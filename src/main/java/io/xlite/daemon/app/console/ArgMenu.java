@@ -89,7 +89,23 @@ public class ArgMenu {
     }
 
     /** What the arguments ask for: one of the menu selections, and the password. */
-    private record Credentials(int selection, char[] password) {}
+    private static final class Credentials {
+        private final int selection;
+        private final char[] password;
+
+        Credentials(int selection, char[] password) {
+            this.selection = selection;
+            this.password = password;
+        }
+
+        int selection() {
+            return selection;
+        }
+
+        char[] password() {
+            return password;
+        }
+    }
 
     private void completeLogin(char[] password, String userMnemonic) {
         CoinInstance.CoinError coinError =

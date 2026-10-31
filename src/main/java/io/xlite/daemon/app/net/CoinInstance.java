@@ -835,49 +835,49 @@ public final class CoinInstance {
         XRouterPacketManager.XRouterRequest request =
                 new XRouterPacketManager.XRouterRequest(
                         blocknetPeer, uuid, keyHandler.getBaseECKey(), keyHandler.getPublicKey());
-        switch (command) {
-            case "xrGetBlockCount":
-                return getXRouterPacketManager()
-                        .getXrGetBlockCount(request, (String) params.get("currency"));
-            case "xrService":
-                return getXRouterPacketManager()
-                        .getXrService(
-                                request,
-                                (String) params.get("command"),
-                                (List<?>) params.get("params"));
-            case "xrSendTransaction":
-                return getXRouterPacketManager()
-                        .getXrSendTransaction(
-                                request,
-                                (String) params.get("feetx"),
-                                (String) params.get("currency"),
-                                (String) params.get("transaction"));
-            case "xrGetBlockHash":
-                return getXRouterPacketManager()
-                        .getXrGetBlockHash(
-                                request,
-                                (String) params.get("feetx"),
-                                (String) params.get("currency"),
-                                (String) params.get("blockIndex"));
-            case "xrGetBlock":
-                return getXRouterPacketManager()
-                        .getXrGetBlock(
-                                request,
-                                (String) params.get("feetx"),
-                                (String) params.get("currency"),
-                                (String) params.get("blockHash"));
-            case "xrGetTransaction":
-                return getXRouterPacketManager()
-                        .getXrGetTransaction(
-                                request,
-                                (String) params.get("currency"),
-                                (String) params.get("txid"));
-            case "xrGetConfig":
-                return getXRouterPacketManager().getXrGetConfig(request, "self");
-            default:
+        return switch (command) {
+            case "xrGetBlockCount" ->
+                    getXRouterPacketManager()
+                            .getXrGetBlockCount(request, (String) params.get("currency"));
+            case "xrService" ->
+                    getXRouterPacketManager()
+                            .getXrService(
+                                    request,
+                                    (String) params.get("command"),
+                                    (List<?>) params.get("params"));
+            case "xrSendTransaction" ->
+                    getXRouterPacketManager()
+                            .getXrSendTransaction(
+                                    request,
+                                    (String) params.get("feetx"),
+                                    (String) params.get("currency"),
+                                    (String) params.get("transaction"));
+            case "xrGetBlockHash" ->
+                    getXRouterPacketManager()
+                            .getXrGetBlockHash(
+                                    request,
+                                    (String) params.get("feetx"),
+                                    (String) params.get("currency"),
+                                    (String) params.get("blockIndex"));
+            case "xrGetBlock" ->
+                    getXRouterPacketManager()
+                            .getXrGetBlock(
+                                    request,
+                                    (String) params.get("feetx"),
+                                    (String) params.get("currency"),
+                                    (String) params.get("blockHash"));
+            case "xrGetTransaction" ->
+                    getXRouterPacketManager()
+                            .getXrGetTransaction(
+                                    request,
+                                    (String) params.get("currency"),
+                                    (String) params.get("txid"));
+            case "xrGetConfig" -> getXRouterPacketManager().getXrGetConfig(request, "self");
+            default -> {
                 LOGGER.fine("[coin] ERROR: Unknown XRouter Message! Command: " + command);
-                return null;
-        }
+                yield null;
+            }
+        };
     }
 
     public JsonArray getAllUTXOS() {
