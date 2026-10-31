@@ -542,13 +542,12 @@ public final class CoinInstance {
                     LOGGER.warning(
                             "[wallet] Wallet already exists on disk, ignoring provided mnemonic");
                 }
-            } else if (userMnemonic != null) {
-                if (!KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), pw)) {
-                    LOGGER.warning("[wallet] Unable to create wallet from mnemonic");
-                    return new CoinError(
-                            "Unable to create wallet from mnemonic",
-                            CoinError.CoinErrorCode.BADMNEMONIC);
-                }
+            } else if (userMnemonic != null
+                    && !KeyHandler.importFromMnemonic(Arrays.asList(userMnemonic.split(" ")), pw)) {
+                LOGGER.warning("[wallet] Unable to create wallet from mnemonic");
+                return new CoinError(
+                        "Unable to create wallet from mnemonic",
+                        CoinError.CoinErrorCode.BADMNEMONIC);
             }
 
             baseSeed = KeyHandler.getBaseSeed(pw);
@@ -727,8 +726,7 @@ public final class CoinInstance {
         try {
             networkParameters =
                     io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters.from(
-                            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.get(
-                                    CoinTickerUtils.tickerToString(ticker)));
+                            CoinConfigRegistry.get(CoinTickerUtils.tickerToString(ticker)));
             return null;
         } catch (IllegalStateException | IllegalArgumentException e) {
             LOGGER.warning("[coin] [" + ticker + "] missing/invalid config: " + e.getMessage());
@@ -1093,8 +1091,8 @@ public final class CoinInstance {
                                 StandardCharsets.UTF_8));
                 utxoJSON.addProperty("spendable", true);
 
-                int totalBlocks = CoinInstance.getBlockCountByTicker(getTicker());
-                int confirmations = (totalBlocks - bUtxo.getHeight()) + 1;
+                int totalBlocks = getBlockCountByTicker(getTicker());
+                int confirmations = totalBlocks - bUtxo.getHeight() + 1;
                 if (bUtxo.getHeight() == 0) {
                     confirmations = 0;
                 }

@@ -221,8 +221,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
         for (final ListenerRegistration<BlocknetPeerDisconnectedEventListener> registration :
                 disconnectedEventListeners) {
-            registration.executor.execute(
-                    () -> registration.listener.onPeerDisconnected(BlocknetPeer.this, 0));
+            registration.executor.execute(() -> registration.listener.onPeerDisconnected(this, 0));
         }
     }
 
@@ -490,8 +489,7 @@ public class BlocknetPeer extends PeerSocketHandler {
         setTimeoutEnabled(false);
         for (final ListenerRegistration<BlocknetPeerConnectedEventListener> registration :
                 peerConnectedEventListeners) {
-            registration.executor.execute(
-                    () -> registration.listener.onPeerConnected(BlocknetPeer.this, 1));
+            registration.executor.execute(() -> registration.listener.onPeerConnected(this, 1));
         }
 
         if (peerVersionMessage.clientVersion < MIN_PROTOCOL_VERSION) {
@@ -745,7 +743,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                 blocksDownloadedEventListeners) {
             registration.executor.execute(() ->
                     registration.listener.onBlocksDownloaded(
-                            BlocknetPeer.this, block, filteredBlock, blocksLeft));
+                            this, block, filteredBlock, blocksLeft));
         }
     }
 

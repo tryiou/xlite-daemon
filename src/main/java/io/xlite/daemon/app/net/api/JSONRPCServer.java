@@ -148,7 +148,7 @@ public class JSONRPCServer extends Thread {
                     } catch (InterruptedException e) {
                         // Stop requested mid-retry: keep the flag, close any
                         // channel the bind produced.
-                        Thread.currentThread().interrupt();
+                        interrupt();
                         lastBindError = e;
                         if (bindFuture != null) {
                             bindFuture
@@ -166,10 +166,10 @@ public class JSONRPCServer extends Thread {
                 }
                 if (boundChannel == null && pass + 1 < passes) {
                     try {
-                        Thread.sleep(PASS_DELAY_MS);
+                        sleep(PASS_DELAY_MS);
                     } catch (InterruptedException ie) {
                         // Sibling clause cannot intercept this; keep the flag.
-                        Thread.currentThread().interrupt();
+                        interrupt();
                         lastBindError = ie;
                         break;
                     }
@@ -245,9 +245,9 @@ public class JSONRPCServer extends Thread {
                 return bound;
             }
             try {
-                Thread.sleep(25);
+                sleep(25);
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                interrupt();
                 return bound;
             }
         }
@@ -283,9 +283,10 @@ public class JSONRPCServer extends Thread {
                 return true;
             }
             try {
-                Thread.sleep(100);
+                sleep(100);
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                // Static helper: restore the flag through the current thread.
+                currentThread().interrupt();
                 return false;
             }
         }

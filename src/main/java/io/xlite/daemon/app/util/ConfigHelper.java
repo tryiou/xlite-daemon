@@ -48,7 +48,8 @@ public final class ConfigHelper {
      * Bind address written into fresh configs and used when the key is absent: loopback only, so a
      * wallet RPC never listens on a network interface unless the operator names one explicitly.
      */
-    public static final String DEFAULT_RPC_BIND_ADDRESS = "127.0.0.1";
+    public static final String DEFAULT_RPC_BIND_ADDRESS =
+            InetAddress.getLoopbackAddress().getHostAddress();
 
     /** Config value meaning "no port recorded yet": the listener derives one. */
     public static final int UNSET_RPC_PORT = -1000;
@@ -269,13 +270,11 @@ public final class ConfigHelper {
     private File getFile() {
         File configFile = settingsFile(tickerStr);
         File settingsDirectory = configFile.getParentFile();
-        if (!settingsDirectory.exists()) {
-            if (!settingsDirectory.isDirectory()
-                    && !settingsDirectory.mkdirs()
-                    && !settingsDirectory.isDirectory()) {
-                LOGGER.finer("[config] ERROR: Could not create base/settings directory!");
-                return null;
-            }
+        if (!settingsDirectory.exists()
+                && !settingsDirectory.mkdirs()
+                && !settingsDirectory.isDirectory()) {
+            LOGGER.finer("[config] ERROR: Could not create base/settings directory!");
+            return null;
         }
         // A regular file (or anything non-directory) at settings/ would make
         // every config write below fail: refuse instead of booting on defaults.

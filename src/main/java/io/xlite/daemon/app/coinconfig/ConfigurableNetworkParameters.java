@@ -109,7 +109,7 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
 
     @Override
     public Coin getMaxMoney() {
-        return ready() ? maxMoney : NetworkParameters.MAX_MONEY;
+        return ready() ? maxMoney : MAX_MONEY;
     }
 
     @Override

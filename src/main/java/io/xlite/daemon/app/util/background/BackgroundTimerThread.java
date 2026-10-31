@@ -140,7 +140,7 @@ public class BackgroundTimerThread implements Runnable {
     }
 
     private void outputAvailableCurrencies() {
-        long elapsed = (System.currentTimeMillis() - lastOut);
+        long elapsed = System.currentTimeMillis() - lastOut;
 
         if (elapsed < 60 * 1000 && lastOut != 0) {
             return;
@@ -176,7 +176,7 @@ public class BackgroundTimerThread implements Runnable {
     }
 
     private void sendKeepAlive() {
-        long elapsed = (System.currentTimeMillis() - lastKeepAliveTime);
+        long elapsed = System.currentTimeMillis() - lastKeepAliveTime;
 
         if (elapsed < KEEPALIVE_INTERVAL && lastKeepAliveTime != 0) {
             return;

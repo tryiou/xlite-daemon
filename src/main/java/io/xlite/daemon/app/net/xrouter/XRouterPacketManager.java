@@ -145,7 +145,7 @@ public class XRouterPacketManager {
             compactSize = (byte) 253;
             // LOGGER.finer("Compact size = " + compactSize + ", extSize = " + extSize);
             xRouterHeaderBytes[0] = compactSize;
-            xRouterHeaderBytes[1] = (byte) (0xFF & (extSize));
+            xRouterHeaderBytes[1] = (byte) (0xFF & extSize);
             xRouterHeaderBytes[2] = (byte) (0xFF & (extSize >> 8));
             compactSizeBytes = 3;
         } else {

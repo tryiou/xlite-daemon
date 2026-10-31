@@ -321,9 +321,9 @@ public class WalletHelper {
             return utxos;
         }
 
-        List<UTXO> utxosLowerHalf = new ArrayList<>(utxos.subList(0, ((sizeOfUtxos + 1) / 2)));
+        List<UTXO> utxosLowerHalf = new ArrayList<>(utxos.subList(0, (sizeOfUtxos + 1) / 2));
         List<UTXO> utxosGreaterHalf =
-                new ArrayList<>(utxos.subList(((sizeOfUtxos + 1) / 2), sizeOfUtxos));
+                new ArrayList<>(utxos.subList((sizeOfUtxos + 1) / 2, sizeOfUtxos));
 
         List<UTXO> res = new ArrayList<>();
 
@@ -845,7 +845,7 @@ public class WalletHelper {
             inputsSats += utxo.getValue();
         }
         long outputsSats = 0;
-        for (org.bitcoinj.core.TransactionOutput out : tx.getOutputs()) {
+        for (TransactionOutput out : tx.getOutputs()) {
             outputsSats += out.getValue().value;
         }
         return inputsSats - outputsSats;

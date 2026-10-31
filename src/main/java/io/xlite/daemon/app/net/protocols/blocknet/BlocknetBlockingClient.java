@@ -48,7 +48,7 @@ public final class BlocknetBlockingClient implements MessageWriteTarget {
                 new Thread(() -> {
                     Context.propagate(context);
                     if (clientSet != null) {
-                        clientSet.add(BlocknetBlockingClient.this);
+                        clientSet.add(this);
                     }
                     try {
                         socket.connect(serverAddress, connectTimeoutMillis);
@@ -75,7 +75,7 @@ public final class BlocknetBlockingClient implements MessageWriteTarget {
                             // the channel is closed
                         }
                         if (clientSet != null) {
-                            clientSet.remove(BlocknetBlockingClient.this);
+                            clientSet.remove(this);
                         }
                         connection.connectionClosed();
                     }

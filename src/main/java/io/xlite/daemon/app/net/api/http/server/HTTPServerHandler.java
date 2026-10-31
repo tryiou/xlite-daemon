@@ -305,8 +305,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                String methodLower =
-                        method == null ? null : method.toLowerCase(java.util.Locale.ROOT);
+                String methodLower = method == null ? null : method.toLowerCase(Locale.ROOT);
                 boolean sensitiveMethod =
                         methodLower != null && SENSITIVE_METHODS.contains(methodLower);
                 boolean pingMethod = "ping".equals(methodLower);
@@ -379,7 +378,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private JsonObject getResponse(String method, JsonArray params) {
         JsonObject response = new JsonObject();
 
-        String normalizedMethod = method == null ? "" : method.toLowerCase(java.util.Locale.ROOT);
+        String normalizedMethod = method == null ? "" : method.toLowerCase(Locale.ROOT);
         switch (normalizedMethod) {
             case "reloadconfig":
                 {
@@ -1533,8 +1532,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                         resultJSON.addProperty(
                                 "confirmations",
-                                (CoinInstance.getBlockCountByTicker(coin.getTicker())
-                                                - utxo.getHeight())
+                                CoinInstance.getBlockCountByTicker(coin.getTicker())
+                                        - utxo.getHeight()
                                         + 1);
                         resultJSON.addProperty(
                                 "value",
@@ -1922,8 +1921,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     String address;
                     double amount;
-                    io.xlite.daemon.app.wallet.WalletHelper.BuildFailure[] buildFailure =
-                            new io.xlite.daemon.app.wallet.WalletHelper.BuildFailure[1];
+                    WalletHelper.BuildFailure[] buildFailure = new WalletHelper.BuildFailure[1];
                     boolean dryRun;
                     try {
                         address = params.get(0).getAsString();
@@ -1998,9 +1996,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                         buildFailure[0] == null
                                                 ? "UNKNOWN"
                                                 : buildFailure[0].name());
-                                if (buildFailure[0]
-                                        == io.xlite.daemon.app.wallet.WalletHelper.BuildFailure
-                                                .NTIME_UNRESOLVED) {
+                                if (buildFailure[0] == WalletHelper.BuildFailure.NTIME_UNRESOLVED) {
                                     errorJSON.addProperty("nTimeResolved", false);
                                 }
                                 response.add("error", errorJSON);
@@ -2333,7 +2329,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
      * one implementation.
      */
     private static boolean hasTxTimeField(CoinTicker ticker) {
-        return io.xlite.daemon.app.util.TxTimeField.appliesTo(ticker);
+        return TxTimeField.appliesTo(ticker);
     }
 
     /**
@@ -2514,7 +2510,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         result.addProperty("inputs", transaction.getInputs().size());
         result.addProperty("outputs", transaction.getOutputs().size());
         result.addProperty("feeSats", feeSats);
-        result.addProperty("fee", io.xlite.daemon.app.util.Sats.toWholeCoins(feeSats, coinUnit));
+        result.addProperty("fee", Sats.toWholeCoins(feeSats, coinUnit));
         result.addProperty("feePerByte", WalletHelper.getFeePerByte(params));
         result.addProperty("minTxFee", WalletHelper.getMinTxFee(params));
         result.addProperty("coinUnit", coinUnit);
@@ -2568,7 +2564,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     static String txidForDecoded(CoinTicker ticker, byte[] wireBytes, Transaction parsed) {
         return hasTxTimeField(ticker)
-                ? io.xlite.daemon.app.util.TxTimeField.txidOfWireBytes(wireBytes)
+                ? TxTimeField.txidOfWireBytes(wireBytes)
                 : parsed.getTxId().toString();
     }
 
@@ -2588,7 +2584,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     static Transaction parseForCoin(CoinTicker ticker, NetworkParameters params, byte[] rawBytes) {
         byte[] parsed = decodeForParsing(ticker, rawBytes);
         Transaction tx = new Transaction(params, parsed);
-        if (hasTxTimeField(ticker) && !java.util.Arrays.equals(tx.bitcoinSerialize(), parsed)) {
+        if (hasTxTimeField(ticker) && !Arrays.equals(tx.bitcoinSerialize(), parsed)) {
             throw new IllegalArgumentException(
                     "raw transaction is not in this chain's wire layout: it re-serializes "
                             + "differently, so it carries no nTime");

@@ -144,9 +144,8 @@ public final class CoinConfigEnsurer {
         try {
             onDisk =
                     new String(
-                            java.nio.file.Files.readAllBytes(
-                                    ConfigHelper.settingsFile(tickerStr).toPath()),
-                            java.nio.charset.StandardCharsets.UTF_8);
+                            Files.readAllBytes(ConfigHelper.settingsFile(tickerStr).toPath()),
+                            StandardCharsets.UTF_8);
         } catch (Exception e) {
             throw new IllegalStateException(
                     "config for " + tickerStr + " was not written: " + e.getMessage(), e);

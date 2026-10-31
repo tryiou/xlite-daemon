@@ -49,7 +49,6 @@ public final class CoinConfigRegistry {
     public static synchronized void loadWithFallback(String source, CoinConfigCache cache) {
         try {
             load(source, cache);
-            return;
         } catch (RuntimeException first) {
             if (cache == null) {
                 throw first;

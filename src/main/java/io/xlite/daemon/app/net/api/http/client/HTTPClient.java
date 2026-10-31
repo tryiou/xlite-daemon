@@ -677,7 +677,7 @@ public class HTTPClient {
 
             int height = utxoArr.getJSONObject(i).getInt("block_number");
             int currentHeight = CoinInstance.getBlockCountByTicker(coinTicker);
-            int confirmations = (currentHeight - height) + 1;
+            int confirmations = currentHeight - height + 1;
             if (height == 0) {
                 confirmations = 0;
             }
@@ -1378,7 +1378,8 @@ public class HTTPClient {
                                     .getAsJsonObject();
                     JsonObject scriptPubKey = vout.getAsJsonObject("scriptPubKey");
 
-                    if ((scriptPubKey == null || scriptPubKey.isJsonNull())
+                    if (scriptPubKey == null
+                            || scriptPubKey.isJsonNull()
                             || scriptPubKey.get("addresses").isJsonNull()) {
                         continue;
                     }

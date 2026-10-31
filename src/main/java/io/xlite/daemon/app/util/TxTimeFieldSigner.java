@@ -214,7 +214,7 @@ public final class TxTimeFieldSigner {
                     out, (index != nIn && (hashSingle || hashNone)) ? 0 : in.getSequenceNumber());
         }
 
-        int outputCount = hashNone ? 0 : (hashSingle ? nIn + 1 : tx.getOutputs().size());
+        int outputCount = hashNone ? 0 : hashSingle ? nIn + 1 : tx.getOutputs().size();
         writeCompactSize(out, outputCount);
         for (int i = 0; i < outputCount; i++) {
             if (hashSingle && i != nIn) {
