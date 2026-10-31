@@ -111,16 +111,15 @@ final class SendTransactionMethod {
             return RpcResponse.error(3002, "wallet not ready: could not load unspent outputs");
         }
 
-        WalletHelper.BuildFailure[] failure = new WalletHelper.BuildFailure[1];
-        WalletHelper.BuiltTransaction built;
+        WalletHelper.BuildResult result;
         try {
-            built =
-                    WalletHelper.createTransactionSimpleWithFee(
-                            coin.getTicker(),
-                            request.address(),
-                            request.amount(),
-                            nTimes::forInputs,
-                            failure);
+            result =
+                    WalletHelper.build(
+                            new WalletHelper.BuildRequest(
+                                    coin.getTicker(),
+                                    request.address(),
+                                    request.amount(),
+                                    nTimes::forInputs));
         } catch (RuntimeException e) {
             LOGGER.warning(
                     "[http-server-handler] Error creating transaction in sendtransaction for "
@@ -129,9 +128,10 @@ final class SendTransactionMethod {
                             + e.getMessage());
             return RpcResponse.error(-6, messageOf(e));
         }
-        if (built == null) {
-            return buildFailure(failure[0]);
+        if (result.failure() != null) {
+            return buildFailure(result.failure());
         }
+        WalletHelper.BuiltTransaction built = result.transaction();
 
         String rawTxHex;
         try {
@@ -154,12 +154,7 @@ final class SendTransactionMethod {
 
         if (request.dryRun()) {
             return RpcResponse.ok(
-                    buildDryRunResult(
-                            coin.getNetworkParameters(),
-                            coinFactor(),
-                            built.feeSats(),
-                            rawTxHex,
-                            built.transaction()));
+                    buildDryRunResult(coin.getNetworkParameters(), coinFactor(), rawTxHex, built));
         }
         return broadcast(built.transaction(), rawTxHex);
     }
@@ -264,9 +259,9 @@ final class SendTransactionMethod {
     static JsonObject buildDryRunResult(
             NetworkParameters params,
             long coinUnit,
-            long feeSats,
             String rawTxHex,
-            Transaction transaction) {
+            WalletHelper.BuiltTransaction built) {
+        Transaction transaction = built.transaction();
         JsonObject result = new JsonObject();
         result.addProperty("dryRun", true);
         result.addProperty("txid", TxWire.txidForHex(rawTxHex));
@@ -274,8 +269,8 @@ final class SendTransactionMethod {
         result.addProperty("sizeBytes", Hex.decode(rawTxHex).length);
         result.addProperty("inputs", transaction.getInputs().size());
         result.addProperty("outputs", transaction.getOutputs().size());
-        result.addProperty("feeSats", feeSats);
-        result.addProperty("fee", Sats.toWholeCoins(feeSats, coinUnit));
+        result.addProperty("feeSats", built.feeSats());
+        result.addProperty("fee", Sats.toWholeCoins(built.feeSats(), coinUnit));
         result.addProperty("feePerByte", WalletHelper.getFeePerByte(params));
         result.addProperty("minTxFee", WalletHelper.getMinTxFee(params));
         result.addProperty("coinUnit", coinUnit);

@@ -50,6 +50,33 @@ public final class TxTimeFieldSigner {
     private TxTimeFieldSigner() {}
 
     /**
+     * One key, outpoint and spent script per input, in input order.
+     *
+     * @param scripts the spent output's script per input -- the script the chain substitutes for
+     *     that input
+     */
+    public record InputsToSign(
+            List<ECKey> keys, List<TransactionOutPoint> outpoints, List<Script> scripts) {
+
+        public InputsToSign {
+            keys = List.copyOf(keys);
+            outpoints = List.copyOf(outpoints);
+            scripts = List.copyOf(scripts);
+        }
+    }
+
+    /**
+     * The sighash policy applied to every input of a transaction.
+     *
+     * @param sigHash the sighash flags
+     * @param nTime the nTime to sign, and the one the caller must later splice into the wire bytes
+     */
+    public record SignaturePolicy(Transaction.SigHash sigHash, long nTime) {}
+
+    /** One input's position, sighash type and nTime, as the preimage is computed for it. */
+    public record SighashRequest(int inputIndex, int hashType, long nTime) {}
+
+    /**
      * Attach and sign every input of a transaction destined for a time-field chain.
      *
      * <p>All inputs are attached <em>before</em> any signature is computed, which is forced by the
@@ -66,32 +93,33 @@ public final class TxTimeFieldSigner {
      */
     public static void addSignedInputs(
             NetworkParameters params,
-            Transaction tx,
-            List<ECKey> keys,
-            List<TransactionOutPoint> outpoints,
-            List<Script> scripts,
-            Transaction.SigHash sigHash,
-            long nTime) {
-        requireSameSize(keys, outpoints, scripts);
-        if (keys.isEmpty()) {
+            Transaction transaction,
+            InputsToSign inputs,
+            SignaturePolicy policy) {
+        requireSameSize(inputs);
+        if (inputs.keys().isEmpty()) {
             throw new IllegalArgumentException("no inputs to sign");
         }
+        long nTime = policy.nTime();
         if (nTime < 0 || nTime > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("nTime out of uint32 range: " + nTime);
         }
-
-        int hashType = sigHash.value;
+        int hashType = policy.sigHash().value;
 
         // Attach every input first, with an empty script, so each preimage is
         // computed against the finished input set.
-        for (TransactionOutPoint outpoint : outpoints) {
-            tx.addInput(new TransactionInput(params, tx, new byte[0], outpoint));
+        for (TransactionOutPoint outpoint : inputs.outpoints()) {
+            transaction.addInput(new TransactionInput(params, transaction, new byte[0], outpoint));
         }
 
-        for (int nIn = 0; nIn < keys.size(); nIn++) {
-            Sha256Hash digest = chainSighash(tx, scripts.get(nIn), nIn, hashType, nTime);
-            Script scriptSig = buildScriptSig(keys.get(nIn), digest, hashType);
-            tx.getInputs().get(nIn).setScriptSig(scriptSig);
+        for (int index = 0; index < inputs.keys().size(); index++) {
+            Sha256Hash digest =
+                    chainSighash(
+                            transaction,
+                            inputs.scripts().get(index),
+                            new SighashRequest(index, hashType, nTime));
+            Script scriptSig = buildScriptSig(inputs.keys().get(index), digest, hashType);
+            transaction.getInputs().get(index).setScriptSig(scriptSig);
         }
     }
 
@@ -111,16 +139,16 @@ public final class TxTimeFieldSigner {
         return new ScriptBuilder().data(encoded).data(key.getPubKey()).build();
     }
 
-    private static void requireSameSize(
-            List<ECKey> keys, List<TransactionOutPoint> outpoints, List<Script> scripts) {
-        if (keys.size() != outpoints.size() || keys.size() != scripts.size()) {
+    private static void requireSameSize(InputsToSign inputs) {
+        if (inputs.keys().size() != inputs.outpoints().size()
+                || inputs.keys().size() != inputs.scripts().size()) {
             throw new IllegalArgumentException(
                     "one key, outpoint and script per input required: "
-                            + keys.size()
+                            + inputs.keys().size()
                             + "/"
-                            + outpoints.size()
+                            + inputs.outpoints().size()
                             + "/"
-                            + scripts.size());
+                            + inputs.scripts().size());
         }
     }
 
@@ -133,14 +161,14 @@ public final class TxTimeFieldSigner {
      * inputs. Reordering these two checks would turn a chain-defined signature into a thrown error.
      */
     public static Sha256Hash chainSighash(
-            Transaction tx, Script scriptCode, int nIn, int hashType, long nTime) {
-        boolean hashSingle = (hashType & 0x1f) == SIGHASH_SINGLE;
+            Transaction transaction, Script scriptCode, SighashRequest request) {
+        boolean hashSingle = (request.hashType() & 0x1f) == SIGHASH_SINGLE;
 
         // The chain treats SIGHASH_SINGLE with an out-of-range input as a
         // signature bug and hashes the constant 1 rather than failing. Match it
         // exactly, so a transaction signed here reaches the same verdict the
         // node reaches instead of a different one.
-        if (hashSingle && nIn >= tx.getOutputs().size()) {
+        if (hashSingle && request.inputIndex() >= transaction.getOutputs().size()) {
             // The chain's constant is uint256(1) and the set byte is the FIRST
             // one. base_blob::SetHex (uint256.cpp) walks the hex string backward
             // starting at data[0], so uint256S("...0001") yields 0100...00, and
@@ -155,20 +183,23 @@ public final class TxTimeFieldSigner {
             one[0] = 1;
             return Sha256Hash.wrap(one);
         }
-        if (tx.getInputs().isEmpty()) {
+        checkInputExists(transaction, request.inputIndex());
+        return Sha256Hash.wrap(
+                Sha256Hash.hashTwice(preimageBytes(transaction, scriptCode, request)));
+    }
+
+    private static void checkInputExists(Transaction transaction, int inputIndex) {
+        if (transaction.getInputs().isEmpty()) {
             throw new IllegalArgumentException("transaction has no inputs to sign");
         }
-        if (nIn < 0 || nIn >= tx.getInputs().size()) {
+        if (inputIndex < 0 || inputIndex >= transaction.getInputs().size()) {
             throw new IllegalArgumentException(
                     "input index "
-                            + nIn
+                            + inputIndex
                             + " outside transaction of "
-                            + tx.getInputs().size()
+                            + transaction.getInputs().size()
                             + " inputs");
         }
-
-        return Sha256Hash.wrap(
-                Sha256Hash.hashTwice(preimageBytes(tx, scriptCode, nIn, hashType, nTime)));
     }
 
     /**
@@ -180,62 +211,75 @@ public final class TxTimeFieldSigner {
      * stripped script, the nTime position) rather than re-transcribing the layout.
      */
     static byte[] preimageBytes(
-            Transaction tx, Script scriptCode, int nIn, int hashType, long nTime) {
-        boolean anyoneCanPay = (hashType & 0x80) != 0;
-        boolean hashSingle = (hashType & 0x1f) == SIGHASH_SINGLE;
-        boolean hashNone = (hashType & 0x1f) == SIGHASH_NONE;
-
-        if (tx.getInputs().isEmpty()) {
-            throw new IllegalArgumentException("transaction has no inputs to sign");
-        }
-        if (nIn < 0 || nIn >= tx.getInputs().size()) {
-            throw new IllegalArgumentException(
-                    "input index "
-                            + nIn
-                            + " outside transaction of "
-                            + tx.getInputs().size()
-                            + " inputs");
-        }
+            Transaction transaction, Script scriptCode, SighashRequest request) {
+        int hashType = request.hashType();
+        checkInputExists(transaction, request.inputIndex());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        writeInt32(out, (int) tx.getVersion());
-        writeUInt32(out, nTime);
-
-        int inputCount = anyoneCanPay ? 1 : tx.getInputs().size();
-        writeCompactSize(out, inputCount);
-        for (int i = 0; i < inputCount; i++) {
-            int index = anyoneCanPay ? nIn : i;
-            TransactionInput in = tx.getInputs().get(index);
-            writeOutPoint(out, in.getOutpoint());
-            // The chain blanks the other inputs' scripts, and zeroes their
-            // sequence only under SINGLE/NONE.
-            writeScript(out, index == nIn ? scriptCode : new ScriptBuilder().build());
-            writeUInt32(
-                    out, (index != nIn && (hashSingle || hashNone)) ? 0 : in.getSequenceNumber());
-        }
-
-        int outputCount = hashNone ? 0 : hashSingle ? nIn + 1 : tx.getOutputs().size();
-        writeCompactSize(out, outputCount);
-        for (int i = 0; i < outputCount; i++) {
-            if (hashSingle && i != nIn) {
-                // The chain serializes a default-constructed CTxOut for these,
-                // and that constructor calls SetNull(), which sets nValue to -1
-                // rather than 0. The preimage therefore carries 0xffff...ff
-                // here; writing 0 would produce a signature the node rejects.
-                // bitcoinj's own sighash does the same via
-                // Coin.NEGATIVE_SATOSHI, whose value is -1.
-                writeUInt64(out, -1L);
-                writeScript(out, new ScriptBuilder().build());
-            } else {
-                TransactionOutput o = tx.getOutputs().get(i);
-                writeUInt64(out, o.getValue().value);
-                writeScript(out, o.getScriptPubKey());
-            }
-        }
-
-        writeUInt32(out, tx.getLockTime());
+        writeInt32(out, (int) transaction.getVersion());
+        writeUInt32(out, request.nTime());
+        writeInputs(out, transaction, scriptCode, request);
+        writeOutputs(out, transaction, request);
+        writeUInt32(out, transaction.getLockTime());
         writeInt32(out, hashType);
         return out.toByteArray();
+    }
+
+    private static void writeInputs(
+            ByteArrayOutputStream out,
+            Transaction transaction,
+            Script scriptCode,
+            SighashRequest request) {
+        int hashType = request.hashType();
+        int inputIndex = request.inputIndex();
+        boolean anyoneCanPay = (hashType & 0x80) != 0;
+        // The chain zeroes the other inputs' sequence only under SINGLE/NONE.
+        boolean blankOtherSequences =
+                (hashType & 0x1f) == SIGHASH_SINGLE || (hashType & 0x1f) == SIGHASH_NONE;
+
+        int inputCount = anyoneCanPay ? 1 : transaction.getInputs().size();
+        writeCompactSize(out, inputCount);
+        for (int i = 0; i < inputCount; i++) {
+            int index = anyoneCanPay ? inputIndex : i;
+            TransactionInput in = transaction.getInputs().get(index);
+            writeOutPoint(out, in.getOutpoint());
+            // The chain blanks the other inputs' scripts.
+            writeScript(out, index == inputIndex ? scriptCode : new ScriptBuilder().build());
+            writeUInt32(
+                    out, (index != inputIndex && blankOtherSequences) ? 0 : in.getSequenceNumber());
+        }
+    }
+
+    private static void writeOutputs(
+            ByteArrayOutputStream out, Transaction transaction, SighashRequest request) {
+        int hashType = request.hashType();
+        boolean hashSingle = (hashType & 0x1f) == SIGHASH_SINGLE;
+        boolean hashNone = (hashType & 0x1f) == SIGHASH_NONE;
+        int outputCount =
+                hashNone
+                        ? 0
+                        : hashSingle ? request.inputIndex() + 1 : transaction.getOutputs().size();
+        writeCompactSize(out, outputCount);
+        for (int index = 0; index < outputCount; index++) {
+            writeOutput(out, transaction, request, index);
+        }
+    }
+
+    private static void writeOutput(
+            ByteArrayOutputStream out, Transaction transaction, SighashRequest request, int index) {
+        boolean hashSingle = (request.hashType() & 0x1f) == SIGHASH_SINGLE;
+        if (hashSingle && index != request.inputIndex()) {
+            // The chain serializes a default-constructed CTxOut for these, and that constructor
+            // calls SetNull(), which sets nValue to -1 rather than 0. The preimage therefore
+            // carries 0xffff...ff here; writing 0 would produce a signature the node rejects.
+            // bitcoinj's own sighash does the same via Coin.NEGATIVE_SATOSHI, whose value is -1.
+            writeUInt64(out, -1L);
+            writeScript(out, new ScriptBuilder().build());
+            return;
+        }
+        TransactionOutput output = transaction.getOutputs().get(index);
+        writeUInt64(out, output.getValue().value);
+        writeScript(out, output.getScriptPubKey());
     }
 
     /**
@@ -250,11 +294,7 @@ public final class TxTimeFieldSigner {
             return false;
         }
         List<ScriptChunk> chunks = scriptSig.getChunks();
-        if (chunks.size() < 2) {
-            return false;
-        }
-        // A non-push chunk (an opcode, say) carries no data at all.
-        if (!chunks.get(0).isPushData() || !chunks.get(1).isPushData()) {
+        if (chunks.size() < 2 || !chunks.get(0).isPushData() || !chunks.get(1).isPushData()) {
             return false;
         }
         byte[] signature = chunks.get(0).data;
@@ -262,14 +302,15 @@ public final class TxTimeFieldSigner {
         if (signature == null || pubkey == null || signature.length < 2) {
             return false;
         }
+        return verifies(hash, signature, pubkey);
+    }
+
+    private static boolean verifies(Sha256Hash hash, byte[] signature, byte[] pubkey) {
         byte[] der = new byte[signature.length - 1];
         System.arraycopy(signature, 0, der, 0, der.length);
         try {
             ECDSASignature parsed = ECDSASignature.decodeFromDER(der);
-            if (!parsed.isCanonical()) {
-                return false;
-            }
-            return ECKey.fromPublicOnly(pubkey).verify(hash, parsed);
+            return parsed.isCanonical() && ECKey.fromPublicOnly(pubkey).verify(hash, parsed);
         } catch (SignatureDecodeException e) {
             return false;
         }

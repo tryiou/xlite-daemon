@@ -35,6 +35,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -213,7 +214,10 @@ public class WalletHelper {
         }
 
         TxTimeFieldSigner.addSignedInputs(
-                networkParameters, tx, keys, outpoints, scripts, Transaction.SigHash.ALL, nTime);
+                networkParameters,
+                tx,
+                new TxTimeFieldSigner.InputsToSign(keys, outpoints, scripts),
+                new TxTimeFieldSigner.SignaturePolicy(Transaction.SigHash.ALL, nTime));
 
         for (UTXO utxo : selectedUtxos) {
             if (!utxo.isSpent()) {
@@ -482,10 +486,9 @@ public class WalletHelper {
 
     public static Transaction createTransactionSimple(
             CoinTicker coinTicker, String address, double amount) {
-        BuiltTransaction built =
-                createTransactionSimpleWithFee(coinTicker, address, amount, null, null);
-        // buildSimple reports failure by returning null, so unwrap it here rather
-        // than letting a caller meet a NullPointerException on .transaction().
+        // A build reports failure by returning no transaction, so unwrap it here rather than
+        // letting a caller meet a NullPointerException on .transaction().
+        BuiltTransaction built = createTransactionSimpleWithFee(coinTicker, address, amount, null);
         return built == null ? null : built.transaction();
     }
 
@@ -520,6 +523,40 @@ public class WalletHelper {
      * really paid. Callers that only want to send can keep using {@link #createTransactionSimple}.
      */
     public record BuiltTransaction(Transaction transaction, long feeSats, long nTime) {}
+
+    /** A one-recipient send to build and sign. */
+    public record BuildRequest(
+            CoinTicker ticker, String address, double amount, NTimeResolver nTimeResolver) {}
+
+    /** A build either produces a transaction or names the reason it could not. */
+    public record BuildResult(BuiltTransaction transaction, BuildFailure failure) {
+
+        static BuildResult built(BuiltTransaction transaction) {
+            return new BuildResult(transaction, null);
+        }
+
+        static BuildResult failed(BuildFailure failure) {
+            return new BuildResult(null, failure);
+        }
+    }
+
+    /** The coin's parameters, wallet, base-unit factor and spendable outputs. */
+    private record BuildContext(
+            NetworkParameters params, WalletHelper wallet, long coinUnit, List<UTXO> utxos) {}
+
+    /** The outputs to add, the inputs that fund them, and the change left over. */
+    private record Selection(List<UTXO> selected, List<UTXO> outputs, double change) {}
+
+    /** Everything input selection needs, so it stays one call rather than eight arguments. */
+    private record Funding(
+            List<UTXO> utxos,
+            List<UTXO> selected,
+            List<UTXO> outputs,
+            double sendAmount,
+            double initialFee,
+            long feePerByte,
+            long minTxFee,
+            long coinUnit) {}
 
     /**
      * Sentinel for a transaction that carries no nTime field: none is signed and none is spliced
@@ -602,226 +639,213 @@ public class WalletHelper {
      */
     public static BuiltTransaction createTransactionSimpleWithFee(
             CoinTicker coinTicker, String address, double amount, NTimeResolver nTimeResolver) {
-        return createTransactionSimpleWithFee(coinTicker, address, amount, nTimeResolver, null);
+        return build(new BuildRequest(coinTicker, address, amount, nTimeResolver)).transaction();
     }
 
     /**
-     * As {@link #createTransactionSimpleWithFee(CoinTicker, String, double, NTimeResolver)},
-     * additionally reporting why a null result is null.
+     * Builds and signs a one-recipient transaction, or reports why it could not be built.
      *
-     * <p>The reason is returned to the caller rather than stashed in a field because sends are
-     * serialized per coin, not per process: a static slot would be overwritten by a concurrent
-     * send, and the caller would then be told its empty wallet failed to resolve an nTime.
-     *
-     * @param failureOut receives the reason; may be null when the caller does not need it
+     * <p>The reason is returned rather than stashed in a field because sends are serialized per
+     * coin, not per process: a static slot would be overwritten by a concurrent send, and the
+     * caller would then be told its empty wallet failed to resolve an nTime.
      */
-    public static BuiltTransaction createTransactionSimpleWithFee(
-            CoinTicker coinTicker,
-            String address,
-            double amount,
-            NTimeResolver nTimeResolver,
-            BuildFailure[] failureOut) {
-        return buildSimple(
-                coinTicker,
-                address,
-                amount,
-                nTimeResolver,
-                failureOut == null ? new BuildFailure[1] : failureOut);
+    public static BuildResult build(BuildRequest request) {
+        BuildContext context = contextFor(request);
+        Optional<BuildFailure> rejection = rejectRequest(request, context);
+        if (rejection.isPresent()) {
+            return BuildResult.failed(rejection.get());
+        }
+        Selection selection = selection(request, context);
+        if (selection.selected().isEmpty()) {
+            LOGGER.warning(
+                    "[wallet-"
+                            + CoinTickerUtils.tickerToString(request.ticker())
+                            + "] createTransactionSimple: failed to select UTXOs");
+            return BuildResult.failed(BuildFailure.SELECTION_FAILED);
+        }
+        Transaction transaction = assemble(request, context, selection);
+        // The fee is exactly what leaves the wallet: the selected inputs minus every output
+        // actually added. Deriving it from the transaction's own totals rather than from a
+        // linear formula keeps it right when change was calculated but dropped as dust,
+        // since that value never became an output and must not be subtracted here.
+        long feeSats = feeActuallyCharged(selection.selected(), transaction);
+
+        // A time-field chain signs nTime, so it must be fixed before signing and reused
+        // verbatim for the wire bytes. Resolve it once, here, against the inputs that were
+        // actually selected.
+        long nTime = resolveNTime(request.ticker(), selection.selected(), request.nTimeResolver());
+        if (nTime == INVALID_NTIME) {
+            return BuildResult.failed(BuildFailure.NTIME_UNRESOLVED);
+        }
+        Transaction signed =
+                context.wallet().signTransactionWithUtxos(transaction, selection.selected(), nTime);
+        if (signed == null) {
+            return BuildResult.failed(BuildFailure.SIGNING_FAILED);
+        }
+        return BuildResult.built(new BuiltTransaction(signed, feeSats, nTime));
     }
 
-    private static BuiltTransaction buildSimple(
-            CoinTicker coinTicker,
-            String address,
-            double amount,
-            NTimeResolver nTimeResolver,
-            BuildFailure[] failureOut) {
-        CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
-        WalletHelper walletHelper = coinInstance.getWalletHelper();
-        NetworkParameters params = coinInstance.getNetworkParameters();
-
-        long feePerByte = getFeePerByte(params);
-        long minTxFee = getMinTxFee(params);
-
-        // The coin's own BCF COIN factor (base units per whole coin).
-        // Never Coin.COIN.value: that hardcodes 8 decimals and misprices
-        // every 6-decimal coin 100x in fee, output and dust math below.
+    private static BuildContext contextFor(BuildRequest request) {
+        CoinInstance coinInstance = CoinInstance.getInstance(request.ticker());
+        WalletHelper wallet = coinInstance.getWalletHelper();
+        List<UTXO> utxos = wallet.sortLeastToGreatest();
+        utxos.removeIf(UTXO::isSpent);
+        // The coin's own BCF COIN factor (base units per whole coin). Never
+        // Coin.COIN.value: that hardcodes 8 decimals and misprices every 6-decimal
+        // coin 100x in fee, output and dust math.
         long coinUnit =
-                CoinConfigRegistry.get(CoinTickerUtils.tickerToString(coinTicker)).coinFactor();
+                CoinConfigRegistry.get(CoinTickerUtils.tickerToString(request.ticker()))
+                        .coinFactor();
+        return new BuildContext(coinInstance.getNetworkParameters(), wallet, coinUnit, utxos);
+    }
 
-        // A recipient output below the coin's threshold cannot be relayed: every
-        // node rejects the transaction at mempool acceptance. Refuse it here,
-        // before inputs are selected and signed, so the caller is told the amount
-        // is unspendable instead of only learning it when the broadcast fails.
-        // The comparison matches the change gate below (and the node): an output
-        // exactly at the threshold is spendable.
-        long dustLimit = params.getMinNonDustOutput().value;
-        long outputSats = Sats.fromWholeCoins(amount, coinUnit);
+    /**
+     * Why the request cannot be built at all, if it cannot.
+     *
+     * <p>A recipient output below the coin's threshold cannot be relayed: every node rejects the
+     * transaction at mempool acceptance. It is refused before inputs are selected and signed, so
+     * the caller is told the amount is unspendable instead of only learning it when the broadcast
+     * fails. The comparison matches the change gate (and the node): an output exactly at the
+     * threshold is spendable.
+     */
+    private static Optional<BuildFailure> rejectRequest(
+            BuildRequest request, BuildContext context) {
+        long dustLimit = context.params().getMinNonDustOutput().value;
+        long outputSats = Sats.fromWholeCoins(request.amount(), context.coinUnit());
         if (outputSats < dustLimit) {
             LOGGER.warning(
                     "[wallet-"
-                            + CoinTickerUtils.tickerToString(coinTicker)
+                            + CoinTickerUtils.tickerToString(request.ticker())
                             + "] createTransactionSimple: output "
                             + outputSats
                             + " is below the dust threshold "
                             + dustLimit);
-            failureOut[0] = BuildFailure.DUST_OUTPUT;
-            return null;
+            return Optional.of(BuildFailure.DUST_OUTPUT);
         }
-
-        List<UTXO> allUtxos = walletHelper.sortLeastToGreatest();
-        allUtxos.removeIf(UTXO::isSpent);
-
-        if (allUtxos.isEmpty()) {
+        if (context.utxos().isEmpty()) {
             LOGGER.warning(
                     "[wallet-"
-                            + CoinTickerUtils.tickerToString(coinTicker)
+                            + CoinTickerUtils.tickerToString(request.ticker())
                             + "] createTransactionSimple: no UTXOs available");
-            failureOut[0] = BuildFailure.NO_UTXOS;
-            return null;
+            return Optional.of(BuildFailure.NO_UTXOS);
         }
-
-        double amountNotIncludingFees = amount;
-        double totalAvailable = 0.0;
-        for (UTXO utxo : allUtxos) {
-            totalAvailable += utxo.getAmount();
-        }
-
-        if (totalAvailable < amountNotIncludingFees) {
+        double totalAvailable = totalAvailable(context.utxos());
+        if (totalAvailable < request.amount()) {
             LOGGER.warning(
                     "[wallet-"
-                            + CoinTickerUtils.tickerToString(coinTicker)
+                            + CoinTickerUtils.tickerToString(request.ticker())
                             + "] createTransactionSimple: insufficient funds (have="
                             + totalAvailable
                             + ", need="
-                            + amountNotIncludingFees
+                            + request.amount()
                             + ")");
-            failureOut[0] = BuildFailure.INSUFFICIENT_FUNDS;
-            return null;
+            return Optional.of(BuildFailure.INSUFFICIENT_FUNDS);
         }
-
-        List<UTXO> selectedUtxos = new ArrayList<>();
-        List<UTXO> outputs = new ArrayList<>();
-        outputs.add(createTransactionOutput(coinTicker, address, amount, params));
-
-        long estimatedFeeSats = Math.max(feePerByte * (192 + 34), minTxFee);
-        double estimatedFee = (double) estimatedFeeSats / coinUnit;
-
-        double changeAmt =
-                fundTransaction(
-                        allUtxos,
-                        selectedUtxos,
-                        outputs,
-                        amountNotIncludingFees,
-                        estimatedFee,
-                        feePerByte,
-                        minTxFee,
-                        coinUnit);
-        if (selectedUtxos.isEmpty()) {
-            LOGGER.warning(
-                    "[wallet-"
-                            + CoinTickerUtils.tickerToString(coinTicker)
-                            + "] createTransactionSimple: failed to select UTXOs");
-            failureOut[0] = BuildFailure.SELECTION_FAILED;
-            return null;
-        }
-
-        Transaction tx = CoinTransactions.newTransaction(params, coinTicker);
-        for (UTXO output : outputs) {
-            Address addr = LegacyAddress.fromBase58(params, output.getAddress());
-            tx.addOutput(Coin.valueOf(Sats.fromWholeCoins(output.getAmount(), coinUnit)), addr);
-        }
-
-        boolean changeAdded = changeAmt > 0 && !isDust(changeAmt, coinUnit, params);
-        if (changeAdded) {
-            tx.addOutput(
-                    Coin.valueOf(Sats.fromWholeCoins(changeAmt, coinUnit)),
-                    walletHelper.getChangeAddress());
-        }
-
-        // The fee is exactly what leaves the wallet: the selected inputs minus
-        // every output actually added. Deriving it from the transaction's own
-        // totals rather than from a linear formula keeps it right when change was
-        // calculated but dropped as dust, since that value never became an output
-        // and must not be subtracted here.
-        long feeSats = feeActuallyCharged(selectedUtxos, tx);
-
-        // A time-field chain signs nTime, so it must be fixed before signing
-        // and reused verbatim for the wire bytes. Resolve it once, here,
-        // against the inputs that were actually selected.
-        long nTime = resolveNTime(coinTicker, selectedUtxos, nTimeResolver);
-        if (nTime == INVALID_NTIME) {
-            failureOut[0] = BuildFailure.NTIME_UNRESOLVED;
-            return null;
-        }
-
-        Transaction signed = walletHelper.signTransactionWithUtxos(tx, selectedUtxos, nTime);
-        if (signed == null) {
-            failureOut[0] = BuildFailure.SIGNING_FAILED;
-            return null;
-        }
-        return new BuiltTransaction(signed, feeSats, nTime);
+        return Optional.empty();
     }
 
-    private static double fundTransaction(
-            List<UTXO> allUtxos,
-            List<UTXO> selectedUtxos,
-            List<UTXO> recipientOutputs,
-            double sendAmount,
-            double initialFee,
-            long feePerByte,
-            long minTxFee,
-            long coinUnit) {
-        double totalSelected = 0.0;
-        double fees = initialFee;
-
-        allUtxos.sort(Comparator.comparingLong(UTXO::getValue));
-
-        if (allUtxos.size() == 1) {
-            UTXO utxo = allUtxos.get(0);
-            selectedUtxos.add(utxo);
-            totalSelected = utxo.getAmount();
-            double required = sendAmount + fees;
-            if (totalSelected >= required) {
-                return totalSelected - required;
-            }
-            // Shortfall must fail like the multi-input path — returning
-            // change 0.0 here used to build a deterministically invalid
-            // transaction (recipient output exceeding the lone input).
-            throw new RuntimeException("Not enough funds");
+    private static double totalAvailable(List<UTXO> utxos) {
+        double total = 0.0;
+        for (UTXO utxo : utxos) {
+            total += utxo.getAmount();
         }
+        return total;
+    }
 
+    private static Selection selection(BuildRequest request, BuildContext context) {
+        List<UTXO> selectedUtxos = new ArrayList<>();
+        List<UTXO> outputs = new ArrayList<>();
+        outputs.add(
+                createTransactionOutput(
+                        request.ticker(), request.address(), request.amount(), context.params()));
+        long feePerByte = getFeePerByte(context.params());
+        long minTxFee = getMinTxFee(context.params());
+        long estimatedFeeSats = Math.max(feePerByte * (192 + 34), minTxFee);
+        double change =
+                fundTransaction(
+                        new Funding(
+                                context.utxos(),
+                                selectedUtxos,
+                                outputs,
+                                request.amount(),
+                                (double) estimatedFeeSats / context.coinUnit(),
+                                feePerByte,
+                                minTxFee,
+                                context.coinUnit()));
+        return new Selection(selectedUtxos, outputs, change);
+    }
+
+    private static Transaction assemble(
+            BuildRequest request, BuildContext context, Selection selection) {
+        Transaction transaction =
+                CoinTransactions.newTransaction(context.params(), request.ticker());
+        for (UTXO output : selection.outputs()) {
+            Address address = LegacyAddress.fromBase58(context.params(), output.getAddress());
+            transaction.addOutput(
+                    Coin.valueOf(Sats.fromWholeCoins(output.getAmount(), context.coinUnit())),
+                    address);
+        }
+        double change = selection.change();
+        if (change > 0 && !isDust(change, context.coinUnit(), context.params())) {
+            transaction.addOutput(
+                    Coin.valueOf(Sats.fromWholeCoins(change, context.coinUnit())),
+                    context.wallet().getChangeAddress());
+        }
+        return transaction;
+    }
+
+    private static double fundTransaction(Funding funding) {
+        funding.utxos().sort(Comparator.comparingLong(UTXO::getValue));
+        if (funding.utxos().size() == 1) {
+            return singleInputChange(funding);
+        }
+        return multiInputChange(funding);
+    }
+
+    private static double singleInputChange(Funding funding) {
+        UTXO utxo = funding.utxos().get(0);
+        funding.selected().add(utxo);
+        double available = utxo.getAmount();
+        double required = funding.sendAmount() + funding.initialFee();
+        if (available < required) {
+            // Shortfall must fail like the multi-input path — returning change 0.0 here used to
+            // build a deterministically invalid transaction (recipient output exceeding the lone
+            // input).
+            throw new IllegalStateException("Not enough funds");
+        }
+        return available - required;
+    }
+
+    private static double multiInputChange(Funding funding) {
+        List<UTXO> allUtxos = funding.utxos();
+        List<UTXO> selected = funding.selected();
+        double fees = funding.initialFee();
+        double totalSelected = 0.0;
         UTXO largestUtxo = allUtxos.get(allUtxos.size() - 1);
 
-        for (int i = allUtxos.size() - 1; i >= 0; i--) {
-            fees =
-                    calculateFee(
-                            selectedUtxos.size() + 1,
-                            recipientOutputs.size() + 1,
-                            feePerByte,
-                            minTxFee,
-                            coinUnit);
-            double requiredAmount = sendAmount + fees;
-            UTXO utxo = allUtxos.get(i);
+        for (int index = allUtxos.size() - 1; index >= 0; index--) {
+            fees = calculateFee(funding, selected.size() + 1, funding.outputs().size() + 1);
+            double requiredAmount = funding.sendAmount() + fees;
+            UTXO utxo = allUtxos.get(index);
 
             if (largestUtxo.getAmount() < requiredAmount) {
                 if (totalSelected >= requiredAmount) {
                     break;
                 }
                 totalSelected += utxo.getAmount();
-                selectedUtxos.add(utxo);
-            } else if (i == 0 || utxo.getAmount() < requiredAmount) {
-                UTXO prevUtxo = allUtxos.get(i + 1);
-                totalSelected += prevUtxo.getAmount();
-                selectedUtxos.add(prevUtxo);
+                selected.add(utxo);
+            } else if (index == 0 || utxo.getAmount() < requiredAmount) {
+                UTXO previous = allUtxos.get(index + 1);
+                totalSelected += previous.getAmount();
+                selected.add(previous);
                 break;
             }
         }
 
-        double totalSendAmount = sendAmount + fees;
+        double totalSendAmount = funding.sendAmount() + fees;
         if (totalSelected < totalSendAmount) {
-            throw new RuntimeException("Not enough funds");
+            throw new IllegalStateException("Not enough funds");
         }
-
         return totalSelected - totalSendAmount;
     }
 
@@ -851,10 +875,12 @@ public class WalletHelper {
         return inputsSats - outputsSats;
     }
 
-    private static double calculateFee(
-            int inputCount, int outputCount, long feePerByte, long minTxFee, long coinUnit) {
-        long feeSats = Math.max(feePerByte * (192 * inputCount + 34 * outputCount), minTxFee);
-        return (double) feeSats / coinUnit;
+    private static double calculateFee(Funding funding, int inputCount, int outputCount) {
+        long feeSats =
+                Math.max(
+                        funding.feePerByte() * (192 * inputCount + 34 * outputCount),
+                        funding.minTxFee());
+        return (double) feeSats / funding.coinUnit();
     }
 
     private static boolean isDust(double amount, long coinUnit, NetworkParameters params) {

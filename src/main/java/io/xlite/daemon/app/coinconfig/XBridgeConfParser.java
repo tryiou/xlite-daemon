@@ -24,24 +24,17 @@ public final class XBridgeConfParser {
     private XBridgeConfParser() {}
 
     public static Map<String, Map<String, String>> parse(String contents) {
-        if (contents.startsWith("\uFEFF")) {
-            contents = contents.substring(1);
-        }
         Map<String, Map<String, String>> sections = new LinkedHashMap<>();
         String current = null;
         int lineNo = 0;
-        for (String rawLine : contents.split("\\r?\\n", -1)) {
+        for (String rawLine : stripBom(contents).split("\\r?\\n", -1)) {
             lineNo++;
             String line = rawLine.trim();
-            if (line.isEmpty() || line.startsWith("#") || line.startsWith(";")) {
+            if (isIgnorable(line)) {
                 continue;
             }
-            if (line.startsWith("[") && line.endsWith("]")) {
-                current = line.substring(1, line.length() - 1).trim();
-                if (current.isEmpty() || current.indexOf('[') >= 0 || current.indexOf(']') >= 0) {
-                    throw new IllegalStateException(
-                            "Malformed section header at line " + lineNo + ": '" + rawLine + "'");
-                }
+            if (isSectionHeader(line)) {
+                current = sectionName(line, lineNo, rawLine);
                 sections.putIfAbsent(current, new LinkedHashMap<>());
                 continue;
             }
@@ -49,16 +42,41 @@ public final class XBridgeConfParser {
                 throw new IllegalStateException(
                         "Malformed line " + lineNo + " outside any section: '" + rawLine + "'");
             }
-            int eq = line.indexOf('=');
-            if (eq <= 0) {
-                throw new IllegalStateException(
-                        "Malformed line " + lineNo + " in [" + current + "]: '" + rawLine + "'");
-            }
-            String key = line.substring(0, eq).trim();
-            String value = line.substring(eq + 1).trim();
-            sections.get(current).put(key, value);
+            addEntry(sections.get(current), rawLine, lineNo, current);
         }
         return sections;
+    }
+
+    private static String stripBom(String contents) {
+        return contents.startsWith("\uFEFF") ? contents.substring(1) : contents;
+    }
+
+    private static boolean isIgnorable(String line) {
+        return line.isEmpty() || line.startsWith("#") || line.startsWith(";");
+    }
+
+    private static boolean isSectionHeader(String line) {
+        return line.startsWith("[") && line.endsWith("]");
+    }
+
+    private static String sectionName(String line, int lineNo, String rawLine) {
+        String name = line.substring(1, line.length() - 1).trim();
+        if (name.isEmpty() || name.indexOf('[') >= 0 || name.indexOf(']') >= 0) {
+            throw new IllegalStateException(
+                    "Malformed section header at line " + lineNo + ": '" + rawLine + "'");
+        }
+        return name;
+    }
+
+    private static void addEntry(
+            Map<String, String> section, String rawLine, int lineNo, String name) {
+        String line = rawLine.trim();
+        int separator = line.indexOf('=');
+        if (separator <= 0) {
+            throw new IllegalStateException(
+                    "Malformed line " + lineNo + " in [" + name + "]: '" + rawLine + "'");
+        }
+        section.put(line.substring(0, separator).trim(), line.substring(separator + 1).trim());
     }
 
     public static Map<String, Map<String, String>> parseFile(Path file) throws IOException {

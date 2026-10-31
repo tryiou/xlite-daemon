@@ -76,50 +76,6 @@ public abstract class TestHelper {
     protected static final String PASSWORD = getPassword();
     protected static final String COIN_TICKER = "LITECOIN";
 
-    /** A coin configuration for tests, with every value supplied explicitly. */
-    protected static CoinConfig testCoinConfig(
-            String ticker,
-            String blockchain,
-            int addr,
-            int p2sh,
-            int dpk,
-            int port,
-            long feePerByte,
-            long minTxFee) {
-        return testCoinConfig(
-                ticker, blockchain, addr, p2sh, dpk, port, feePerByte, minTxFee, 100_000_000L);
-    }
-
-    /**
-     * The coin factor is a parameter because a fixture that only ever uses 1e8 cannot detect a
-     * divisor that is hardcoded to 1e8: every such calculation would agree with itself. Currencies
-     * with fewer than eight decimals are real here, so a test that wants to catch that has to be
-     * able to ask for one.
-     */
-    protected static CoinConfig testCoinConfig(
-            String ticker,
-            String blockchain,
-            int addr,
-            int p2sh,
-            int dpk,
-            int port,
-            long feePerByte,
-            long minTxFee,
-            long coinFactor) {
-        Map<String, String> e = new LinkedHashMap<>();
-        e.put("AddressPrefix", Integer.toString(addr));
-        e.put("ScriptPrefix", Integer.toString(p2sh));
-        e.put("SecretPrefix", Integer.toString(dpk));
-        e.put("COIN", Long.toString(coinFactor));
-        e.put("FeePerByte", Long.toString(feePerByte));
-        e.put("MinTxFee", Long.toString(minTxFee));
-        e.put("Port", Integer.toString(port));
-        e.put("DustAmount", "0");
-        e.put("TxVersion", "1");
-        e.put("Title", blockchain);
-        return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", e);
-    }
-
     protected static int getAddressCount() {
         return testConfig.getAsJsonObject("test_parameters").get("address_count").getAsInt();
     }
@@ -170,8 +126,19 @@ public abstract class TestHelper {
             // because address derivation depends on them. The fees are chosen
             // by the test and are not claims about current configuration, which
             // changes; nothing here should be updated when it does.
-            cfgs.put("LTC", testCoinConfig("LTC", "Litecoin", 48, 50, 176, 9332, 10L, 5000L));
-            cfgs.put("BLOCK", testCoinConfig("BLOCK", "Blocknet", 26, 28, 154, 41414, 20L, 10000L));
+            cfgs.put(
+                    "LTC",
+                    CoinFixture.coin("LTC", "Litecoin")
+                            .prefixes(48, 50, 176)
+                            .fees(10L, 5_000L)
+                            .build());
+            cfgs.put(
+                    "BLOCK",
+                    CoinFixture.coin("BLOCK", "Blocknet")
+                            .prefixes(26, 28, 154)
+                            .fees(20L, 10_000L)
+                            .port(41414)
+                            .build());
             CoinConfigRegistry.loadForTest(cfgs);
         }
     }

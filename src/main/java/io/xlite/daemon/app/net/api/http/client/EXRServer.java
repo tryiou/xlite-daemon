@@ -55,47 +55,13 @@ public class EXRServer {
                 return false;
             }
             try {
-                JsonElement root = wrapper.executeGet("heights");
-                if (root == null || !root.isJsonObject()) {
-                    // Unusable body — leave capabilitiesProbed false so the
-                    // next probe cycle retries instead of pinning an empty set.
+                JsonObject heights = fetchHeights();
+                if (heights == null) {
                     return false;
                 }
-                JsonObject result = root.getAsJsonObject();
-                if (!result.has("result") || !result.get("result").isJsonObject()) {
-                    return false;
-                }
-                JsonObject heights = result.getAsJsonObject("result");
-                for (String coinName : heights.keySet()) {
-                    JsonElement heightValue = heights.get(coinName);
-                    if (heightValue.isJsonNull()) {
-                        continue;
-                    }
-                    try {
-                        CoinTicker coin = CoinTickerUtils.stringToTicker(coinName);
-                        if (coin != null) {
-                            supportedCoins.add(coin);
-                        }
-                    } catch (Exception e) {
-                        LOGGER.finer(
-                                "[exr-server] Failed to map coin "
-                                        + coinName
-                                        + ", "
-                                        + e.getMessage());
-                    }
-                }
-
+                collectSupportedCoins(heights);
                 capabilitiesProbed = true;
-                LOGGER.info(
-                        "[exr-server] Probed capabilities for "
-                                + endpoint
-                                + ", supports: "
-                                + supportedCoins.size()
-                                + " coins: "
-                                + supportedCoins.stream()
-                                        .map(CoinTickerUtils::tickerToString)
-                                        .reduce((a, b) -> a + ", " + b)
-                                        .orElse("none"));
+                logCapabilities();
                 return true;
             } catch (Exception e) {
                 LOGGER.warning(
@@ -106,6 +72,51 @@ public class EXRServer {
                 return false;
             }
         }
+    }
+
+    /** The coin heights the server reports, or null when the body is unusable. */
+    private JsonObject fetchHeights() {
+        JsonElement root = wrapper.executeGet("heights");
+        if (root == null || !root.isJsonObject()) {
+            // Unusable body — leave capabilitiesProbed false so the next probe cycle
+            // retries instead of pinning an empty set.
+            return null;
+        }
+        JsonObject body = root.getAsJsonObject();
+        if (!body.has("result") || !body.get("result").isJsonObject()) {
+            return null;
+        }
+        return body.getAsJsonObject("result");
+    }
+
+    private void collectSupportedCoins(JsonObject heights) {
+        for (String coinName : heights.keySet()) {
+            JsonElement height = heights.get(coinName);
+            if (height.isJsonNull()) {
+                continue;
+            }
+            try {
+                CoinTicker coin = CoinTickerUtils.stringToTicker(coinName);
+                if (coin != null) {
+                    supportedCoins.add(coin);
+                }
+            } catch (Exception e) {
+                LOGGER.finer("[exr-server] Failed to map coin " + coinName + ", " + e.getMessage());
+            }
+        }
+    }
+
+    private void logCapabilities() {
+        LOGGER.info(
+                "[exr-server] Probed capabilities for "
+                        + endpoint
+                        + ", supports: "
+                        + supportedCoins.size()
+                        + " coins: "
+                        + supportedCoins.stream()
+                                .map(CoinTickerUtils::tickerToString)
+                                .reduce((a, b) -> a + ", " + b)
+                                .orElse("none"));
     }
 
     public boolean isHealthy() {

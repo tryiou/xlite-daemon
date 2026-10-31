@@ -124,28 +124,45 @@ public final class App {
      */
     public static String resolveUserConfigDir(
             String dataHomeEnv, String osName, String userHome, String appDataEnv) {
-        if (dataHomeEnv != null && !dataHomeEnv.trim().isEmpty()) {
+        if (isSet(dataHomeEnv)) {
             return new File(dataHomeEnv.trim()).getAbsoluteFile().getPath();
         }
         String platform = osName.toLowerCase(Locale.ROOT);
         if (platform.contains("win")) {
-            // Fail fast: returning a null AppData would stringify into a
-            // bogus relative "null/xlite-daemon/" dir and fork the wallet.
-            if (appDataEnv == null || appDataEnv.trim().isEmpty()) {
-                throw new IllegalStateException(
-                        "[app] Cannot resolve config dir on Windows: AppData is not set. "
-                                + "Set XLITE_DATA_HOME to an explicit path.");
-            }
-            return appDataEnv;
-        } else if (platform.contains("mac")) {
-            if (userHome == null || userHome.trim().isEmpty()) {
-                throw new IllegalStateException(
-                        "[app] Cannot resolve config dir on macOS: user.home is not set. "
-                                + "Set XLITE_DATA_HOME to an explicit path.");
-            }
-            return userHome + File.separator + "Library" + File.separator + "Application Support";
+            return windowsConfigDir(appDataEnv);
         }
-        if (userHome == null || userHome.trim().isEmpty()) {
+        if (platform.contains("mac")) {
+            return macConfigDir(userHome);
+        }
+        return linuxConfigDir(userHome);
+    }
+
+    private static boolean isSet(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private static String windowsConfigDir(String appDataEnv) {
+        // Fail fast: a null AppData would stringify into a bogus relative
+        // "null/xlite-daemon/" dir and fork the wallet.
+        if (!isSet(appDataEnv)) {
+            throw new IllegalStateException(
+                    "[app] Cannot resolve config dir on Windows: AppData is not set. "
+                            + "Set XLITE_DATA_HOME to an explicit path.");
+        }
+        return appDataEnv;
+    }
+
+    private static String macConfigDir(String userHome) {
+        if (!isSet(userHome)) {
+            throw new IllegalStateException(
+                    "[app] Cannot resolve config dir on macOS: user.home is not set. "
+                            + "Set XLITE_DATA_HOME to an explicit path.");
+        }
+        return userHome + File.separator + "Library" + File.separator + "Application Support";
+    }
+
+    private static String linuxConfigDir(String userHome) {
+        if (!isSet(userHome)) {
             throw new IllegalStateException(
                     "[app] Cannot resolve config dir: user.home is not set. "
                             + "Set XLITE_DATA_HOME to an explicit path.");
@@ -255,6 +272,18 @@ public final class App {
     }
 
     public static void main(String[] args) {
+        printImmediateArgument(args);
+        configureLogging();
+        installFileHandler();
+        installConsoleHandler();
+        initExrEndpoint();
+        initCoinConfigs(args);
+        console = new ConsoleMenu(args);
+        console.init();
+    }
+
+    /** Arguments that print and exit before any logging or wallet setup happens. */
+    private static void printImmediateArgument(String[] args) {
         for (String arg : args) {
             if (arg.equals("--version")) {
                 System.out.println(Version.CLIENT_VERSION);
@@ -265,15 +294,18 @@ public final class App {
                 System.exit(0);
             }
         }
+    }
 
+    private static void configureLogging() {
         Level logLevel = parseLogLevel(getEnv("XLITE_DAEMON_LOG_LEVEL"), Level.INFO);
         LOGGER.setLevel(logLevel);
         LOGGER.setUseParentHandlers(false);
-
         LogRotationUtil.performLogRotation();
-
         Runtime.getRuntime().addShutdownHook(new Thread(App::shutdown));
+    }
 
+    /** Adds the rotating error log next to the wallet data. */
+    private static void installFileHandler() {
         try {
             String userHomeDir = getUserConfigDir();
             String logDir = userHomeDir + File.separator + ConfigHelper.DATA_DIR_NAME;
@@ -290,12 +322,9 @@ public final class App {
                             5, // 5 rotated files
                             true // append to existing
                             );
-
             fileHandler.setFormatter(new FileFormatter());
             fileHandler.setLevel(Level.INFO);
-
             LOGGER.addHandler(fileHandler);
-
         } catch (IOException e) {
             LOGGER.warning("[app] Failed to initialize file handler: " + e.getMessage());
         } catch (IllegalStateException e) {
@@ -305,8 +334,10 @@ public final class App {
             LOGGER.severe("[app] " + e.getMessage());
             System.exit(1);
         }
+    }
 
-        // Diagnostics to stderr, payloads and prompts to stdout.
+    /** Diagnostics to stderr, payloads and prompts to stdout. */
+    private static void installConsoleHandler() {
         ConsoleHandler consoleHandler =
                 new ConsoleHandler() {
                     @Override
@@ -317,14 +348,7 @@ public final class App {
                 };
         consoleHandler.setFormatter(new ConsoleFormatter());
         consoleHandler.setLevel(Level.FINE);
-
         LOGGER.addHandler(consoleHandler);
-
-        initExrEndpoint();
-        initCoinConfigs(args);
-
-        console = new ConsoleMenu(args);
-        console.init();
     }
 
     public static void shutdown() {

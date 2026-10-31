@@ -133,7 +133,9 @@ class TimeFieldSignerTest {
                 TxTimeFieldSigner.verify(
                         tx.getInputs().get(0).getScriptSig(),
                         TxTimeFieldSigner.chainSighash(
-                                tx, prevScript, 0, flagByteOf(tx), TX_NTIME)),
+                                tx,
+                                prevScript,
+                                new TxTimeFieldSigner.SighashRequest(0, flagByteOf(tx), TX_NTIME))),
                 "a preimage without nTime cannot satisfy a chain whose sighash "
                         + "covers nTime; if this ever passes, the chain stopped "
                         + "hashing nTime and the custom signer is dead weight");
@@ -147,7 +149,9 @@ class TimeFieldSignerTest {
                 TxTimeFieldSigner.verify(
                         tx.getInputs().get(0).getScriptSig(),
                         TxTimeFieldSigner.chainSighash(
-                                tx, prevScript, 0, flagByteOf(tx), TX_NTIME)),
+                                tx,
+                                prevScript,
+                                new TxTimeFieldSigner.SighashRequest(0, flagByteOf(tx), TX_NTIME))),
                 "signing the chain's own preimage must satisfy it");
     }
 
@@ -159,7 +163,10 @@ class TimeFieldSignerTest {
         // "standard" reference. Ours must differ (it covers 4 more bytes).
         assertNotEquals(
                 tx.hashForSignature(0, prevScript, Transaction.SigHash.ALL, false),
-                TxTimeFieldSigner.chainSighash(tx, prevScript, 0, flagByteOf(tx), TX_NTIME),
+                TxTimeFieldSigner.chainSighash(
+                        tx,
+                        prevScript,
+                        new TxTimeFieldSigner.SighashRequest(0, flagByteOf(tx), TX_NTIME)),
                 "the two preimages must differ, or this suite proves nothing");
     }
 
@@ -187,7 +194,10 @@ class TimeFieldSignerTest {
                 TxTimeFieldSigner.verify(
                         signedWith.getInputs().get(0).getScriptSig(),
                         TxTimeFieldSigner.chainSighash(
-                                signedWith, prevScript, 0, flagByteOf(signedWith), TX_NTIME)));
+                                signedWith,
+                                prevScript,
+                                new TxTimeFieldSigner.SighashRequest(
+                                        0, flagByteOf(signedWith), TX_NTIME))));
 
         // Rewarding the same preimage under a different nTime must fail,
         // which is what makes nTime genuinely part of the signed message.
@@ -195,7 +205,10 @@ class TimeFieldSignerTest {
                 TxTimeFieldSigner.verify(
                         signedWith.getInputs().get(0).getScriptSig(),
                         TxTimeFieldSigner.chainSighash(
-                                signedWith, prevScript, 0, flagByteOf(signedWith), TX_NTIME + 1)),
+                                signedWith,
+                                prevScript,
+                                new TxTimeFieldSigner.SighashRequest(
+                                        0, flagByteOf(signedWith), TX_NTIME + 1))),
                 "nTime must be covered by the signature, not merely carried");
     }
 
@@ -211,11 +224,11 @@ class TimeFieldSignerTest {
         TxTimeFieldSigner.addSignedInputs(
                 params,
                 tx,
-                List.of(key, key),
-                List.of(spendable(), second),
-                List.of(prevScript, prevScript),
-                Transaction.SigHash.ALL,
-                TX_NTIME);
+                new TxTimeFieldSigner.InputsToSign(
+                        List.of(key, key),
+                        List.of(spendable(), second),
+                        List.of(prevScript, prevScript)),
+                new TxTimeFieldSigner.SignaturePolicy(Transaction.SigHash.ALL, TX_NTIME));
 
         assertEquals(2, tx.getInputs().size());
         for (int i = 0; i < tx.getInputs().size(); i++) {
@@ -223,7 +236,10 @@ class TimeFieldSignerTest {
                     TxTimeFieldSigner.verify(
                             tx.getInputs().get(i).getScriptSig(),
                             TxTimeFieldSigner.chainSighash(
-                                    tx, prevScript, i, flagByteOf(tx, i), TX_NTIME)),
+                                    tx,
+                                    prevScript,
+                                    new TxTimeFieldSigner.SighashRequest(
+                                            i, flagByteOf(tx, i), TX_NTIME))),
                     "input "
                             + i
                             + " must verify against the completed "
@@ -238,11 +254,9 @@ class TimeFieldSignerTest {
         TxTimeFieldSigner.addSignedInputs(
                 params,
                 tx,
-                List.of(key),
-                List.of(spendable()),
-                List.of(prevScript),
-                Transaction.SigHash.SINGLE,
-                TX_NTIME);
+                new TxTimeFieldSigner.InputsToSign(
+                        List.of(key), List.of(spendable()), List.of(prevScript)),
+                new TxTimeFieldSigner.SignaturePolicy(Transaction.SigHash.SINGLE, TX_NTIME));
 
         // SINGLE with nIn=0 locks in only output 0, so the hash must be
         // reproduced with the same rule, not with the ALL layout.
@@ -250,7 +264,10 @@ class TimeFieldSignerTest {
                 TxTimeFieldSigner.verify(
                         tx.getInputs().get(0).getScriptSig(),
                         TxTimeFieldSigner.chainSighash(
-                                tx, prevScript, 0, flagByteOf(tx), TX_NTIME)));
+                                tx,
+                                prevScript,
+                                new TxTimeFieldSigner.SighashRequest(
+                                        0, flagByteOf(tx), TX_NTIME))));
         // bitcoinj signs the standard layout (no nTime, all outputs); a SINGLE
         // signature over the chain's nTime-bearing preimage must not verify
         // against it.
@@ -271,22 +288,20 @@ class TimeFieldSignerTest {
                         TxTimeFieldSigner.addSignedInputs(
                                 params,
                                 tx,
-                                List.of(key),
-                                List.of(spendable()),
-                                List.of(prevScript),
-                                Transaction.SigHash.ALL,
-                                0x1_0000_0000L));
+                                new TxTimeFieldSigner.InputsToSign(
+                                        List.of(key), List.of(spendable()), List.of(prevScript)),
+                                new TxTimeFieldSigner.SignaturePolicy(
+                                        Transaction.SigHash.ALL, 0x1_0000_0000L)));
         assertThrows(
                 IllegalArgumentException.class,
                 () ->
                         TxTimeFieldSigner.addSignedInputs(
                                 params,
                                 tx,
-                                List.of(key),
-                                List.of(spendable()),
-                                List.of(prevScript),
-                                Transaction.SigHash.ALL,
-                                -1L));
+                                new TxTimeFieldSigner.InputsToSign(
+                                        List.of(key), List.of(spendable()), List.of(prevScript)),
+                                new TxTimeFieldSigner.SignaturePolicy(
+                                        Transaction.SigHash.ALL, -1L)));
     }
 
     @Test
@@ -299,11 +314,12 @@ class TimeFieldSignerTest {
                         TxTimeFieldSigner.addSignedInputs(
                                 params,
                                 tx,
-                                List.of(key, key),
-                                List.of(spendable()),
-                                List.of(prevScript, prevScript),
-                                Transaction.SigHash.ALL,
-                                TX_NTIME),
+                                new TxTimeFieldSigner.InputsToSign(
+                                        List.of(key, key),
+                                        List.of(spendable()),
+                                        List.of(prevScript, prevScript)),
+                                new TxTimeFieldSigner.SignaturePolicy(
+                                        Transaction.SigHash.ALL, TX_NTIME)),
                 "two keys against one outpoint must not sign");
         assertThrows(
                 IllegalArgumentException.class,
@@ -311,11 +327,9 @@ class TimeFieldSignerTest {
                         TxTimeFieldSigner.addSignedInputs(
                                 params,
                                 tx,
-                                List.of(),
-                                List.of(),
-                                List.of(),
-                                Transaction.SigHash.ALL,
-                                TX_NTIME),
+                                new TxTimeFieldSigner.InputsToSign(List.of(), List.of(), List.of()),
+                                new TxTimeFieldSigner.SignaturePolicy(
+                                        Transaction.SigHash.ALL, TX_NTIME)),
                 "an input-less transaction cannot be signed");
     }
 
@@ -326,16 +340,17 @@ class TimeFieldSignerTest {
         TxTimeFieldSigner.addSignedInputs(
                 params,
                 tx,
-                List.of(key),
-                List.of(spendable()),
-                List.of(prevScript),
-                Transaction.SigHash.ALL,
-                TX_NTIME);
+                new TxTimeFieldSigner.InputsToSign(
+                        List.of(key), List.of(spendable()), List.of(prevScript)),
+                new TxTimeFieldSigner.SignaturePolicy(Transaction.SigHash.ALL, TX_NTIME));
         assertThrows(
                 IllegalArgumentException.class,
                 () ->
                         TxTimeFieldSigner.chainSighash(
-                                tx, prevScript, 5, Transaction.SigHash.ALL.value, TX_NTIME));
+                                tx,
+                                prevScript,
+                                new TxTimeFieldSigner.SighashRequest(
+                                        5, Transaction.SigHash.ALL.value, TX_NTIME)));
     }
 
     @Test
@@ -356,12 +371,18 @@ class TimeFieldSignerTest {
         assertEquals(
                 Sha256Hash.wrap(uint256One),
                 TxTimeFieldSigner.chainSighash(
-                        tx, prevScript, 2, Transaction.SigHash.SINGLE.value, TX_NTIME),
+                        tx,
+                        prevScript,
+                        new TxTimeFieldSigner.SighashRequest(
+                                2, Transaction.SigHash.SINGLE.value, TX_NTIME)),
                 "out-of-range SIGHASH_SINGLE must hash the constant one");
         assertNotEquals(
                 Sha256Hash.wrap(new byte[32]),
                 TxTimeFieldSigner.chainSighash(
-                        tx, prevScript, 2, Transaction.SigHash.SINGLE.value, TX_NTIME),
+                        tx,
+                        prevScript,
+                        new TxTimeFieldSigner.SighashRequest(
+                                2, Transaction.SigHash.SINGLE.value, TX_NTIME)),
                 "the constant is one, not zero");
     }
 
@@ -378,16 +399,19 @@ class TimeFieldSignerTest {
         TxTimeFieldSigner.addSignedInputs(
                 params,
                 tx,
-                List.of(key, key),
-                List.of(spendable(), second),
-                List.of(prevScript, prevScript),
-                Transaction.SigHash.SINGLE,
-                TX_NTIME);
+                new TxTimeFieldSigner.InputsToSign(
+                        List.of(key, key),
+                        List.of(spendable(), second),
+                        List.of(prevScript, prevScript)),
+                new TxTimeFieldSigner.SignaturePolicy(Transaction.SigHash.SINGLE, TX_NTIME));
 
         assertNotEquals(
                 Sha256Hash.wrap(new byte[32]),
                 TxTimeFieldSigner.chainSighash(
-                        tx, prevScript, 1, Transaction.SigHash.SINGLE.value, TX_NTIME),
+                        tx,
+                        prevScript,
+                        new TxTimeFieldSigner.SighashRequest(
+                                1, Transaction.SigHash.SINGLE.value, TX_NTIME)),
                 "an in-range SIGHASH_SINGLE must not collapse to the constant one");
     }
 
@@ -416,7 +440,10 @@ class TimeFieldSignerTest {
         tx.addInput(parentHash(), 0, bigScript);
         byte[] pre =
                 TxTimeFieldSigner.preimageBytes(
-                        tx, bigScript, 0, Transaction.SigHash.ALL.value, TX_NTIME);
+                        tx,
+                        bigScript,
+                        new TxTimeFieldSigner.SighashRequest(
+                                0, Transaction.SigHash.ALL.value, TX_NTIME));
         // The script length prefix sits after version(4) + nTime(4) +
         // inCount(1) + outpoint(36): assert FD 2F 01 at that offset.
         int scriptLenOffset = 4 + 4 + 1 + 36;
@@ -449,7 +476,10 @@ class TimeFieldSignerTest {
                 IllegalArgumentException.class,
                 () ->
                         TxTimeFieldSigner.chainSighash(
-                                empty, prevScript, 0, Transaction.SigHash.ALL.value, TX_NTIME));
+                                empty,
+                                prevScript,
+                                new TxTimeFieldSigner.SighashRequest(
+                                        0, Transaction.SigHash.ALL.value, TX_NTIME)));
     }
 
     @Test
@@ -488,11 +518,9 @@ class TimeFieldSignerTest {
         TxTimeFieldSigner.addSignedInputs(
                 params,
                 tx,
-                List.of(key),
-                List.of(spendable()),
-                List.of(prevScript),
-                Transaction.SigHash.ALL,
-                TX_NTIME);
+                new TxTimeFieldSigner.InputsToSign(
+                        List.of(key), List.of(spendable()), List.of(prevScript)),
+                new TxTimeFieldSigner.SignaturePolicy(Transaction.SigHash.ALL, TX_NTIME));
         return tx;
     }
 
@@ -523,7 +551,10 @@ class TimeFieldSignerTest {
         tx.addInput(Sha256Hash.wrap(new byte[32]), 1, prevScript);
         byte[] pre =
                 TxTimeFieldSigner.preimageBytes(
-                        tx, prevScript, 1, Transaction.SigHash.SINGLE.value, TX_NTIME);
+                        tx,
+                        prevScript,
+                        new TxTimeFieldSigner.SighashRequest(
+                                1, Transaction.SigHash.SINGLE.value, TX_NTIME));
         // Layout: version(4) + nTime(4) + inCount(1) + 2 inputs + outCount(1)
         // + output0(8 value + script). Find the first output value by
         // scanning past the fixed header and inputs is brittle; instead
@@ -553,7 +584,10 @@ class TimeFieldSignerTest {
         tx.addInput(parentHash(), 0, prevScript);
         byte[] pre =
                 TxTimeFieldSigner.preimageBytes(
-                        tx, prevScript, 0, Transaction.SigHash.ALL.value, TX_NTIME);
+                        tx,
+                        prevScript,
+                        new TxTimeFieldSigner.SighashRequest(
+                                0, Transaction.SigHash.ALL.value, TX_NTIME));
         // version(4) then nTime(4 LE). TX_NTIME = 1_790_592_305 = 0x6ABA4531.
         // LE bytes: 31 45 BA 6A.
         assertEquals((byte) 0x31, pre[4]);
@@ -574,7 +608,10 @@ class TimeFieldSignerTest {
         tx.addInput(parentHash(), 0, prevScript);
         byte[] ours =
                 TxTimeFieldSigner.preimageBytes(
-                        tx, prevScript, 0, Transaction.SigHash.ALL.value, TX_NTIME);
+                        tx,
+                        prevScript,
+                        new TxTimeFieldSigner.SighashRequest(
+                                0, Transaction.SigHash.ALL.value, TX_NTIME));
         // Remove bytes 4-8 (nTime) to get the standard layout.
         byte[] withoutNTime = new byte[ours.length - 4];
         System.arraycopy(ours, 0, withoutNTime, 0, 4);
@@ -609,7 +646,10 @@ class TimeFieldSignerTest {
         tx.addInput(parentHash(), 0, withSep);
         byte[] pre =
                 TxTimeFieldSigner.preimageBytes(
-                        tx, withSep, 0, Transaction.SigHash.ALL.value, TX_NTIME);
+                        tx,
+                        withSep,
+                        new TxTimeFieldSigner.SighashRequest(
+                                0, Transaction.SigHash.ALL.value, TX_NTIME));
         // The opcode byte 0xAB must not appear in the preimage's script
         // section. The stripped script is 1 byte shorter; assert the exact
         // reduced length prefix at the script position rather than scanning

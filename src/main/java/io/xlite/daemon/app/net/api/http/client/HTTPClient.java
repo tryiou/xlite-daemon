@@ -78,6 +78,9 @@ public class HTTPClient {
      * failures ({@code "utxo-plugin unreachable …"}, batch failures) and for address-level failures
      * ({@code "All addresses failed"}), none of which may be cached.
      */
+    /** How many times one raw transaction is fetched before giving up. */
+    private static final int MAX_RAW_TX_ATTEMPTS = 5;
+
     static final String NO_UPSTREAM_MARKER = "No utxo-plugin configured for coin ";
 
     /**
@@ -122,23 +125,7 @@ public class HTTPClient {
      *     preserving today's retry behavior (fail-open)
      */
     static boolean recordUpstreamRejection(String family, CoinTicker ticker, String res) {
-        JsonObject error = upstreamError(res);
-        if (error == null || !error.has("code") || !error.has("message")) {
-            return false;
-        }
-        try {
-            if (!error.get("code").isJsonPrimitive()
-                    || !error.get("code").getAsJsonPrimitive().isNumber()
-                    || error.get("code").getAsInt() != -32000) {
-                return false;
-            }
-            if (!error.get("message").isJsonPrimitive()
-                    || !error.get("message").getAsJsonPrimitive().isString()
-                    || !error.get("message").getAsString().contains(NO_UPSTREAM_MARKER)) {
-                return false;
-            }
-        } catch (RuntimeException e) {
-            // Deliberately broad: a fail-open helper must never throw on odd shapes.
+        if (!isNoUpstreamError(upstreamError(res))) {
             return false;
         }
         String key = upstreamRejectionKey(family, ticker);
@@ -151,6 +138,28 @@ public class HTTPClient {
                             + " - will not retry this session");
         }
         return true;
+    }
+
+    /**
+     * Whether an upstream error is the adapter's definitive "no plugin for this coin" rejection.
+     */
+    private static boolean isNoUpstreamError(JsonObject error) {
+        if (error == null || !error.has("code") || !error.has("message")) {
+            return false;
+        }
+        try {
+            JsonElement code = error.get("code");
+            JsonElement message = error.get("message");
+            return code.isJsonPrimitive()
+                    && code.getAsJsonPrimitive().isNumber()
+                    && code.getAsInt() == -32000
+                    && message.isJsonPrimitive()
+                    && message.getAsJsonPrimitive().isString()
+                    && message.getAsString().contains(NO_UPSTREAM_MARKER);
+        } catch (RuntimeException e) {
+            // Deliberately broad: a fail-open helper must never throw on odd shapes.
+            return false;
+        }
     }
 
     /**
@@ -627,67 +636,71 @@ public class HTTPClient {
         if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_UTXO, coinTicker, res)) {
             return null;
         }
+        UtxoResponse response = parseUtxoResponse(coinInstance, res, "getUtxosUncached");
+        if (response.rows() == null) {
+            return null;
+        }
+        JsonArray utxoList = new JsonArray();
+        for (int i = 0; i < response.rows().length(); i++) {
+            utxoList.add(utxoJson(coinTicker, response.rows().getJSONObject(i)));
+        }
+        return utxoList;
+    }
 
+    /** One provider UTXO row as the RPC surface states it. */
+    private static JsonObject utxoJson(CoinTicker coinTicker, JSONObject row) {
+        JsonObject utxo = new JsonObject();
+        String address = row.getString("address");
+        utxo.addProperty("txid", row.getString("txhash"));
+        utxo.addProperty("vout", row.getInt("vout"));
+        utxo.addProperty("value", row.getDouble("value"));
+        utxo.addProperty("spendable", true);
+        utxo.addProperty("address", address);
+
+        LegacyAddress addr =
+                LegacyAddress.fromBase58(
+                        CoinInstance.getInstance(coinTicker).getNetworkParameters(), address);
+        Script script = ScriptBuilder.createOutputScript(addr);
+        utxo.addProperty(
+                "scriptPubKey",
+                new String(Hex.encode(script.getProgram()), StandardCharsets.UTF_8));
+
+        int height = row.getInt("block_number");
+        int confirmations =
+                height == 0 ? 0 : CoinInstance.getBlockCountByTicker(coinTicker) - height + 1;
+        utxo.addProperty("confirmations", confirmations);
+        return utxo;
+    }
+
+    /** A provider UTXO response: its body and {@code utxos} array, either of which may be null. */
+    private record UtxoResponse(JSONObject body, JSONArray rows) {}
+
+    /** The body and {@code utxos} array of a provider response; rows is null when unusable. */
+    private static UtxoResponse parseUtxoResponse(
+            CoinInstance coinInstance, String res, String call) {
         JSONObject jsonObject = null;
         JSONArray utxoArr = null;
         try {
             jsonObject = new JSONObject(res);
             utxoArr = jsonObject.getJSONArray("utxos");
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             LOGGER.warning(
-                    "[httpclient] getUtxosUncached "
+                    "[httpclient] "
+                            + call
+                            + " "
                             + coinInstance.getTicker()
                             + " parse error - "
                             + e.getMessage());
         }
-
-        if (jsonObject == null || utxoArr == null) {
-            if (jsonObject == null) {
-                LOGGER.warning(
-                        "[httpclient] getUtxosUncached "
-                                + coinInstance.getTicker()
-                                + " null jsonObject");
-            }
-            if (utxoArr == null) {
-                LOGGER.warning(
-                        "[httpclient] getUtxosUncached "
-                                + coinInstance.getTicker()
-                                + " null utxoArr");
-            }
-            return null;
+        if (jsonObject == null) {
+            LOGGER.warning(
+                    "[httpclient] " + call + " " + coinInstance.getTicker() + " null jsonObject");
         }
-
-        JsonArray utxoList = new JsonArray();
-        for (int i = 0; i < utxoArr.length(); i++) {
-            JsonObject utxoJSON = new JsonObject();
-            utxoJSON.addProperty("txid", utxoArr.getJSONObject(i).getString("txhash"));
-            utxoJSON.addProperty("vout", utxoArr.getJSONObject(i).getInt("vout"));
-            utxoJSON.addProperty("value", utxoArr.getJSONObject(i).getDouble("value"));
-            utxoJSON.addProperty("spendable", true);
-
-            String address = utxoArr.getJSONObject(i).getString("address");
-            utxoJSON.addProperty("address", address);
-
-            LegacyAddress addr =
-                    LegacyAddress.fromBase58(coinInstance.getNetworkParameters(), address);
-            Script script = ScriptBuilder.createOutputScript(addr);
-            utxoJSON.addProperty(
-                    "scriptPubKey",
-                    new String(Hex.encode(script.getProgram()), StandardCharsets.UTF_8));
-
-            int height = utxoArr.getJSONObject(i).getInt("block_number");
-            int currentHeight = CoinInstance.getBlockCountByTicker(coinTicker);
-            int confirmations = currentHeight - height + 1;
-            if (height == 0) {
-                confirmations = 0;
-            }
-
-            utxoJSON.addProperty("confirmations", confirmations);
-
-            utxoList.add(utxoJSON);
+        if (utxoArr == null) {
+            LOGGER.warning(
+                    "[httpclient] " + call + " " + coinInstance.getTicker() + " null utxoArr");
         }
-
-        return utxoList;
+        return new UtxoResponse(jsonObject, utxoArr);
     }
 
     /**
@@ -711,17 +724,15 @@ public class HTTPClient {
         }
 
         List<String> utxoParams = coinInstance.getUTXOParams();
-        if (utxoParams.size() == 0) {
+        if (utxoParams.isEmpty()) {
             LOGGER.warning(
                     "[httpclient] getUtxos " + coinInstance.getTicker() + " null param size");
             return null;
         }
 
-        JsonArray innerParams = new Gson().toJsonTree(utxoParams).getAsJsonArray();
-
         JsonObject params = new JsonObject();
         params.addProperty("method", "getutxos");
-        params.add("params", innerParams);
+        params.add("params", new Gson().toJsonTree(utxoParams).getAsJsonArray());
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getUtxos " + coinInstance.getTicker() + " " + res);
 
@@ -732,74 +743,60 @@ public class HTTPClient {
         if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_UTXO, coinTicker, res)) {
             return null;
         }
-
-        JSONObject jsonObject = null;
-        JSONArray utxoArr = null;
-        try {
-            jsonObject = new JSONObject(res);
-            utxoArr = jsonObject.getJSONArray("utxos");
-        } catch (Exception e) {
-            LOGGER.warning(
-                    "[httpclient] getUtxos "
-                            + coinInstance.getTicker()
-                            + " parse error - "
-                            + e.getMessage());
-        }
-
-        if (jsonObject == null || utxoArr == null) {
-            if (jsonObject == null) {
-                LOGGER.warning(
-                        "[httpclient] getUtxos " + coinInstance.getTicker() + " null jsonObject");
-            }
-            if (utxoArr == null) {
-                LOGGER.warning(
-                        "[httpclient] getUtxos " + coinInstance.getTicker() + " null utxoArr");
-            }
+        UtxoResponse response = parseUtxoResponse(coinInstance, res, "getUtxos");
+        if (response.rows() == null) {
             return null;
         }
+        UtxoBatch batch = readUtxoBatch(coinTicker, response.body(), response.rows());
 
-        List<UTXO> utxoList = new ArrayList<>();
-        Set<String> returnedAddresses = new HashSet<>();
-        // Backend-declared per-address failures ("errors" array the adapter
-        // attaches): such addresses are treated as omitted entirely — their
-        // rows are neither added below nor kept stored (see eviction).
-        Set<String> failedAddresses = failedAddresses(jsonObject);
-        for (int i = 0; i < utxoArr.length(); i++) {
-            String rowAddress = utxoArr.getJSONObject(i).getString("address");
-            if (failedAddresses.contains(rowAddress)) {
-                continue;
-            }
-            UTXO utxo =
-                    new UTXO(
-                            coinTicker,
-                            rowAddress,
-                            utxoArr.getJSONObject(i).getString("txhash"),
-                            utxoArr.getJSONObject(i).getInt("vout"),
-                            utxoArr.getJSONObject(i).getInt("block_number"),
-                            UTXO.baseUnitsForTicker(
-                                    coinTicker, utxoArr.getJSONObject(i).getDouble("value")));
-
-            utxoList.add(utxo);
-            returnedAddresses.add(rowAddress);
-        }
-
-        // Evict rows for requested-but-backend-omitted addresses. A successful
-        // response that omits a tracked address (or flags it in the backend's
-        // "errors" array) means the backend holds no unspent outputs for it —
-        // any stored rows are confirmed-stale (a lagging view re-serves dead
-        // outputs with live-looking confirmations otherwise). processUtxos
-        // below only clears addresses PRESENT in the response, so without this
-        // an omitted address keeps its rows forever. Runs on parsed-success
-        // only: null/parse-error responses return above with stored rows
-        // untouched (an outage must never wipe the wallet).
-        evictOmittedAddresses(coinInstance, utxoParams, returnedAddresses);
+        // Evict rows for requested-but-backend-omitted addresses. A successful response that
+        // omits a tracked address (or flags it in the backend's "errors" array) means the
+        // backend holds no unspent outputs for it — any stored rows are confirmed-stale (a
+        // lagging view re-serves dead outputs with live-looking confirmations otherwise).
+        // processUtxos below only clears addresses PRESENT in the response, so without this an
+        // omitted address keeps its rows forever. Runs on parsed-success only: null/parse-error
+        // responses return above with stored rows untouched (an outage must never wipe the
+        // wallet).
+        evictOmittedAddresses(coinInstance, utxoParams, batch.addresses());
 
         // Update last fetch time
         lastFetchTimes.put(lastFetchTimesKey(coinTicker, "getUtxos"), currentTime);
 
-        coinInstance.processUtxos(utxoList);
+        coinInstance.processUtxos(batch.utxos());
         return coinInstance.getAllUTXOS();
     }
+
+    /**
+     * The UTXOs a provider response describes, and every address it did return.
+     *
+     * <p>Backend-declared per-address failures ("errors" array the adapter attaches) are treated as
+     * omitted entirely: their rows are neither added nor kept stored.
+     */
+    private UtxoBatch readUtxoBatch(CoinTicker coinTicker, JSONObject body, JSONArray rows) {
+        List<UTXO> utxos = new ArrayList<>();
+        Set<String> returnedAddresses = new HashSet<>();
+        Set<String> failedAddresses = failedAddresses(body);
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.getJSONObject(i);
+            String address = row.getString("address");
+            if (failedAddresses.contains(address)) {
+                continue;
+            }
+            utxos.add(
+                    new UTXO(
+                            coinTicker,
+                            address,
+                            row.getString("txhash"),
+                            row.getInt("vout"),
+                            row.getInt("block_number"),
+                            UTXO.baseUnitsForTicker(coinTicker, row.getDouble("value"))));
+            returnedAddresses.add(address);
+        }
+        return new UtxoBatch(utxos, returnedAddresses);
+    }
+
+    /** The parsed UTXOs of one response, and the addresses they cover. */
+    private record UtxoBatch(List<UTXO> utxos, Set<String> addresses) {}
 
     /**
      * Reads the backend-declared per-address failures from a getutxos response ("errors" array of
@@ -1159,77 +1156,14 @@ public class HTTPClient {
         if (currentTime - lastFetchTime < expiry) {
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
         }
-
-        List<String> utxoParams = coinInstance.getUTXOParams();
-        if (utxoParams.size() == 0) {
-            LOGGER.warning(
-                    "[httpclient] getHistory " + coinInstance.getTicker() + " null param size");
-            return null;
-        }
-
-        JsonArray innerParams = new Gson().toJsonTree(utxoParams).getAsJsonArray();
-
-        JsonObject params = new JsonObject();
-        params.addProperty("method", "gethistory");
-        params.add("params", innerParams);
-
-        String res = executeRequest("/", params);
-        LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
-        if (res == null) {
-            return null;
-        }
-        // Definitive no-upstream rejection becomes this session's answer.
-        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_HISTORY, coinTicker, res)) {
-            return null;
-        }
-
-        JsonArray json;
-        try {
-            json = new Gson().fromJson(res, JsonArray.class);
-        } catch (Exception e) {
-            LOGGER.warning(
-                    "[httpclient] getHistory parsing error - Response: "
-                            + res
-                            + " - "
-                            + e.getMessage());
-            return null;
-        }
-
+        JsonArray json = fetchHistory(coinInstance, coinTicker, HistoryCall.HISTORY);
         if (json == null) {
-            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null json");
             return null;
         }
+        coinInstance.processHistoryTxs(parseHistory(json));
 
-        List<Transaction> historyList = new ArrayList<>();
-        for (JsonElement elements : json) {
-            for (JsonElement element : elements.getAsJsonArray()) {
-                // LOGGER.warning("*** DEBUG *** [httpclient] getHistory " + element);
-                JsonObject jsonObject = element.getAsJsonObject();
-
-                Transaction tx =
-                        new Transaction(
-                                jsonObject.get("address").getAsString(),
-                                jsonObject.get("txid").getAsString(),
-                                jsonObject.get("blockhash").getAsString(),
-                                jsonObject.get("vout").getAsInt(),
-                                jsonObject.get("amount").getAsDouble(),
-                                jsonObject.get("confirmations").getAsInt(),
-                                jsonObject.get("blocktime").getAsInt());
-                tx.setCategory(jsonObject.get("category").getAsString());
-                tx.setFee(jsonObject.get("fee").getAsDouble());
-
-                historyList.add(tx);
-            }
-        }
-        coinInstance.processHistoryTxs(historyList);
-
-        // Return the latest transaction history
         JsonArray txs = coinInstance.getAllTransactions();
-
-        // Update last fetch time
         lastFetchTimes.put(lastFetchTimesKey(coinTicker, "getHistory"), currentTime);
-
-        // Filter txs by time if time frame requested
         return filterHistory(txs, startTime, endTime);
     }
 
@@ -1252,27 +1186,54 @@ public class HTTPClient {
         long lastFetchTime =
                 lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getAddressHistory"), 0L);
         long currentTime = System.currentTimeMillis() / 1000;
-        if ((currentTime - lastFetchTime) < expiry) {
+        if (currentTime - lastFetchTime < expiry) {
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
         }
+        JsonArray json = fetchHistory(coinInstance, coinTicker, HistoryCall.ADDRESS);
+        if (json == null) {
+            return null;
+        }
+        coinInstance.processHistoryTxs(parseAddressHistory(coinTicker, coinInstance, json));
 
+        JsonArray txs = coinInstance.getAllTransactions();
+        lastFetchTimes.put(lastFetchTimesKey(coinTicker, "getAddressHistory"), currentTime);
+        return filterHistory(txs, startTime, endTime);
+    }
+
+    /** One history endpoint: the RPC method it calls and the name its logs use. */
+    private enum HistoryCall {
+        HISTORY("gethistory", "getHistory"),
+        ADDRESS("getaddresshistory", "getAddressHistory");
+
+        private final String rpcMethod;
+        private final String logName;
+
+        HistoryCall(String rpcMethod, String logName) {
+            this.rpcMethod = rpcMethod;
+            this.logName = logName;
+        }
+    }
+
+    /** Fetches and parses one history response, or returns null when the body is unusable. */
+    private JsonArray fetchHistory(
+            CoinInstance coinInstance, CoinTicker coinTicker, HistoryCall call) {
         List<String> utxoParams = coinInstance.getUTXOParams();
-        if (utxoParams.size() == 0) {
+        if (utxoParams.isEmpty()) {
             LOGGER.warning(
-                    "[httpclient] getAddressHistory "
+                    "[httpclient] "
+                            + call.logName
+                            + " "
                             + coinInstance.getTicker()
                             + " null param size");
             return null;
         }
 
-        JsonArray innerParams = new Gson().toJsonTree(utxoParams).getAsJsonArray();
-
         JsonObject params = new JsonObject();
-        params.addProperty("method", "getaddresshistory");
-        params.add("params", innerParams);
+        params.addProperty("method", call.rpcMethod);
+        params.add("params", new Gson().toJsonTree(utxoParams).getAsJsonArray());
 
         String res = executeRequest("/", params);
-        LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
+        LOGGER.finer("[httpclient] " + call.logName + " " + coinInstance.getTicker() + " " + res);
         if (res == null) {
             return null;
         }
@@ -1284,9 +1245,11 @@ public class HTTPClient {
         JsonArray json;
         try {
             json = new Gson().fromJson(res, JsonArray.class);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             LOGGER.warning(
-                    "[httpclient] getAddressHistory parsing error - Response: "
+                    "[httpclient] "
+                            + call.logName
+                            + " parsing error - Response: "
                             + res
                             + " - "
                             + e.getMessage());
@@ -1294,180 +1257,191 @@ public class HTTPClient {
         }
         if (json == null) {
             LOGGER.warning(
-                    "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null json");
-            return null;
+                    "[httpclient] " + call.logName + " " + coinInstance.getTicker() + " null json");
         }
+        return json;
+    }
 
-        List<Transaction> historyList = new ArrayList<>();
-        for (JsonElement elements : json) {
-            for (JsonElement element : elements.getAsJsonArray()) {
-                // LOGGER.warning("*** DEBUG *** [httpclient] getAddressHistory " + element );
-                JsonObject jsonObject = element.getAsJsonObject();
-
-                String txid = jsonObject.get("tx_hash").getAsString();
-                JsonObject rawTransaction = null;
-
-                int fails = 1;
-                while (fails > 0) {
-                    if (fails >= 5) {
-                        fails = 0;
-                    }
-
-                    try {
-                        rawTransaction = getRawTransaction(coinTicker, txid, true);
-
-                        if (rawTransaction != null && !rawTransaction.get("result").isJsonNull()) {
-                            rawTransaction = rawTransaction.getAsJsonObject("result");
-                            fails = 0;
-
-                            break;
-                        } else {
-                            ++fails;
-                        }
-                    } catch (Exception e) {
-                        LOGGER.warning("[httpclient] getRawTransaction failed - " + e.getMessage());
-                        ++fails;
-                    }
-                }
-
-                if (fails != 0) {
-                    continue;
-                }
-
-                for (JsonElement vin : rawTransaction.get("vin").getAsJsonArray()) {
-                    String vinTxid = vin.getAsJsonObject().get("txid").getAsString();
-                    int voutInt = vin.getAsJsonObject().get("vout").getAsInt();
-
-                    JsonObject voutRawTransaction = null;
-
-                    fails = 1;
-                    while (fails > 0) {
-                        if (fails >= 5) {
-                            fails = 0;
-                        }
-
-                        try {
-                            voutRawTransaction = getRawTransaction(coinTicker, vinTxid, true);
-
-                            if (voutRawTransaction != null
-                                    && !voutRawTransaction.get("result").isJsonNull()) {
-                                voutRawTransaction = voutRawTransaction.getAsJsonObject("result");
-                                fails = 0;
-
-                                break;
-                            } else {
-                                ++fails;
-                            }
-                        } catch (Exception e) {
-                            LOGGER.warning(
-                                    "[httpclient] getRawTransaction(vout) failed - "
-                                            + e.getMessage());
-                            ++fails;
-                        }
-                    }
-
-                    if (fails != 0) {
-                        continue;
-                    }
-
-                    JsonObject vout =
-                            voutRawTransaction
-                                    .get("vout")
-                                    .getAsJsonArray()
-                                    .get(voutInt)
-                                    .getAsJsonObject();
-                    JsonObject scriptPubKey = vout.getAsJsonObject("scriptPubKey");
-
-                    if (scriptPubKey == null
-                            || scriptPubKey.isJsonNull()
-                            || scriptPubKey.get("addresses").isJsonNull()) {
-                        continue;
-                    }
-
-                    for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
-                        String address = addressElement.getAsString();
-
-                        for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
-                            String utxoAddress = addressBalance.getAddress().toBase58();
-
-                            if (utxoAddress.equals(address)) {
-                                Transaction tx =
-                                        new Transaction(
-                                                address,
-                                                txid,
-                                                rawTransaction.get("blockhash").getAsString(),
-                                                voutInt,
-                                                vout.get("value").getAsDouble(),
-                                                rawTransaction.get("confirmations").getAsInt(),
-                                                rawTransaction.get("blocktime").getAsInt());
-                                tx.setCategory("send");
-                                tx.setFee(0.0);
-
-                                historyList.add(tx);
-                            }
-                        }
-                    }
-                }
-
-                for (JsonElement vout : rawTransaction.get("vout").getAsJsonArray()) {
-                    JsonObject scriptPubKey =
-                            vout.getAsJsonObject().getAsJsonObject("scriptPubKey");
-
-                    try {
-                        if (scriptPubKey.isJsonNull()
-                                || scriptPubKey.get("addresses").isJsonNull()) {
-                            continue;
-                        }
-                    } catch (Exception e) {
-                        continue;
-                    }
-
-                    for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
-                        String address = addressElement.getAsString();
-
-                        for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
-                            String utxoAddress = addressBalance.getAddress().toBase58();
-
-                            if (utxoAddress.equals(address)) {
-                                Transaction tx =
-                                        new Transaction(
-                                                address,
-                                                txid,
-                                                rawTransaction.get("blockhash").getAsString(),
-                                                vout.getAsJsonObject().get("n").getAsInt(),
-                                                vout.getAsJsonObject().get("value").getAsDouble(),
-                                                rawTransaction.get("confirmations").getAsInt(),
-                                                rawTransaction.get("blocktime").getAsInt());
-                                tx.setCategory("receive");
-                                tx.setFee(0.0);
-
-                                historyList.add(tx);
-                            }
-                        }
-                    }
-                }
+    /** The plain history rows the provider already carries in the shape the wallet stores. */
+    private static List<Transaction> parseHistory(JsonArray json) {
+        List<Transaction> history = new ArrayList<>();
+        for (JsonElement group : json) {
+            for (JsonElement element : group.getAsJsonArray()) {
+                history.add(historyEntry(element.getAsJsonObject()));
             }
         }
-        coinInstance.processHistoryTxs(historyList);
+        return history;
+    }
 
-        // Return the latest transaction history
-        JsonArray txs = coinInstance.getAllTransactions();
-
-        // Update last fetch time
-        lastFetchTimes.put(lastFetchTimesKey(coinTicker, "getAddressHistory"), currentTime);
-
-        // Filter txs by time if time frame requested
-        return filterHistory(txs, startTime, endTime);
+    private static Transaction historyEntry(JsonObject record) {
+        Transaction tx =
+                new Transaction(
+                        record.get("address").getAsString(),
+                        record.get("txid").getAsString(),
+                        record.get("blockhash").getAsString(),
+                        record.get("vout").getAsInt(),
+                        record.get("amount").getAsDouble(),
+                        record.get("confirmations").getAsInt(),
+                        record.get("blocktime").getAsInt());
+        tx.setCategory(record.get("category").getAsString());
+        tx.setFee(record.get("fee").getAsDouble());
+        return tx;
     }
 
     /**
-     * Filters the transaction array in place. This does not make a copy but modifies the existing
-     * list.
+     * History reconstructed from raw transactions: the provider's address history names the
+     * transactions, and each one's spends and receives are resolved against the wallet's addresses.
+     */
+    private List<Transaction> parseAddressHistory(
+            CoinTicker coinTicker, CoinInstance coinInstance, JsonArray json) {
+        List<Transaction> history = new ArrayList<>();
+        for (JsonElement group : json) {
+            for (JsonElement element : group.getAsJsonArray()) {
+                collectAddressRecord(coinTicker, coinInstance, element.getAsJsonObject(), history);
+            }
+        }
+        return history;
+    }
+
+    private void collectAddressRecord(
+            CoinTicker coinTicker,
+            CoinInstance coinInstance,
+            JsonObject record,
+            List<Transaction> history) {
+        String txid = record.get("tx_hash").getAsString();
+        JsonObject rawTransaction = fetchRawTransactionWithRetries(coinTicker, txid);
+        if (rawTransaction == null) {
+            return;
+        }
+        SpendContext context = new SpendContext(coinTicker, coinInstance, rawTransaction, txid);
+        collectSpends(context, history);
+        collectReceives(context, history);
+    }
+
+    /** Fetches a raw transaction, retrying a handful of times; null when it never arrived. */
+    private JsonObject fetchRawTransactionWithRetries(CoinTicker coinTicker, String txid) {
+        int fails = 1;
+        while (fails > 0) {
+            if (fails >= MAX_RAW_TX_ATTEMPTS) {
+                fails = 0;
+            }
+            try {
+                JsonObject response = getRawTransaction(coinTicker, txid, true);
+                if (response != null && !response.get("result").isJsonNull()) {
+                    return response.getAsJsonObject("result");
+                }
+                fails++;
+            } catch (RuntimeException e) {
+                LOGGER.warning("[httpclient] getRawTransaction failed - " + e.getMessage());
+                fails++;
+            }
+        }
+        return null;
+    }
+
+    private void collectSpends(SpendContext context, List<Transaction> history) {
+        for (JsonElement element : context.rawTransaction().get("vin").getAsJsonArray()) {
+            JsonObject input = element.getAsJsonObject();
+            int vout = input.get("vout").getAsInt();
+            JsonObject parent =
+                    fetchRawTransactionWithRetries(
+                            context.ticker(), input.get("txid").getAsString());
+            if (parent == null) {
+                continue;
+            }
+            JsonObject spent = parent.get("vout").getAsJsonArray().get(vout).getAsJsonObject();
+            JsonObject scriptPubKey = spent.getAsJsonObject("scriptPubKey");
+            if (!hasAddresses(scriptPubKey)) {
+                continue;
+            }
+            for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
+                String address = addressElement.getAsString();
+                if (isWalletAddress(context.coinInstance(), address)) {
+                    history.add(
+                            historyEntry(
+                                    context.rawTransaction(),
+                                    new HistoryRow(
+                                            address,
+                                            context.txid(),
+                                            vout,
+                                            spent.get("value").getAsDouble(),
+                                            "send")));
+                }
+            }
+        }
+    }
+
+    private static void collectReceives(SpendContext context, List<Transaction> history) {
+        for (JsonElement element : context.rawTransaction().get("vout").getAsJsonArray()) {
+            JsonObject output = element.getAsJsonObject();
+            JsonObject scriptPubKey = output.getAsJsonObject("scriptPubKey");
+            if (!hasAddresses(scriptPubKey)) {
+                continue;
+            }
+            for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
+                String address = addressElement.getAsString();
+                if (isWalletAddress(context.coinInstance(), address)) {
+                    history.add(
+                            historyEntry(
+                                    context.rawTransaction(),
+                                    new HistoryRow(
+                                            address,
+                                            context.txid(),
+                                            output.get("n").getAsInt(),
+                                            output.get("value").getAsDouble(),
+                                            "receive")));
+                }
+            }
+        }
+    }
+
+    private static boolean hasAddresses(JsonObject scriptPubKey) {
+        return scriptPubKey != null
+                && !scriptPubKey.isJsonNull()
+                && scriptPubKey.has("addresses")
+                && !scriptPubKey.get("addresses").isJsonNull();
+    }
+
+    private static boolean isWalletAddress(CoinInstance coinInstance, String address) {
+        for (AddressBalance balance : coinInstance.getAddressKeyPairs()) {
+            if (balance.getAddress().toBase58().equals(address)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Transaction historyEntry(JsonObject rawTransaction, HistoryRow row) {
+        Transaction tx =
+                new Transaction(
+                        row.address(),
+                        row.txid(),
+                        rawTransaction.get("blockhash").getAsString(),
+                        row.vout(),
+                        row.value(),
+                        rawTransaction.get("confirmations").getAsInt(),
+                        rawTransaction.get("blocktime").getAsInt());
+        tx.setCategory(row.category());
+        tx.setFee(0.0);
+        return tx;
+    }
+
+    /** The transaction whose history is being reconstructed, and the wallet to match against. */
+    private record SpendContext(
+            CoinTicker ticker, CoinInstance coinInstance, JsonObject rawTransaction, String txid) {}
+
+    /** One reconstructed history row: who it belongs to, which output, its amount and direction. */
+    private record HistoryRow(
+            String address, String txid, int vout, double value, String category) {}
+
+    /**
+     * Return all transaction hashes associated with the coin.
      *
-     * @param txs List to filter
-     * @param startTime Transaction on or after this time
-     * @param endTime Transaction on or before this time
-     * @return Filtered transaction list
+     * @param coinTicker Coin
+     * @param startTime Beginning of the time frame in unix time
+     * @param endTime End of the time frame in unix time
+     * @param expiry Time in milliseconds until cache expires
+     * @return JsonArray or null on error
      */
     private JsonArray filterHistory(JsonArray txs, int startTime, int endTime) {
         if (endTime <= 0) {

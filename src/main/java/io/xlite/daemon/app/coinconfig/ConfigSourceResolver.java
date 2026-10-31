@@ -61,39 +61,52 @@ public final class ConfigSourceResolver {
             throw new IllegalArgumentException(FLAG_NAME + ": empty config source");
         }
         String lower = v.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("https://github.com/") || lower.startsWith("http://github.com/")) {
-            int hostIdx = lower.indexOf("github.com/") + "github.com/".length();
-            String rest = v.substring(hostIdx);
-            String lowerRest = lower.substring(hostIdx);
-            while (lowerRest.endsWith("/") || rest.endsWith("/")) {
-                lowerRest = lowerRest.replaceAll("/+$", "");
-                rest = rest.replaceAll("/+$", "");
-            }
-            if (lowerRest.endsWith(".git")) {
-                lowerRest = lowerRest.substring(0, lowerRest.length() - ".git".length());
-                rest = rest.substring(0, rest.length() - ".git".length());
-            }
-            String branch = "master";
-            for (String marker : new String[] {"/tree/", "/blob/"}) {
-                int idx = lowerRest.indexOf(marker);
-                if (idx >= 0) {
-                    branch = rest.substring(idx + marker.length());
-                    rest = rest.substring(0, idx);
-                    if (branch.isEmpty() || branch.contains("/")) {
-                        throw new IllegalArgumentException(
-                                "unsupported github URL form '"
-                                        + value
-                                        + "' (expected"
-                                        + " github.com/<owner>/<repo>[.git][/tree/<branch>])");
-                    }
-                    break;
-                }
-            }
-            String scheme = lower.startsWith("http://") ? "http://" : "https://";
-            return scheme + "raw.githubusercontent.com/" + rest + "/" + branch;
+        if (!isGithubUrl(lower)) {
+            return stripTrailingSlashes(v);
         }
-        return v.replaceAll("/+$", "");
+        String rest = stripTrailingSlashes(v.substring(githubPathStart(lower)));
+        String lowerRest = stripTrailingSlashes(lower.substring(githubPathStart(lower)));
+        if (lowerRest.endsWith(".git")) {
+            rest = rest.substring(0, rest.length() - ".git".length());
+            lowerRest = lowerRest.substring(0, lowerRest.length() - ".git".length());
+        }
+        GitRef ref = splitBranch(value, rest, lowerRest);
+        String scheme = lower.startsWith("http://") ? "http://" : "https://";
+        return scheme + "raw.githubusercontent.com/" + ref.path() + "/" + ref.branch();
     }
+
+    private static boolean isGithubUrl(String lower) {
+        return lower.startsWith("https://github.com/") || lower.startsWith("http://github.com/");
+    }
+
+    private static int githubPathStart(String lower) {
+        return lower.indexOf("github.com/") + "github.com/".length();
+    }
+
+    private static String stripTrailingSlashes(String value) {
+        return value.replaceAll("/+$", "");
+    }
+
+    /** Splits {@code owner/repo[/tree/branch]} into the repository path and the branch name. */
+    private static GitRef splitBranch(String original, String rest, String lowerRest) {
+        for (String marker : new String[] {"/tree/", "/blob/"}) {
+            int index = lowerRest.indexOf(marker);
+            if (index >= 0) {
+                String branch = rest.substring(index + marker.length());
+                if (branch.isEmpty() || branch.contains("/")) {
+                    throw new IllegalArgumentException(
+                            "unsupported github URL form '"
+                                    + original
+                                    + "' (expected"
+                                    + " github.com/<owner>/<repo>[.git][/tree/<branch>])");
+                }
+                return new GitRef(rest.substring(0, index), branch);
+            }
+        }
+        return new GitRef(rest, "master");
+    }
+
+    private record GitRef(String path, String branch) {}
 
     static String normalize(String v) {
         if (v == null) {

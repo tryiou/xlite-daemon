@@ -7,6 +7,7 @@ import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
+import io.xlite.daemon.app.testing.CoinFixture;
 import io.xlite.daemon.app.util.TxTimeField;
 
 import org.bitcoinj.core.Coin;
@@ -46,30 +47,16 @@ class TxWireLayoutTest {
     @BeforeAll
     static void loadRegistry() {
         Map<String, CoinConfig> cfgs = new LinkedHashMap<>();
-        cfgs.put("LTC", config("LTC", "Litecoin", 48, 50, 176, false));
-        cfgs.put("XVG", config("XVG", "Verge", 30, 33, 158, true));
+        cfgs.put("LTC", CoinFixture.coin("LTC", "Litecoin").prefixes(48, 50, 176).build());
+        cfgs.put(
+                "XVG",
+                CoinFixture.coin("XVG", "Verge").prefixes(30, 33, 158).timeField(true).build());
         CoinConfigRegistry.loadForTest(cfgs);
     }
 
     @AfterAll
     static void releaseRegistry() {
         CoinConfigRegistry.resetForTest();
-    }
-
-    private static CoinConfig config(
-            String ticker, String name, int addr, int p2sh, int dpk, boolean timeField) {
-        Map<String, String> e = new LinkedHashMap<>();
-        e.put("AddressPrefix", Integer.toString(addr));
-        e.put("ScriptPrefix", Integer.toString(p2sh));
-        e.put("SecretPrefix", Integer.toString(dpk));
-        e.put("COIN", "100000000");
-        e.put("FeePerByte", "2");
-        e.put("MinTxFee", "678");
-        e.put("Port", "9332");
-        e.put("DustAmount", "0");
-        e.put("TxVersion", "1");
-        e.put("TxWithTimeField", Boolean.toString(timeField));
-        return new CoinConfig(ticker, name, ticker.toLowerCase() + "--test", e);
     }
 
     private static NetworkParameters litecoin() {

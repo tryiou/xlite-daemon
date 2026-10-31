@@ -256,39 +256,44 @@ public class KeyHandler {
         if (password.length < 8) {
             return 0;
         }
-
         int score = password.length >= 10 ? 2 : 1;
-        boolean hasDigit = false;
-        boolean hasLower = false;
-        boolean hasUpper = false;
-        boolean hasSpecial = false;
-
-        for (char c : password) {
-            if (Character.isDigit(c)) {
-                hasDigit = true;
-            } else if (Character.isLowerCase(c)) {
-                hasLower = true;
-            } else if (Character.isUpperCase(c)) {
-                hasUpper = true;
-            } else if (SPECIAL_CHARS.indexOf(c) >= 0) {
-                hasSpecial = true;
-            }
-        }
-
-        if (hasDigit) {
+        PasswordClasses classes = classify(password);
+        if (classes.digit()) {
             score += 2;
         }
-        if (hasLower) {
+        if (classes.lower()) {
             score += 2;
         }
-        if (hasUpper) {
+        if (classes.upper()) {
             score += 2;
         }
-        if (hasSpecial) {
+        if (classes.special()) {
             score += 2;
         }
         return score;
     }
+
+    private static PasswordClasses classify(char[] password) {
+        boolean digit = false;
+        boolean lower = false;
+        boolean upper = false;
+        boolean special = false;
+        for (char c : password) {
+            if (Character.isDigit(c)) {
+                digit = true;
+            } else if (Character.isLowerCase(c)) {
+                lower = true;
+            } else if (Character.isUpperCase(c)) {
+                upper = true;
+            } else if (SPECIAL_CHARS.indexOf(c) >= 0) {
+                special = true;
+            }
+        }
+        return new PasswordClasses(digit, lower, upper, special);
+    }
+
+    /** Which character classes a password contains. */
+    private record PasswordClasses(boolean digit, boolean lower, boolean upper, boolean special) {}
 
     // =========================================================================
     // Private — key derivation and cipher
@@ -588,60 +593,69 @@ public class KeyHandler {
         File legacyBackup = null;
         byte[] newSalt = null;
         byte[] seedBytes = null;
-
         try {
             validateMigrationReady(keyFile);
-
-            // Create a distinctly named legacy backup (not in the backups/ subdir, so
-            // it is easy to find and recover manually).
-            String timestamp = TIMESTAMP_FORMAT.format(ZonedDateTime.now(ZoneId.systemDefault()));
-            legacyBackup =
-                    new File(
-                            ConfigHelper.getLocalDataDirectory(),
-                            "key-backup-legacy-" + timestamp + ".dat");
-            if (!keyFile.renameTo(legacyBackup)) {
-                throw new RuntimeException("Cannot back up legacy wallet — migration aborted");
-            }
-
+            legacyBackup = backupLegacyWallet(keyFile);
             newSalt = new byte[SALT_LENGTH];
             seedBytes = seed.getBytes(StandardCharsets.UTF_8);
             SecureRandom.getInstanceStrong().nextBytes(newSalt);
-
             String[] parts = encryptBaseSeedWithIv(passphrase, seedBytes, newSalt);
             writeWalletFile(keyFile, newSalt, parts[0], parts[1]);
-
             if (!validateMigration(passphrase, keyFile)) {
                 throw new RuntimeException(
                         "Post-migration validation failed — new file is unreadable");
             }
-
             LOGGER.info("[security] Wallet successfully migrated to V2 (SHA-256/CBC)");
-
         } catch (Exception e) {
             LOGGER.severe("[security] Migration failed: " + e.getMessage());
-
-            // Rollback: remove the (potentially partial) new file, then restore the backup.
-            if (keyFile.exists() && !keyFile.delete()) {
-                LOGGER.warning("[security] Could not remove the partial wallet file " + keyFile);
-            }
-            if (legacyBackup != null && legacyBackup.exists()) {
-                if (!legacyBackup.renameTo(keyFile)) {
-                    throw new RuntimeException(
-                            "[security] CRITICAL: migration failed AND backup restoration failed"
-                                    + e.getMessage());
-                }
-                LOGGER.info("[security] Legacy wallet restored from backup");
-            } else {
-                throw new RuntimeException(
-                        "Migration failed with no backup available" + e.getMessage());
-            }
+            rollback(keyFile, legacyBackup, e);
         } finally {
-            if (newSalt != null) {
-                Arrays.fill(newSalt, (byte) 0);
-            }
-            if (seedBytes != null) {
-                Arrays.fill(seedBytes, (byte) 0);
-            }
+            clear(newSalt);
+            clear(seedBytes);
+        }
+    }
+
+    /**
+     * Rename the legacy wallet out of the way, outside the backups/ subdir so it is easy to find
+     * and recover manually.
+     */
+    private static File backupLegacyWallet(File keyFile) {
+        String timestamp = TIMESTAMP_FORMAT.format(ZonedDateTime.now(ZoneId.systemDefault()));
+        File backup =
+                new File(
+                        ConfigHelper.getLocalDataDirectory(),
+                        "key-backup-legacy-" + timestamp + ".dat");
+        if (!keyFile.renameTo(backup)) {
+            throw new RuntimeException("Cannot back up legacy wallet — migration aborted");
+        }
+        return backup;
+    }
+
+    /**
+     * Restores the legacy wallet after a failed migration.
+     *
+     * <p>Removes the possibly partial new file first. A failure to restore is reported as critical:
+     * the caller has to know the wallet is in an inconsistent state.
+     */
+    private static void rollback(File keyFile, File legacyBackup, Exception cause) {
+        if (keyFile.exists() && !keyFile.delete()) {
+            LOGGER.warning("[security] Could not remove the partial wallet file " + keyFile);
+        }
+        if (legacyBackup == null || !legacyBackup.exists()) {
+            throw new RuntimeException(
+                    "Migration failed with no backup available" + cause.getMessage());
+        }
+        if (!legacyBackup.renameTo(keyFile)) {
+            throw new RuntimeException(
+                    "[security] CRITICAL: migration failed AND backup restoration failed"
+                            + cause.getMessage());
+        }
+        LOGGER.info("[security] Legacy wallet restored from backup");
+    }
+
+    private static void clear(byte[] secret) {
+        if (secret != null) {
+            Arrays.fill(secret, (byte) 0);
         }
     }
 

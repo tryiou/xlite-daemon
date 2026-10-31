@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinTicker;
+import io.xlite.daemon.app.testing.CoinFixture;
 import io.xlite.daemon.app.util.UTXO;
 
 import org.junit.jupiter.api.Test;
@@ -31,30 +32,20 @@ class SatsConversionTest {
     @org.junit.jupiter.api.BeforeAll
     static void loadRegistry() {
         java.util.Map<String, CoinConfig> cfgs = new java.util.LinkedHashMap<>();
-        cfgs.put("LTC", config("LTC", "Litecoin", 48, 50, 176, 100_000_000L));
+        cfgs.put("LTC", CoinFixture.coin("LTC", "Litecoin").prefixes(48, 50, 176).build());
         // CoinTicker.VERGE carries the manifest ticker XVG.
-        cfgs.put("XVG", config("XVG", "Verge", 30, 33, 158, 1_000_000L));
+        cfgs.put(
+                "XVG",
+                CoinFixture.coin("XVG", "Verge")
+                        .prefixes(30, 33, 158)
+                        .coinFactor(1_000_000L)
+                        .build());
         CoinConfigRegistry.loadForTest(cfgs);
     }
 
     @org.junit.jupiter.api.AfterAll
     static void releaseRegistry() {
         CoinConfigRegistry.resetForTest();
-    }
-
-    private static CoinConfig config(
-            String ticker, String name, int addr, int p2sh, int dpk, long coinFactor) {
-        java.util.Map<String, String> e = new java.util.LinkedHashMap<>();
-        e.put("AddressPrefix", Integer.toString(addr));
-        e.put("ScriptPrefix", Integer.toString(p2sh));
-        e.put("SecretPrefix", Integer.toString(dpk));
-        e.put("COIN", Long.toString(coinFactor));
-        e.put("FeePerByte", "2");
-        e.put("MinTxFee", "678");
-        e.put("Port", "9332");
-        e.put("DustAmount", "0");
-        e.put("TxVersion", "1");
-        return new CoinConfig(ticker, name, ticker.toLowerCase() + "--test", e);
     }
 
     @Test

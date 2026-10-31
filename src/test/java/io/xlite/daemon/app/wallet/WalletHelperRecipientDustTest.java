@@ -110,15 +110,14 @@ class WalletHelperRecipientDustTest {
                                 100,
                                 290_000_000L)));
 
-        WalletHelper.BuildFailure[] failure = new WalletHelper.BuildFailure[1];
-        WalletHelper.BuiltTransaction built =
-                WalletHelper.createTransactionSimpleWithFee(
-                        CoinTicker.BLOCKNET,
-                        addressBalance.getAddress().toBase58(),
-                        (double) amountInBaseUnits / coinFactor,
-                        null,
-                        failure);
-        return built == null ? failure[0] : null;
+        WalletHelper.BuildResult result =
+                WalletHelper.build(
+                        new WalletHelper.BuildRequest(
+                                CoinTicker.BLOCKNET,
+                                addressBalance.getAddress().toBase58(),
+                                (double) amountInBaseUnits / coinFactor,
+                                null));
+        return result.failure();
     }
 
     @Test

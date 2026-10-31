@@ -3,16 +3,15 @@ package io.xlite.daemon.app.util;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinTicker;
+import io.xlite.daemon.app.testing.CoinFixture;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -34,35 +33,30 @@ class SatsDivisorCallSiteTest {
     void useSixDecimalCoin() {
         CoinConfigRegistry.loadForTest(
                 Map.of(
-                        "PIVX", config("PIVX", "PIVX", 30, 13, 212, SIX_DECIMAL),
-                        "BLOCK", config("BLOCK", "Blocknet", 26, 28, 154, EIGHT_DECIMAL),
-                        "BTC", config("BTC", "Bitcoin", 0, 5, 128, EIGHT_DECIMAL)));
+                        "PIVX",
+                        CoinFixture.coin("PIVX", "PIVX")
+                                .prefixes(30, 13, 212)
+                                .coinFactor(SIX_DECIMAL)
+                                .fees(10, 5_000)
+                                .port(10_000)
+                                .build(),
+                        "BLOCK",
+                        CoinFixture.coin("BLOCK", "Blocknet")
+                                .prefixes(26, 28, 154)
+                                .fees(10, 5_000)
+                                .port(10_000)
+                                .build(),
+                        "BTC",
+                        CoinFixture.coin("BTC", "Bitcoin")
+                                .prefixes(0, 5, 128)
+                                .fees(10, 5_000)
+                                .port(10_000)
+                                .build()));
     }
 
     @AfterEach
     void reset() {
         CoinConfigRegistry.resetForTest();
-    }
-
-    private static CoinConfig config(
-            String ticker,
-            String blockchain,
-            int addrPrefix,
-            int scriptPrefix,
-            int secretPrefix,
-            long coin) {
-        Map<String, String> e = new LinkedHashMap<>();
-        e.put("AddressPrefix", Integer.toString(addrPrefix));
-        e.put("ScriptPrefix", Integer.toString(scriptPrefix));
-        e.put("SecretPrefix", Integer.toString(secretPrefix));
-        e.put("COIN", Long.toString(coin));
-        e.put("FeePerByte", "10");
-        e.put("MinTxFee", "5000");
-        e.put("Port", "10000");
-        e.put("DustAmount", "0");
-        e.put("TxVersion", "1");
-        e.put("Title", blockchain);
-        return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", e);
     }
 
     @Test

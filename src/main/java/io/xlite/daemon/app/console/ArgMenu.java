@@ -7,16 +7,13 @@ import io.xlite.daemon.app.net.CoinTicker;
 import java.util.Arrays;
 
 public class ArgMenu {
-    private String[] arguments;
+    private final String[] arguments;
 
     public ArgMenu(String[] args) {
         this.arguments = args == null ? new String[0] : args.clone();
     }
 
     public void init() {
-        int selection = 2;
-        char[] password = null;
-
         System.out.println("-------------------------");
         System.out.println("Help: ");
         System.out.println("Create new wallet: --new-wallet (password)");
@@ -25,69 +22,74 @@ public class ArgMenu {
         if (arguments.length == 0) {
             System.out.println("No arguments given.");
             System.exit(0);
-        } else {
-            if (arguments.length == 1) {
-                password = arguments[0].toCharArray();
-            } else if (arguments.length == 2 && arguments[0].equals("--new-wallet")) {
-                selection = 1;
-                password = arguments[1].toCharArray();
-            } else if (arguments.length == 2 && arguments[0].equals("--decrypt-wallet")) {
-                password = arguments[1].toCharArray();
-            }
         }
-
+        Credentials credentials = credentials();
         try {
-            if (password == null) {
+            if (credentials.password() == null) {
                 System.out.println(
                         "Unrecognized arguments. Use --new-wallet <password> or --decrypt-wallet"
                                 + " <password>.");
                 return;
             }
-            switch (selection) {
-                case 1:
-                    {
-                        if (KeyHandler.existsBaseECKeyFromLocal()) {
-                            System.out.println("Key already exists");
-                            return;
-                        }
-
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-
-                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            System.out.println("Bad password.");
-                            return;
-                        }
-
-                        completeLogin(password, null);
-                        break;
-                    }
-                case 2:
-                    {
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-
-                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            System.out.println("Bad password.");
-                            return;
-                        }
-
-                        completeLogin(password, null);
-                        break;
-                    }
-                case 3:
-                    {
-                        System.out.println("Exiting...");
-                        System.exit(0);
-                    }
-                    break;
-                default:
-                    throw new IllegalStateException("Unexpected value: " + selection);
-            }
+            run(credentials.selection(), credentials.password());
         } finally {
-            if (password != null) {
-                Arrays.fill(password, '\0');
+            if (credentials.password() != null) {
+                Arrays.fill(credentials.password(), '\0');
             }
         }
     }
+
+    /**
+     * The action and password the arguments ask for. A null password means the arguments were not
+     * understood; the caller reports that rather than guessing an action.
+     */
+    private Credentials credentials() {
+        if (arguments.length == 1) {
+            return new Credentials(2, arguments[0].toCharArray());
+        }
+        if (arguments.length != 2) {
+            return new Credentials(2, null);
+        }
+        if (arguments[0].equals("--new-wallet")) {
+            return new Credentials(1, arguments[1].toCharArray());
+        }
+        if (arguments[0].equals("--decrypt-wallet")) {
+            return new Credentials(2, arguments[1].toCharArray());
+        }
+        return new Credentials(2, null);
+    }
+
+    private void run(int selection, char[] password) {
+        switch (selection) {
+            case 1 -> createWallet(password);
+            case 2 -> unlockWallet(password);
+            default -> throw new IllegalStateException("Unexpected value: " + selection);
+        }
+    }
+
+    private void createWallet(char[] password) {
+        if (KeyHandler.existsBaseECKeyFromLocal()) {
+            System.out.println("Key already exists");
+            return;
+        }
+        if (KeyHandler.calculatePasswordStrength(password) < 9) {
+            System.out.println("Bad password.");
+            return;
+        }
+        completeLogin(password, null);
+    }
+
+    private void unlockWallet(char[] password) {
+        if (!KeyHandler.existsBaseECKeyFromLocal()
+                && KeyHandler.calculatePasswordStrength(password) < 9) {
+            System.out.println("Bad password.");
+            return;
+        }
+        completeLogin(password, null);
+    }
+
+    /** What the arguments ask for: one of the menu selections, and the password. */
+    private record Credentials(int selection, char[] password) {}
 
     private void completeLogin(char[] password, String userMnemonic) {
         CoinInstance.CoinError coinError =

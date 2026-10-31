@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -218,6 +217,58 @@ class HTTPServerHandlerTest {
         assertEquals(-1, errorCode(response));
     }
 
+    private static final Map<String, String> BASE_PARAMS =
+            Map.ofEntries(
+                    Map.entry("ping", "[]"),
+                    Map.entry("help", "[]"),
+                    Map.entry("version", "[]"),
+                    Map.entry("getinfo", "[]"),
+                    Map.entry("getnewaddress", "[]"),
+                    Map.entry("getnetworkinfo", "[]"),
+                    Map.entry("getblockchaininfo", "[]"),
+                    Map.entry("getfees", "[]"),
+                    Map.entry("getrawmempool", "[]"),
+                    Map.entry("getblockcount", "[]"),
+                    Map.entry("getaddressesbyaccount", "[]"),
+                    Map.entry("listunspent", "[]"),
+                    Map.entry("listtransactions", "[]"),
+                    Map.entry("reloadconfig", "[]"),
+                    Map.entry("validateaddress", "[\"D8r8y7dummy\"]"),
+                    Map.entry("decoderawtransaction", "[\"zz\"]"),
+                    Map.entry("createrawtransaction", "[\"[{}]\",\"{}\"]"),
+                    Map.entry("signrawtransaction", "[\"zz\"]"),
+                    Map.entry("sendrawtransaction", "[\"zz\"]"),
+                    Map.entry("getblockhash", "[1]"),
+                    Map.entry("getblock", "[\"" + TXID + "\"]"),
+                    Map.entry("getrawtransaction", "[\"" + TXID + "\"]"),
+                    Map.entry("gettransaction", "[\"" + TXID + "\"]"),
+                    Map.entry("gettxout", "[\"" + TXID + "\",0]"),
+                    Map.entry("signmessage", "[\"a\",\"b\"]"),
+                    Map.entry("verifymessage", "[\"a\",\"b\",\"c\"]"),
+                    Map.entry("dumpprivkey", "[\"a\"]"),
+                    Map.entry("importprivkey", "[\"wif\"]"),
+                    Map.entry("sendtransaction", "[\"addr\",0.001,true]"));
+
+    private static final List<String> ENVELOPE_MUTANTS =
+            List.of(
+                    "{\"method\":\"ping\"}",
+                    "{\"method\":\"ping\",\"params\":null}",
+                    "{\"method\":\"ping\",\"params\":\"foo\"}",
+                    "{\"method\":\"ping\",\"params\":123}",
+                    "{\"method\":\"ping\",\"params\":{}}",
+                    "{\"params\":[]}",
+                    "{\"method\":123,\"params\":[]}",
+                    "{\"method\":null,\"params\":[]}",
+                    "{\"method\":{},\"params\":[]}",
+                    "{\"method\":[],\"params\":[]}",
+                    "{\"method\":true,\"params\":[]}",
+                    "this is not json",
+                    "",
+                    "{\"method\":\"nosuchmethod\",\"params\":[]}");
+
+    private static final List<String> REPLACEMENTS =
+            List.of("0", "\"x\"", "true", "null", "{}", "[]");
+
     /**
      * Mutation engine: every method below is exercised with systematically generated malformed
      * shapes. No per-case expectations are hardcoded — each response must satisfy the universal
@@ -225,80 +276,7 @@ class HTTPServerHandlerTest {
      */
     @Test
     void testMutationEngineEveryCallYieldsWellFormedEnvelope() {
-        Map<String, String> baseParams = new LinkedHashMap<>();
-        baseParams.put("ping", "[]");
-        baseParams.put("help", "[]");
-        baseParams.put("version", "[]");
-        baseParams.put("getinfo", "[]");
-        baseParams.put("getnewaddress", "[]");
-        baseParams.put("getnetworkinfo", "[]");
-        baseParams.put("getblockchaininfo", "[]");
-        baseParams.put("getfees", "[]");
-        baseParams.put("getrawmempool", "[]");
-        baseParams.put("getblockcount", "[]");
-        baseParams.put("getaddressesbyaccount", "[]");
-        baseParams.put("listunspent", "[]");
-        baseParams.put("listtransactions", "[]");
-        baseParams.put("reloadconfig", "[]");
-        baseParams.put("validateaddress", "[\"D8r8y7dummy\"]");
-        baseParams.put("decoderawtransaction", "[\"zz\"]");
-        baseParams.put("createrawtransaction", "[\"[{}]\",\"{}\"]");
-        baseParams.put("signrawtransaction", "[\"zz\"]");
-        baseParams.put("sendrawtransaction", "[\"zz\"]");
-        baseParams.put("getblockhash", "[1]");
-        baseParams.put("getblock", "[\"" + TXID + "\"]");
-        baseParams.put("getrawtransaction", "[\"" + TXID + "\"]");
-        baseParams.put("gettransaction", "[\"" + TXID + "\"]");
-        baseParams.put("gettxout", "[\"" + TXID + "\",0]");
-        baseParams.put("signmessage", "[\"a\",\"b\"]");
-        baseParams.put("verifymessage", "[\"a\",\"b\",\"c\"]");
-        baseParams.put("dumpprivkey", "[\"a\"]");
-        baseParams.put("importprivkey", "[\"wif\"]");
-        baseParams.put("sendtransaction", "[\"addr\",0.001,true]");
-
-        List<String> mutants = new ArrayList<>();
-        mutants.add("{\"method\":\"ping\"}");
-        mutants.add("{\"method\":\"ping\",\"params\":null}");
-        mutants.add("{\"method\":\"ping\",\"params\":\"foo\"}");
-        mutants.add("{\"method\":\"ping\",\"params\":123}");
-        mutants.add("{\"method\":\"ping\",\"params\":{}}");
-        mutants.add("{\"params\":[]}");
-        mutants.add("{\"method\":123,\"params\":[]}");
-        mutants.add("{\"method\":null,\"params\":[]}");
-        mutants.add("{\"method\":{},\"params\":[]}");
-        mutants.add("{\"method\":[],\"params\":[]}");
-        mutants.add("{\"method\":true,\"params\":[]}");
-        mutants.add("this is not json");
-        mutants.add("");
-        mutants.add("{\"method\":\"nosuchmethod\",\"params\":[]}");
-
-        for (Map.Entry<String, String> entry : baseParams.entrySet()) {
-            String method = entry.getKey();
-            JsonArray base = JsonParser.parseString(entry.getValue()).getAsJsonArray();
-            mutants.add("{\"method\":\"" + method + "\",\"params\":" + base + "}");
-            mutants.add("{\"method\":\"" + method + "\",\"params\":[]}");
-            JsonArray over = base.deepCopy();
-            over.add("extra-junk");
-            over.add(999);
-            mutants.add("{\"method\":\"" + method + "\",\"params\":" + over + "}");
-            for (int k = 1; k < base.size(); k++) {
-                JsonArray prefix = new JsonArray();
-                for (int j = 0; j < k; j++) {
-                    prefix.add(base.get(j).deepCopy());
-                }
-                mutants.add("{\"method\":\"" + method + "\",\"params\":" + prefix + "}");
-            }
-            for (int i = 0; i < base.size(); i++) {
-                for (String replacement : new String[] {"0", "\"x\"", "true", "null", "{}", "[]"}) {
-                    JsonArray mutated = base.deepCopy();
-                    mutated.set(i, JsonParser.parseString(replacement));
-                    mutants.add("{\"method\":\"" + method + "\",\"params\":" + mutated + "}");
-                }
-            }
-        }
-        mutants.add("{\"method\":\"ping\",\"params\":[]}x");
-
-        for (String body : mutants) {
+        for (String body : mutants()) {
             FullHttpResponse response = post(body);
             assertWellFormedEnvelope(response, body);
             assertTrue(
@@ -306,11 +284,60 @@ class HTTPServerHandlerTest {
                             || response.status() == HttpResponseStatus.BAD_REQUEST,
                     "unexpected status " + response.status() + " for: " + body);
         }
-
         assertWellFormedEnvelope(
                 post(HttpMethod.GET, "/", "{\"method\":\"ping\",\"params\":[]}"), "GET /");
         assertWellFormedEnvelope(
                 post(HttpMethod.POST, "/badpath", "{\"method\":\"ping\",\"params\":[]}"),
                 "POST /badpath");
+    }
+
+    private static List<String> mutants() {
+        List<String> mutants = new ArrayList<>(ENVELOPE_MUTANTS);
+        for (Map.Entry<String, String> base : BASE_PARAMS.entrySet()) {
+            addMethodMutants(mutants, base.getKey(), base.getValue());
+        }
+        mutants.add("{\"method\":\"ping\",\"params\":[]}x");
+        return mutants;
+    }
+
+    /** The base call, no params, extra params, every prefix, and every replaced param. */
+    private static void addMethodMutants(List<String> mutants, String method, String baseJson) {
+        JsonArray base = JsonParser.parseString(baseJson).getAsJsonArray();
+        mutants.add(call(method, base));
+        mutants.add(call(method, new JsonArray()));
+        mutants.add(call(method, withExtraParams(base)));
+        for (int size = 1; size < base.size(); size++) {
+            mutants.add(call(method, prefix(base, size)));
+        }
+        for (int index = 0; index < base.size(); index++) {
+            for (String replacement : REPLACEMENTS) {
+                mutants.add(call(method, replaced(base, index, replacement)));
+            }
+        }
+    }
+
+    private static String call(String method, JsonArray params) {
+        return "{\"method\":\"" + method + "\",\"params\":" + params + "}";
+    }
+
+    private static JsonArray withExtraParams(JsonArray base) {
+        JsonArray over = base.deepCopy();
+        over.add("extra-junk");
+        over.add(999);
+        return over;
+    }
+
+    private static JsonArray prefix(JsonArray base, int size) {
+        JsonArray prefix = new JsonArray();
+        for (int index = 0; index < size; index++) {
+            prefix.add(base.get(index).deepCopy());
+        }
+        return prefix;
+    }
+
+    private static JsonArray replaced(JsonArray base, int index, String replacement) {
+        JsonArray mutated = base.deepCopy();
+        mutated.set(index, JsonParser.parseString(replacement));
+        return mutated;
     }
 }

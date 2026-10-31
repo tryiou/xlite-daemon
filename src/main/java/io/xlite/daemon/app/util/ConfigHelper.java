@@ -54,6 +54,19 @@ public final class ConfigHelper {
     /** Config value meaning "no port recorded yet": the listener derives one. */
     public static final int UNSET_RPC_PORT = -1000;
 
+    /** Every key a coin's config file is expected to hold. */
+    private static final String[] CONFIG_KEYS =
+            new String[] {
+                "feeperbyte",
+                "mintxfee",
+                "rpcEnabled",
+                "rpcUsername",
+                "rpcPassword",
+                "rpcPort",
+                "rpcBindAddress",
+                "addressCount"
+            };
+
     /** Ticker of the master listener's configuration, as on disk and in code. */
     public static final String MASTER_TICKER = "master";
 
@@ -126,112 +139,123 @@ public final class ConfigHelper {
             String rawConfig =
                     new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
             if (rawConfig.isEmpty()) {
-                rpcEnabled = false;
-                rpcUsername = "";
-                rpcPassword = "";
-                rpcPort = defaultRpcPort();
-                rpcBindAddress = DEFAULT_RPC_BIND_ADDRESS;
-                addressCount = 0;
-
-                writeConfig();
+                applyEmptyDefaults();
                 return;
             }
-
             JSONObject config = new JSONObject(rawConfig);
-
-            final String[] configKeys =
-                    new String[] {
-                        "feeperbyte",
-                        "mintxfee",
-                        "rpcEnabled",
-                        "rpcUsername",
-                        "rpcPassword",
-                        "rpcPort",
-                        "rpcBindAddress",
-                        "addressCount"
-                    };
-
-            for (String configKey : configKeys) {
-                if (!config.has(configKey)) {
-                    LOGGER.finer(
-                            "[config] Missing config key '"
-                                    + configKey
-                                    + "' for "
-                                    + tickerStr
-                                    + ", will use default");
-                }
-            }
-
-            boolean needsWrite = false;
-
-            if (!config.has("feeperbyte")) {
-                needsWrite = true;
-            } else {
-                feePerByte = config.getLong("feeperbyte");
-            }
-
-            if (!config.has("mintxfee")) {
-                needsWrite = true;
-            } else {
-                minTxFee = config.getLong("mintxfee");
-            }
-
-            if (!config.has("rpcEnabled")) {
-                rpcEnabled = false;
-                needsWrite = true;
-            } else {
-                rpcEnabled = config.getBoolean("rpcEnabled");
-            }
-
-            if (!config.has("rpcUsername")) {
-                rpcUsername = "";
-                needsWrite = true;
-            } else {
-                rpcUsername = config.getString("rpcUsername");
-            }
-
-            if (!config.has("rpcPassword")) {
-                rpcPassword = "";
-                needsWrite = true;
-            } else {
-                rpcPassword = config.getString("rpcPassword");
-            }
-
-            if (!config.has("rpcPort")) {
-                rpcPort = defaultRpcPort();
-                needsWrite = true;
-            } else {
-                rpcPort = config.getInt("rpcPort");
-                if (rpcPort == 0) {
-                    rpcPort = UNSET_RPC_PORT;
-                    needsWrite = true;
-                }
-            }
-
-            if (!config.has("rpcBindAddress")) {
-                rpcBindAddress = DEFAULT_RPC_BIND_ADDRESS;
-                needsWrite = true;
-            } else {
-                // Normalize once: validation trims, and the servers resolve
-                // the stored value verbatim — padded input must not pass one
-                // and fail the other.
-                rpcBindAddress = config.getString("rpcBindAddress").trim();
-            }
-
-            if (!config.has("addressCount")) {
-                setAddressCount(0);
-                needsWrite = true;
-            } else {
-                addressCount = config.getInt("addressCount");
-            }
-
-            if (needsWrite) {
+            warnAboutMissingKeys(config);
+            if (applyStoredValues(config)) {
                 writeConfig();
             }
         } catch (Exception e) {
             LOGGER.warning(
                     "[config] Error reading config file for " + tickerStr + ", " + e.getMessage());
         }
+    }
+
+    /** An empty file means a fresh coin: RPC off, no credentials, defaults for the rest. */
+    private void applyEmptyDefaults() {
+        rpcEnabled = false;
+        rpcUsername = "";
+        rpcPassword = "";
+        rpcPort = defaultRpcPort();
+        rpcBindAddress = DEFAULT_RPC_BIND_ADDRESS;
+        addressCount = 0;
+        writeConfig();
+    }
+
+    private void warnAboutMissingKeys(JSONObject config) {
+        for (String key : CONFIG_KEYS) {
+            if (!config.has(key)) {
+                LOGGER.finer(
+                        "[config] Missing config key '"
+                                + key
+                                + "' for "
+                                + tickerStr
+                                + ", will use default");
+            }
+        }
+    }
+
+    /**
+     * Applies every stored value, defaulting the missing ones; returns whether a rewrite is due.
+     */
+    private boolean applyStoredValues(JSONObject config) {
+        boolean needsWrite = applyFees(config);
+        needsWrite |= applyCredentials(config);
+        needsWrite |= applyRpcEndpoint(config);
+        needsWrite |= applyAddressCount(config);
+        return needsWrite;
+    }
+
+    private boolean applyFees(JSONObject config) {
+        boolean needsWrite = false;
+        if (config.has("feeperbyte")) {
+            feePerByte = config.getLong("feeperbyte");
+        } else {
+            needsWrite = true;
+        }
+        if (config.has("mintxfee")) {
+            minTxFee = config.getLong("mintxfee");
+        } else {
+            needsWrite = true;
+        }
+        return needsWrite;
+    }
+
+    private boolean applyCredentials(JSONObject config) {
+        boolean needsWrite = false;
+        if (config.has("rpcEnabled")) {
+            rpcEnabled = config.getBoolean("rpcEnabled");
+        } else {
+            rpcEnabled = false;
+            needsWrite = true;
+        }
+        if (config.has("rpcUsername")) {
+            rpcUsername = config.getString("rpcUsername");
+        } else {
+            rpcUsername = "";
+            needsWrite = true;
+        }
+        if (config.has("rpcPassword")) {
+            rpcPassword = config.getString("rpcPassword");
+        } else {
+            rpcPassword = "";
+            needsWrite = true;
+        }
+        return needsWrite;
+    }
+
+    private boolean applyRpcEndpoint(JSONObject config) {
+        boolean needsWrite = false;
+        if (config.has("rpcPort")) {
+            rpcPort = config.getInt("rpcPort");
+            if (rpcPort == 0) {
+                rpcPort = UNSET_RPC_PORT;
+                needsWrite = true;
+            }
+        } else {
+            rpcPort = defaultRpcPort();
+            needsWrite = true;
+        }
+        if (config.has("rpcBindAddress")) {
+            // Normalize once: validation trims, and the servers resolve the stored value
+            // verbatim — padded input must not pass one and fail the other.
+            rpcBindAddress = config.getString("rpcBindAddress").trim();
+        } else {
+            rpcBindAddress = DEFAULT_RPC_BIND_ADDRESS;
+            needsWrite = true;
+        }
+        return needsWrite;
+    }
+
+    private boolean applyAddressCount(JSONObject config) {
+        if (config.has("addressCount")) {
+            addressCount = config.getInt("addressCount");
+            return false;
+        }
+        setAddressCount(0);
+        return true;
     }
 
     /**
@@ -462,53 +486,28 @@ public final class ConfigHelper {
     }
 
     public static String getLocalDataDirectory() {
-        String baseDir;
-        if (configDir == null || configDir.isEmpty()) {
-            baseDir = App.getUserConfigDir();
-        } else {
-            baseDir = configDir;
-        }
-        // Fail fast on a null/blank base (e.g. missing Windows AppData)
-        // instead of stringifying to a bogus "null/xlite-daemon/" dir.
-        if (baseDir == null || baseDir.trim().isEmpty()) {
-            throw new IllegalStateException(
-                    "[config] Cannot resolve data directory: base config dir is null or blank. "
-                            + "Set XLITE_DATA_HOME to an explicit path.");
-        }
-
+        String baseDir = resolveBaseDirectory();
         File newDir = new File(baseDir, DATA_DIR_NAME);
         File oldDir = new File(baseDir, LEGACY_DIR_NAME);
-        // Intra-JVM mutual exclusion plus an inter-process file lock: supervisors
-        // restart daemons, and two processes racing on the shared staging dir
-        // would otherwise wipe each other's in-progress copy. The loser of a
-        // real race blocks here, then finds the source already reconciled.
+        // Intra-JVM mutual exclusion plus an inter-process file lock: supervisors restart
+        // daemons, and two processes racing on the shared staging dir would otherwise wipe each
+        // other's in-progress copy. The loser of a real race blocks here, then finds the source
+        // already reconciled.
         synchronized (MIGRATION_LOCK) {
             File base = new File(baseDir);
-            // Re-check after mkdirs: a concurrent creator winning the race
-            // makes mkdirs return false for an existing dir (no failure).
-            if (!base.isDirectory() && !base.mkdirs() && !base.isDirectory()) {
-                throw new IllegalStateException(
-                        "[config] Cannot create base config directory: "
-                                + base
-                                + ". Check permissions or set XLITE_DATA_HOME.");
-            }
+            ensureDirectory(base, "base config");
             try (RandomAccessFile lockRaf =
                             new RandomAccessFile(new File(base, MIGRATION_LOCK_FILE), "rw");
                     FileLock migrationLock = acquireMigrationLock(lockRaf, base)) {
-                // Blocking acquire is intentional: the loser waits, then finds
-                // the source already reconciled. A second daemon only ever
-                // blocks here during an in-progress large copy.
+                // Blocking acquire is intentional: the loser waits, then finds the source
+                // already reconciled. A second daemon only ever blocks here during an
+                // in-progress large copy.
                 migrateLegacyDirectory(baseDir, oldDir, newDir);
-                if (!newDir.isDirectory() && !newDir.mkdirs() && !newDir.isDirectory()) {
-                    throw new IllegalStateException(
-                            "[config] Cannot create data directory: "
-                                    + newDir
-                                    + ". Check permissions or set XLITE_DATA_HOME.");
-                }
+                ensureDirectory(newDir, "data");
             } catch (OverlappingFileLockException e) {
-                // Unreachable through our own paths (same-JVM overlap is
-                // excluded by MIGRATION_LOCK and the file is ours alone),
-                // but wrap precisely rather than leak an undecorated throw.
+                // Unreachable through our own paths (same-JVM overlap is excluded by
+                // MIGRATION_LOCK and the file is ours alone), but wrap precisely rather than
+                // leak an undecorated throw.
                 throw new IllegalStateException(
                         "[config] Data directory migration lock failed for "
                                 + base
@@ -523,8 +522,32 @@ public final class ConfigHelper {
                         e);
             }
         }
-
         return newDir.getPath() + File.separator;
+    }
+
+    private static String resolveBaseDirectory() {
+        String baseDir =
+                (configDir == null || configDir.isEmpty()) ? App.getUserConfigDir() : configDir;
+        // Fail fast on a null/blank base (e.g. missing Windows AppData) instead of stringifying
+        // to a bogus "null/xlite-daemon/" dir.
+        if (baseDir == null || baseDir.trim().isEmpty()) {
+            throw new IllegalStateException(
+                    "[config] Cannot resolve data directory: base config dir is null or blank. "
+                            + "Set XLITE_DATA_HOME to an explicit path.");
+        }
+        return baseDir;
+    }
+
+    /** Creates a directory, tolerating a concurrent creator that won the race. */
+    private static void ensureDirectory(File directory, String kind) {
+        if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) {
+            throw new IllegalStateException(
+                    "[config] Cannot create "
+                            + kind
+                            + " directory: "
+                            + directory
+                            + ". Check permissions or set XLITE_DATA_HOME.");
+        }
     }
 
     /**
@@ -801,22 +824,31 @@ public final class ConfigHelper {
     }
 
     private static void copyDirectoryRecursively(File source, File target) throws IOException {
-        if (source.isDirectory()) {
-            if (!target.exists() && !target.mkdirs() && !target.exists()) {
-                throw new IOException("Failed to create directory " + target);
-            }
-            File[] children = source.listFiles();
-            if (children != null) {
-                for (File child : children) {
-                    copyDirectoryRecursively(child, new File(target, child.getName()));
-                }
-            }
-        } else {
-            File parent = target.getParentFile();
-            if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) {
-                throw new IOException("Failed to create directory " + parent);
-            }
-            Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        if (!source.isDirectory()) {
+            copyFile(source, target);
+            return;
+        }
+        ensureDirectoryExists(target);
+        File[] children = source.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            copyDirectoryRecursively(child, new File(target, child.getName()));
+        }
+    }
+
+    private static void copyFile(File source, File target) throws IOException {
+        File parent = target.getParentFile();
+        if (parent != null) {
+            ensureDirectoryExists(parent);
+        }
+        Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static void ensureDirectoryExists(File directory) throws IOException {
+        if (!directory.exists() && !directory.mkdirs() && !directory.exists()) {
+            throw new IOException("Failed to create directory " + directory);
         }
     }
 }

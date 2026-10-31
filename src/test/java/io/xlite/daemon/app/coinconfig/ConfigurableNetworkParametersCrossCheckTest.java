@@ -2,6 +2,7 @@ package io.xlite.daemon.app.coinconfig;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.xlite.daemon.app.testing.CoinFixture;
 import io.xlite.daemon.app.wallet.WalletHelper;
 
 import org.bitcoinj.core.LegacyAddress;
@@ -46,7 +47,12 @@ class ConfigurableNetworkParametersCrossCheckTest {
         // values chosen by the test and claimed to mirror no coin.
         ConfigurableNetworkParameters p =
                 ConfigurableNetworkParameters.from(
-                        config("LTC", 17, 18, 19, 1_000_000L, 777L, 88_800L, 34567));
+                        CoinFixture.coin("LTC", "LTC")
+                                .prefixes(17, 18, 19)
+                                .coinFactor(1_000_000L)
+                                .fees(777L, 88_800L)
+                                .port(34567)
+                                .build());
 
         assertEquals(17, p.getAddressHeader(), "address header from config");
         assertEquals(18, p.getP2SHHeader(), "p2sh header from config");
@@ -61,10 +67,20 @@ class ConfigurableNetworkParametersCrossCheckTest {
         // fell back to a constant would give both the same answer.
         ConfigurableNetworkParameters a =
                 ConfigurableNetworkParameters.from(
-                        config("LTC", 30, 63, 128, 1_000_000L, 11L, 22L, 1111));
+                        CoinFixture.coin("LTC", "LTC")
+                                .prefixes(30, 63, 128)
+                                .coinFactor(1_000_000L)
+                                .fees(11L, 22L)
+                                .port(1111)
+                                .build());
         ConfigurableNetworkParameters b =
                 ConfigurableNetworkParameters.from(
-                        config("DASH", 60, 122, 200, 100_000_000L, 33L, 44L, 2222));
+                        CoinFixture.coin("DASH", "DASH")
+                                .prefixes(60, 122, 200)
+                                .coinFactor(100_000_000L)
+                                .fees(33L, 44L)
+                                .port(2222)
+                                .build());
 
         assertEquals(11L, WalletHelper.getFeePerByte(a));
         assertEquals(22L, WalletHelper.getMinTxFee(a));
@@ -86,7 +102,13 @@ class ConfigurableNetworkParametersCrossCheckTest {
      */
     @Test
     void testSupplementDerivedValuesComeFromTheSupplement() {
-        CoinConfig cfg = config("LTC", 17, 18, 19, 1_000_000L, 777L, 88_800L, 34567);
+        CoinConfig cfg =
+                CoinFixture.coin("LTC", "LTC")
+                        .prefixes(17, 18, 19)
+                        .coinFactor(1_000_000L)
+                        .fees(777L, 88_800L)
+                        .port(34567)
+                        .build();
         CompiledCoinSupplement.Supplement s = CompiledCoinSupplement.forTicker(cfg.getTicker());
         ConfigurableNetworkParameters p = ConfigurableNetworkParameters.from(cfg);
 
@@ -149,15 +171,10 @@ class ConfigurableNetworkParametersCrossCheckTest {
         for (int i = 0; i < tickers.length; i++) {
             ConfigurableNetworkParameters p =
                     ConfigurableNetworkParameters.from(
-                            config(
-                                    tickers[i],
-                                    coins[i][0],
-                                    coins[i][1],
-                                    coins[i][2],
-                                    100_000_000L,
-                                    10L,
-                                    5_000L,
-                                    9332));
+                            CoinFixture.coin(tickers[i], tickers[i])
+                                    .prefixes(coins[i][0], coins[i][1], coins[i][2])
+                                    .fees(10L, 5_000L)
+                                    .build());
             assertEquals(
                     encoded[i],
                     LegacyAddress.fromPubKeyHash(p, hash).toString(),
@@ -179,7 +196,13 @@ class ConfigurableNetworkParametersCrossCheckTest {
         // its value is charged as fee rather than returned to the sender. A
         // per-coin constant here is therefore not cosmetic, and the compiler
         // must invent nothing when the configuration is silent.
-        CoinConfig zero = config("LTC", 30, 63, 128, 100_000_000L, 10L, 5_000L, 9332);
+        CoinConfig zero =
+                CoinFixture.coin("LTC", "LTC")
+                        .prefixes(30, 63, 128)
+                        .coinFactor(100_000_000L)
+                        .fees(10L, 5_000L)
+                        .port(9332)
+                        .build();
         assertEquals(
                 0L,
                 ConfigurableNetworkParameters.from(zero).getMinNonDustOutput().getValue(),
@@ -252,7 +275,13 @@ class ConfigurableNetworkParametersCrossCheckTest {
             "Port"
         };
         for (String key : required) {
-            CoinConfig good = config("LTC", 30, 63, 128, 1_000_000L, 777L, 88_800L, 34567);
+            CoinConfig good =
+                    CoinFixture.coin("LTC", "LTC")
+                            .prefixes(30, 63, 128)
+                            .coinFactor(1_000_000L)
+                            .fees(777L, 88_800L)
+                            .port(34567)
+                            .build();
             Map<String, String> missing = new LinkedHashMap<>(good.getConfEntries());
             assertTrue(missing.remove(key) != null, "fixture must actually carry " + key);
             CoinConfig bad =
@@ -271,7 +300,13 @@ class ConfigurableNetworkParametersCrossCheckTest {
 
     @Test
     void testGateRejectsPrefixOutOfByteRange() {
-        CoinConfig good = config("LTC", 30, 63, 128, 1_000_000L, 777L, 88_800L, 34567);
+        CoinConfig good =
+                CoinFixture.coin("LTC", "LTC")
+                        .prefixes(30, 63, 128)
+                        .coinFactor(1_000_000L)
+                        .fees(777L, 88_800L)
+                        .port(34567)
+                        .build();
         Map<String, String> broken = new LinkedHashMap<>(good.getConfEntries());
         broken.put("AddressPrefix", "9999");
         CoinConfig bad =
@@ -288,7 +323,13 @@ class ConfigurableNetworkParametersCrossCheckTest {
         // Distinct prefixes are what stop an address from one network parsing
         // on another, so a collision is a configuration error to reject, not a
         // value to default away.
-        CoinConfig good = config("LTC", 30, 63, 128, 1_000_000L, 777L, 88_800L, 34567);
+        CoinConfig good =
+                CoinFixture.coin("LTC", "LTC")
+                        .prefixes(30, 63, 128)
+                        .coinFactor(1_000_000L)
+                        .fees(777L, 88_800L)
+                        .port(34567)
+                        .build();
         Map<String, String> broken = new LinkedHashMap<>(good.getConfEntries());
         broken.put("ScriptPrefix", broken.get("AddressPrefix"));
         CoinConfig bad =
@@ -298,35 +339,10 @@ class ConfigurableNetworkParametersCrossCheckTest {
 
     /** The same synthetic configuration, with an explicit dust floor. */
     private static CoinConfig configWithDust(String ticker, long dust) {
-        CoinConfig base = config(ticker, 30, 63, 128, 100_000_000L, 10L, 5_000L, 9332);
-        Map<String, String> e = new LinkedHashMap<>(base.getConfEntries());
-        e.put("DustAmount", Long.toString(dust));
-        return new CoinConfig(ticker, ticker, ticker.toLowerCase() + "--test", e);
-    }
-
-    /**
-     * A synthetic configuration: every value chosen by the test, none claimed to mirror any real
-     * coin.
-     */
-    private static CoinConfig config(
-            String ticker,
-            int addr,
-            int p2sh,
-            int dpk,
-            long coin,
-            long feePerByte,
-            long minTxFee,
-            int port) {
-        Map<String, String> e = new LinkedHashMap<>();
-        e.put("AddressPrefix", Integer.toString(addr));
-        e.put("ScriptPrefix", Integer.toString(p2sh));
-        e.put("SecretPrefix", Integer.toString(dpk));
-        e.put("COIN", Long.toString(coin));
-        e.put("FeePerByte", Long.toString(feePerByte));
-        e.put("MinTxFee", Long.toString(minTxFee));
-        e.put("Port", Integer.toString(port));
-        e.put("DustAmount", "0");
-        e.put("TxVersion", "1");
-        return new CoinConfig(ticker, ticker, ticker.toLowerCase() + "--test", e);
+        return CoinFixture.coin(ticker, ticker)
+                .prefixes(30, 63, 128)
+                .fees(10L, 5_000L)
+                .dust(Long.toString(dust))
+                .build();
     }
 }

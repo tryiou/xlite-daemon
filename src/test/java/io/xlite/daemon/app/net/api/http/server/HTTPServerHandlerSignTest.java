@@ -35,6 +35,7 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
+import io.xlite.daemon.app.testing.CoinFixture;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.TxTimeField;
@@ -90,38 +91,31 @@ class HTTPServerHandlerSignTest {
     @BeforeAll
     static void loadRegistry() {
         Map<String, CoinConfig> cfgs = new LinkedHashMap<>();
-        cfgs.put("XVG", config("XVG", 30, 33, 158, 1_000_000L, 20102, 1, true));
-        cfgs.put("PKOIN", config("PKOIN", 55, 80, 33, 100_000_000L, 37071, 2, true));
-        cfgs.put("LTC", config("LTC", 48, 50, 176, 100_000_000L, 9332, 2, false));
+        cfgs.put(
+                "XVG",
+                CoinFixture.coin("XVG", "Test XVG")
+                        .prefixes(30, 33, 158)
+                        .coinFactor(1_000_000L)
+                        .port(20102)
+                        .timeField(true)
+                        .build());
+        cfgs.put(
+                "PKOIN",
+                CoinFixture.coin("PKOIN", "Test PKOIN")
+                        .prefixes(55, 80, 33)
+                        .port(37071)
+                        .txVersion(2)
+                        .timeField(true)
+                        .build());
+        cfgs.put(
+                "LTC",
+                CoinFixture.coin("LTC", "Test LTC").prefixes(48, 50, 176).txVersion(2).build());
         CoinConfigRegistry.loadForTest(cfgs);
     }
 
     @AfterAll
     static void resetRegistry() {
         CoinConfigRegistry.resetForTest();
-    }
-
-    private static CoinConfig config(
-            String ticker,
-            int addr,
-            int p2sh,
-            int dpk,
-            long coinFactor,
-            int port,
-            int txVersion,
-            boolean timeField) {
-        Map<String, String> e = new LinkedHashMap<>();
-        e.put("AddressPrefix", Integer.toString(addr));
-        e.put("ScriptPrefix", Integer.toString(p2sh));
-        e.put("SecretPrefix", Integer.toString(dpk));
-        e.put("COIN", Long.toString(coinFactor));
-        e.put("FeePerByte", "2");
-        e.put("MinTxFee", "678");
-        e.put("Port", Integer.toString(port));
-        e.put("DustAmount", "0");
-        e.put("TxVersion", Integer.toString(txVersion));
-        e.put("TxWithTimeField", Boolean.toString(timeField));
-        return new CoinConfig(ticker, "Test " + ticker, ticker.toLowerCase() + "--test", e);
     }
 
     private static String hex(byte[] bytes) {
@@ -263,9 +257,8 @@ class HTTPServerHandlerSignTest {
                 TxTimeFieldSigner.chainSighash(
                         signed,
                         fixture.spentScript,
-                        0,
-                        Transaction.SigHash.ALL.value,
-                        expectedNTime);
+                        new TxTimeFieldSigner.SighashRequest(
+                                0, Transaction.SigHash.ALL.value, expectedNTime));
         assertTrue(
                 TxTimeFieldSigner.verify(signed.getInputs().get(0).getScriptSig(), hash),
                 "the signature must verify against the nTime carried on the wire");

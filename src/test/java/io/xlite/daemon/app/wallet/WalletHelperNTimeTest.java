@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
+import io.xlite.daemon.app.testing.CoinFixture;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.UTXO;
 
@@ -37,38 +38,28 @@ class WalletHelperNTimeTest {
         Map<String, CoinConfig> cfgs = new LinkedHashMap<>();
         // XVG carries nTime; BLOCK does not. Both are needed to prove the
         // per-coin branch, not a hardcoded default.
-        cfgs.put("XVG", fixture("XVG", "Verge", 30, 33, 158, 1_000_000L, 20102, "true"));
-        cfgs.put("BLOCK", fixture("BLOCK", "Blocknet", 26, 28, 154, 100_000_000L, 41414, "false"));
+        cfgs.put(
+                "XVG",
+                CoinFixture.coin("XVG", "Verge")
+                        .prefixes(30, 33, 158)
+                        .coinFactor(1_000_000L)
+                        .fees(200, 100_000)
+                        .port(20102)
+                        .timeField(true)
+                        .build());
+        cfgs.put(
+                "BLOCK",
+                CoinFixture.coin("BLOCK", "Blocknet")
+                        .prefixes(26, 28, 154)
+                        .fees(200, 100_000)
+                        .port(41414)
+                        .build());
         CoinConfigRegistry.loadForTest(cfgs);
     }
 
     @AfterAll
     static void resetRegistry() {
         CoinConfigRegistry.resetForTest();
-    }
-
-    private static CoinConfig fixture(
-            String ticker,
-            String blockchain,
-            int addrPrefix,
-            int scriptPrefix,
-            int secretPrefix,
-            long coin,
-            int port,
-            String txWithTimeField) {
-        Map<String, String> entries = new LinkedHashMap<>();
-        entries.put("AddressPrefix", Integer.toString(addrPrefix));
-        entries.put("ScriptPrefix", Integer.toString(scriptPrefix));
-        entries.put("SecretPrefix", Integer.toString(secretPrefix));
-        entries.put("COIN", Long.toString(coin));
-        entries.put("FeePerByte", "200");
-        entries.put("MinTxFee", "100000");
-        entries.put("Port", Integer.toString(port));
-        entries.put("DustAmount", "0");
-        entries.put("TxVersion", "1");
-        entries.put("Title", blockchain);
-        entries.put("TxWithTimeField", txWithTimeField);
-        return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", entries);
     }
 
     private static ArrayList<UTXO> selected() {

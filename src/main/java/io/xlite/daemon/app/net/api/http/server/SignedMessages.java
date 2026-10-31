@@ -14,6 +14,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.SignatureException;
 import java.util.Arrays;
+import java.util.Map;
 
 /**
  * Bitcoin-style signed messages: the per-coin header prefix, signing and key recovery.
@@ -23,6 +24,22 @@ import java.util.Arrays;
  * prefix.
  */
 final class SignedMessages {
+
+    private static final Map<CoinTicker, String> HEADERS =
+            Map.ofEntries(
+                    Map.entry(CoinTicker.BLOCKNET, "Blocknet Signed Message:\n"),
+                    Map.entry(CoinTicker.BITCOIN, "Bitcoin Signed Message:\n"),
+                    Map.entry(CoinTicker.BITCOIN_CASH, "Bitcoin Signed Message:\n"),
+                    Map.entry(CoinTicker.LITECOIN, "Litecoin Signed Message:\n"),
+                    Map.entry(CoinTicker.PIVX, "DarkNet Signed Message:\n"),
+                    Map.entry(CoinTicker.DASHCOIN, "DarkCoin Signed Message:\n"),
+                    Map.entry(CoinTicker.UNOBTANIUM, "Unobtanium Signed Message:\n"),
+                    Map.entry(CoinTicker.PKOIN, "Pocketcoin Signed Message:\n"),
+                    Map.entry(CoinTicker.DIGIBYTE, "DigiByte Signed Message:\n"),
+                    Map.entry(CoinTicker.RAVENCOIN, "Raven Signed Message:\n"),
+                    Map.entry(CoinTicker.DOGECOIN, "Dogecoin Signed Message:\n"),
+                    Map.entry(CoinTicker.SYSCOIN, "Syscoin Signed Message:\n"),
+                    Map.entry(CoinTicker.VERGE, "VERGE Signed Message:\n"));
 
     private SignedMessages() {}
 
@@ -37,21 +54,11 @@ final class SignedMessages {
         if (ticker == null) {
             throw new IllegalArgumentException("a ticker is required");
         }
-        return switch (ticker) {
-            case BLOCKNET -> "Blocknet Signed Message:\n";
-            case BITCOIN, BITCOIN_CASH -> "Bitcoin Signed Message:\n";
-            case LITECOIN -> "Litecoin Signed Message:\n";
-            case PIVX -> "DarkNet Signed Message:\n";
-            case DASHCOIN -> "DarkCoin Signed Message:\n";
-            case UNOBTANIUM -> "Unobtanium Signed Message:\n";
-            case PKOIN -> "Pocketcoin Signed Message:\n";
-            case DIGIBYTE -> "DigiByte Signed Message:\n";
-            case RAVENCOIN -> "Raven Signed Message:\n";
-            case DOGECOIN -> "Dogecoin Signed Message:\n";
-            case SYSCOIN -> "Syscoin Signed Message:\n";
-            case VERGE -> "VERGE Signed Message:\n";
-            default -> throw new IllegalArgumentException("no signed-message header for " + ticker);
-        };
+        String header = HEADERS.get(ticker);
+        if (header == null) {
+            throw new IllegalArgumentException("no signed-message header for " + ticker);
+        }
+        return header;
     }
 
     /** A base64 compact signature over {@code message}, as Bitcoin wallets produce it. */

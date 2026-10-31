@@ -82,38 +82,15 @@ public class CoinConfigRpcTest {
         JsonArray arr = resp.getAsJsonArray("result");
         assertFalse(arr.isEmpty());
         assertEquals(2, arr.size());
-        String prev = "";
+        String previous = "";
         for (int i = 0; i < arr.size(); i++) {
-            JsonObject o = arr.get(i).getAsJsonObject();
-            for (String k :
-                    new String[] {
-                        "ticker",
-                        "blockchain",
-                        "verId",
-                        "addressPrefix",
-                        "scriptPrefix",
-                        "secretPrefix",
-                        "coin",
-                        "feePerByte",
-                        "minTxFee",
-                        "port",
-                        "dustAmount"
-                    }) {
-                assertTrue(o.has(k), "missing " + k);
-            }
-            if (!o.get("dustAmount").isJsonNull()) {
-                assertTrue(o.get("dustAmount").getAsLong() >= 0);
-            }
-            String t = o.get("ticker").getAsString();
-            assertTrue(t.compareTo(prev) >= 0, "not sorted " + prev + ">" + t);
-            prev = t;
+            JsonObject coin = arr.get(i).getAsJsonObject();
+            assertFullDto(coin);
+            String ticker = coin.get("ticker").getAsString();
+            assertTrue(ticker.compareTo(previous) >= 0, "not sorted " + previous + ">" + ticker);
+            previous = ticker;
         }
-        JsonObject ltc = null;
-        for (int i = 0; i < arr.size(); i++) {
-            if ("LTC".equals(arr.get(i).getAsJsonObject().get("ticker").getAsString())) {
-                ltc = arr.get(i).getAsJsonObject();
-            }
-        }
+        JsonObject ltc = findByTicker(arr, "LTC");
         assertNotNull(ltc);
         assertEquals(48, ltc.get("addressPrefix").getAsInt());
         assertEquals(50, ltc.get("scriptPrefix").getAsInt());
@@ -153,5 +130,37 @@ public class CoinConfigRpcTest {
         p.add("extra");
         assertEquals(-1, call("getCoins", p).getAsJsonObject("error").get("code").getAsInt());
         assertEquals(-1, call("getCoins", null).getAsJsonObject("error").get("code").getAsInt());
+    }
+
+    private static void assertFullDto(JsonObject coin) {
+        for (String key :
+                new String[] {
+                    "ticker",
+                    "blockchain",
+                    "verId",
+                    "addressPrefix",
+                    "scriptPrefix",
+                    "secretPrefix",
+                    "coin",
+                    "feePerByte",
+                    "minTxFee",
+                    "port",
+                    "dustAmount"
+                }) {
+            assertTrue(coin.has(key), "missing " + key);
+        }
+        if (!coin.get("dustAmount").isJsonNull()) {
+            assertTrue(coin.get("dustAmount").getAsLong() >= 0);
+        }
+    }
+
+    private static JsonObject findByTicker(JsonArray arr, String ticker) {
+        for (int i = 0; i < arr.size(); i++) {
+            JsonObject coin = arr.get(i).getAsJsonObject();
+            if (ticker.equals(coin.get("ticker").getAsString())) {
+                return coin;
+            }
+        }
+        return null;
     }
 }

@@ -9,6 +9,7 @@ import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
+import io.xlite.daemon.app.testing.CoinFixture;
 import io.xlite.daemon.app.util.UTXO;
 
 import org.bitcoinj.core.AddressFormatException;
@@ -47,11 +48,36 @@ class WalletHelperSendTest {
     static void loadRegistry() {
         CoinConfigRegistry.loadForTest(
                 Map.of(
-                        "LTC", fixture("LTC", "Litecoin", 48, 50, 176, 100000000L, 9332),
-                        "DASH", fixture("DASH", "Dash", 76, 16, 204, 100000000L, 9998),
-                        "PIVX", fixture("PIVX", "PIVX", 30, 13, 212, 100000000L, 51474),
-                        "BLOCK", fixture("BLOCK", "Blocknet", 26, 28, 154, 100000000L, 41414),
-                        "XVG", fixture("XVG", "Verge", 30, 33, 158, 1000000L, 20102)));
+                        "LTC",
+                        CoinFixture.coin("LTC", "Litecoin")
+                                .prefixes(48, 50, 176)
+                                .fees(10, 5_000)
+                                .build(),
+                        "DASH",
+                        CoinFixture.coin("DASH", "Dash")
+                                .prefixes(76, 16, 204)
+                                .fees(10, 5_000)
+                                .port(9998)
+                                .build(),
+                        "PIVX",
+                        CoinFixture.coin("PIVX", "PIVX")
+                                .prefixes(30, 13, 212)
+                                .fees(10, 5_000)
+                                .port(51474)
+                                .build(),
+                        "BLOCK",
+                        CoinFixture.coin("BLOCK", "Blocknet")
+                                .prefixes(26, 28, 154)
+                                .fees(10, 5_000)
+                                .port(41414)
+                                .build(),
+                        "XVG",
+                        CoinFixture.coin("XVG", "Verge")
+                                .prefixes(30, 33, 158)
+                                .coinFactor(1_000_000L)
+                                .fees(10, 5_000)
+                                .port(20102)
+                                .build()));
     }
 
     @AfterAll
@@ -66,28 +92,6 @@ class WalletHelperSendTest {
      */
     private static NetworkParameters paramsFor(String ticker) {
         return ConfigurableNetworkParameters.from(CoinConfigRegistry.get(ticker));
-    }
-
-    private static CoinConfig fixture(
-            String ticker,
-            String blockchain,
-            int addrPrefix,
-            int scriptPrefix,
-            int secretPrefix,
-            long coin,
-            int port) {
-        Map<String, String> entries = new LinkedHashMap<>();
-        entries.put("AddressPrefix", Integer.toString(addrPrefix));
-        entries.put("ScriptPrefix", Integer.toString(scriptPrefix));
-        entries.put("SecretPrefix", Integer.toString(secretPrefix));
-        entries.put("COIN", Long.toString(coin));
-        entries.put("FeePerByte", "10");
-        entries.put("MinTxFee", "5000");
-        entries.put("Port", Integer.toString(port));
-        entries.put("DustAmount", "0");
-        entries.put("TxVersion", "1");
-        entries.put("Title", blockchain);
-        return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", entries);
     }
 
     /**
@@ -180,7 +184,14 @@ class WalletHelperSendTest {
         // path production uses. Every other fixture here is 8-decimal, where a
         // hardcoded 1e8 divisor happens to give the right answer.
         Map<String, CoinConfig> cfgs = new LinkedHashMap<>();
-        cfgs.put("PIVX", fixture("PIVX", "PIVX", 30, 13, 212, 1_000_000L, 51474));
+        cfgs.put(
+                "PIVX",
+                CoinFixture.coin("PIVX", "PIVX")
+                        .prefixes(30, 13, 212)
+                        .coinFactor(1_000_000L)
+                        .fees(10, 5_000)
+                        .port(51474)
+                        .build());
         CoinConfigRegistry.loadForTest(cfgs);
         try {
             NetworkParameters params = paramsFor("PIVX");

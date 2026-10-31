@@ -63,6 +63,19 @@ public class HTTPClientUtxoEvictionTest {
         ConfigHelper.setConfigDir(tempDir.toString());
         CoinInstance.getCoinInstances().clear();
         CoinInstance.setAddressDiscoveryEnabled(false);
+        installCoinConfig();
+        coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
+        assertNotNull(coin);
+        coin.getConfigHelper().setAddressCount(2);
+        startWallet(coin);
+        List<AddressBalance> pairs = coin.getAddressKeyPairs();
+        assertTrue(pairs.size() >= 2);
+        addrA = pairs.get(0).getAddress().toBase58();
+        addrB = pairs.get(1).getAddress().toBase58();
+        assertNotEquals(addrA, addrB);
+    }
+
+    private void installCoinConfig() {
         Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs = new LinkedHashMap<>();
         Map<String, String> block = new LinkedHashMap<>();
         block.put("AddressPrefix", "26");
@@ -82,20 +95,15 @@ public class HTTPClientUtxoEvictionTest {
         if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {
             io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadForTest(cfgs);
         }
-        coin = CoinInstance.getInstance(CoinTicker.BLOCKNET);
-        assertNotNull(coin);
-        coin.getConfigHelper().setAddressCount(2);
-        char[] pw = PASSWORD.toCharArray();
+    }
+
+    private static void startWallet(CoinInstance coin) {
+        char[] password = PASSWORD.toCharArray();
         try {
-            assertNull(coin.init(pw, MNEMONIC, false));
+            assertNull(coin.init(password, MNEMONIC, false));
         } finally {
-            Arrays.fill(pw, '\0');
+            Arrays.fill(password, '\0');
         }
-        List<AddressBalance> pairs = coin.getAddressKeyPairs();
-        assertTrue(pairs.size() >= 2);
-        addrA = pairs.get(0).getAddress().toBase58();
-        addrB = pairs.get(1).getAddress().toBase58();
-        assertNotEquals(addrA, addrB);
     }
 
     @AfterEach

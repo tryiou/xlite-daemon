@@ -312,16 +312,9 @@ final class RawTransactionMethods {
         if (params.size() < 1 || params.size() > 3) {
             return RpcResponse.usage(SIGN_USAGE);
         }
-        Transaction transaction;
-        long preservedNTime = -1;
+        SigningRequest request;
         try {
-            byte[] rawBytes = Hex.decode(params.get(0).getAsString());
-            if (TxWire.hasTimeField(coin.getTicker())) {
-                // Preserve the incoming nTime across re-signing.
-                preservedNTime = TxTimeField.parentNTime(rawBytes);
-            }
-            transaction =
-                    TxWire.parseForCoin(coin.getTicker(), coin.getNetworkParameters(), rawBytes);
+            request = decodeForSigning(params);
         } catch (RuntimeException e) {
             LOGGER.warning(
                     "[http-server-handler] Error decoding raw tx in signrawtransaction for "
@@ -331,14 +324,9 @@ final class RawTransactionMethods {
             return invalidTransaction();
         }
 
-        Transaction signed = CoinTransactions.forSigning(coin.getNetworkParameters(), transaction);
-        for (TransactionOutput output : transaction.getOutputs()) {
-            signed.addOutput(output);
-        }
-
         SigningInputs inputs;
         try {
-            inputs = collectSigningInputs(transaction);
+            inputs = collectSigningInputs(request.transaction());
         } catch (RuntimeException e) {
             LOGGER.warning(
                     "[http-server-handler] signrawtransaction aborted with unsigned inputs for "
@@ -350,7 +338,7 @@ final class RawTransactionMethods {
 
         long signedNTime;
         try {
-            signedNTime = nTimes.forSigning(preservedNTime, inputTxids(inputs));
+            signedNTime = nTimes.forSigning(request.preservedNTime(), inputTxids(inputs));
         } catch (RuntimeException e) {
             LOGGER.warning(
                     "[http-server-handler] signrawtransaction could not resolve nTime for "
@@ -360,6 +348,11 @@ final class RawTransactionMethods {
             return RpcResponse.error(-6, "Cannot resolve nTime: " + e.getMessage());
         }
 
+        Transaction signed =
+                CoinTransactions.forSigning(coin.getNetworkParameters(), request.transaction());
+        for (TransactionOutput output : request.transaction().getOutputs()) {
+            signed.addOutput(output);
+        }
         try {
             // All inputs are attached before any signature is computed: the preimage covers
             // every input, so signing as we went would invalidate each earlier signature.
@@ -372,12 +365,25 @@ final class RawTransactionMethods {
                             + e.getMessage());
             return invalidTransaction();
         }
+        return RpcResponse.ok(signedTransaction(signed, signedNTime));
+    }
 
+    private JsonObject signedTransaction(Transaction signed, long signedNTime) {
         JsonObject result = new JsonObject();
         result.addProperty(
                 "hex", TxWire.serializeForBroadcast(coin.getTicker(), signed, signedNTime));
         result.addProperty("complete", true);
-        return RpcResponse.ok(result);
+        return result;
+    }
+
+    /** The transaction to sign, and the nTime it already carries (or -1 for a standard chain). */
+    private SigningRequest decodeForSigning(JsonArray params) {
+        byte[] rawBytes = Hex.decode(params.get(0).getAsString());
+        long preservedNTime =
+                TxWire.hasTimeField(coin.getTicker()) ? TxTimeField.parentNTime(rawBytes) : -1;
+        return new SigningRequest(
+                TxWire.parseForCoin(coin.getTicker(), coin.getNetworkParameters(), rawBytes),
+                preservedNTime);
     }
 
     private SigningInputs collectSigningInputs(Transaction transaction) {
@@ -410,11 +416,9 @@ final class RawTransactionMethods {
             TxTimeFieldSigner.addSignedInputs(
                     coin.getNetworkParameters(),
                     signed,
-                    inputs.keys(),
-                    inputs.outPoints(),
-                    inputs.scripts(),
-                    Transaction.SigHash.ALL,
-                    signedNTime);
+                    new TxTimeFieldSigner.InputsToSign(
+                            inputs.keys(), inputs.outPoints(), inputs.scripts()),
+                    new TxTimeFieldSigner.SignaturePolicy(Transaction.SigHash.ALL, signedNTime));
             return;
         }
         for (int i = 0; i < inputs.keys().size(); i++) {
@@ -481,6 +485,9 @@ final class RawTransactionMethods {
 
     /** One recipient of a {@code createrawtransaction} request. */
     private record OutputEntry(String address, double amount) {}
+
+    /** A transaction to sign and the nTime it already carries. */
+    private record SigningRequest(Transaction transaction, long preservedNTime) {}
 
     /** The keys, outpoints and scripts needed to sign every input of a transaction. */
     private record SigningInputs(

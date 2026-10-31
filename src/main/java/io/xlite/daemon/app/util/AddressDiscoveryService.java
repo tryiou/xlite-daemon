@@ -111,81 +111,84 @@ public final class AddressDiscoveryService {
     public int discoverAddressCount() {
         long startTime = System.currentTimeMillis();
         int currentAddressCount = configHelper.getAddressCount();
-
         LOGGER.fine(getLogPrefix() + " Starting sequential batch scan");
-
         try {
             if (isTimedOut(startTime)) {
                 return currentAddressCount;
             }
-
-            int lastNonEmptyBatch = -1;
-            List<UTXO> lastBatchUtxos = null;
-            int consecutiveErrors = 0;
-
-            for (int i = 0; i < NUM_BATCHES; i++) {
-                if (isTimedOut(startTime)) {
-                    LOGGER.warning(getLogPrefix() + " Timeout at batch " + i);
-                    break;
-                }
-
-                List<UTXO> utxos = probeBatch(i);
-
-                if (utxos == null) {
-                    consecutiveErrors++;
-                    if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                        LOGGER.warning(
-                                getLogPrefix()
-                                        + " Aborting: "
-                                        + MAX_CONSECUTIVE_ERRORS
-                                        + " consecutive HTTP failures");
-                        break;
-                    }
-                    continue;
-                }
-
-                consecutiveErrors = 0;
-                if (utxos.isEmpty()) {
-                    break;
-                }
-
-                lastNonEmptyBatch = i;
-                lastBatchUtxos = utxos;
-            }
-
-            if (lastNonEmptyBatch < 0) {
+            BatchScan scan = scanBatches(startTime);
+            if (scan.lastNonEmptyBatch() < 0) {
                 LOGGER.info(getLogPrefix() + " No UTXOs found");
                 return currentAddressCount;
             }
-
-            // Find exact highest funded address in the last non-empty batch
-            int batchStart = lastNonEmptyBatch * BATCH_SIZE;
-            List<AddressBalance> batch = deriveAddressRange(batchStart, BATCH_SIZE);
-
-            int lastUsedInBatch = findLastUsedIndexInBatch(batch, lastBatchUtxos);
-            int discoveredCount = batchStart + lastUsedInBatch + 1;
-
-            for (AddressBalance addr : batch) {
-                addr.clearPrivateKey();
-            }
-
+            int discoveredCount = discoveredCount(scan);
             LOGGER.info(
                     getLogPrefix()
                             + " Discovery complete: lastBatch="
-                            + lastNonEmptyBatch
+                            + scan.lastNonEmptyBatch()
                             + ", count="
                             + discoveredCount
                             + ", time="
                             + (System.currentTimeMillis() - startTime)
                             + "ms");
-
             return discoveredCount;
-
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             LOGGER.warning(getLogPrefix() + " Error during discovery" + e.getMessage());
             return currentAddressCount;
         }
     }
+
+    /**
+     * Scans batches from 0 until the first empty one, a timeout, or too many consecutive failures.
+     * Keeps the last non-empty batch, which is where the exact address count is found.
+     */
+    private BatchScan scanBatches(long startTime) {
+        int lastNonEmptyBatch = -1;
+        List<UTXO> lastBatchUtxos = null;
+        int consecutiveErrors = 0;
+        for (int batchIndex = 0; batchIndex < NUM_BATCHES; batchIndex++) {
+            if (isTimedOut(startTime)) {
+                LOGGER.warning(getLogPrefix() + " Timeout at batch " + batchIndex);
+                return new BatchScan(lastNonEmptyBatch, lastBatchUtxos);
+            }
+            List<UTXO> utxos = probeBatch(batchIndex);
+            if (utxos == null) {
+                consecutiveErrors++;
+                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    LOGGER.warning(
+                            getLogPrefix()
+                                    + " Aborting: "
+                                    + MAX_CONSECUTIVE_ERRORS
+                                    + " consecutive HTTP failures");
+                    return new BatchScan(lastNonEmptyBatch, lastBatchUtxos);
+                }
+                continue;
+            }
+            consecutiveErrors = 0;
+            if (utxos.isEmpty()) {
+                return new BatchScan(lastNonEmptyBatch, lastBatchUtxos);
+            }
+            lastNonEmptyBatch = batchIndex;
+            lastBatchUtxos = utxos;
+        }
+        return new BatchScan(lastNonEmptyBatch, lastBatchUtxos);
+    }
+
+    /** The index of the last funded address plus one, found in the last non-empty batch. */
+    private int discoveredCount(BatchScan scan) {
+        int batchStart = scan.lastNonEmptyBatch() * BATCH_SIZE;
+        List<AddressBalance> batch = deriveAddressRange(batchStart, BATCH_SIZE);
+        try {
+            return batchStart + findLastUsedIndexInBatch(batch, scan.lastBatchUtxos()) + 1;
+        } finally {
+            for (AddressBalance address : batch) {
+                address.clearPrivateKey();
+            }
+        }
+    }
+
+    /** The last batch that held UTXOs, or -1 when none did. */
+    private record BatchScan(int lastNonEmptyBatch, List<UTXO> lastBatchUtxos) {}
 
     /**
      * Probe a batch for UTXOs.
@@ -262,40 +265,11 @@ public final class AddressDiscoveryService {
         List<UTXO> utxos = new ArrayList<>();
         for (JsonElement element : utxoResponse) {
             try {
-                JsonObject utxoJson = element.getAsJsonObject();
-
-                JsonElement addressElement = utxoJson.get("address");
-                JsonElement txidElement = utxoJson.get("txid");
-                JsonElement voutElement = utxoJson.get("vout");
-                JsonElement confirmationsElement = utxoJson.get("confirmations");
-                JsonElement valueElement = utxoJson.get("value");
-
-                if (addressElement == null
-                        || txidElement == null
-                        || voutElement == null
-                        || confirmationsElement == null
-                        || valueElement == null
-                        || addressElement.isJsonNull()
-                        || txidElement.isJsonNull()
-                        || voutElement.isJsonNull()
-                        || confirmationsElement.isJsonNull()
-                        || valueElement.isJsonNull()) {
-                    LOGGER.warning(
-                            getLogPrefix() + " Skipping invalid UTXO - missing required fields");
-                    continue;
+                UTXO utxo = parseUtxo(element.getAsJsonObject());
+                if (utxo != null) {
+                    utxos.add(utxo);
                 }
-
-                UTXO utxo =
-                        new UTXO(
-                                coinInstance.getTicker(),
-                                addressElement.getAsString(),
-                                txidElement.getAsString(),
-                                voutElement.getAsInt(),
-                                confirmationsElement.getAsInt(),
-                                UTXO.baseUnitsForTicker(
-                                        coinInstance.getTicker(), valueElement.getAsDouble()));
-                utxos.add(utxo);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 LOGGER.warning(
                         getLogPrefix()
                                 + " Failed to parse UTXO response element: "
@@ -303,6 +277,39 @@ public final class AddressDiscoveryService {
             }
         }
         return utxos;
+    }
+
+    /** The UTXO a provider row describes, or null when the row is missing a required field. */
+    private UTXO parseUtxo(JsonObject utxoJson) {
+        String address = requiredString(utxoJson, "address");
+        String txid = requiredString(utxoJson, "txid");
+        JsonElement vout = utxoJson.get("vout");
+        JsonElement confirmations = utxoJson.get("confirmations");
+        JsonElement value = utxoJson.get("value");
+        if (address == null
+                || txid == null
+                || isNull(vout)
+                || isNull(confirmations)
+                || isNull(value)) {
+            LOGGER.warning(getLogPrefix() + " Skipping invalid UTXO - missing required fields");
+            return null;
+        }
+        return new UTXO(
+                coinInstance.getTicker(),
+                address,
+                txid,
+                vout.getAsInt(),
+                confirmations.getAsInt(),
+                UTXO.baseUnitsForTicker(coinInstance.getTicker(), value.getAsDouble()));
+    }
+
+    private static String requiredString(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        return isNull(element) ? null : element.getAsString();
+    }
+
+    private static boolean isNull(JsonElement element) {
+        return element == null || element.isJsonNull();
     }
 
     /**

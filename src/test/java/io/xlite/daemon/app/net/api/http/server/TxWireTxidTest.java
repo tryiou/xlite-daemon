@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.net.CoinTicker;
+import io.xlite.daemon.app.testing.CoinFixture;
 import io.xlite.daemon.app.util.TxTimeField;
 
 import org.bitcoinj.core.Coin;
@@ -38,30 +39,16 @@ class TxWireTxidTest {
         // The time-field flag lives in the coin's configuration, so deciding
         // whether it applies needs a loaded registry.
         java.util.Map<String, CoinConfig> cfgs = new java.util.LinkedHashMap<>();
-        cfgs.put("LTC", config("LTC", "Litecoin", 48, 50, 176, false));
-        cfgs.put("XVG", config("XVG", "Verge", 30, 33, 158, true));
+        cfgs.put("LTC", CoinFixture.coin("LTC", "Litecoin").prefixes(48, 50, 176).build());
+        cfgs.put(
+                "XVG",
+                CoinFixture.coin("XVG", "Verge").prefixes(30, 33, 158).timeField(true).build());
         io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadForTest(cfgs);
     }
 
     @org.junit.jupiter.api.AfterAll
     static void clearRegistry() {
         io.xlite.daemon.app.coinconfig.CoinConfigRegistry.resetForTest();
-    }
-
-    private static CoinConfig config(
-            String ticker, String name, int addr, int p2sh, int dpk, boolean timeField) {
-        java.util.Map<String, String> e = new java.util.LinkedHashMap<>();
-        e.put("AddressPrefix", Integer.toString(addr));
-        e.put("ScriptPrefix", Integer.toString(p2sh));
-        e.put("SecretPrefix", Integer.toString(dpk));
-        e.put("COIN", "100000000");
-        e.put("FeePerByte", "2");
-        e.put("MinTxFee", "678");
-        e.put("Port", "9332");
-        e.put("DustAmount", "0");
-        e.put("TxVersion", "1");
-        e.put("TxWithTimeField", Boolean.toString(timeField));
-        return new CoinConfig(ticker, name, ticker.toLowerCase() + "--test", e);
     }
 
     private static byte[] standardTransaction(NetworkParameters params, byte[] hash160) {

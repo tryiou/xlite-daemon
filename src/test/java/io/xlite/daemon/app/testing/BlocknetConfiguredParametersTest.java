@@ -88,15 +88,11 @@ class BlocknetConfiguredParametersTest extends TestHelper {
     private static final int SECRET_PREFIX = 99;
 
     private static CoinConfig blockConfig() {
-        return testCoinConfig(
-                "BLOCK",
-                "Blocknet",
-                ADDRESS_PREFIX,
-                P2SH_PREFIX,
-                SECRET_PREFIX,
-                41414,
-                FEE_PER_BYTE,
-                MIN_TX_FEE);
+        return CoinFixture.coin("BLOCK", "Blocknet")
+                .prefixes(ADDRESS_PREFIX, P2SH_PREFIX, SECRET_PREFIX)
+                .fees(FEE_PER_BYTE, MIN_TX_FEE)
+                .port(41414)
+                .build();
     }
 
     private CoinInstance initializedBlocknet() {
@@ -155,16 +151,12 @@ class BlocknetConfiguredParametersTest extends TestHelper {
         CoinConfigRegistry.loadForTest(
                 Map.of(
                         "BLOCK",
-                        testCoinConfig(
-                                "BLOCK",
-                                "Blocknet",
-                                ADDRESS_PREFIX,
-                                P2SH_PREFIX,
-                                SECRET_PREFIX,
-                                41414,
-                                FEE_PER_BYTE,
-                                MIN_TX_FEE,
-                                sixDecimals)));
+                        CoinFixture.coin("BLOCK", "Blocknet")
+                                .prefixes(ADDRESS_PREFIX, P2SH_PREFIX, SECRET_PREFIX)
+                                .coinFactor(sixDecimals)
+                                .fees(FEE_PER_BYTE, MIN_TX_FEE)
+                                .port(41414)
+                                .build()));
         ConfigurableNetworkParameters fromConfig =
                 ConfigurableNetworkParameters.from(CoinConfigRegistry.get("BLOCK"));
         BlocknetNetworkParameters peer = new BlocknetNetworkParameters();
@@ -193,16 +185,12 @@ class BlocknetConfiguredParametersTest extends TestHelper {
         CoinConfigRegistry.loadForTest(
                 Map.of(
                         "BLOCK",
-                        testCoinConfig(
-                                "BLOCK",
-                                "Blocknet",
-                                ADDRESS_PREFIX,
-                                P2SH_PREFIX,
-                                SECRET_PREFIX,
-                                41414,
-                                FEE_PER_BYTE,
-                                MIN_TX_FEE,
-                                unrepresentable)));
+                        CoinFixture.coin("BLOCK", "Blocknet")
+                                .prefixes(ADDRESS_PREFIX, P2SH_PREFIX, SECRET_PREFIX)
+                                .coinFactor(unrepresentable)
+                                .fees(FEE_PER_BYTE, MIN_TX_FEE)
+                                .port(41414)
+                                .build()));
         CoinInstance blocknet = CoinInstance.getInstance(CoinTicker.BLOCKNET);
         assertNotNull(blocknet, "BLOCKNET instance");
         char[] pw = getPassword().toCharArray();
@@ -226,7 +214,12 @@ class BlocknetConfiguredParametersTest extends TestHelper {
         // all would send the reader looking for a fetch or cache problem instead
         // of a coin that is genuinely not configured.
         CoinConfigRegistry.loadForTest(
-                Map.of("LTC", testCoinConfig("LTC", "Litecoin", 48, 50, 176, 9332, 10L, 5_000L)));
+                Map.of(
+                        "LTC",
+                        CoinFixture.coin("LTC", "Litecoin")
+                                .prefixes(48, 50, 176)
+                                .fees(10L, 5_000L)
+                                .build()));
         IllegalStateException e =
                 assertThrows(IllegalStateException.class, () -> CoinConfigRegistry.get("BLOCK"));
         // Qualified: TestHelper declares its own single-argument assertTrue,

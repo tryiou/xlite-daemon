@@ -12,6 +12,7 @@ import com.google.gson.JsonPrimitive;
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
+import io.xlite.daemon.app.wallet.WalletHelper;
 
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
@@ -68,6 +69,10 @@ class SendTransactionMethodTest {
 
     private static NetworkParameters xvgParams() {
         return ConfigurableNetworkParameters.from(CoinConfigRegistry.get("XVG"));
+    }
+
+    private static WalletHelper.BuiltTransaction built(long feeSats, Transaction transaction) {
+        return new WalletHelper.BuiltTransaction(transaction, feeSats, WalletHelper.NO_NTIME);
     }
 
     private static JsonArray params(Object... values) {
@@ -176,7 +181,8 @@ class SendTransactionMethodTest {
         String hex = bytesToHex(tx.bitcoinSerialize());
 
         JsonObject result =
-                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(
+                        params, XVG_COIN_UNIT, hex, built(100_000L, tx));
 
         assertTrue(result.get("dryRun").getAsBoolean());
         assertEquals(hex, result.get("hex").getAsString());
@@ -204,7 +210,8 @@ class SendTransactionMethodTest {
         // formula; the wallet actually reserved for a change input and
         // charged the 120000 it passed in. The payload must show the latter.
         JsonObject result =
-                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 120_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(
+                        params, XVG_COIN_UNIT, hex, built(120_000L, tx));
 
         assertEquals(120_000L, result.get("feeSats").getAsLong());
         assertEquals(0.12, result.get("fee").getAsDouble(), 1e-9);
@@ -227,7 +234,8 @@ class SendTransactionMethodTest {
         // 100000 base units of a 1e6-divisor coin is 0.1 XVG. With a
         // hardcoded 1e8 divisor this would report 0.001.
         JsonObject result =
-                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(
+                        params, XVG_COIN_UNIT, hex, built(100_000L, tx));
 
         assertEquals(0.1, result.get("fee").getAsDouble(), 1e-9);
     }
@@ -249,7 +257,8 @@ class SendTransactionMethodTest {
         String hex = bytesToHex(tx.bitcoinSerialize());
 
         JsonObject result =
-                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(
+                        params, XVG_COIN_UNIT, hex, built(100_000L, tx));
 
         assertEquals(2, result.get("inputs").getAsInt());
         assertEquals(1, result.get("outputs").getAsInt());

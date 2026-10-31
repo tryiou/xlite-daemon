@@ -1,10 +1,11 @@
 package io.xlite.daemon.app.net.api.http.master;
 
-import com.google.common.base.Preconditions;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.subgraph.orchid.encoders.Base64;
 
 import io.netty.buffer.ByteBuf;
@@ -33,7 +34,10 @@ import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.SecureTokens;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Comparator;
 import java.util.Locale;
+import java.util.Map;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -41,7 +45,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-    private ConfigHelper configHelper;
+    private final ConfigHelper configHelper;
 
     public HTTPServerHandler() {
         configHelper = new ConfigHelper(ConfigHelper.MASTER_TICKER);
@@ -75,369 +79,284 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
-        boolean successfulAuth = false;
-        HttpResponseStatus status = HttpResponseStatus.OK;
-        JsonObject response = new JsonObject();
-
-        if (request != null) {
-            HttpHeaders httpHeaders = request.headers();
-
-            if (HttpUtil.is100ContinueExpected(request)) {
-                send100Continue(ctx);
-            }
-
-            String headerUser;
-            String headerPass;
-            if (httpHeaders.contains("Authorization")) {
-                String authorization = httpHeaders.get("Authorization");
-
-                if (authorization != null
-                        && authorization.toLowerCase(Locale.ROOT).startsWith("basic")) {
-                    String base64Credentials = authorization.substring("Basic".length()).trim();
-                    byte[] credDecoded = Base64.decode(base64Credentials);
-                    String credentials = new String(credDecoded, StandardCharsets.UTF_8);
-                    final String[] values = credentials.split(":", 2);
-                    if (values.length < 2) {
-                        LOGGER.warning("[http-server-handler] Malformed Basic Auth header");
-                    } else {
-                        headerUser = values[0];
-                        headerPass = values[1];
-
-                        if (headerUser.equals(configHelper.getRpcUsername())
-                                && headerPass.equals(configHelper.getRpcPassword())) {
-                            successfulAuth = true;
-                            LOGGER.finer("[http-server-handler] Successful Auth");
-                        }
-                    }
-                }
-            }
-
-            if (!request.uri().equals("/")) {
-                JsonObject onlyServerRootJSON = new JsonObject();
-                onlyServerRootJSON.addProperty("code", -1002);
-                onlyServerRootJSON.addProperty(
-                        "message", "Only the server root ('/') is being served.");
-
-                response.add("error", onlyServerRootJSON);
-                response.add("result", JsonNull.INSTANCE);
-                status = HttpResponseStatus.BAD_REQUEST;
-            }
-
-            if (!HttpMethod.POST.equals(request.method())) {
-                JsonObject onlyPostAllowedJSON = new JsonObject();
-
-                onlyPostAllowedJSON.addProperty("code", -1003);
-                onlyPostAllowedJSON.addProperty("message", "Only HTTP POST is accepted.");
-
-                response.add("error", onlyPostAllowedJSON);
-                response.add("result", JsonNull.INSTANCE);
-                status = HttpResponseStatus.BAD_REQUEST;
-            }
-
-            if (!successfulAuth) {
-                JsonObject onlyServerRootJSON = new JsonObject();
-                onlyServerRootJSON.addProperty("code", -1111);
-                onlyServerRootJSON.addProperty("message", "Unauthorized!");
-
-                response.add("error", onlyServerRootJSON);
-                response.add("result", JsonNull.INSTANCE);
-                status = HttpResponseStatus.FORBIDDEN;
-            }
+        if (request == null) {
+            return;
+        }
+        if (HttpUtil.is100ContinueExpected(request)) {
+            send100Continue(ctx);
         }
 
-        if (!HttpResponseStatus.OK.equals(status)) {
-            ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
-            FullHttpResponse httpResponse =
-                    new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
-
-            writeResponse(ctx, httpResponse, request);
-            ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+        Rejection rejection = rejection(request);
+        if (rejection != null) {
+            writeAndClose(
+                    ctx, request, rejection.status(), error(rejection.code(), rejection.message()));
             return;
         }
 
-        if (request != null) {
-            String content = request.content().toString(CharsetUtil.UTF_8);
-            JsonObject jsonReq = null;
-
-            try {
-                jsonReq = JsonParser.parseString(content).getAsJsonObject();
-
-                Preconditions.checkNotNull(jsonReq);
-
-                if (!jsonReq.has("method") || !jsonReq.has("params")) {
-                    ctx.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
-                    throw new IllegalArgumentException("Bad JSON-RPC request by client.");
-                }
-            } catch (Exception e) {
-                LOGGER.info("Failed Content: " + content);
-                LOGGER.warning("[http-master] Failed to parse JSON-RPC request" + e.getMessage());
-                JsonObject errorParsingJSON = new JsonObject();
-                errorParsingJSON.addProperty("code", -1001);
-                errorParsingJSON.addProperty("message", "Error parsing JSON.");
-
-                response.add("error", errorParsingJSON);
-                response.add("result", JsonNull.INSTANCE);
-                if (e instanceof IllegalArgumentException) {
-                    LOGGER.finer(
-                            "[http-server-handler] WARNING: Client sent valid JSON, but did not"
-                                    + " specify method and/or parameters!");
-                } else {
-                    LOGGER.finer("[http-server-handler] WARNING: Client sent invalid JSON!");
-                }
-                status = HttpResponseStatus.BAD_REQUEST;
-            }
-
-            if (HttpResponseStatus.OK.equals(status)) {
-                Preconditions.checkNotNull(jsonReq);
-
-                String method = jsonReq.get("method").getAsString();
-                JsonArray params = jsonReq.get("params").getAsJsonArray();
-
-                // Master surface handles wallet management — params may contain
-                // passwords; never log them verbatim. Ping is high-frequency liveness.
-                String methodLower = method == null ? null : method.toLowerCase(Locale.ROOT);
-                if ("ping".equals(methodLower)) {
-                    LOGGER.finer(
-                            "[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
-                } else {
-                    LOGGER.info(
-                            "[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
-                }
-
-                response = getResponse(method, params);
-                LOGGER.finer(response.toString());
-            } else {
-                ByteBuf responseContent =
-                        Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
-                FullHttpResponse httpResponse =
-                        new DefaultFullHttpResponse(
-                                request.protocolVersion(), status, responseContent);
-
-                writeResponse(ctx, httpResponse, request);
-                ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-                return;
-            }
-
-            // A FullHttpRequest is always its own LastHttpContent, so this is the
-            // only write for a complete request.
-            ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
-
-            FullHttpResponse httpResponse =
-                    new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
-
-            if (!writeResponse(ctx, httpResponse, request)) {
-                ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-            }
+        JsonObject jsonRequest;
+        try {
+            jsonRequest = parseRequest(request.content().toString(CharsetUtil.UTF_8));
+        } catch (RuntimeException e) {
+            writeAndClose(
+                    ctx,
+                    request,
+                    HttpResponseStatus.BAD_REQUEST,
+                    parseFailure(request.content().toString(CharsetUtil.UTF_8), e));
+            return;
         }
+
+        String method = jsonRequest.get("method").getAsString();
+        JsonArray params = jsonRequest.get("params").getAsJsonArray();
+        // Master surface handles wallet management — params may contain passwords; never log
+        // them verbatim. Ping is high-frequency liveness.
+        if ("ping".equals(method.toLowerCase(Locale.ROOT))) {
+            LOGGER.finer("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
+        } else {
+            LOGGER.info("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
+        }
+        JsonObject response = getResponse(method, params);
+        LOGGER.finer(response.toString());
+
+        FullHttpResponse httpResponse =
+                new DefaultFullHttpResponse(
+                        request.protocolVersion(),
+                        HttpResponseStatus.OK,
+                        Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8));
+        if (!writeResponse(ctx, httpResponse, request)) {
+            ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+        }
+    }
+
+    /**
+     * The first guard the request fails: authentication, then the HTTP shape. An unauthenticated
+     * caller learns nothing about the wallet beyond the fact that it must authenticate.
+     */
+    private Rejection rejection(FullHttpRequest request) {
+        if (!authorized(request)) {
+            return new Rejection(HttpResponseStatus.FORBIDDEN, -1111, "Unauthorized!");
+        }
+        if (!HttpMethod.POST.equals(request.method())) {
+            return new Rejection(
+                    HttpResponseStatus.BAD_REQUEST, -1003, "Only HTTP POST is accepted.");
+        }
+        if (!request.uri().equals("/")) {
+            return new Rejection(
+                    HttpResponseStatus.BAD_REQUEST,
+                    -1002,
+                    "Only the server root ('/') is being served.");
+        }
+        return null;
+    }
+
+    private boolean authorized(FullHttpRequest request) {
+        HttpHeaders headers = request.headers();
+        if (!headers.contains("Authorization")) {
+            return false;
+        }
+        String authorization = headers.get("Authorization");
+        if (authorization == null || !authorization.toLowerCase(Locale.ROOT).startsWith("basic")) {
+            return false;
+        }
+        String[] values =
+                new String(
+                                Base64.decode(authorization.substring("Basic".length()).trim()),
+                                StandardCharsets.UTF_8)
+                        .split(":", 2);
+        if (values.length < 2) {
+            LOGGER.warning("[http-server-handler] Malformed Basic Auth header");
+            return false;
+        }
+        boolean authenticated =
+                MessageDigest.isEqual(
+                                values[0].getBytes(StandardCharsets.UTF_8),
+                                configHelper.getRpcUsername().getBytes(StandardCharsets.UTF_8))
+                        && MessageDigest.isEqual(
+                                values[1].getBytes(StandardCharsets.UTF_8),
+                                configHelper.getRpcPassword().getBytes(StandardCharsets.UTF_8));
+        if (authenticated) {
+            LOGGER.finer("[http-server-handler] Successful Auth");
+        }
+        return authenticated;
+    }
+
+    /** Parses the envelope, rejecting anything without a method and a parameter array. */
+    private static JsonObject parseRequest(String content) {
+        JsonObject json = JsonParser.parseString(content).getAsJsonObject();
+        if (!json.has("method") || !json.has("params") || !json.get("params").isJsonArray()) {
+            throw new IllegalArgumentException("Bad JSON-RPC request by client.");
+        }
+        return json;
+    }
+
+    private static JsonObject parseFailure(String content, RuntimeException cause) {
+        LOGGER.info("Failed Content: " + content);
+        LOGGER.warning("[http-master] Failed to parse JSON-RPC request" + cause.getMessage());
+        if (cause instanceof IllegalArgumentException) {
+            LOGGER.finer(
+                    "[http-server-handler] WARNING: Client sent valid JSON, but did not specify"
+                            + " method and/or parameters!");
+        } else {
+            LOGGER.finer("[http-server-handler] WARNING: Client sent invalid JSON!");
+        }
+        return error(-1001, "Error parsing JSON.");
     }
 
     public JsonObject getResponse(String method, JsonArray params) {
-        JsonObject response = new JsonObject();
-        boolean shutdownRequested = false;
-
-        String normalizedMethod = method == null ? "" : method.toLowerCase(Locale.ROOT);
-        switch (normalizedMethod) {
+        String normalized = method == null ? "" : method.toLowerCase(Locale.ROOT);
+        switch (normalized) {
             case "reloadconfig":
-                {
-                    if (params.size() != 1) {
-                        response.add("result", JsonNull.INSTANCE);
-                        JsonObject errorJSON = new JsonObject();
-                        errorJSON.addProperty("code", -1);
-                        errorJSON.addProperty(
-                                "message",
-                                "Usage: reloadconfig <token>\n\ntoken (string, required)");
-
-                        response.add("error", errorJSON);
-                        break;
-                    }
-
-                    CoinTicker ticker = CoinTickerUtils.stringToTicker(params.get(0).getAsString());
-                    if (ticker == null) {
-                        JsonObject errorJSON = new JsonObject();
-                        errorJSON.addProperty("code", -1);
-                        errorJSON.addProperty(
-                                "message", "Unknown ticker: " + params.get(0).getAsString());
-                        response.add("error", errorJSON);
-                        break;
-                    }
-
-                    CoinInstance instance = CoinInstance.getInstance(ticker);
-                    if (instance == null) {
-                        JsonObject errorJSON = new JsonObject();
-                        errorJSON.addProperty("code", -1);
-                        errorJSON.addProperty(
-                                "message",
-                                "Coin instance not found for ticker: "
-                                        + CoinTickerUtils.tickerToString(ticker));
-                        response.add("error", errorJSON);
-                        break;
-                    }
-
-                    Thread t =
-                            new Thread(() -> {
-                                try {
-                                    Thread.sleep(500);
-                                    instance.reloadConfig();
-                                } catch (InterruptedException e) {
-                                    LOGGER.warning(
-                                            "[http-master] Interrupted during reloadconfig for "
-                                                    + ticker
-                                                    + ", "
-                                                    + e.getMessage());
-                                }
-                            });
-                    t.setDaemon(true);
-                    t.start();
-
-                    response.addProperty("result", true);
-                    response.add("error", JsonNull.INSTANCE);
-                    break;
-                }
+                return reloadConfig(params);
             case "version":
-                {
-                    response.addProperty("result", Version.CLIENT_VERSION);
-                    response.add("error", JsonNull.INSTANCE);
-                    break;
-                }
-            //			case "reloadconfigs": {
-            //				boolean success = true;
-            //				for (CoinInstance instance : CoinInstance.getCoinInstances()) {
-            //					if (!CoinTickerUtils.isActiveTicker(instance.getTicker()))
-            //						continue;
-            //
-            //					try {
-            //						LOGGER.info(instance.getTicker().toString());
-            //						instance.reloadConfig();
-            //					} catch (Exception e) {
-            //						success = false;
-            //						e.printStackTrace();
-            //					}
-            //				}
-            //
-            //				response.addProperty("result", success);
-            //				response.add("error", JsonNull.INSTANCE);
-            //				break;
-            //			}
+                return ok(new JsonPrimitive(Version.CLIENT_VERSION));
             case "ping":
-                {
-                    response.addProperty("result", 1);
-                    response.add("error", JsonNull.INSTANCE);
-                    break;
-                }
+                return ok(new JsonPrimitive(1));
             case "help":
-                {
-                    String helpString =
-                            "Master JSON-RPC server\n"
-                                    + "This JSON-RPC server is served by "
-                                    + CoinInstance.getVersionString()
-                                    + "\n"
-                                    + "\n"
-                                    + "help - Display the help\n"
-                                    + "\n"
-                                    + "=====RPC Master=====\n"
-                                    + "ping - Lightweight liveness probe (result 1)\n"
-                                    + "stop - Shutdown the server\n"
-                                    + "reloadconfig <token> - Reload configuration for specified"
-                                    + " token\n"
-                                    + "getCoins - List coin configurations (alias listCoins)\n"
-                                    + "version - Get version\n";
-                    //						+ "reloadconfigs - Reload all configuration files\n";
-
-                    response.addProperty("result", helpString);
-                    response.add("error", JsonNull.INSTANCE);
-                    break;
-                }
+                return help();
             case "stop":
-                {
-                    shutdownRequested = true;
-                    response.addProperty("result", "shutting down...");
-                    response.add("error", JsonNull.INSTANCE);
-                    break;
-                }
+                return stop();
             case "getcoins":
             case "listcoins":
-                {
-                    if (params == null || params.size() != 0) {
-                        JsonObject err = new JsonObject();
-                        err.addProperty("code", -1);
-                        err.addProperty("message", "Usage: getCoins");
-                        response.add("error", err);
-                        response.add("result", JsonNull.INSTANCE);
-                        break;
-                    }
-                    // Atomic snapshot — avoids isLoaded()/list() TOCTOU; empty check is the gate.
-                    java.util.Map<String, CoinConfig> snap = CoinConfigRegistry.list();
-                    if (snap.isEmpty()) {
-                        JsonObject err = new JsonObject();
-                        err.addProperty("code", -1);
-                        err.addProperty("message", "Coin configs not loaded");
-                        response.add("error", err);
-                        response.add("result", JsonNull.INSTANCE);
-                        break;
-                    }
-                    // Single DTO source — delegate to CoinConfig.toDtoMap() (authenticated via
-                    // channelRead0)
-                    try {
-                        JsonArray arr = new JsonArray();
-                        snap.values().stream()
-                                .sorted(java.util.Comparator.comparing(CoinConfig::getTicker))
-                                .forEach(cfg -> {
-                                    java.util.Map<String, Object> dto = cfg.toDtoMap();
-                                    JsonObject o = new JsonObject();
-                                    o.addProperty("ticker", (String) dto.get("ticker"));
-                                    o.addProperty("blockchain", (String) dto.get("blockchain"));
-                                    o.addProperty("verId", (String) dto.get("verId"));
-                                    o.addProperty(
-                                            "addressPrefix",
-                                            ((Number) dto.get("addressPrefix")).intValue());
-                                    o.addProperty(
-                                            "scriptPrefix",
-                                            ((Number) dto.get("scriptPrefix")).intValue());
-                                    o.addProperty(
-                                            "secretPrefix",
-                                            ((Number) dto.get("secretPrefix")).intValue());
-                                    o.addProperty("coin", ((Number) dto.get("coin")).longValue());
-                                    o.addProperty(
-                                            "feePerByte",
-                                            ((Number) dto.get("feePerByte")).longValue());
-                                    o.addProperty(
-                                            "minTxFee", ((Number) dto.get("minTxFee")).longValue());
-                                    o.addProperty("port", ((Number) dto.get("port")).intValue());
-                                    o.addProperty(
-                                            "dustAmount",
-                                            ((Number) dto.get("dustAmount")).longValue());
-                                    arr.add(o);
-                                });
-                        response.add("result", arr);
-                        response.add("error", JsonNull.INSTANCE);
-                    } catch (IllegalStateException e) {
-                        LOGGER.warning("[http-master] getCoins DTO error: " + e.getMessage());
-                        JsonObject err = new JsonObject();
-                        err.addProperty("code", -1);
-                        err.addProperty("message", e.getMessage());
-                        response.add("error", err);
-                        response.add("result", JsonNull.INSTANCE);
-                    }
-                    break;
-                }
+                return coinConfigs(params);
             default:
-                {
-                    JsonObject methodNotFound = new JsonObject();
-                    methodNotFound.addProperty("code", -32601);
-                    methodNotFound.addProperty("message", "Method not found.");
-                    response.add("error", methodNotFound);
-                    response.add("result", JsonNull.INSTANCE);
-                    break;
-                }
+                return error(-32601, "Method not found.");
         }
+    }
 
-        if (shutdownRequested) {
-            Thread t = new Thread(() -> System.exit(0));
-            t.setDaemon(true);
-            t.start();
+    private static JsonObject help() {
+        return ok(
+                new JsonPrimitive(
+                        "Master JSON-RPC server\n"
+                                + "This JSON-RPC server is served by "
+                                + CoinInstance.getVersionString()
+                                + "\n"
+                                + "\n"
+                                + "help - Display the help\n"
+                                + "\n"
+                                + "=====RPC Master=====\n"
+                                + "ping - Lightweight liveness probe (result 1)\n"
+                                + "stop - Shutdown the server\n"
+                                + "reloadconfig <token> - Reload configuration for specified"
+                                + " token\n"
+                                + "getCoins - List coin configurations (alias listCoins)\n"
+                                + "version - Get version\n"));
+    }
+
+    private JsonObject reloadConfig(JsonArray params) {
+        if (params.size() != 1) {
+            return error(-1, "Usage: reloadconfig <token>\n\ntoken (string, required)");
         }
+        String requested = params.get(0).getAsString();
+        CoinTicker ticker = CoinTickerUtils.stringToTicker(requested);
+        if (ticker == null) {
+            return error(-1, "Unknown ticker: " + requested);
+        }
+        CoinInstance instance = CoinInstance.getInstance(ticker);
+        if (instance == null) {
+            return error(
+                    -1,
+                    "Coin instance not found for ticker: "
+                            + CoinTickerUtils.tickerToString(ticker));
+        }
+        Thread reloader =
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(500);
+                        instance.reloadConfig();
+                    } catch (InterruptedException e) {
+                        LOGGER.warning(
+                                "[http-master] Interrupted during reloadconfig for "
+                                        + ticker
+                                        + ", "
+                                        + e.getMessage());
+                        Thread.currentThread().interrupt();
+                    }
+                });
+        reloader.setDaemon(true);
+        reloader.start();
+        return ok(new JsonPrimitive(true));
+    }
+
+    private static JsonObject stop() {
+        Thread shutdown = new Thread(() -> System.exit(0));
+        shutdown.setDaemon(true);
+        shutdown.start();
+        return ok(new JsonPrimitive("shutting down..."));
+    }
+
+    private static JsonObject coinConfigs(JsonArray params) {
+        if (params == null || params.size() != 0) {
+            return error(-1, "Usage: getCoins");
+        }
+        // Atomic snapshot — avoids isLoaded()/list() TOCTOU; empty check is the gate.
+        Map<String, CoinConfig> snapshot = CoinConfigRegistry.list();
+        if (snapshot.isEmpty()) {
+            return error(-1, "Coin configs not loaded");
+        }
+        try {
+            return ok(coinConfigs(snapshot));
+        } catch (IllegalStateException e) {
+            LOGGER.warning("[http-master] getCoins DTO error: " + e.getMessage());
+            return error(-1, e.getMessage());
+        }
+    }
+
+    /** Single DTO source: delegates to {@link CoinConfig#toDtoMap()}. */
+    private static JsonArray coinConfigs(Map<String, CoinConfig> snapshot) {
+        JsonArray coins = new JsonArray();
+        snapshot.values().stream()
+                .sorted(Comparator.comparing(CoinConfig::getTicker))
+                .forEach(config -> coins.add(coinConfig(config)));
+        return coins;
+    }
+
+    private static JsonObject coinConfig(CoinConfig config) {
+        Map<String, Object> dto = config.toDtoMap();
+        JsonObject coin = new JsonObject();
+        coin.addProperty("ticker", (String) dto.get("ticker"));
+        coin.addProperty("blockchain", (String) dto.get("blockchain"));
+        coin.addProperty("verId", (String) dto.get("verId"));
+        coin.addProperty("addressPrefix", ((Number) dto.get("addressPrefix")).intValue());
+        coin.addProperty("scriptPrefix", ((Number) dto.get("scriptPrefix")).intValue());
+        coin.addProperty("secretPrefix", ((Number) dto.get("secretPrefix")).intValue());
+        coin.addProperty("coin", ((Number) dto.get("coin")).longValue());
+        coin.addProperty("feePerByte", ((Number) dto.get("feePerByte")).longValue());
+        coin.addProperty("minTxFee", ((Number) dto.get("minTxFee")).longValue());
+        coin.addProperty("port", ((Number) dto.get("port")).intValue());
+        coin.addProperty("dustAmount", ((Number) dto.get("dustAmount")).longValue());
+        return coin;
+    }
+
+    private static JsonObject ok(JsonElement result) {
+        JsonObject response = new JsonObject();
+        response.add("result", result);
+        response.add("error", JsonNull.INSTANCE);
         return response;
     }
+
+    private static JsonObject error(int code, String message) {
+        JsonObject response = new JsonObject();
+        response.add("result", JsonNull.INSTANCE);
+        JsonObject detail = new JsonObject();
+        detail.addProperty("code", code);
+        detail.addProperty("message", message);
+        response.add("error", detail);
+        return response;
+    }
+
+    private void writeAndClose(
+            ChannelHandlerContext ctx,
+            FullHttpRequest request,
+            HttpResponseStatus status,
+            JsonObject body) {
+        ByteBuf content = Unpooled.copiedBuffer(body.toString(), CharsetUtil.UTF_8);
+        FullHttpResponse response =
+                new DefaultFullHttpResponse(request.protocolVersion(), status, content);
+        writeResponse(ctx, response, request);
+        ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+    }
+
+    /** Why a request was refused before its body was looked at. */
+    private record Rejection(HttpResponseStatus status, int code, String message) {}
 
     private boolean writeResponse(
             ChannelHandlerContext ctx, FullHttpResponse httpResponse, FullHttpRequest request) {

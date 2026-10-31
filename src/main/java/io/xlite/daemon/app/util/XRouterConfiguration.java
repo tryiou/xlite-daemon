@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 public class XRouterConfiguration {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final int DEFAULT_CLIENT_REQUEST_LIMIT = 100;
 
     private final String rawXRouterConfig;
     private final HashMap<String, Double> feeMap = new HashMap<>();
@@ -65,51 +66,47 @@ public class XRouterConfiguration {
                                 + e.getMessage());
                 return;
             }
+            applyParameters(properties);
+            fee =
+                    properties.containsKey("fee")
+                            ? Double.parseDouble(properties.getProperty("fee"))
+                            : 0;
+            clientRequestLimit =
+                    properties.containsKey("clientrequestlimit")
+                            ? Integer.parseInt(properties.getProperty("clientrequestlimit"))
+                            : DEFAULT_CLIENT_REQUEST_LIMIT;
+            logParsedConfig();
+        }
 
+        private void applyParameters(Properties properties) {
             if (!properties.containsKey("parameters") && !properties.containsKey("paramsType")) {
                 LOGGER.finer("[xrouter-plugin-config-parser] ERROR: Plugin has no parameters!");
-            } else {
-                String[] rawParamTypes;
-
-                if (properties.containsKey("parameters")) {
-                    rawParamTypes = properties.getProperty("parameters").split(",");
-                } else if (properties.containsKey("paramsType")) {
-                    rawParamTypes = properties.getProperty("paramsType").split(",");
-                } else {
-                    return;
-                }
-
-                for (String rawParamType : rawParamTypes) {
-                    if (rawParamType.isEmpty()) {
-                        continue;
-                    }
-
-                    if (!pluginParamTypes.containsKey(rawParamType)) {
-                        LOGGER.finer(
-                                "[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin"
-                                        + " parameter type: "
-                                        + rawParamType
-                                        + ". Failing.");
-                        throw new IllegalArgumentException(
-                                "Invalid/unsupported plugin parameter type: " + rawParamType);
-                    }
-
-                    paramTypes.add(pluginParamTypes.get(rawParamType));
+                return;
+            }
+            String declared =
+                    properties.getProperty("parameters", properties.getProperty("paramsType", ""));
+            for (String rawParamType : declared.split(",")) {
+                if (!rawParamType.isEmpty()) {
+                    paramTypes.add(requireKnownParamType(rawParamType));
                 }
             }
+        }
 
-            if (properties.containsKey("fee")) {
-                fee = Double.parseDouble(properties.getProperty("fee"));
-            } else {
-                fee = 0;
+        private static Class requireKnownParamType(String rawParamType) {
+            Class<?> type = pluginParamTypes.get(rawParamType);
+            if (type == null) {
+                LOGGER.finer(
+                        "[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin"
+                                + " parameter type: "
+                                + rawParamType
+                                + ". Failing.");
+                throw new IllegalArgumentException(
+                        "Invalid/unsupported plugin parameter type: " + rawParamType);
             }
+            return type;
+        }
 
-            if (properties.containsKey("clientrequestlimit")) {
-                clientRequestLimit = Integer.parseInt(properties.getProperty("clientrequestlimit"));
-            } else {
-                clientRequestLimit = 100;
-            }
-
+        private void logParsedConfig() {
             LOGGER.finer(
                     "[xrouter-plugin-config-parser] Processing '" + pluginName + "' complete.");
             LOGGER.finer("[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": fee = " + fee);

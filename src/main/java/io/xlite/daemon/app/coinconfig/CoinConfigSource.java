@@ -108,122 +108,39 @@ public final class CoinConfigSource {
         String manifestJson =
                 isLocal() ? readLocalFile(localManifest()) : remoteFetch.apply(manifestUrl());
         JsonArray entries = parseManifestEntries(manifestJson);
-        // Snapshot the previous cached manifest BEFORE overwriting: the
-        // compare must run old-vs-fresh, and a failed load must leave the
-        // last-good cache intact for offline fallback.
+        // Snapshot the previous cached manifest BEFORE overwriting: the compare must run
+        // old-vs-fresh, and a failed load must leave the last-good cache intact for offline
+        // fallback.
         Optional<String> prevCachedManifest =
                 (cache != null && !isLocal()) ? cache.cachedManifest() : Optional.empty();
-        RemoteTexts remoteTexts =
-                isLocal() ? null : resolveRemoteTexts(entries, prevCachedManifest);
-        Map<String, CoinConfig> out = new LinkedHashMap<>();
-        int index = 0;
-        int skipped = 0;
-        int unsupported = 0;
-        for (JsonElement el : entries) {
-            index++;
-            JsonObject entry;
-            try {
-                entry = el.getAsJsonObject();
-                final String ticker = requiredField(entry, "ticker", index);
-                if (!isSupportedTicker(ticker)) {
-                    LOGGER.fine(
-                            "[coinconfig] skipping ["
-                                    + ticker
-                                    + "] entry #"
-                                    + index
-                                    + ": ticker not in wallet enum");
-                    unsupported++;
-                    continue;
-                }
-                final String blockchain = requiredField(entry, "blockchain", index);
-                final String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
-                final String xbridgeConf = requiredField(entry, "xbridge_conf", index);
-                if (!XBRIDGE_CONF_PATTERN.matcher(xbridgeConf).matches()
-                        || xbridgeConf.contains("..")) {
-                    String msg = "xbridge_conf filename fails validation: " + xbridgeConf;
-                    if (isLocal()) {
-                        throw new IllegalStateException(msg);
-                    } else {
-                        LOGGER.warning(
-                                "[coinconfig] skipping ["
-                                        + ticker
-                                        + "] entry #"
-                                        + index
-                                        + ": "
-                                        + msg);
-                        skipped++;
-                        continue;
-                    }
-                }
-                if (out.containsKey(ticker)) {
-                    LOGGER.warning(
-                            "[coinconfig] duplicate ticker "
-                                    + ticker
-                                    + " entry #"
-                                    + index
-                                    + " overwriting previous (keeping last)");
-                }
-                Map<String, Map<String, String>> sections;
-                try {
-                    if (isLocal()) {
-                        sections = safeParseLocal(localXBridgeConf(xbridgeConf));
-                    } else {
-                        String text = remoteTexts.get(xbridgeConf);
-                        if (text == null) {
-                            // Fetch already failed during the resolve phase and
-                            // was warned + counted there; skip quietly here.
-                            continue;
-                        }
-                        sections = XBridgeConfParser.parse(text);
-                    }
-                } catch (RuntimeException fe) {
-                    if (isLocal()) {
-                        throw fe;
-                    } else {
-                        LOGGER.warning(
-                                "[coinconfig] skipping ["
-                                        + ticker
-                                        + "] entry #"
-                                        + index
-                                        + " ("
-                                        + xbridgeConf
-                                        + "): "
-                                        + fe.getMessage());
-                        skipped++;
-                        continue;
-                    }
-                }
-                Map<String, String> section = sections.get(ticker);
-                if (section == null) {
-                    String msg = "xbridge conf " + xbridgeConf + " has no [" + ticker + "] section";
-                    if (isLocal()) {
-                        throw new IllegalStateException(msg);
-                    } else {
-                        LOGGER.warning(
-                                "[coinconfig] skipping ["
-                                        + ticker
-                                        + "] entry #"
-                                        + index
-                                        + ": "
-                                        + msg);
-                        skipped++;
-                        continue;
-                    }
-                }
-                out.put(ticker, new CoinConfig(ticker, blockchain, verId, section));
-            } catch (RuntimeException e) {
-                // Required-field or JSON shape errors are still hard failures;
-                // per-entry fetch/section issues for local are re-thrown above
-                // and will be wrapped here; remote skips are already continued.
-                if (e.getMessage() != null && e.getMessage().startsWith("manifest entry #")) {
-                    throw e;
-                }
-                throw new IllegalStateException(
-                        "manifest entry #" + index + ": " + e.getMessage(), e);
-            }
+        RemotePlan plan = isLocal() ? null : resolveRemoteTexts(entries, prevCachedManifest);
+        LoadResult result = loadEntries(entries, plan);
+        int skipped = result.skipped() + (plan == null ? 0 : plan.skipped);
+        logLoadSummary(result, plan, skipped);
+        if (result.byTicker().isEmpty()) {
+            throw new IllegalStateException(
+                    "manifest: no loadable entries ("
+                            + skipped
+                            + " skipped, "
+                            + result.unsupported()
+                            + " unsupported)");
         }
-        if (!isLocal()) {
-            skipped += remoteTexts.skipped;
+        if (!isLocal() && cache != null) {
+            cache.storeManifest(manifestJson);
+        }
+        return result.byTicker();
+    }
+
+    private static void logLoadSummary(LoadResult result, RemotePlan plan, int skipped) {
+        if (plan != null) {
+            LOGGER.info(
+                    "[coinconfig] loaded "
+                            + result.byTicker().size()
+                            + " ticker(s): "
+                            + plan.fetched
+                            + " fetched, "
+                            + plan.cached
+                            + " from cache");
         }
         if (skipped > 0) {
             LOGGER.warning(
@@ -231,34 +148,139 @@ public final class CoinConfigSource {
                             + skipped
                             + " manifest entries with missing/unreadable xbridge confs");
         }
-        if (unsupported > 0) {
+        if (result.unsupported() > 0) {
             LOGGER.info(
                     "[coinconfig] skipped "
-                            + unsupported
+                            + result.unsupported()
                             + " manifest entries with tickers not in wallet enum");
         }
-        if (!isLocal()) {
-            LOGGER.info(
-                    "[coinconfig] loaded "
-                            + out.size()
-                            + " ticker(s): "
-                            + remoteTexts.fetched
-                            + " fetched, "
-                            + remoteTexts.cached
-                            + " from cache");
+    }
+
+    private LoadResult loadEntries(JsonArray entries, RemotePlan plan) {
+        Map<String, CoinConfig> byTicker = new LinkedHashMap<>();
+        int skipped = 0;
+        int unsupported = 0;
+        for (int index = 1; index <= entries.size(); index++) {
+            EntryOutcome outcome = loadEntry(entries.get(index - 1), index, plan, byTicker);
+            if (outcome.config() != null) {
+                byTicker.put(outcome.ticker(), outcome.config());
+            } else if (outcome.unsupported()) {
+                unsupported++;
+            } else {
+                skipped++;
+            }
         }
-        if (out.isEmpty()) {
-            throw new IllegalStateException(
-                    "manifest: no loadable entries ("
-                            + skipped
-                            + " skipped, "
-                            + unsupported
-                            + " unsupported)");
+        return new LoadResult(byTicker, skipped, unsupported);
+    }
+
+    private EntryOutcome loadEntry(
+            JsonElement element, int index, RemotePlan plan, Map<String, CoinConfig> byTicker) {
+        try {
+            return extractEntry(element.getAsJsonObject(), index, plan, byTicker);
+        } catch (RuntimeException e) {
+            // Required-field or JSON shape errors are still hard failures; per-entry
+            // fetch/section issues for local are re-thrown above and will be wrapped here;
+            // remote skips are already continued.
+            if (e.getMessage() != null && e.getMessage().startsWith("manifest entry #")) {
+                throw e;
+            }
+            throw new IllegalStateException("manifest entry #" + index + ": " + e.getMessage(), e);
         }
-        if (!isLocal() && cache != null) {
-            cache.storeManifest(manifestJson);
+    }
+
+    private EntryOutcome extractEntry(
+            JsonObject entry, int index, RemotePlan plan, Map<String, CoinConfig> byTicker) {
+        String ticker = requiredField(entry, "ticker", index);
+        if (!isSupportedTicker(ticker)) {
+            LOGGER.fine(
+                    "[coinconfig] skipping ["
+                            + ticker
+                            + "] entry #"
+                            + index
+                            + ": ticker not in wallet enum");
+            return EntryOutcome.ofUnsupported();
         }
-        return out;
+        String blockchain = requiredField(entry, "blockchain", index);
+        String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
+        String xbridgeConf = requiredField(entry, "xbridge_conf", index);
+        if (!XBRIDGE_CONF_PATTERN.matcher(xbridgeConf).matches() || xbridgeConf.contains("..")) {
+            failEntry("xbridge_conf filename fails validation: " + xbridgeConf, index, ticker);
+            return EntryOutcome.skipped();
+        }
+        if (byTicker.containsKey(ticker)) {
+            LOGGER.warning(
+                    "[coinconfig] duplicate ticker "
+                            + ticker
+                            + " entry #"
+                            + index
+                            + " overwriting previous (keeping last)");
+        }
+        Map<String, String> section = readSection(xbridgeConf, ticker, index, plan);
+        if (section == null) {
+            return EntryOutcome.skipped();
+        }
+        return EntryOutcome.loaded(ticker, new CoinConfig(ticker, blockchain, verId, section));
+    }
+
+    /**
+     * A per-entry problem: fatal for a local source, a counted skip for a remote one.
+     *
+     * <p>The local source is a checkout the operator made, so a bad entry there is a mistake to
+     * report; a remote manifest is trusted only entry by entry.
+     */
+    private void failEntry(String message, int index, String ticker) {
+        if (isLocal()) {
+            throw new IllegalStateException(message);
+        }
+        LOGGER.warning("[coinconfig] skipping [" + ticker + "] entry #" + index + ": " + message);
+    }
+
+    /** The ticker's section, or null when the entry is skipped. */
+    private Map<String, String> readSection(
+            String xbridgeConf, String ticker, int index, RemotePlan plan) {
+        Map<String, Map<String, String>> sections;
+        try {
+            sections =
+                    isLocal()
+                            ? readLocalSections(xbridgeConf)
+                            : readRemoteSections(plan, xbridgeConf);
+        } catch (RuntimeException e) {
+            if (isLocal()) {
+                throw e;
+            }
+            LOGGER.warning(
+                    "[coinconfig] skipping ["
+                            + ticker
+                            + "] entry #"
+                            + index
+                            + " ("
+                            + xbridgeConf
+                            + "): "
+                            + e.getMessage());
+            return null;
+        }
+        if (sections == null) {
+            // A failed fetch was already warned and counted during the resolve phase.
+            return null;
+        }
+        Map<String, String> section = sections.get(ticker);
+        if (section != null) {
+            return section;
+        }
+        failEntry(
+                "xbridge conf " + xbridgeConf + " has no [" + ticker + "] section", index, ticker);
+        return null;
+    }
+
+    private Map<String, Map<String, String>> readLocalSections(String xbridgeConf) {
+        return safeParseLocal(localXBridgeConf(xbridgeConf));
+    }
+
+    /** The remote text resolved earlier, or null when its fetch already failed and was counted. */
+    private static Map<String, Map<String, String>> readRemoteSections(
+            RemotePlan plan, String xbridgeConf) {
+        String text = plan.texts.get(xbridgeConf);
+        return text == null ? null : XBridgeConfParser.parse(text);
     }
 
     /**
@@ -287,14 +309,16 @@ public final class CoinConfigSource {
     }
 
     /** Resolved conf texts for the remote path, keyed by conf file name. */
-    private static final class RemoteTexts {
+    private static final class RemotePlan {
         final Map<String, String> texts = new LinkedHashMap<>();
+        final Map<String, String> cachedCompare;
+        final List<String[]> toFetch = new ArrayList<>();
         int skipped;
         int cached;
         int fetched;
 
-        String get(String fileName) {
-            return texts.get(fileName);
+        RemotePlan(Map<String, String> cachedCompare) {
+            this.cachedCompare = cachedCompare;
         }
     }
 
@@ -306,41 +330,47 @@ public final class CoinConfigSource {
      * @param prevCachedManifest snapshot of the cached manifest taken before this load (never the
      *     just-fetched one)
      */
-    private RemoteTexts resolveRemoteTexts(JsonArray entries, Optional<String> prevCachedManifest) {
-        RemoteTexts plan = new RemoteTexts();
-        Map<String, String> cachedCompare = readCachedCompare(prevCachedManifest);
-        List<String[]> toFetch = new ArrayList<>();
-        int index = 0;
-        for (JsonElement el : entries) {
-            index++;
-            JsonObject entry = el.getAsJsonObject();
-            String ticker = requiredField(entry, "ticker", index);
-            if (!isSupportedTicker(ticker)) {
-                continue;
-            }
-            String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
-            String xbridgeConf = requiredField(entry, "xbridge_conf", index);
-            if (!XBRIDGE_CONF_PATTERN.matcher(xbridgeConf).matches()
-                    || xbridgeConf.contains("..")) {
-                continue;
-            }
-            if (plan.texts.containsKey(xbridgeConf) || containsFile(toFetch, xbridgeConf)) {
-                continue;
-            }
-            String want = verId + "\0" + xbridgeConf;
-            String have = cachedCompare.get(ticker);
-            if (cache != null && want.equals(have)) {
-                Optional<String> cachedText = cache.cachedConf(xbridgeConf);
-                if (cachedText.isPresent() && parsesWithSection(cachedText.get(), ticker)) {
-                    plan.texts.put(xbridgeConf, cachedText.get());
-                    plan.cached++;
-                    continue;
-                }
-            }
-            toFetch.add(new String[] {xbridgeConf, ticker, String.valueOf(index)});
+    private RemotePlan resolveRemoteTexts(JsonArray entries, Optional<String> prevCachedManifest) {
+        RemotePlan plan = new RemotePlan(readCachedCompare(prevCachedManifest));
+        for (int index = 1; index <= entries.size(); index++) {
+            planRemoteEntry(entries.get(index - 1).getAsJsonObject(), index, plan);
         }
-        fetchParallel(toFetch, plan);
+        fetchParallel(plan);
         return plan;
+    }
+
+    private void planRemoteEntry(JsonObject entry, int index, RemotePlan plan) {
+        String ticker = requiredField(entry, "ticker", index);
+        if (!isSupportedTicker(ticker)) {
+            return;
+        }
+        String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
+        String xbridgeConf = requiredField(entry, "xbridge_conf", index);
+        if (!XBRIDGE_CONF_PATTERN.matcher(xbridgeConf).matches() || xbridgeConf.contains("..")) {
+            return;
+        }
+        if (plan.texts.containsKey(xbridgeConf) || containsFile(plan.toFetch, xbridgeConf)) {
+            return;
+        }
+        if (useCachedConf(ticker, verId, xbridgeConf, plan)) {
+            return;
+        }
+        plan.toFetch.add(new String[] {xbridgeConf, ticker, String.valueOf(index)});
+    }
+
+    /** Serves an unchanged entry from the cache, when its text still parses with the section. */
+    private boolean useCachedConf(
+            String ticker, String verId, String xbridgeConf, RemotePlan plan) {
+        if (cache == null || !(verId + "\0" + xbridgeConf).equals(plan.cachedCompare.get(ticker))) {
+            return false;
+        }
+        Optional<String> cachedText = cache.cachedConf(xbridgeConf);
+        if (cachedText.isEmpty() || !parsesWithSection(cachedText.get(), ticker)) {
+            return false;
+        }
+        plan.texts.put(xbridgeConf, cachedText.get());
+        plan.cached++;
+        return true;
     }
 
     /**
@@ -349,7 +379,7 @@ public final class CoinConfigSource {
      */
     private Map<String, String> readCachedCompare(Optional<String> prevCachedManifest) {
         Map<String, String> compare = new LinkedHashMap<>();
-        if (cache == null || !prevCachedManifest.isPresent()) {
+        if (cache == null || prevCachedManifest.isEmpty()) {
             return compare;
         }
         JsonArray cachedEntries;
@@ -360,21 +390,29 @@ public final class CoinConfigSource {
                     "[coinconfig] cached manifest unreadable, refetching all: " + e.getMessage());
             return compare;
         }
-        for (JsonElement el : cachedEntries) {
-            try {
-                JsonObject entry = el.getAsJsonObject();
-                String ticker = requiredField(entry, "ticker", 0);
-                String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
-                String xbridgeConf = requiredField(entry, "xbridge_conf", 0);
-                compare.put(ticker, verId + "\0" + xbridgeConf);
-            } catch (RuntimeException e) {
-                LOGGER.warning(
-                        "[coinconfig] cached manifest entry unreadable, refetching all: "
-                                + e.getMessage());
+        for (JsonElement element : cachedEntries) {
+            Optional<Map.Entry<String, String>> entry = cachedCompareEntry(element);
+            if (entry.isEmpty()) {
                 return new LinkedHashMap<>();
             }
+            compare.put(entry.get().getKey(), entry.get().getValue());
         }
         return compare;
+    }
+
+    private static Optional<Map.Entry<String, String>> cachedCompareEntry(JsonElement element) {
+        try {
+            JsonObject entry = element.getAsJsonObject();
+            String ticker = requiredField(entry, "ticker", 0);
+            String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
+            String xbridgeConf = requiredField(entry, "xbridge_conf", 0);
+            return Optional.of(Map.entry(ticker, verId + "\0" + xbridgeConf));
+        } catch (RuntimeException e) {
+            LOGGER.warning(
+                    "[coinconfig] cached manifest entry unreadable, refetching all: "
+                            + e.getMessage());
+            return Optional.empty();
+        }
     }
 
     private static boolean containsFile(List<String[]> toFetch, String fileName) {
@@ -399,86 +437,110 @@ public final class CoinConfigSource {
      * proceeds with fetched + cached. Every outcome (success, failure, timeout) lands
      * deterministically in the plan.
      */
-    private void fetchParallel(List<String[]> toFetch, RemoteTexts plan) {
-        if (toFetch.isEmpty()) {
+    private void fetchParallel(RemotePlan plan) {
+        if (plan.toFetch.isEmpty()) {
             return;
         }
-        // Daemon threads: a hung fetch (uninterruptible socket I/O) must
-        // never delay JVM shutdown past the phase cap.
-        ExecutorService pool =
-                Executors.newFixedThreadPool(
-                        Math.min(FETCH_POOL_SIZE, toFetch.size()),
-                        r -> {
-                            Thread t = new Thread(r, "coinconfig-fetch");
-                            t.setDaemon(true);
-                            return t;
-                        });
+        ExecutorService pool = newFetchPool(plan.toFetch.size());
         try {
-            List<Callable<String[]>> tasks = new ArrayList<>();
-            for (String[] need : toFetch) {
-                final String fileName = need[0];
-                final String url = xbridgeConfUrl(fileName);
-                tasks.add(() -> {
-                    String text = remoteFetch.apply(url);
-                    if (cache != null) {
-                        cache.storeConf(fileName, text);
-                    }
-                    return new String[] {fileName, text};
-                });
-            }
-            List<Future<String[]>> futures;
-            boolean poolInterrupted = false;
-            try {
-                futures = pool.invokeAll(tasks, fetchPhaseTimeoutSeconds, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                futures = new ArrayList<>();
-                poolInterrupted = true;
-            }
-            for (int i = 0; i < toFetch.size(); i++) {
-                String[] need = toFetch.get(i);
-                String fileName = need[0];
-                String ticker = need[1];
-                String entryNo = need[2];
-                if (poolInterrupted || i >= futures.size() || futures.get(i).isCancelled()) {
-                    warnFetchSkip(
-                            plan,
-                            ticker,
-                            entryNo,
-                            fileName,
-                            poolInterrupted ? "fetch interrupted" : "fetch timed out");
-                    continue;
-                }
-                try {
-                    String[] done = futures.get(i).get();
-                    plan.texts.put(done[0], done[1]);
-                    plan.fetched++;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    warnFetchSkip(plan, ticker, entryNo, fileName, "fetch interrupted");
-                } catch (Exception e) {
-                    Throwable cause = e.getCause() != null ? e.getCause() : e;
-                    warnFetchSkip(plan, ticker, entryNo, fileName, cause.getMessage());
-                }
-            }
+            collectFetches(plan, invokeFetches(pool, plan.toFetch));
         } finally {
             pool.shutdown();
         }
     }
 
-    private static void warnFetchSkip(
-            RemoteTexts plan, String ticker, String entryNo, String fileName, String reason) {
+    private static ExecutorService newFetchPool(int taskCount) {
+        // Daemon threads: a hung fetch (uninterruptible socket I/O) must never delay JVM
+        // shutdown past the phase cap.
+        return Executors.newFixedThreadPool(
+                Math.min(FETCH_POOL_SIZE, taskCount),
+                runnable -> {
+                    Thread thread = new Thread(runnable, "coinconfig-fetch");
+                    thread.setDaemon(true);
+                    return thread;
+                });
+    }
+
+    private List<Future<String[]>> invokeFetches(ExecutorService pool, List<String[]> toFetch) {
+        List<Callable<String[]>> tasks = new ArrayList<>();
+        for (String[] need : toFetch) {
+            tasks.add(fetchTask(need[0]));
+        }
+        try {
+            return pool.invokeAll(tasks, fetchPhaseTimeoutSeconds, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new ArrayList<>();
+        }
+    }
+
+    private Callable<String[]> fetchTask(String fileName) {
+        return () -> {
+            String text = remoteFetch.apply(xbridgeConfUrl(fileName));
+            if (cache != null) {
+                cache.storeConf(fileName, text);
+            }
+            return new String[] {fileName, text};
+        };
+    }
+
+    private void collectFetches(RemotePlan plan, List<Future<String[]>> futures) {
+        for (int index = 0; index < plan.toFetch.size(); index++) {
+            collectFetch(plan, plan.toFetch.get(index), futures, index);
+        }
+    }
+
+    private void collectFetch(
+            RemotePlan plan, String[] need, List<Future<String[]>> futures, int index) {
+        Future<String[]> future = index < futures.size() ? futures.get(index) : null;
+        if (future == null || future.isCancelled()) {
+            warnFetchSkip(plan, need, "fetch timed out");
+            return;
+        }
+        try {
+            String[] done = future.get();
+            plan.texts.put(done[0], done[1]);
+            plan.fetched++;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            warnFetchSkip(plan, need, "fetch interrupted");
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            warnFetchSkip(plan, need, cause.getMessage());
+        }
+    }
+
+    private static void warnFetchSkip(RemotePlan plan, String[] need, String reason) {
         LOGGER.warning(
                 "[coinconfig] skipping ["
-                        + ticker
+                        + need[1]
                         + "] entry #"
-                        + entryNo
+                        + need[2]
                         + " ("
-                        + fileName
+                        + need[0]
                         + "): "
                         + reason);
         plan.skipped++;
     }
+
+    /** One entry's outcome: a loaded config, or one of the two counted skips. */
+    private record EntryOutcome(String ticker, CoinConfig config, boolean unsupported) {
+
+        static EntryOutcome loaded(String ticker, CoinConfig config) {
+            return new EntryOutcome(ticker, config, false);
+        }
+
+        static EntryOutcome skipped() {
+            return new EntryOutcome(null, null, false);
+        }
+
+        static EntryOutcome ofUnsupported() {
+            return new EntryOutcome(null, null, true);
+        }
+    }
+
+    /** Every coin loaded, plus the counts the summary reports. */
+    private record LoadResult(Map<String, CoinConfig> byTicker, int skipped, int unsupported) {}
 
     /**
      * True when the wallet can serve this ticker: present in the string map and in the
