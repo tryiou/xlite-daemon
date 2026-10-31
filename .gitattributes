@@ -1,0 +1,23 @@
+# Normalize line endings at the repository boundary so a Windows checkout
+# and a Linux checkout produce byte-identical sources.
+* text=auto eol=lf
+
+*.java text eol=lf
+*.xml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.properties text eol=lf
+
+# Windows batch files must keep CRLF: cmd.exe misparses labels on LF alone.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets: never diff, never normalize.
+*.png binary
+*.jpg binary
+*.ico binary
+*.jar binary
+*.zip binary

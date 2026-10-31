@@ -40,6 +40,6 @@ Thumbs.db
 *.temp
 *~
 
-xlite-daemon/*
+# Eclipse project metadata
 .settings
 .project
