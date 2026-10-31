@@ -140,13 +140,17 @@ public class BackgroundTimerThread implements Runnable {
     private void outputAvailableCurrencies() {
         long elapsed = (System.currentTimeMillis() - lastOut);
 
-        if (elapsed < 60 * 1000 && lastOut != 0) return;
+        if (elapsed < 60 * 1000 && lastOut != 0) {
+            return;
+        }
 
         List<String> available = new ArrayList<>();
         Set<String> unavailable = new HashSet<>();
 
         for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) continue;
+            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
+                continue;
+            }
 
             String name = CoinTickerUtils.tickerToString(coinInstance.getTicker());
             if (CoinInstance.getBlockCountByTicker(coinInstance.getTicker()) > 0) {
@@ -172,21 +176,28 @@ public class BackgroundTimerThread implements Runnable {
     private void sendKeepAlive() {
         long elapsed = (System.currentTimeMillis() - lastKeepAliveTime);
 
-        if (elapsed < KEEPALIVE_INTERVAL && lastKeepAliveTime != 0) return;
+        if (elapsed < KEEPALIVE_INTERVAL && lastKeepAliveTime != 0) {
+            return;
+        }
 
         if (HTTP_BLOCK_COUNT_UPDATES) {
             heightUpdateHttpClient.getAllBlockCounts();
         } else if (!blocknetPeerGroup.getConnectedPeers().isEmpty()) {
             for (BlocknetPeer blocknetPeer : blocknetPeerGroup.getConnectedPeers()) {
                 XRouterConfiguration xRouterConfiguration = blocknetPeer.getxRouterConfiguration();
-                if (xRouterConfiguration == null) continue;
+                if (xRouterConfiguration == null) {
+                    continue;
+                }
 
                 for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-                    if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) continue;
-                    else if (!blocknetPeer
+                    if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
+                        continue;
+                    } else if (!blocknetPeer
                             .getxRouterConfiguration()
                             .getSupportedWallets()
-                            .contains(coinInstance.getNetworkParameters().getId())) continue;
+                            .contains(coinInstance.getNetworkParameters().getId())) {
+                        continue;
+                    }
 
                     coinInstance.sendXrGetBlockCount(blocknetPeer);
                     LOGGER.finer(
@@ -204,13 +215,17 @@ public class BackgroundTimerThread implements Runnable {
     private void sendBalanceUpdate() {
         long elapsed = (System.currentTimeMillis() - lastBalanceUpdateTime);
 
-        if (elapsed < BALANCE_INTERVAL && lastBalanceUpdateTime != 0) return;
+        if (elapsed < BALANCE_INTERVAL && lastBalanceUpdateTime != 0) {
+            return;
+        }
 
         // No longer polling balances and transaction history here. Instead it is requested
         // on demand when client requests the data. See HTTPServerHandler.java:302-330
 
         for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) continue;
+            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
+                continue;
+            }
 
             if (CoinInstance.getBlockCountByTicker(coinInstance.getTicker()) <= 0) {
                 continue;
@@ -245,7 +260,9 @@ public class BackgroundTimerThread implements Runnable {
         LOGGER.finer("[BackgroundTimer] Waiting until initial messages are sent off.");
 
         for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) continue;
+            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
+                continue;
+            }
 
             Thread historyThread =
                     new Thread(
@@ -265,7 +282,9 @@ public class BackgroundTimerThread implements Runnable {
         }
 
         while (!Thread.currentThread().isInterrupted()) {
-            if (shutdownRequested) break;
+            if (shutdownRequested) {
+                break;
+            }
             try {
                 sendKeepAlive();
                 outputAvailableCurrencies();

@@ -41,7 +41,9 @@ class CoinInstanceTest extends TestHelper {
 
             List<String> expected = getExpectedAddresses();
             assertTrue(noDups(new ArrayList<>(expected)));
-            for (int i = 0; i < expected.size(); i++) assertEquals(expected.get(i), actual.get(i));
+            for (int i = 0; i < expected.size(); i++) {
+                assertEquals(expected.get(i), actual.get(i));
+            }
             assertEquals(expected.size(), actual.size());
 
             coin.deinit();
@@ -63,18 +65,24 @@ class CoinInstanceTest extends TestHelper {
             }
 
             final int total = getAddressCount() - getAddressCountInitial() - 1;
-            for (int i = 0; i < total; i++) coin.generateAddress(false);
+            for (int i = 0; i < total; i++) {
+                coin.generateAddress(false);
+            }
             coin.generateAddress(true); // last one
 
             List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
-            for (AddressBalance address : addresses) actual.add(address.getAddress().toBase58());
+            for (AddressBalance address : addresses) {
+                actual.add(address.getAddress().toBase58());
+            }
             assertEquals(getAddressCount(), actual.size());
             assertTrue(noDups(actual));
 
             List<String> expected = getExpectedAddresses();
             assertTrue(noDups(new ArrayList<>(expected)));
-            for (int i = 0; i < expected.size(); i++) assertEquals(expected.get(i), actual.get(i));
+            for (int i = 0; i < expected.size(); i++) {
+                assertEquals(expected.get(i), actual.get(i));
+            }
             assertEquals(expected.size(), actual.size());
 
             coin.deinit();
@@ -106,13 +114,17 @@ class CoinInstanceTest extends TestHelper {
 
             List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
-            for (AddressBalance address : addresses) actual.add(address.getAddress().toBase58());
+            for (AddressBalance address : addresses) {
+                actual.add(address.getAddress().toBase58());
+            }
             assertEquals(getAddressCount(), actual.size());
             assertTrue(noDups(actual));
 
             List<String> expected = getExpectedAddresses();
             assertTrue(noDups(new ArrayList<>(expected)));
-            for (int i = 0; i < expected.size(); i++) assertEquals(expected.get(i), actual.get(i));
+            for (int i = 0; i < expected.size(); i++) {
+                assertEquals(expected.get(i), actual.get(i));
+            }
             assertEquals(expected.size(), actual.size());
 
             coin.deinit();
@@ -141,13 +153,17 @@ class CoinInstanceTest extends TestHelper {
             coin.reloadConfig();
             List<AddressBalance> addresses = coin.getAddressKeyPairs();
             ArrayList<String> actual = new ArrayList<>();
-            for (AddressBalance address : addresses) actual.add(address.getAddress().toBase58());
+            for (AddressBalance address : addresses) {
+                actual.add(address.getAddress().toBase58());
+            }
             assertEquals(idx, actual.size());
             assertTrue(noDups(actual));
 
             List<String> expected = getExpectedAddresses();
             assertTrue(noDups(new ArrayList<>(expected)));
-            for (int i = 0; i < idx; i++) assertEquals(expected.get(i), actual.get(i));
+            for (int i = 0; i < idx; i++) {
+                assertEquals(expected.get(i), actual.get(i));
+            }
         }
 
         coin.deinit();

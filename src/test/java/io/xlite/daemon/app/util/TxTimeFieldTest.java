@@ -48,8 +48,9 @@ class TxTimeFieldTest {
     private static byte[] hex(String s) {
         int n = s.length();
         byte[] out = new byte[n / 2];
-        for (int i = 0; i < n; i += 2)
+        for (int i = 0; i < n; i += 2) {
             out[i / 2] = (byte) Integer.parseInt(s.substring(i, i + 2), 16);
+        }
         return out;
     }
 

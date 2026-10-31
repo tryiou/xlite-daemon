@@ -88,12 +88,14 @@ public final class TxTimeField {
      * emitting a corrupt tx.
      */
     public static byte[] insertNTime(byte[] standardTx, long nTime) {
-        if (standardTx == null || standardTx.length < MIN_STANDARD_TX_LENGTH)
+        if (standardTx == null || standardTx.length < MIN_STANDARD_TX_LENGTH) {
             throw new IllegalArgumentException(
                     "standard tx too short for nTime insertion: "
                             + (standardTx == null ? "null" : standardTx.length));
-        if (nTime < 0 || nTime > 0xFFFFFFFFL)
+        }
+        if (nTime < 0 || nTime > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("nTime out of uint32 range: " + nTime);
+        }
         byte[] out = new byte[standardTx.length + WORD_LENGTH];
         System.arraycopy(standardTx, 0, out, 0, WORD_LENGTH);
         ByteBuffer.wrap(out, WORD_LENGTH, WORD_LENGTH)
@@ -113,10 +115,11 @@ public final class TxTimeField {
      * (for bitcoinj parsing/display paths). Throws IllegalArgumentException on undersized input.
      */
     public static byte[] stripNTime(byte[] timeFieldTx) {
-        if (timeFieldTx == null || timeFieldTx.length < MIN_STANDARD_TX_LENGTH + WORD_LENGTH)
+        if (timeFieldTx == null || timeFieldTx.length < MIN_STANDARD_TX_LENGTH + WORD_LENGTH) {
             throw new IllegalArgumentException(
                     "time-field tx too short for nTime removal: "
                             + (timeFieldTx == null ? "null" : timeFieldTx.length));
+        }
         byte[] out = new byte[timeFieldTx.length - WORD_LENGTH];
         System.arraycopy(timeFieldTx, 0, out, 0, WORD_LENGTH);
         System.arraycopy(
@@ -162,10 +165,11 @@ public final class TxTimeField {
      * satisfy the input-time consensus rule when spending its outputs.
      */
     public static long parentNTime(byte[] parentTimeFieldTx) {
-        if (parentTimeFieldTx == null || parentTimeFieldTx.length < WORD_LENGTH + WORD_LENGTH)
+        if (parentTimeFieldTx == null || parentTimeFieldTx.length < WORD_LENGTH + WORD_LENGTH) {
             throw new IllegalArgumentException(
                     "parent tx too short to carry nTime: "
                             + (parentTimeFieldTx == null ? "null" : parentTimeFieldTx.length));
+        }
         return ByteBuffer.wrap(parentTimeFieldTx, WORD_LENGTH, WORD_LENGTH)
                         .order(ByteOrder.LITTLE_ENDIAN)
                         .getInt()
@@ -181,7 +185,9 @@ public final class TxTimeField {
         long nTime = nowUnix;
         if (parentNTimes != null) {
             for (Long parent : parentNTimes) {
-                if (parent != null && parent > nTime) nTime = parent;
+                if (parent != null && parent > nTime) {
+                    nTime = parent;
+                }
             }
         }
         LOGGER.fine("[tx-time-field] spend nTime=" + nTime + " (now=" + nowUnix + ")");

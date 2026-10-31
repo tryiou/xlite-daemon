@@ -39,7 +39,9 @@ public class ConsoleMenu {
     }
 
     public void logBadPassword(String msg) {
-        if (msg == null || msg.isEmpty()) msg = "Bad password";
+        if (msg == null || msg.isEmpty()) {
+            msg = "Bad password";
+        }
         LOGGER.info(
                 "[master] Error("
                         + CoinInstance.CoinError.CoinErrorCode.BADPASSWORD.name()
@@ -98,7 +100,8 @@ public class ConsoleMenu {
                                     App.BASE_URL = envEndpoint;
                                 } else {
                                     LOGGER.warning(
-                                            "Missing custom endpoint after '--development-endpoint'");
+                                            "Missing custom endpoint after"
+                                                    + " '--development-endpoint'");
                                 }
                             }
                             break;
@@ -148,7 +151,8 @@ public class ConsoleMenu {
                                 String envVal = App.getEnv("BLOCKCHAIN_CONFIGURATION_FILES");
                                 if (envVal == null || envVal.isEmpty()) {
                                     LOGGER.warning(
-                                            "Missing value after '--blockchain-configuration-files'");
+                                            "Missing value after"
+                                                    + " '--blockchain-configuration-files'");
                                 }
                             }
                             break;
@@ -265,7 +269,8 @@ public class ConsoleMenu {
                                     // Wipe BEFORE exiting — System.exit does not
                                     // unwind, so a finally block would be skipped.
                                     LOGGER.severe(
-                                            "Error(BADPASSWORD): could not retrieve mnemonic for the supplied password");
+                                            "Error(BADPASSWORD): could not retrieve mnemonic for"
+                                                    + " the supplied password");
                                     Arrays.fill(password, '\0');
                                     System.exit(4);
                                 }
@@ -301,14 +306,18 @@ public class ConsoleMenu {
                                 int strength = KeyHandler.calculatePasswordStrength(newPassword);
                                 if (strength < 9) {
                                     LOGGER.info(
-                                            "Unable to change the password: New password is not strong enough");
+                                            "Unable to change the password: New password is not"
+                                                    + " strong enough");
                                     System.exit(1);
                                 }
 
                                 CoinInstance.CoinError err =
                                         CoinInstance.changePassword(currentPassword, newPassword);
-                                if (err != null) logBadChangePass(err.getMessage());
-                                else LOGGER.info("Wallet password changed successfully");
+                                if (err != null) {
+                                    logBadChangePass(err.getMessage());
+                                } else {
+                                    LOGGER.info("Wallet password changed successfully");
+                                }
                             } finally {
                                 Arrays.fill(currentPassword, '\0');
                                 Arrays.fill(newPassword, '\0');
@@ -446,10 +455,14 @@ public class ConsoleMenu {
     }
 
     public void deinit() {
-        if (backgroundTimerThread != null) backgroundTimerThread.stop();
+        if (backgroundTimerThread != null) {
+            backgroundTimerThread.stop();
+        }
         for (CoinTicker cointicker : CoinTicker.coins()) {
             CoinInstance instance = CoinInstance.getInstance(cointicker);
-            if (instance != null) instance.deinit();
+            if (instance != null) {
+                instance.deinit();
+            }
         }
     }
 
@@ -493,7 +506,9 @@ public class ConsoleMenu {
             // Auth/init failure must not exit 0 — scripts and the GUI treat
             // exit code 0 as success. Wipe the credential before exiting
             // (System.exit does not unwind caller finally blocks).
-            if (password != null) Arrays.fill(password, '\0');
+            if (password != null) {
+                Arrays.fill(password, '\0');
+            }
             System.exit(5);
         }
 
@@ -651,11 +666,15 @@ public class ConsoleMenu {
 
     private String readPassword(
             Scanner input, String[] args, int argPos, String msg, String envVar) {
-        if (msg.isEmpty()) msg = "Password:\n";
+        if (msg.isEmpty()) {
+            msg = "Password:\n";
+        }
         if (args == null || args.length <= argPos || args[argPos].contains("--")) {
             if (envVar != null) {
                 String envVal = App.getEnv(envVar);
-                if (envVal != null && !envVal.isEmpty()) return envVal;
+                if (envVal != null && !envVal.isEmpty()) {
+                    return envVal;
+                }
             }
             System.out.println(msg);
             return input.nextLine();
@@ -669,11 +688,15 @@ public class ConsoleMenu {
      */
     private char[] readPasswordChars(
             Scanner input, String[] args, int argPos, String msg, String envVar) {
-        if (msg.isEmpty()) msg = "Password:\n";
+        if (msg.isEmpty()) {
+            msg = "Password:\n";
+        }
         if (args == null || args.length <= argPos || args[argPos].contains("--")) {
             if (envVar != null) {
                 String envVal = App.getEnv(envVar);
-                if (envVal != null && !envVal.isEmpty()) return envVal.toCharArray();
+                if (envVal != null && !envVal.isEmpty()) {
+                    return envVal.toCharArray();
+                }
             }
             System.out.println(msg);
             return input.nextLine().toCharArray();
@@ -690,11 +713,15 @@ public class ConsoleMenu {
                 + "Options:\n"
                 + "  --enablerpcandconfigure    Enable and configure RPC\n"
                 + "  --development-endpoint     Set a custom development endpoint\n"
-                + "                             Example: --development-endpoint <https://url.endpoint.org/>\n"
+                + "                             Example: --development-endpoint"
+                + " <https://url.endpoint.org/>\n"
                 + "  --exr-endpoint             Set EXR endpoint for EXR server\n"
-                + "                             Example: --exr-endpoint <http://exrproxy1.airdns.org:42114>\n"
-                + "  --blockchain-configuration-files  Set blockchain-configuration-files source\n"
-                + "                             Example: --blockchain-configuration-files <path-or-url>\n"
+                + "                             Example: --exr-endpoint"
+                + " <http://exrproxy1.airdns.org:42114>\n"
+                + "  --blockchain-configuration-files  Set blockchain-configuration-files"
+                + " source\n"
+                + "                             Example: --blockchain-configuration-files"
+                + " <path-or-url>\n"
                 + "  --version                  Display the version\n"
                 + "  --createdefaultwallet     Create a default wallet\n"
                 + "  --createwalletmnemonic    Create a wallet with a mnemonic\n"
@@ -703,6 +730,7 @@ public class ConsoleMenu {
                 + "  --getmnemonic             Retrieve mnemonic for a password\n"
                 + "                           Example: --getmnemonic <your_password>\n"
                 + "  --changepassword          Change wallet password\n"
-                + "                           Example: --changepassword <current_password> <new_password>\n";
+                + "                           Example: --changepassword <current_password>"
+                + " <new_password>\n";
     }
 }

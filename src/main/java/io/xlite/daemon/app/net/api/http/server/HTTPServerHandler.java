@@ -1,7 +1,13 @@
 package io.xlite.daemon.app.net.api.http.server;
 
 import com.google.common.base.Preconditions;
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.subgraph.orchid.encoders.Base64;
 import com.subgraph.orchid.encoders.Hex;
 
@@ -10,7 +16,17 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.CharsetUtil;
 import io.xlite.daemon.app.Version;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
@@ -29,7 +45,21 @@ import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.Utility;
 import io.xlite.daemon.app.wallet.WalletHelper;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.Address;
+import org.bitcoinj.core.AddressFormatException;
+import org.bitcoinj.core.Base58;
+import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.SegwitAddress;
+import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.Transaction;
+import org.bitcoinj.core.TransactionInput;
+import org.bitcoinj.core.TransactionOutPoint;
+import org.bitcoinj.core.TransactionOutput;
+import org.bitcoinj.core.Utils;
+import org.bitcoinj.core.VarInt;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 
@@ -272,7 +302,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 response.add("result", JsonNull.INSTANCE);
                 if (e instanceof IllegalArgumentException) {
                     LOGGER.warning(
-                            "[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
+                            "[http-server-handler] WARNING: Client sent valid JSON, but did not"
+                                    + " specify method and/or parameters!");
                 } else {
                     LOGGER.warning("[http-server-handler] WARNING: Client sent invalid JSON!");
                 }
@@ -326,9 +357,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     response.add("error", invalidParams);
                     response.add("result", JsonNull.INSTANCE);
                 }
-                if (sensitiveMethod)
+                if (sensitiveMethod) {
                     LOGGER.finer("[http-server-handler] response withheld (sensitive method)");
-                else LOGGER.finer(response.toString());
+                } else {
+                    LOGGER.finer(response.toString());
+                }
             } else {
                 ByteBuf responseContent =
                         Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
@@ -369,7 +402,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                     Thread.sleep(500);
                                 } catch (InterruptedException e) {
                                     LOGGER.warning(
-                                            "[http-server-handler] Interrupted during reloadconfig for "
+                                            "[http-server-handler] Interrupted during reloadconfig"
+                                                    + " for "
                                                     + CoinTickerUtils.tickerToString(
                                                             coin.getTicker())
                                                     + ", "
@@ -581,7 +615,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: sendrawtransaction hex-tx\n\nhex-tx (string, required) - Raw transaction, hex encoded");
+                                "Usage: sendrawtransaction hex-tx\n\n"
+                                    + "hex-tx (string, required) - Raw transaction, hex encoded");
 
                         response.add("error", errorJSON);
                         break;
@@ -604,7 +639,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         response.add("error", errorJSON);
 
                         LOGGER.warning(
-                                "[http-server-handler] Error parsing transaction in sendrawtransaction for "
+                                "[http-server-handler] Error parsing transaction in"
+                                        + " sendrawtransaction for "
                                         + CoinTickerUtils.tickerToString(coin.getTicker())
                                         + ", "
                                         + e.getMessage());
@@ -624,9 +660,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                 code = errElement.getAsInt();
                             } else if (errElement.isJsonObject()) {
                                 JsonObject errObj = errElement.getAsJsonObject();
-                                if (errObj.has("code")) code = errObj.get("code").getAsInt();
-                                if (errObj.has("message"))
+                                if (errObj.has("code")) {
+                                    code = errObj.get("code").getAsInt();
+                                }
+                                if (errObj.has("message")) {
                                     message = errObj.get("message").getAsString();
+                                }
                             }
                         }
 
@@ -671,7 +710,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: getrawtransaction\n\ntxid (string, required) - TXID is required, verbose(optional)");
+                                "Usage: getrawtransaction\n\n"
+                                        + "txid (string, required) - TXID is required,"
+                                        + " verbose(optional)");
 
                         response.add("error", errorJSON);
                         break;
@@ -682,7 +723,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     if (params.size() == 2) {
                         String v = params.get(1).toString();
-                        if (v.equalsIgnoreCase("true") || v.equals("1")) verbose = true;
+                        if (v.equalsIgnoreCase("true") || v.equals("1")) {
+                            verbose = true;
+                        }
                     }
 
                     JsonObject rawTransaction =
@@ -722,7 +765,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: getrawmempool\n\nverbose (int, optional) - VERBOSE is optional");
+                                "Usage: getrawmempool\n\n"
+                                        + "verbose (int, optional) - VERBOSE is optional");
 
                         response.add("error", errorJSON);
                         break;
@@ -732,7 +776,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     if (params.size() == 2) {
                         String v = params.get(1).toString();
-                        if (v.equalsIgnoreCase("true") || v.equals("1")) verbose = true;
+                        if (v.equalsIgnoreCase("true") || v.equals("1")) {
+                            verbose = true;
+                        }
                     }
 
                     JsonObject rawMempool = httpClient.getRawMempool(coin.getTicker(), verbose);
@@ -769,7 +815,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: getblock hash\n\nhash (string, required) - Hash of block to retrieve");
+                                "Usage: getblock hash\n\n"
+                                        + "hash (string, required) - Hash of block to retrieve");
 
                         response.add("error", errorJSON);
                         break;
@@ -825,7 +872,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: gettransaction txid\n\ntxid (string, required) - The transaction ID");
+                                "Usage: gettransaction txid\n\n"
+                                        + "txid (string, required) - The transaction ID");
 
                         response.add("error", errorJSON);
                         break;
@@ -867,7 +915,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: getaddressesbyaccount account\n\naccount (string, required) - The account from which to grab addresses. The only account available (for now) is 'main'.");
+                                "Usage: getaddressesbyaccount account\n\n"
+                                    + "account (string, required) - The account from which to grab"
+                                    + " addresses. The only account available (for now) is"
+                                    + " 'main'.");
 
                         response.add("error", errorJSON);
                         break;
@@ -897,7 +948,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: createrawtransaction inputs outputs\n\ninputs (string, required) - Inputs in JSON format\nexample: [{\"txid\": \"id\", \"vout\": n}, ...]\n\noutputs (string, required) - Outputs in JSON format\nexample (legacy): {\"address1\": amount1, \"address2\": amount2, ...}\nexample (new): [{\"address\": \"address1\", \"amount\": amount1}, {\"address\": \"address1\", \"amount\": amount2}, ...]");
+                                "Usage: createrawtransaction inputs outputs\n\n"
+                                    + "inputs (string, required) - Inputs in JSON format\n"
+                                    + "example: [{\"txid\": \"id\", \"vout\": n}, ...]\n\n"
+                                    + "outputs (string, required) - Outputs in JSON format\n"
+                                    + "example (legacy): {\"address1\": amount1, \"address2\":"
+                                    + " amount2, ...}\n"
+                                    + "example (new): [{\"address\": \"address1\", \"amount\":"
+                                    + " amount1}, {\"address\": \"address1\", \"amount\": amount2},"
+                                    + " ...]");
                         response.add("error", errorJSON);
                         break;
                     }
@@ -908,14 +967,17 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     List<OutputEntry> outputEntries = new ArrayList<>();
                     long locktime = 0;
 
-                    if (params.size() >= 3) locktime = params.get(2).getAsLong();
+                    if (params.size() >= 3) {
+                        locktime = params.get(2).getAsLong();
+                    }
 
                     try {
                         inputs = params.get(0).getAsJsonArray();
                         for (int i = 0; i < inputs.size(); i++) {
                             JsonObject input = inputs.get(i).getAsJsonObject();
-                            if (!input.has("txid") || !input.has("vout"))
+                            if (!input.has("txid") || !input.has("vout")) {
                                 throw new JsonParseException("Bad transaction input.");
+                            }
                         }
 
                         JsonElement outputsElem = params.get(1);
@@ -924,9 +986,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             JsonArray outputsArray = outputsElem.getAsJsonArray();
                             for (JsonElement elem : outputsArray) {
                                 JsonObject obj = elem.getAsJsonObject();
-                                if (!obj.has("address") || !obj.has("amount"))
+                                if (!obj.has("address") || !obj.has("amount")) {
                                     throw new JsonParseException(
                                             "Output entry must have 'address' and 'amount'");
+                                }
                                 String addr = obj.get("address").getAsString();
                                 double amt = obj.get("amount").getAsDouble();
                                 outputEntries.add(new OutputEntry(addr, amt));
@@ -943,7 +1006,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         }
                     } catch (JsonParseException e) {
                         LOGGER.warning(
-                                "[http-server-handler] ERROR: Error while parsing JSON for createrawtransaction!");
+                                "[http-server-handler] ERROR: Error while parsing JSON for"
+                                        + " createrawtransaction!");
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
                         errorJSON.addProperty("code", -2);
@@ -971,7 +1035,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                     ScriptBuilder.createInputScript(null));
                         } catch (Exception e) {
                             LOGGER.warning(
-                                    "[http-server-handler] ERROR: Error while constructing transaction (input phase)!");
+                                    "[http-server-handler] ERROR: Error while constructing"
+                                            + " transaction (input phase)!");
                             txConstructionError(
                                     response,
                                     e,
@@ -980,7 +1045,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             break;
                         }
                     }
-                    if (!inputSuccess) break;
+                    if (!inputSuccess) {
+                        break;
+                    }
 
                     boolean outputSuccess = true;
 
@@ -1005,9 +1072,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             }
                         } catch (Exception e) {
                             LOGGER.warning(
-                                    "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
+                                    "[http-server-handler] ERROR: Error while constructing"
+                                            + " transaction (output phase)!");
                             LOGGER.warning(
-                                    "[http-server-handler] Error in createrawtransaction P2SH output phase for "
+                                    "[http-server-handler] Error in createrawtransaction P2SH"
+                                            + " output phase for "
                                             + CoinTickerUtils.tickerToString(coin.getTicker())
                                             + ", "
                                             + e.getMessage());
@@ -1031,9 +1100,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             }
                         } catch (Exception e) {
                             LOGGER.warning(
-                                    "[http-server-handler] ERROR: Error while constructing transaction (output phase)!");
+                                    "[http-server-handler] ERROR: Error while constructing"
+                                            + " transaction (output phase)!");
                             LOGGER.warning(
-                                    "[http-server-handler] Error in createrawtransaction output phase for "
+                                    "[http-server-handler] Error in createrawtransaction output"
+                                            + " phase for "
                                             + CoinTickerUtils.tickerToString(coin.getTicker())
                                             + ", "
                                             + e.getMessage());
@@ -1045,7 +1116,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         }
                     }
 
-                    if (!outputSuccess) break;
+                    if (!outputSuccess) {
+                        break;
+                    }
 
                     String hexTx;
                     if (hasTxTimeField(coin.getTicker())) {
@@ -1077,7 +1150,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: decoderawtransaction rawtx\n\nrawtx (string, required) - The raw transaction to decode, hex encoded.");
+                                "Usage: decoderawtransaction rawtx\n\n"
+                                    + "rawtx (string, required) - The raw transaction to decode,"
+                                    + " hex encoded.");
 
                         response.add("error", errorJSON);
                         break;
@@ -1093,7 +1168,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         tx = parseForCoin(coin.getTicker(), coin.getNetworkParameters(), rawBytes);
                     } catch (Exception e) {
                         LOGGER.warning(
-                                "[http-server-handler] Error decoding raw transaction in decoderawtransaction for "
+                                "[http-server-handler] Error decoding raw transaction in"
+                                        + " decoderawtransaction for "
                                         + CoinTickerUtils.tickerToString(coin.getTicker())
                                         + ", "
                                         + e.getMessage());
@@ -1129,7 +1205,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             vin.add(thisVin);
                         } catch (Exception e) {
                             LOGGER.warning(
-                                    "[http-server-handler] ERROR: Error while parsing transaction inputs!");
+                                    "[http-server-handler] ERROR: Error while parsing transaction"
+                                            + " inputs!");
                             LOGGER.warning(
                                     "[http-server-handler] Error parsing transaction inputs for "
                                             + CoinTickerUtils.tickerToString(coin.getTicker())
@@ -1148,7 +1225,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         }
                     }
 
-                    if (!inputParseSuccess) break;
+                    if (!inputParseSuccess) {
+                        break;
+                    }
 
                     txJSON.add("vin", vin);
                     JsonArray vout = new JsonArray();
@@ -1203,7 +1282,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         } catch (Exception e) {
                             outputParseFailed = true;
                             LOGGER.warning(
-                                    "[http-server-handler] ERROR: Error while parsing transaction outputs!");
+                                    "[http-server-handler] ERROR: Error while parsing transaction"
+                                            + " outputs!");
                             LOGGER.warning(
                                     "[http-server-handler] Error parsing transaction outputs for "
                                             + CoinTickerUtils.tickerToString(coin.getTicker())
@@ -1222,7 +1302,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     // A throwing vout must surface as an error, not be silently
                     // dropped from a success-shaped response.
-                    if (outputParseFailed) break;
+                    if (outputParseFailed) {
+                        break;
+                    }
 
                     txJSON.add("vout", vout);
 
@@ -1239,7 +1321,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: signrawtransaction rawtx\n\nrawtx (string, required) - The raw transaction to sign, hex encoded.");
+                                "Usage: signrawtransaction rawtx\n\n"
+                                    + "rawtx (string, required) - The raw transaction to sign, hex"
+                                    + " encoded.");
 
                         response.add("error", errorJSON);
                         break;
@@ -1267,7 +1351,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         tx = parseForCoin(coin.getTicker(), coin.getNetworkParameters(), rawBytes);
                     } catch (Exception e) {
                         LOGGER.warning(
-                                "[http-server-handler] Error decoding raw tx in signrawtransaction for "
+                                "[http-server-handler] Error decoding raw tx in signrawtransaction"
+                                        + " for "
                                         + CoinTickerUtils.tickerToString(coin.getTicker())
                                         + ", "
                                         + e.getMessage());
@@ -1300,7 +1385,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             getInvalidTxResponse(
                                     response,
                                     new Exception(
-                                            "Transaction contains an utxo/input which does not exist in our wallet."));
+                                            "Transaction contains an utxo/input which does not"
+                                                    + " exist in our wallet."));
                             inputFailed = true;
                             break;
                         }
@@ -1320,14 +1406,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         // An error response is already set — never hand back a
                         // partially signed hex claiming complete:true.
                         LOGGER.warning(
-                                "[http-server-handler] signrawtransaction aborted with unsigned inputs for "
+                                "[http-server-handler] signrawtransaction aborted with unsigned"
+                                        + " inputs for "
                                         + CoinTickerUtils.tickerToString(coin.getTicker()));
                         break;
                     }
 
                     List<String> inputTxids = new ArrayList<>();
-                    for (TransactionOutPoint outPoint : outPoints)
+                    for (TransactionOutPoint outPoint : outPoints) {
                         inputTxids.add(outPoint.getHash().toString());
+                    }
 
                     // The chain signs nTime, so the value must be final before any
                     // signature is computed. The value carried by the unsigned
@@ -1340,7 +1428,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     } catch (RuntimeException e) {
                         nTimeFailure(response, e.getMessage());
                         LOGGER.warning(
-                                "[http-server-handler] signrawtransaction could not resolve nTime for "
+                                "[http-server-handler] signrawtransaction could not resolve nTime"
+                                        + " for "
                                         + CoinTickerUtils.tickerToString(coin.getTicker())
                                         + ", "
                                         + e.getMessage());
@@ -1377,7 +1466,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         // outer handler, so the caller would get no response.
                         getInvalidTxResponse(response, e);
                         LOGGER.warning(
-                                "[http-server-handler] signrawtransaction could not sign inputs for "
+                                "[http-server-handler] signrawtransaction could not sign inputs for"
+                                        + " "
                                         + CoinTickerUtils.tickerToString(coin.getTicker())
                                         + ", "
                                         + e.getMessage());
@@ -1421,7 +1511,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                         + //
                                         "n (numeric, required) - The vout value\\n"
                                         + //
-                                        "include_mempool (boolean, optional, default=true) - Whether to include the mempool");
+                                        "include_mempool (boolean, optional, default=true) -"
+                                        + " Whether to include the mempool");
 
                         response.add("error", errorJSON);
                         break;
@@ -1481,7 +1572,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     if (!includeMempool) {
                         LOGGER.warning(
-                                "[http-server-handler] WARNING: Client requested UTXO that is not ours!");
+                                "[http-server-handler] WARNING: Client requested UTXO that is not"
+                                        + " ours!");
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
 
@@ -1552,7 +1644,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                         if (!isOurs) {
                             LOGGER.warning(
-                                    "[http-server-handler] WARNING: Client requested UTXO that cannot be ours!");
+                                    "[http-server-handler] WARNING: Client requested UTXO that"
+                                            + " cannot be ours!");
                             response.add("result", JsonNull.INSTANCE);
                             JsonObject errorJSON = new JsonObject();
 
@@ -1594,7 +1687,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                             if (!unspent) {
                                 LOGGER.warning(
-                                        "[http-server-handler] WARNING: Client requested UTXO that was already spent!");
+                                        "[http-server-handler] WARNING: Client requested UTXO that"
+                                                + " was already spent!");
                                 response.add("result", JsonNull.INSTANCE);
                                 JsonObject errorJSON = new JsonObject();
 
@@ -1660,7 +1754,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: importprivkey privatekey\n\nNOTE: Key's are not persistent!\n\nprivatekey (string, required)");
+                                "Usage: importprivkey privatekey\n\n"
+                                        + "NOTE: Key's are not persistent!\n\n"
+                                        + "privatekey (string, required)");
 
                         response.add("error", errorJSON);
                         break;
@@ -1710,7 +1806,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: signmessage address message\n\naddress (string, required) - The address whose private key to use to sign the message\nmessage (string, required) - The message to sign");
+                                "Usage: signmessage address message\n\n"
+                                    + "address (string, required) - The address whose private key"
+                                    + " to use to sign the message\n"
+                                    + "message (string, required) - The message to sign");
 
                         response.add("error", errorJSON);
                         break;
@@ -1745,7 +1844,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: verifymessage address signature message\n\naddress (string, required) - The address whose private key to use to sign the message\nsignature (string, required) - The signature to verify, base64 encoded\nmessage (string, required) - The message to sign");
+                                "Usage: verifymessage address signature message\n\n"
+                                    + "address (string, required) - The address whose private key"
+                                    + " to use to sign the message\n"
+                                    + "signature (string, required) - The signature to verify,"
+                                    + " base64 encoded\n"
+                                    + "message (string, required) - The message to sign");
 
                         response.add("error", errorJSON);
                         break;
@@ -1760,18 +1864,22 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     try {
                         ECKey key = signedMessageToKey(signatureB64, message);
                         verified = verifyMessage(key, signatureB64, message);
-                        if (!verified) throw new SignatureException("Signature was not verified.");
+                        if (!verified) {
+                            throw new SignatureException("Signature was not verified.");
+                        }
 
                         String derivedAddr =
                                 LegacyAddress.fromKey(coin.getNetworkParameters(), key).toBase58();
                         if (!addr.equals(derivedAddr)) {
                             LOGGER.warning(
-                                    "[http-server-handler] ERROR: Addresses do not match! Failing.");
+                                    "[http-server-handler] ERROR: Addresses do not match!"
+                                            + " Failing.");
                             verified = false;
                         }
                     } catch (Exception e) {
                         LOGGER.warning(
-                                "[http-server-handler] Error while verifying signature! Invalid signature?");
+                                "[http-server-handler] Error while verifying signature! Invalid"
+                                        + " signature?");
                         LOGGER.warning(
                                 "[http-server-handler] Error verifying message for "
                                         + CoinTickerUtils.tickerToString(coin.getTicker())
@@ -1795,7 +1903,18 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: sendtransaction address amount [dryrun]\n\naddress (string, required)\namount (number, required)\ndryrun (boolean, optional) - build and sign the transaction and return it with its fee breakdown instead of broadcasting it. For a chain whose transactions carry nTime (Verge, Emercoin, Pocketcoin) the nTime is taken as the later of the current time and the times of the parent transactions, so each input's parent is fetched over the network first: this call is slower, and spending an output whose parent is not yet available upstream fails rather than being sent without a valid nTime.");
+                                "Usage: sendtransaction address amount [dryrun]\n\n"
+                                    + "address (string, required)\n"
+                                    + "amount (number, required)\n"
+                                    + "dryrun (boolean, optional) - build and sign the transaction"
+                                    + " and return it with its fee breakdown instead of"
+                                    + " broadcasting it. For a chain whose transactions carry nTime"
+                                    + " (Verge, Emercoin, Pocketcoin) the nTime is taken as the"
+                                    + " later of the current time and the times of the parent"
+                                    + " transactions, so each input's parent is fetched over the"
+                                    + " network first: this call is slower, and spending an output"
+                                    + " whose parent is not yet available upstream fails rather"
+                                    + " than being sent without a valid nTime.");
 
                         response.add("error", errorJSON);
                         break;
@@ -1899,7 +2018,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             response.add("error", errorJSON);
 
                             LOGGER.warning(
-                                    "[http-server-handler] Error creating transaction in sendtransaction for "
+                                    "[http-server-handler] Error creating transaction in"
+                                            + " sendtransaction for "
                                             + CoinTickerUtils.tickerToString(coin.getTicker())
                                             + ", "
                                             + e.getMessage());
@@ -1971,9 +2091,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                     code = errorNode.getAsInt();
                                 } else if (errorNode.isJsonObject()) {
                                     JsonObject errObj = errorNode.getAsJsonObject();
-                                    if (errObj.has("code")) code = errObj.get("code").getAsInt();
-                                    if (errObj.has("message"))
+                                    if (errObj.has("code")) {
+                                        code = errObj.get("code").getAsInt();
+                                    }
+                                    if (errObj.has("message")) {
                                         errorMsg = errObj.get("message").getAsString();
+                                    }
                                 }
                             }
                             LOGGER.warning(
@@ -2036,7 +2159,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         errorJSON.addProperty("code", -1);
                         errorJSON.addProperty(
                                 "message",
-                                "Usage: validateaddress address\n\naddress (string, required) - The address to validate.");
+                                "Usage: validateaddress address\n\n"
+                                        + "address (string, required) - The address to validate.");
 
                         response.add("error", errorJSON);
                         break;
@@ -2110,38 +2234,60 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                     + "\n"
                                     + "help - This command help.\n"
                                     + "version - Get version\n"
-                                    + "\n=====Blockchain=====\n"
-                                    + "gettxout <txid> <vout> - Get info about an unspent transaction output\n"
-                                    + "\n=====Network=====\n"
-                                    + "ping - Lightweight liveness probe (result 1 if RPC listener alive)\n"
-                                    + "getinfo - Get information such as balances, protocol version, and more.\n"
+                                    + "\n"
+                                    + "=====Blockchain=====\n"
+                                    + "gettxout <txid> <vout> - Get info about an unspent"
+                                    + " transaction output\n"
+                                    + "\n"
+                                    + "=====Network=====\n"
+                                    + "ping - Lightweight liveness probe (result 1 if RPC listener"
+                                    + " alive)\n"
+                                    + "getinfo - Get information such as balances, protocol"
+                                    + " version, and more.\n"
                                     + "getblockcount - Get block count\n"
                                     + "getnetworkinfo - Get network information\n"
                                     + "getfees - Get fee per byte and minimum transaction fee\n"
                                     + "getrawmempool - Get raw mempool\n"
                                     + "getblockchaininfo - Get blockchain info\n"
-                                    + "getblockhash <height> - Get the hash of a block at a given height\n"
-                                    + "getblock <hash> - Get a block's JSON representation given its hash\n"
-                                    + "\n=====Wallet=====\n"
+                                    + "getblockhash <height> - Get the hash of a block at a given"
+                                    + " height\n"
+                                    + "getblock <hash> - Get a block's JSON representation given"
+                                    + " its hash\n"
+                                    + "\n"
+                                    + "=====Wallet=====\n"
                                     + "listunspent - Get all UTXOs in the wallet\n"
                                     + "listtransactions - Get all transactions in the wallet\n"
                                     + "getnewaddress - Generate a new address\n"
                                     + "gettransaction <txid> - Get a transaction given its TXID\n"
-                                    + "getaddressesbyaccount <account> - Get addresses belonging to a given account. The only account available is 'main' which contains all addresses.\n"
-                                    + "importprivkey <privkey> - Import an address given it's privkey\n"
+                                    + "getaddressesbyaccount <account> - Get addresses belonging to"
+                                    + " a given account. The only account available is 'main' which"
+                                    + " contains all addresses.\n"
+                                    + "importprivkey <privkey> - Import an address given it's"
+                                    + " privkey\n"
                                     + "dumpprivkey <address> - Dump an addresses private key\n"
-                                    + "\n=====Utilities=====\n"
-                                    + "signmessage <address> <message> - Sign a message with a given address' private key\n"
-                                    + "verifymessage <address> <signature> <message> - Verify a signature for a message signed by a given address\n"
+                                    + "\n"
+                                    + "=====Utilities=====\n"
+                                    + "signmessage <address> <message> - Sign a message with a"
+                                    + " given address' private key\n"
+                                    + "verifymessage <address> <signature> <message> - Verify a"
+                                    + " signature for a message signed by a given address\n"
                                     + "validateaddress <address> - Validate a given address\n"
-                                    + "reloadconfig <ticker> - Reload configuration for the specified coin ticker\n"
-                                    + "sendtransaction <address> <amount> - Create and broadcast a signed transaction to the network\n"
-                                    + "\n=====Raw Transactions=====\n"
-                                    + "getrawtransaction <txid> [verbose] - Get a transaction's serialized hex (JSON when verbose)\n"
-                                    + "createrawtransaction <inputs> <outputs> - Create a raw transaction given inputs and outputs in JSON format. For more info, run createrawtransaction with no arguments.\n"
-                                    + "decoderawtransaction <rawtx> - Get a raw transaction's JSON representation\n"
+                                    + "reloadconfig <ticker> - Reload configuration for the"
+                                    + " specified coin ticker\n"
+                                    + "sendtransaction <address> <amount> - Create and broadcast a"
+                                    + " signed transaction to the network\n"
+                                    + "\n"
+                                    + "=====Raw Transactions=====\n"
+                                    + "getrawtransaction <txid> [verbose] - Get a transaction's"
+                                    + " serialized hex (JSON when verbose)\n"
+                                    + "createrawtransaction <inputs> <outputs> - Create a raw"
+                                    + " transaction given inputs and outputs in JSON format. For"
+                                    + " more info, run createrawtransaction with no arguments.\n"
+                                    + "decoderawtransaction <rawtx> - Get a raw transaction's JSON"
+                                    + " representation\n"
                                     + "signrawtransaction <rawtx> - Sign a raw transaction\n"
-                                    + "sendrawtransaction <rawtx> - Broadcast a signed raw transaction to the network\n";
+                                    + "sendrawtransaction <rawtx> - Broadcast a signed raw"
+                                    + " transaction to the network\n";
 
                     response.addProperty("result", helpString);
                     response.add("error", JsonNull.INSTANCE);
@@ -2196,10 +2342,13 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     static String serializeForBroadcast(
             CoinTicker ticker, Transaction transaction, long signedNTime) {
         byte[] standard = transaction.bitcoinSerialize();
-        if (!hasTxTimeField(ticker)) return new String(Hex.encode(standard));
-        if (signedNTime < 0 || signedNTime > 0xFFFFFFFFL)
+        if (!hasTxTimeField(ticker)) {
+            return new String(Hex.encode(standard));
+        }
+        if (signedNTime < 0 || signedNTime > 0xFFFFFFFFL) {
             throw new RuntimeException(
                     "cannot serialize: no nTime was signed for this transaction");
+        }
         return new String(Hex.encode(TxTimeField.insertNTime(standard, signedNTime)));
     }
 
@@ -2215,7 +2364,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private long resolveNTimeForInputs(List<UTXO> selected) {
         List<String> parentTxids = new ArrayList<>();
         for (UTXO utxo : selected) {
-            if (!utxo.isSpent()) parentTxids.add(utxo.getTxid());
+            if (!utxo.isSpent()) {
+                parentTxids.add(utxo.getTxid());
+            }
         }
         List<Long> parentNTimes = fetchParentNTimes(coin.getTicker(), parentTxids);
         return TxTimeField.spendNTime(System.currentTimeMillis() / 1000, parentNTimes);
@@ -2234,7 +2385,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         coin.getTicker(), new ArrayList<>(new LinkedHashSet<>(parentTxids)));
         long max = -1;
         for (Long parent : parentNTimes) {
-            if (parent != null && parent > max) max = parent;
+            if (parent != null && parent > max) {
+                max = parent;
+            }
         }
         return max;
     }
@@ -2248,13 +2401,17 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
      * there is undecodable, and guessing a time would sign bytes no node hashes.
      */
     private long resolveSignedNTime(long preservedNTime, List<String> inputTxids) {
-        if (!hasTxTimeField(coin.getTicker())) return -1;
+        if (!hasTxTimeField(coin.getTicker())) {
+            return -1;
+        }
         long parentMax = -1;
         if (TxTimeField.requiresParentNTime(coin.getTicker()) && !inputTxids.isEmpty()) {
             parentMax = resolveParentNTimeMax(inputTxids);
         }
         long signedNTime = Math.max(preservedNTime, parentMax);
-        if (signedNTime < 0) throw new RuntimeException("the unsigned transaction has no nTime");
+        if (signedNTime < 0) {
+            throw new RuntimeException("the unsigned transaction has no nTime");
+        }
         return signedNTime;
     }
 
@@ -2274,21 +2431,30 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
      * unrecognized value means false, so an existing two-parameter call keeps its behavior.
      */
     static boolean parseDryRunFlag(JsonArray params, int index) {
-        if (params.size() <= index) return false;
+        if (params.size() <= index) {
+            return false;
+        }
         JsonElement element = params.get(index);
         // A JSON null is an omitted flag: that is how an explicit null reads to
         // every JSON caller, and it is how a pre-flag two-argument call arrives.
-        if (element == null || element.isJsonNull()) return false;
+        if (element == null || element.isJsonNull()) {
+            return false;
+        }
         // A non-primitive here is not a boolean in any encoding, it is a wrong
         // argument. It used to be read as "not a dry run", which meant an object
         // or array in that position silently produced a real broadcast -- the one
         // outcome that must not be reached by guessing, since the caller asked
         // to have the transaction reviewed before it was spent.
-        if (!element.isJsonPrimitive())
+        if (!element.isJsonPrimitive()) {
             throw new IllegalArgumentException("dryrun must be true or false, got " + element);
+        }
         String value = element.getAsString();
-        if (value.equalsIgnoreCase("true") || value.equals("1")) return true;
-        if (value.equalsIgnoreCase("false") || value.equals("0")) return false;
+        if (value.equalsIgnoreCase("true") || value.equals("1")) {
+            return true;
+        }
+        if (value.equalsIgnoreCase("false") || value.equals("0")) {
+            return false;
+        }
         // Anything else is a typo, and here the cost of guessing is asymmetric:
         // the verbose flag degrades output, whereas a misspelled dryrun that
         // resolved to false would spend the money the caller asked to have
@@ -2360,8 +2526,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         List<Long> parents = new ArrayList<>();
         for (String parentTxid : parentTxids) {
             JsonObject parent = httpClient.getRawTransaction(ticker, parentTxid, false);
-            if (parent == null || !parent.has("result") || parent.get("result").isJsonNull())
+            if (parent == null || !parent.has("result") || parent.get("result").isJsonNull()) {
                 throw new RuntimeException("Cannot fetch parent " + parentTxid + " for nTime");
+            }
             try {
                 parents.add(
                         TxTimeField.parentNTime(Hex.decode(parent.get("result").getAsString())));
@@ -2378,7 +2545,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
      * IllegalArgumentException on undersized input (handled by callers as an invalid-tx response).
      */
     private static byte[] decodeForParsing(CoinTicker ticker, byte[] rawBytes) {
-        if (!hasTxTimeField(ticker)) return rawBytes;
+        if (!hasTxTimeField(ticker)) {
+            return rawBytes;
+        }
         // A standard-layout transaction has no nTime, so reading one would
         // shift every remaining field and yield a transaction that parses into
         // something else. No length threshold can tell the layouts apart -- a
@@ -2411,10 +2580,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     static Transaction parseForCoin(CoinTicker ticker, NetworkParameters params, byte[] rawBytes) {
         byte[] parsed = decodeForParsing(ticker, rawBytes);
         Transaction tx = new Transaction(params, parsed);
-        if (hasTxTimeField(ticker) && !java.util.Arrays.equals(tx.bitcoinSerialize(), parsed))
+        if (hasTxTimeField(ticker) && !java.util.Arrays.equals(tx.bitcoinSerialize(), parsed)) {
             throw new IllegalArgumentException(
                     "raw transaction is not in this chain's wire layout: it re-serializes "
                             + "differently, so it carries no nTime");
+        }
         return tx;
     }
 
@@ -2423,7 +2593,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
      * Package-private static for testability.
      */
     static String signedMessageHeader(CoinTicker ticker) {
-        if (ticker == null) return null;
+        if (ticker == null) {
+            return null;
+        }
         switch (ticker) {
             case BLOCKNET:
                 return "Blocknet Signed Message:\n";
@@ -2494,7 +2666,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 break;
             }
         }
-        if (recoveryId == -1) throw new IllegalStateException("Recovery ID is invalid.");
+        if (recoveryId == -1) {
+            throw new IllegalStateException("Recovery ID is invalid.");
+        }
 
         byte[] sigData = new byte[65];
         byte headerByte = (byte) (recoveryId + 27 + (key.isCompressed() ? 4 : 0));
@@ -2514,13 +2688,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             throw new SignatureException("Could not decode base64", e);
         }
 
-        if (signatureEncoded.length < 65)
+        if (signatureEncoded.length < 65) {
             throw new SignatureException(
                     "Signature truncated, expected 65 bytes and got " + signatureEncoded.length);
+        }
         int header = signatureEncoded[0] & 0xFF;
 
-        if (header < 27 || header > 34)
+        if (header < 27 || header > 34) {
             throw new SignatureException("Header byte out of range: " + header);
+        }
 
         BigInteger r = new BigInteger(1, Arrays.copyOfRange(signatureEncoded, 1, 33));
         BigInteger s = new BigInteger(1, Arrays.copyOfRange(signatureEncoded, 33, 65));
@@ -2536,8 +2712,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
         int recId = header - 27;
         ECKey key = ECKey.recoverFromSignature(recId, sig, messageHash, compressed);
-        if (key == null)
+        if (key == null) {
             throw new SignatureException("Could not recover public key from signature");
+        }
         return key;
     }
 
@@ -2545,7 +2722,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         boolean verified = false;
         try {
             ECKey k = signedMessageToKey(signatureB64, message);
-            if (Arrays.equals(k.getPubKey(), key.getPubKey())) verified = true;
+            if (Arrays.equals(k.getPubKey(), key.getPubKey())) {
+                verified = true;
+            }
         } catch (SignatureException e) {
             LOGGER.warning(
                     "[http-server-handler] Error verifying message for "
@@ -2682,7 +2861,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         if (xRouterResult.get() == null || xRouterResult.get().isEmpty()) {
             LOGGER.finer(
-                    "[http-server-handler] ERROR: XRouter request timed out or errored! Timeout period = "
+                    "[http-server-handler] ERROR: XRouter request timed out or errored! Timeout"
+                            + " period = "
                             + timeoutPeriod);
 
             response.add("result", JsonNull.INSTANCE);
@@ -2698,8 +2878,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             }
 
             if (xRouterResObj != null && xRouterResObj.has("result")) {
-                if (xRouterResObj.has("code")) response.add("code", xRouterResObj.get("code"));
-                if (xRouterResObj.has("error")) response.add("error", xRouterResObj.get("error"));
+                if (xRouterResObj.has("code")) {
+                    response.add("code", xRouterResObj.get("code"));
+                }
+                if (xRouterResObj.has("error")) {
+                    response.add("error", xRouterResObj.get("error"));
+                }
                 response.add("result", xRouterResObj.get("result"));
             } else {
                 if (xRouterResObj != null) {
@@ -2729,7 +2913,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private boolean writeResponse(
             ChannelHandlerContext ctx, FullHttpResponse httpResponse, FullHttpRequest request) {
         boolean keepAlive = false;
-        if (request != null) keepAlive = HttpUtil.isKeepAlive(request);
+        if (request != null) {
+            keepAlive = HttpUtil.isKeepAlive(request);
+        }
 
         httpResponse.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json");
         httpResponse

@@ -11,7 +11,11 @@ import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.XRouterConfiguration;
 import io.xlite.daemon.app.wallet.WalletHelper;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.Transaction;
+import org.bitcoinj.core.TransactionOutput;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +39,8 @@ public class XRouterFeeUtils {
 
         if (!feeMap.containsKey(xRouterCommand)) {
             LOGGER.finer(
-                    "[xrouter-fee-utils] WARNING: Invalid/unknown XRouter command supplied to getXRouterFeeTx()! Assuming this command is free.");
+                    "[xrouter-fee-utils] WARNING: Invalid/unknown XRouter command supplied to"
+                            + " getXRouterFeeTx()! Assuming this command is free.");
             LOGGER.finer("[xrouter-fee-utils] Command: " + xRouterCommand);
 
             return "nohash;nofee";
@@ -148,11 +153,15 @@ public class XRouterFeeUtils {
 
         String xrFee = getXRouterFeeTx(blocknetPeer, "xrSendTransaction");
 
-        if (xrFee.equals("nohash;nofee")) return xrFee;
+        if (xrFee.equals("nohash;nofee")) {
+            return xrFee;
+        }
 
         Transaction tx = new Transaction(blocknetCoin.getNetworkParameters(), Hex.decode(xrFee));
 
-        if (tx.getInputs().size() == 0) return null;
+        if (tx.getInputs().size() == 0) {
+            return null;
+        }
 
         return xrFee;
     }

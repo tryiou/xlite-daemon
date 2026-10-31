@@ -4,7 +4,11 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.*;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.Uninterruptibles;
 
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
@@ -34,8 +38,20 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Queue;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.LogManager;
@@ -147,7 +163,9 @@ public class BlocknetPeerGroup {
         try {
             ListenableFuture<SocketAddress> future =
                     clientManager.openConnection(inetSocketAddress, blocknetPeer);
-            if (future.isDone()) Uninterruptibles.getUninterruptibly(future);
+            if (future.isDone()) {
+                Uninterruptibles.getUninterruptibly(future);
+            }
         } catch (ExecutionException e) {
             LOGGER.warning("[blocknet] Error connecting to peer" + e.getMessage());
             Throwable cause = Throwables.getRootCause(e);
@@ -162,7 +180,9 @@ public class BlocknetPeerGroup {
                 BlocknetPeer blocknetPeer =
                         createPeer(blocknetNetworkParameters, blockChain, blocknetSeed);
 
-                if (blocknetPeer == null) continue;
+                if (blocknetPeer == null) {
+                    continue;
+                }
 
                 LOGGER.finer(
                         "[blocknet-peer-group] Connecting to "
@@ -206,7 +226,9 @@ public class BlocknetPeerGroup {
                 startBackgroundThreads();
 
                 if (!(BackgroundTimerThread.HTTP_BLOCK_COUNT_UPDATES
-                        && BackgroundTimerThread.HTTP_BALANCE_UPDATES)) scheduleReconnects();
+                        && BackgroundTimerThread.HTTP_BALANCE_UPDATES)) {
+                    scheduleReconnects();
+                }
 
                 //                scheduleMessageQueueRuns();
             } catch (Throwable e) {
@@ -266,7 +288,9 @@ public class BlocknetPeerGroup {
     public BlocknetPeer getBestBlocknetPeer(String currency) {
         BlocknetPeer bestConnectedPeer = getBestConnectedPeer(currency);
 
-        if (bestConnectedPeer == null) return getBestPendingPeer(currency);
+        if (bestConnectedPeer == null) {
+            return getBestPendingPeer(currency);
+        }
 
         return bestConnectedPeer;
     }
@@ -290,7 +314,9 @@ public class BlocknetPeerGroup {
     }
 
     private void sendInitialXRouterMessages(BlocknetPeer peer) {
-        if (peer.getHaveConfig().get()) return;
+        if (peer.getHaveConfig().get()) {
+            return;
+        }
 
         LOGGER.finer("[blocknet-peer-group] Sending initial XRouter messages!");
 
@@ -308,7 +334,9 @@ public class BlocknetPeerGroup {
 
         peer.addXRouterMessageReceivedEventListener((message, original) -> {
             Preconditions.checkNotNull(message);
-            if (original == null) return;
+            if (original == null) {
+                return;
+            }
 
             int originalCmd = original.getXRouterHeader().getCommand();
             String reply = (String) message.getParsedData().get("reply");
@@ -318,7 +346,9 @@ public class BlocknetPeerGroup {
                     {
                         try {
                             JSONObject replyJson = new JSONObject(reply);
-                            if (!replyJson.has("config")) break;
+                            if (!replyJson.has("config")) {
+                                break;
+                            }
 
                             XRouterConfiguration xRouterConfiguration =
                                     new XRouterConfiguration(replyJson.getString("config"));
@@ -332,7 +362,8 @@ public class BlocknetPeerGroup {
 
                             if (peer.getPluginConfig("xrmgetutxos") == null) {
                                 LOGGER.finer(
-                                        "[xrouter] ERROR: Node missing required configuration... Falling back to HTTP if no available nodes. ");
+                                        "[xrouter] ERROR: Node missing required configuration..."
+                                                + " Falling back to HTTP if no available nodes. ");
                                 peer.setHasRequiredPlugins(false);
                                 //                            peer.close();
                             }
@@ -369,7 +400,8 @@ public class BlocknetPeerGroup {
                             LOGGER.finer("Blocks for currency " + originalTicker + ": " + reply);
                         } catch (Exception e) {
                             LOGGER.finer(
-                                    "[xrouter] ERROR: Error while parsing XRouter reply to xrGetBlockCount! Dumping reply and stack trace.");
+                                    "[xrouter] ERROR: Error while parsing XRouter reply to"
+                                            + " xrGetBlockCount! Dumping reply and stack trace.");
                             LOGGER.finer(reply);
                         }
                         break;
@@ -384,12 +416,15 @@ public class BlocknetPeerGroup {
                                     {
                                         if (replyJson.has("error")) {
                                             LOGGER.finer(
-                                                    "[utxo-parser] ERROR: Error while retrieving UTXOs!");
+                                                    "[utxo-parser] ERROR: Error while retrieving"
+                                                            + " UTXOs!");
                                             LOGGER.finer(replyJson.getString("error"));
                                             break;
                                         }
 
-                                        if (!replyJson.has("utxos")) break;
+                                        if (!replyJson.has("utxos")) {
+                                            break;
+                                        }
 
                                         ArrayList originalList =
                                                 (ArrayList) original.getParsedData().get("params");
@@ -437,7 +472,8 @@ public class BlocknetPeerGroup {
                                 case "xrmgetbalance":
                                     {
                                         LOGGER.finer(
-                                                "[xrouter] ERROR: xrmgetbalance is not implemented yet!");
+                                                "[xrouter] ERROR: xrmgetbalance is not implemented"
+                                                        + " yet!");
                                         break;
                                     }
                                 case "xrmgetrawtransaction":
@@ -448,7 +484,8 @@ public class BlocknetPeerGroup {
                                 default:
                                     {
                                         LOGGER.finer(
-                                                "[xrouter] ERROR: Received reply for command we don't recognize! Original custom command: "
+                                                "[xrouter] ERROR: Received reply for command we"
+                                                    + " don't recognize! Original custom command: "
                                                         + originalCustomCmd
                                                         + ". Dumping reply.");
                                         LOGGER.finer(reply);
@@ -457,7 +494,8 @@ public class BlocknetPeerGroup {
                             }
                         } catch (Exception e) {
                             LOGGER.finer(
-                                    "[xrouter] ERROR: Error while parsing XRouter reply to xrService! Original custom command: "
+                                    "[xrouter] ERROR: Error while parsing XRouter reply to"
+                                            + " xrService! Original custom command: "
                                             + originalCustomCmd
                                             + ". Dumping reply and stack trace.");
                             LOGGER.finer(reply);
@@ -467,7 +505,8 @@ public class BlocknetPeerGroup {
                 default:
                     {
                         LOGGER.finer(
-                                "[xrouter] WARNING: Core received reply to unexpected packet type. This is probably not a bug. Original command: "
+                                "[xrouter] WARNING: Core received reply to unexpected packet type."
+                                        + " This is probably not a bug. Original command: "
                                         + XRouterCommandUtils.commandIdToString(originalCmd));
                         break;
                     }
@@ -516,7 +555,8 @@ public class BlocknetPeerGroup {
                 LOGGER.finer(
                         "[xrouter] WARNING: This network ("
                                 + blocknetInstance.getTicker().toString()
-                                + ") does not support XRouter. Will attempt to send XRouter messages over active Blocknet network.");
+                                + ") does not support XRouter. Will attempt to send XRouter"
+                                + " messages over active Blocknet network.");
                 return;
             }
 
@@ -575,11 +615,14 @@ public class BlocknetPeerGroup {
     private Runnable attemptReconnects(boolean forceReconnect) {
         return () -> {
             LOGGER.finer(
-                    "[blocknet-peer-group] Checking if we can reconnect to any disconnected peers...");
+                    "[blocknet-peer-group] Checking if we can reconnect to any disconnected"
+                            + " peers...");
 
             try {
                 for (BlocknetSeed blocknetSeed : blocknetSeeds) {
-                    if (blocknetSeed.isActivePeer()) continue;
+                    if (blocknetSeed.isActivePeer()) {
+                        continue;
+                    }
 
                     if (blocknetSeed.getLastFailTimeDiff() >= 60) {
                         blocknetSeed.resetCounters();
@@ -596,7 +639,9 @@ public class BlocknetPeerGroup {
                         BlocknetPeer blocknetPeer =
                                 createPeer(blocknetNetworkParameters, blockChain, blocknetSeed);
 
-                        if (blocknetPeer == null) continue;
+                        if (blocknetPeer == null) {
+                            continue;
+                        }
 
                         connectTo(
                                 new InetSocketAddress(
@@ -634,10 +679,14 @@ public class BlocknetPeerGroup {
 
             LOGGER.finer("[blocknet-peer-group] processing message queue");
 
-            if (messageQueue.size() == 0) return;
+            if (messageQueue.size() == 0) {
+                return;
+            }
 
             for (QueueItem queueItem : messageQueue) {
-                if (!queueItem.isValidItem()) messageQueue.remove(queueItem);
+                if (!queueItem.isValidItem()) {
+                    messageQueue.remove(queueItem);
+                }
 
                 BlocknetPeer blocknetPeer = queueItem.getOriginalPeer();
 
@@ -648,7 +697,9 @@ public class BlocknetPeerGroup {
                                     blockChain,
                                     blocknetPeer.getBlocknetSeed());
 
-                    if (blocknetPeer == null) continue;
+                    if (blocknetPeer == null) {
+                        continue;
+                    }
 
                     lock.lock();
                     try {

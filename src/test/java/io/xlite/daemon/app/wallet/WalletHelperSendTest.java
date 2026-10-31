@@ -143,7 +143,9 @@ class WalletHelperSendTest {
 
     private static void assertP2SHRoundTrip(CoinTicker ticker, NetworkParameters params) {
         byte[] hash = new byte[20];
-        for (int i = 0; i < hash.length; i++) hash[i] = (byte) (i * 7 + 3);
+        for (int i = 0; i < hash.length; i++) {
+            hash[i] = (byte) (i * 7 + 3);
+        }
         String p2sh = LegacyAddress.fromScriptHash(params, hash).toBase58();
         assertTrue(LegacyAddress.fromBase58(params, p2sh).isP2SHAddress());
         UTXO out = WalletHelper.createTransactionOutput(ticker, p2sh, 0.001, params);

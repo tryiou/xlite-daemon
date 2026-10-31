@@ -21,11 +21,31 @@ class CoinConfigRegistryFallbackTest {
 
     private static final String MANIFEST =
             "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\",\"ver_id\":\"litecoin--v1\",\"xbridge_conf\":\"litecoin--v1.conf\"},"
-                    + "{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\",\"ver_id\":\"doge--v1\",\"xbridge_conf\":\"doge--v1.conf\"}]";
+                + "{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\",\"ver_id\":\"doge--v1\",\"xbridge_conf\":\"doge--v1.conf\"}]";
     private static final String LTC_CONF =
-            "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nDustAmount=5460\nTxVersion=2\n";
+            "[LTC]\n"
+                    + "Title=Litecoin\n"
+                    + "AddressPrefix=48\n"
+                    + "ScriptPrefix=50\n"
+                    + "SecretPrefix=176\n"
+                    + "COIN=100000000\n"
+                    + "FeePerByte=10\n"
+                    + "MinTxFee=5000\n"
+                    + "Port=9332\n"
+                    + "DustAmount=5460\n"
+                    + "TxVersion=2\n";
     private static final String DOGE_CONF =
-            "[DOGE]\nTitle=Dogecoin\nAddressPrefix=30\nScriptPrefix=22\nSecretPrefix=158\nCOIN=100000000\nFeePerByte=10\nMinTxFee=1000\nPort=22555\nDustAmount=1000000\nTxVersion=1\n";
+            "[DOGE]\n"
+                    + "Title=Dogecoin\n"
+                    + "AddressPrefix=30\n"
+                    + "ScriptPrefix=22\n"
+                    + "SecretPrefix=158\n"
+                    + "COIN=100000000\n"
+                    + "FeePerByte=10\n"
+                    + "MinTxFee=1000\n"
+                    + "Port=22555\n"
+                    + "DustAmount=1000000\n"
+                    + "TxVersion=1\n";
 
     @BeforeEach
     void reset() {

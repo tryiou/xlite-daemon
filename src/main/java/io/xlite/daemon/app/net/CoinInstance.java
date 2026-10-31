@@ -11,7 +11,10 @@ import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.crypto.KeyHandler;
 import io.xlite.daemon.app.net.api.JSONRPCController;
 import io.xlite.daemon.app.net.api.JSONRPCServer;
-import io.xlite.daemon.app.net.protocols.blocknet.*;
+import io.xlite.daemon.app.net.protocols.blocknet.BlocknetNetworkParameters;
+import io.xlite.daemon.app.net.protocols.blocknet.BlocknetParameters;
+import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
+import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeerGroup;
 import io.xlite.daemon.app.net.xrouter.XRouterMessage;
 import io.xlite.daemon.app.net.xrouter.XRouterPacketManager;
 import io.xlite.daemon.app.util.AddressBalance;
@@ -25,7 +28,12 @@ import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
 import io.xlite.daemon.app.wallet.WalletHelper;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.BlockChain;
+import org.bitcoinj.core.Context;
+import org.bitcoinj.core.DumpedPrivateKey;
+import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.core.Monetary;
+import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.utils.ListenerRegistration;
 import org.bitcoinj.utils.MonetaryFormat;
 import org.bitcoinj.utils.Threading;
@@ -34,7 +42,16 @@ import org.bitcoinj.wallet.Wallet;
 import org.json.JSONArray;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -119,7 +136,9 @@ public class CoinInstance {
 
         addBlockCount(ticker, 0);
 
-        if (isBlocknetNetwork()) setActiveCurrency(this);
+        if (isBlocknetNetwork()) {
+            setActiveCurrency(this);
+        }
     }
 
     /**
@@ -130,10 +149,14 @@ public class CoinInstance {
      * @return String
      */
     public static String getMnemonicForPw(char[] pw) {
-        if (!KeyHandler.existsBaseECKeyFromLocal()) return "";
+        if (!KeyHandler.existsBaseECKeyFromLocal()) {
+            return "";
+        }
 
         List<String> seed = KeyHandler.getBaseSeed(pw);
-        if (seed == null) return "";
+        if (seed == null) {
+            return "";
+        }
         return Joiner.on(" ").join(seed);
     }
 
@@ -178,7 +201,9 @@ public class CoinInstance {
 
     public AddressBalance getAddress(String addressB58) {
         for (AddressBalance address : addressKeyPairs) {
-            if (address.getAddress().toBase58().equals(addressB58)) return address;
+            if (address.getAddress().toBase58().equals(addressB58)) {
+                return address;
+            }
         }
 
         return null;
@@ -212,7 +237,9 @@ public class CoinInstance {
                         .findAny()
                         .orElse(null);
 
-        if (addrExists == null) addressKeyPairs.add(addressKeyPair);
+        if (addrExists == null) {
+            addressKeyPairs.add(addressKeyPair);
+        }
     }
 
     public CoinTicker getTicker() {
@@ -255,8 +282,11 @@ public class CoinInstance {
                     cfg = new ConfigHelper(CoinTickerUtils.tickerToString(ticker));
                 }
                 instance = new CoinInstance(ticker, cfg);
-                if (ticker == CoinTicker.BLOCKNET) coinInstances.add(0, instance);
-                else coinInstances.add(instance);
+                if (ticker == CoinTicker.BLOCKNET) {
+                    coinInstances.add(0, instance);
+                } else {
+                    coinInstances.add(instance);
+                }
             }
 
             if (ticker == CoinTicker.BLOCKNET) {
@@ -347,12 +377,13 @@ public class CoinInstance {
                                 + CoinTickerUtils.tickerToString(ticker)
                                 + e.getMessage());
             }
-            if (coinRPCServer.isAlive())
+            if (coinRPCServer.isAlive()) {
                 LOGGER.warning(
                         "[coin] RPC server thread for "
                                 + CoinTickerUtils.tickerToString(ticker)
                                 + " still alive after deinit"
                                 + (interruptedDuringJoin ? " (join was interrupted)" : ""));
+            }
         }
     }
 
@@ -366,7 +397,9 @@ public class CoinInstance {
                     // used to take a hardcoded parameter class instead, whose fee
                     // constants had drifted from what that file specifies.
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     // The XRouter-over-p2p parameters are separate and still
                     // hardcoded: they carry the p2p serializer that the config
                     // does not model. Nothing in the money or address paths reads
@@ -384,77 +417,99 @@ public class CoinInstance {
                 {
                     LOGGER.fine("[coin] Initializing for Bitcoin main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case LITECOIN:
                 {
                     LOGGER.fine("[coin] Initializing for Litecoin main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case DASHCOIN:
                 {
                     LOGGER.fine("[coin] Initializing for Dashcoin main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case DIGIBYTE:
                 {
                     LOGGER.fine("[coin] Initializing for Digibyte main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case DOGECOIN:
                 {
                     LOGGER.fine("[coin] Initializing for Dogecoin main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case SYSCOIN:
                 {
                     LOGGER.fine("[coin] Initializing for Syscoin main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case PIVX:
                 {
                     LOGGER.fine("[coin] Initializing for Pivx main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case UNOBTANIUM:
                 {
                     LOGGER.fine("[coin] Initializing for Unobtanium main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case PKOIN:
                 {
                     LOGGER.fine("[coin] Initializing for Pocketcoin main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case RAVENCOIN:
                 {
                     LOGGER.fine("[coin] Initializing for Ravencoin main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             case VERGE:
                 {
                     LOGGER.fine("[coin] Initializing for Verge main network.");
                     CoinError err = loadMigratedParams();
-                    if (err != null) return err;
+                    if (err != null) {
+                        return err;
+                    }
                     break;
                 }
             default:
@@ -544,7 +599,9 @@ public class CoinInstance {
                             + " on port "
                             + getRPCPort());
 
-            if (coinRPCServer.isAlive()) coinRPCServer.deinit();
+            if (coinRPCServer.isAlive()) {
+                coinRPCServer.deinit();
+            }
 
             coinRPCServer.start();
 
@@ -812,7 +869,8 @@ public class CoinInstance {
     public void sendXrGetUtxos(BlocknetPeer blocknetPeer) {
         if (System.currentTimeMillis() - lastUtxoUpdate < MINIMUM_UTXO_UPDATE_INTERVAL) {
             LOGGER.fine(
-                    "[coin] Aborting UTXO checking as the list was updated less than 1 second ago.");
+                    "[coin] Aborting UTXO checking as the list was updated less than 1 second"
+                            + " ago.");
             return;
         }
 
@@ -967,7 +1025,9 @@ public class CoinInstance {
                 }
         }
 
-        if (message != null) blocknetPeerGroup.sendMessage(blocknetPeer, message);
+        if (message != null) {
+            blocknetPeerGroup.sendMessage(blocknetPeer, message);
+        }
 
         return uuid;
     }
@@ -987,7 +1047,9 @@ public class CoinInstance {
         JsonArray unspentTxsJSON = new JsonArray();
         for (AddressBalance addressBalance : getAddressKeyPairs()) {
             for (UTXO utxo : addressBalance.getUtxos()) {
-                if (utxo.isSpent()) continue;
+                if (utxo.isSpent()) {
+                    continue;
+                }
 
                 org.bitcoinj.core.UTXO bUtxo;
                 try {
@@ -1025,7 +1087,9 @@ public class CoinInstance {
 
                             @Override
                             public int signum() {
-                                if (this.getValue() == 0) return 0;
+                                if (this.getValue() == 0) {
+                                    return 0;
+                                }
                                 return this.getValue() < 0 ? -1 : 1;
                             }
                         };
@@ -1039,7 +1103,9 @@ public class CoinInstance {
 
                 int totalBlocks = CoinInstance.getBlockCountByTicker(getTicker());
                 int confirmations = (totalBlocks - bUtxo.getHeight()) + 1;
-                if (bUtxo.getHeight() == 0) confirmations = 0;
+                if (bUtxo.getHeight() == 0) {
+                    confirmations = 0;
+                }
                 // Pre-first-poll the height cache holds a negative sentinel
                 // (-1); clamp so no caller ever sees negative confirmations.
                 confirmations = Math.max(0, confirmations);
@@ -1106,7 +1172,9 @@ public class CoinInstance {
     }
 
     public WalletHelper getWalletHelper() {
-        if (this.walletHelper == null) this.walletHelper = new WalletHelper(this);
+        if (this.walletHelper == null) {
+            this.walletHelper = new WalletHelper(this);
+        }
 
         return this.walletHelper;
     }
@@ -1204,7 +1272,9 @@ public class CoinInstance {
     }
 
     public void processHistoryTxs(List<Transaction> transactions) {
-        for (Transaction tx : transactions) transactionList.put(tx.uid(), tx);
+        for (Transaction tx : transactions) {
+            transactionList.put(tx.uid(), tx);
+        }
     }
 
     private void setLastUtxoUpdate(long newUtxoTime) {
@@ -1214,13 +1284,16 @@ public class CoinInstance {
     public void reloadConfig() {
         this.configHelper.loadConfig();
         resolveRpcPort();
-        if (configHelper.getAddressCount() != generatedAddressCount)
+        if (configHelper.getAddressCount() != generatedAddressCount) {
             generateForwardAddresses(false);
+        }
 
-        if (coinRPCServer == null) return; // no rpc available, skip
+        if (coinRPCServer == null) {
+            return; // no rpc available, skip
 
-        // Same fail-closed gate as initial start: a config edited to a
-        // wildcard between reloads must not rebind onto every interface.
+            // Same fail-closed gate as initial start: a config edited to a
+            // wildcard between reloads must not rebind onto every interface.
+        }
         if (!configHelper.validBindAddress()) {
             LOGGER.severe(
                     "[rpc] Refusing to rebind JSON-RPC server for coin "
@@ -1270,7 +1343,9 @@ public class CoinInstance {
     }
 
     public BlocknetPeer getBestBlocknetPeer(String currency) {
-        if (blocknetPeerGroup == null) return null;
+        if (blocknetPeerGroup == null) {
+            return null;
+        }
 
         return blocknetPeerGroup.getBestBlocknetPeer(currency);
     }

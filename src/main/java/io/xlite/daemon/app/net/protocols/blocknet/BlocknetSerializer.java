@@ -5,7 +5,32 @@ import com.subgraph.orchid.encoders.Hex;
 import io.xlite.daemon.app.net.protocols.blocknet.messages.VersionMessageImpl;
 import io.xlite.daemon.app.net.xrouter.XRouterMessage;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.AddressMessage;
+import org.bitcoinj.core.AlertMessage;
+import org.bitcoinj.core.BitcoinSerializer;
+import org.bitcoinj.core.Block;
+import org.bitcoinj.core.BloomFilter;
+import org.bitcoinj.core.FilteredBlock;
+import org.bitcoinj.core.GetAddrMessage;
+import org.bitcoinj.core.GetBlocksMessage;
+import org.bitcoinj.core.GetDataMessage;
+import org.bitcoinj.core.GetHeadersMessage;
+import org.bitcoinj.core.GetUTXOsMessage;
+import org.bitcoinj.core.HeadersMessage;
+import org.bitcoinj.core.InventoryMessage;
+import org.bitcoinj.core.MemoryPoolMessage;
+import org.bitcoinj.core.Message;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.NotFoundMessage;
+import org.bitcoinj.core.Ping;
+import org.bitcoinj.core.Pong;
+import org.bitcoinj.core.ProtocolException;
+import org.bitcoinj.core.RejectMessage;
+import org.bitcoinj.core.Transaction;
+import org.bitcoinj.core.UTXOsMessage;
+import org.bitcoinj.core.UnknownMessage;
+import org.bitcoinj.core.VersionAck;
+import org.bitcoinj.core.VersionMessage;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -149,7 +174,8 @@ public class BlocknetSerializer extends BitcoinSerializer {
                 return null;
             default:
                 LOGGER.finer(
-                        "[blocknet-serializer] Warning: This serializer does not support deserializing "
+                        "[blocknet-serializer] Warning: This serializer does not support"
+                                + " deserializing "
                                 + blocknetPacketHeader.getCommand()
                                 + " packets (yet).");
                 return new UnknownMessage(params, blocknetPacketHeader.getCommand(), payloadBytes);

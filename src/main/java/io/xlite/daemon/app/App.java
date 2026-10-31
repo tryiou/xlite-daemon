@@ -16,7 +16,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.logging.*;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 public class App {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
@@ -45,7 +50,9 @@ public class App {
         }
         if (dotenv != null) {
             String value = dotenv.get(key);
-            if (value != null) return value;
+            if (value != null) {
+                return value;
+            }
         }
         return System.getenv(key);
     }
@@ -118,7 +125,9 @@ public class App {
     }
 
     public static void initExrEndpoint() {
-        if (EXR_ENDPOINT != null) return;
+        if (EXR_ENDPOINT != null) {
+            return;
+        }
         String exrEndpoint = getEnv("EXR_ENDPOINT");
         if (exrEndpoint != null && !exrEndpoint.isEmpty()) {
             EXR_ENDPOINT = exrEndpoint;
@@ -140,7 +149,8 @@ public class App {
                         flagValue = args[i + 1];
                     } else {
                         LOGGER.warning(
-                                "[coinconfig] Missing value after --blockchain-configuration-files");
+                                "[coinconfig] Missing value after"
+                                        + " --blockchain-configuration-files");
                     }
                     break;
                 }
@@ -168,7 +178,8 @@ public class App {
                             + source
                             + ": "
                             + e.getMessage()
-                            + " — continuing with no configs; migrated coins will report UNSUPPORTEDCOIN");
+                            + " — continuing with no configs; migrated coins will report"
+                            + " UNSUPPORTEDCOIN");
         }
     }
 
@@ -179,8 +190,9 @@ public class App {
      */
     private static io.xlite.daemon.app.coinconfig.CoinConfigCache cacheFor(String source) {
         try {
-            if (io.xlite.daemon.app.coinconfig.ConfigSourceResolver.isLocalDirectory(source))
+            if (io.xlite.daemon.app.coinconfig.ConfigSourceResolver.isLocalDirectory(source)) {
                 return null;
+            }
             java.nio.file.Path root =
                     java.nio.file.Paths.get(
                             getUserConfigDir(), ConfigHelper.DATA_DIR_NAME, "coinconfig-cache");

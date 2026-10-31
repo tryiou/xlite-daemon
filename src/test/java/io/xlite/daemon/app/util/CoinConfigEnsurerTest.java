@@ -48,7 +48,7 @@ class CoinConfigEnsurerTest {
     void testMissingCreatedAndConfiguredUntouched() throws Exception {
         String configured =
                 "{\"rpcEnabled\":false,\"rpcUsername\":\"keep\",\"rpcPassword\":\"keep\","
-                        + "\"rpcPort\":9332,\"feeperbyte\":10,\"mintxfee\":5000,\"addressCount\":3}";
+                    + "\"rpcPort\":9332,\"feeperbyte\":10,\"mintxfee\":5000,\"addressCount\":3}";
         Files.write(settingsFile("LTC").toPath(), configured.getBytes(StandardCharsets.UTF_8));
 
         Map<CoinTicker, CoinConfigEnsurer.Outcome> report =
@@ -97,7 +97,7 @@ class CoinConfigEnsurerTest {
     void testEnabledAndPartialConfigsUntouched() throws Exception {
         String enabled =
                 "{\"rpcEnabled\":true,\"rpcUsername\":\"u\",\"rpcPassword\":\"p\","
-                        + "\"rpcPort\":22555,\"feeperbyte\":10,\"mintxfee\":5000,\"addressCount\":1}";
+                    + "\"rpcPort\":22555,\"feeperbyte\":10,\"mintxfee\":5000,\"addressCount\":1}";
         Files.write(settingsFile("DOGE").toPath(), enabled.getBytes(StandardCharsets.UTF_8));
         // Valid JSON but missing keys: undecidable intent, must not touch
         String partial = "{\"rpcUsername\":\"partial\"}";

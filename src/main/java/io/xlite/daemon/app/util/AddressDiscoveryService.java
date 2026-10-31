@@ -115,7 +115,9 @@ public class AddressDiscoveryService {
         LOGGER.fine(getLogPrefix() + " Starting sequential batch scan");
 
         try {
-            if (isTimedOut(startTime)) return currentAddressCount;
+            if (isTimedOut(startTime)) {
+                return currentAddressCount;
+            }
 
             int lastNonEmptyBatch = -1;
             List<UTXO> lastBatchUtxos = null;
@@ -143,7 +145,9 @@ public class AddressDiscoveryService {
                 }
 
                 consecutiveErrors = 0;
-                if (utxos.isEmpty()) break;
+                if (utxos.isEmpty()) {
+                    break;
+                }
 
                 lastNonEmptyBatch = i;
                 lastBatchUtxos = utxos;

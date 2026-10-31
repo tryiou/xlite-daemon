@@ -100,7 +100,9 @@ class TimeFieldSignerTest {
     /** A 32-byte parent txid; Sha256Hash.wrap needs exactly 32 bytes. */
     private static Sha256Hash parentHash() {
         byte[] hash = new byte[32];
-        for (int i = 0; i < hash.length; i++) hash[i] = (byte) (i * 7 + 3);
+        for (int i = 0; i < hash.length; i++) {
+            hash[i] = (byte) (i * 7 + 3);
+        }
         return Sha256Hash.wrap(hash);
     }
 
@@ -407,7 +409,9 @@ class TimeFieldSignerTest {
 
         Transaction tx = fixture();
         byte[] big = new byte[300];
-        for (int i = 0; i < big.length; i++) big[i] = (byte) (i & 0xff);
+        for (int i = 0; i < big.length; i++) {
+            big[i] = (byte) (i & 0xff);
+        }
         Script bigScript = new ScriptBuilder().data(big).build();
         tx.addInput(parentHash(), 0, bigScript);
         byte[] pre =
@@ -618,17 +622,21 @@ class TimeFieldSignerTest {
                 (byte) scriptLen,
                 pre[scriptLenOffset],
                 "hashed script length must be one less than the raw program");
-        for (int i = scriptLenOffset + 1; i < scriptLenOffset + 1 + scriptLen; i++)
+        for (int i = scriptLenOffset + 1; i < scriptLenOffset + 1 + scriptLen; i++) {
             assertFalse(
                     pre[i] == (byte) ScriptOpCodes.OP_CODESEPARATOR,
                     "OP_CODESEPARATOR (0xAB) must not be hashed");
+        }
     }
 
     private static void assertContains(byte[] haystack, byte[] needle, String msg) {
         outer:
         for (int i = 0; i <= haystack.length - needle.length; i++) {
-            for (int j = 0; j < needle.length; j++)
-                if (haystack[i + j] != needle[j]) continue outer;
+            for (int j = 0; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) {
+                    continue outer;
+                }
+            }
             return;
         }
         org.junit.jupiter.api.Assertions.fail(msg);

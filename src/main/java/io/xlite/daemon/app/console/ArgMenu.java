@@ -39,7 +39,8 @@ public class ArgMenu {
         try {
             if (password == null) {
                 System.out.println(
-                        "Unrecognized arguments. Use --new-wallet <password> or --decrypt-wallet <password>.");
+                        "Unrecognized arguments. Use --new-wallet <password> or --decrypt-wallet"
+                                + " <password>.");
                 return;
             }
             switch (selection) {
@@ -82,7 +83,9 @@ public class ArgMenu {
                     throw new IllegalStateException("Unexpected value: " + selection);
             }
         } finally {
-            if (password != null) Arrays.fill(password, '\0');
+            if (password != null) {
+                Arrays.fill(password, '\0');
+            }
         }
     }
 
@@ -99,9 +102,11 @@ public class ArgMenu {
         }
 
         for (CoinTicker cointicker : CoinTicker.coins()) {
-            if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BITCOIN) continue;
+            if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BITCOIN) {
+                continue;
+            }
             coinError = CoinInstance.getInstance(cointicker).init(password, userMnemonic, false);
-            if (coinError != null)
+            if (coinError != null) {
                 System.out.println(
                         "["
                                 + cointicker.name()
@@ -109,6 +114,7 @@ public class ArgMenu {
                                 + coinError.getCode().name()
                                 + "): "
                                 + coinError.getMessage());
+            }
         }
     }
 }

@@ -76,7 +76,9 @@ public class XRouterMessage extends Message {
      * @throws IOException If writing fails or another error occurs
      */
     private void writePaymentTx(HashMap<String, Object> body, OutputStream out) throws IOException {
-        if (!body.containsKey("paymentTx")) return;
+        if (!body.containsKey("paymentTx")) {
+            return;
+        }
 
         out.write(((String) body.get("paymentTx")).getBytes());
         out.write(0x00);
@@ -200,7 +202,8 @@ public class XRouterMessage extends Message {
             case "xrGenerateBloomFilter":
                 {
                     LOGGER.finer(
-                            "[xrouter-message] ERROR: Attempted to serialize unsupported command 41.");
+                            "[xrouter-message] ERROR: Attempted to serialize unsupported command"
+                                    + " 41.");
                     break;
                 }
             case "xrGetBlocks":
@@ -227,7 +230,8 @@ public class XRouterMessage extends Message {
             case "xrGetBlockAtTime":
                 {
                     LOGGER.finer(
-                            "[xrouter-message] ERROR: Attempted to serialize unsupported command 52.");
+                            "[xrouter-message] ERROR: Attempted to serialize unsupported command"
+                                    + " 52.");
                     break;
                 }
             case "xrGetBalance":
@@ -271,7 +275,7 @@ public class XRouterMessage extends Message {
                         String classStr = XRouterConfiguration.getStringByClass(paramClass);
 
                         if (!(param instanceof String && ((String) param).equalsIgnoreCase("true")
-                                || ((String) param).equalsIgnoreCase("false")))
+                                || ((String) param).equalsIgnoreCase("false"))) {
                             Preconditions.checkState(
                                     paramClass.isInstance(param),
                                     "Supplied parameter at index "
@@ -279,6 +283,7 @@ public class XRouterMessage extends Message {
                                             + " is not of type '"
                                             + classStr
                                             + "'. Aborting transmission.");
+                        }
 
                         LOGGER.finer(
                                 "[xrService] DEBUG: Parameter " + i + " is of type " + classStr);
@@ -295,8 +300,11 @@ public class XRouterMessage extends Message {
                                 {
                                     int typedParam;
 
-                                    if (((String) param).equalsIgnoreCase("true")) typedParam = 1;
-                                    else typedParam = 0;
+                                    if (((String) param).equalsIgnoreCase("true")) {
+                                        typedParam = 1;
+                                    } else {
+                                        typedParam = 0;
+                                    }
 
                                     Utils.uint32ToByteStreamLE(typedParam, stream);
                                     break;
@@ -310,7 +318,8 @@ public class XRouterMessage extends Message {
                             default:
                                 {
                                     LOGGER.finer(
-                                            "[xrService] ERROR: Encountered unhandled parameter of type "
+                                            "[xrService] ERROR: Encountered unhandled parameter of"
+                                                    + " type "
                                                     + classStr
                                                     + ". Aborting transmission.");
                                     throw new IllegalStateException(
@@ -390,13 +399,15 @@ public class XRouterMessage extends Message {
             case "xrGetReply":
                 {
                     LOGGER.finer(
-                            "[xrouter-message] WARNING: Server asked to fetch reply, but we aren't a server.");
+                            "[xrouter-message] WARNING: Server asked to fetch reply, but we aren't"
+                                    + " a server.");
                     break;
                 }
             case "xrGetConfig":
                 {
                     LOGGER.finer(
-                            "[xrouter-message] WARNING: Server asked us for config, but we aren't a servicenode.");
+                            "[xrouter-message] WARNING: Server asked us for config, but we aren't a"
+                                    + " servicenode.");
                     break;
                 }
             case "xrGetBlockCount":

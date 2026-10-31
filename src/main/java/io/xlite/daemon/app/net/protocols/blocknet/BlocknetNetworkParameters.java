@@ -4,7 +4,12 @@ import com.subgraph.orchid.encoders.Hex;
 
 import io.xlite.daemon.app.net.xrouter.XRouterMessageSerializer;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.Block;
+import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.StoredBlock;
+import org.bitcoinj.core.Utils;
+import org.bitcoinj.core.VerificationException;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.MonetaryFormat;
@@ -236,7 +241,9 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 
         String[] dnsSeeds = new String[nodeCount];
 
-        for (int i = 0; i < nodeCount; i++) dnsSeeds[i] = "node-" + i + ".cloudchainsinc.com";
+        for (int i = 0; i < nodeCount; i++) {
+            dnsSeeds[i] = "node-" + i + ".cloudchainsinc.com";
+        }
 
         return dnsSeeds;
     }

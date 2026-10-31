@@ -18,12 +18,15 @@ public final class CoinConfigGate {
         checkByteRange("AddressPrefix", cfg.addressPrefix(), v);
         checkByteRange("ScriptPrefix", cfg.scriptPrefix(), v);
         checkByteRange("SecretPrefix", cfg.secretPrefix(), v);
-        if (cfg.addressPrefix() == cfg.scriptPrefix())
+        if (cfg.addressPrefix() == cfg.scriptPrefix()) {
             v.add("AddressPrefix equals ScriptPrefix (" + cfg.addressPrefix() + ")");
-        if (cfg.addressPrefix() == cfg.secretPrefix())
+        }
+        if (cfg.addressPrefix() == cfg.secretPrefix()) {
             v.add("AddressPrefix equals SecretPrefix (" + cfg.addressPrefix() + ")");
-        if (cfg.scriptPrefix() == cfg.secretPrefix())
+        }
+        if (cfg.scriptPrefix() == cfg.secretPrefix()) {
             v.add("ScriptPrefix equals SecretPrefix (" + cfg.scriptPrefix() + ")");
+        }
 
         if (cfg.coinFactor() <= 0) {
             v.add("COIN must be positive, got " + cfg.coinFactor());
@@ -39,21 +42,29 @@ public final class CoinConfigGate {
                 v.add("COIN is not a power of ten: " + cfg.coinFactor());
             }
         }
-        if (cfg.feePerByte() <= 0) v.add("FeePerByte must be positive, got " + cfg.feePerByte());
-        if (cfg.minTxFee() <= 0) v.add("MinTxFee must be positive, got " + cfg.minTxFee());
+        if (cfg.feePerByte() <= 0) {
+            v.add("FeePerByte must be positive, got " + cfg.feePerByte());
+        }
+        if (cfg.minTxFee() <= 0) {
+            v.add("MinTxFee must be positive, got " + cfg.minTxFee());
+        }
 
         // A dust floor is required: absent fails here rather than silently
         // meaning "no floor". Zero is legal (Firo has no dust gate); negative
         // would let every change output through, paying it to the miner.
         try {
             long dust = cfg.dustAmount();
-            if (dust < 0) v.add("DustAmount must not be negative, got " + dust);
+            if (dust < 0) {
+                v.add("DustAmount must not be negative, got " + dust);
+            }
         } catch (RuntimeException e) {
             v.add("DustAmount invalid: " + e.getMessage());
         }
 
         int port = cfg.port();
-        if (port < 1024 || port > 65_535) v.add("Port out of range 1024..65535: " + port);
+        if (port < 1024 || port > 65_535) {
+            v.add("Port out of range 1024..65535: " + port);
+        }
 
         // TxWithTimeField decides whether signatures are computed over an
         // nTime-bearing preimage. A malformed value throws when the send path
@@ -72,7 +83,9 @@ public final class CoinConfigGate {
         // not capped at 2 -- BCF carries larger values (Particl's 160).
         try {
             int txVersion = cfg.txVersion();
-            if (txVersion < 1) v.add("TxVersion must be positive, got " + txVersion);
+            if (txVersion < 1) {
+                v.add("TxVersion must be positive, got " + txVersion);
+            }
         } catch (RuntimeException e) {
             v.add("TxVersion invalid: " + e.getMessage());
         }
@@ -84,7 +97,9 @@ public final class CoinConfigGate {
     }
 
     private static void checkByteRange(String key, int value, List<String> violations) {
-        if (value < 0 || value > 255) violations.add(key + " out of byte range 0..255: " + value);
+        if (value < 0 || value > 255) {
+            violations.add(key + " out of byte range 0..255: " + value);
+        }
     }
 
     private CoinConfigGate() {}

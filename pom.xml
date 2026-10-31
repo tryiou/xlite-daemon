@@ -237,6 +237,7 @@
               <version>${google.java.format.version}</version>
               <style>AOSP</style>
               <reorderImports>true</reorderImports>
+              <reflowLongStrings>true</reflowLongStrings>
             </googleJavaFormat>
             <removeUnusedImports/>
             <formatAnnotations/>
@@ -248,6 +249,38 @@
           <execution>
             <id>spotless-check</id>
             <phase>process-sources</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Checkstyle: the semantic rules a formatter cannot express.
+           Layout belongs to Spotless above; this is naming, braces,
+           forbidden imports and constructs, and file shape. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${maven.checkstyle.plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>${checkstyle.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <configLocation>config/checkstyle/checkstyle.xml</configLocation>
+          <consoleOutput>true</consoleOutput>
+          <failOnViolation>true</failOnViolation>
+          <violationSeverity>error</violationSeverity>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+        </configuration>
+        <executions>
+          <execution>
+            <id>checkstyle-check</id>
+            <phase>validate</phase>
             <goals>
               <goal>check</goal>
             </goals>

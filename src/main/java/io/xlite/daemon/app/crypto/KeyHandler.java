@@ -10,7 +10,12 @@ import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bitcoinj.wallet.DeterministicSeed;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
@@ -148,7 +153,9 @@ public class KeyHandler {
                     migrateToNewFormat(passphrase, seed, file);
                     return Arrays.asList(seed.split("\\s+"));
                 } finally {
-                    if (legacyPassphrase != null) Arrays.fill(legacyPassphrase, '\0');
+                    if (legacyPassphrase != null) {
+                        Arrays.fill(legacyPassphrase, '\0');
+                    }
                 }
             }
             String seed = decryptSeedCbc(passphrase, data.encrypted, data.salt, data.iv);
@@ -194,7 +201,9 @@ public class KeyHandler {
             LOGGER.warning("Failed to convert mnemonic to entropy" + e.getMessage());
             return false;
         } finally {
-            if (entropy != null) Arrays.fill(entropy, (byte) 0);
+            if (entropy != null) {
+                Arrays.fill(entropy, (byte) 0);
+            }
         }
     }
 
@@ -241,7 +250,9 @@ public class KeyHandler {
      * @return score in [0, 10]
      */
     public static int calculatePasswordStrength(char[] password) {
-        if (password.length < 8) return 0;
+        if (password.length < 8) {
+            return 0;
+        }
 
         int score = password.length >= 10 ? 2 : 1;
         boolean hasDigit = false, hasLower = false, hasUpper = false, hasSpecial = false;
@@ -258,10 +269,18 @@ public class KeyHandler {
             }
         }
 
-        if (hasDigit) score += 2;
-        if (hasLower) score += 2;
-        if (hasUpper) score += 2;
-        if (hasSpecial) score += 2;
+        if (hasDigit) {
+            score += 2;
+        }
+        if (hasLower) {
+            score += 2;
+        }
+        if (hasUpper) {
+            score += 2;
+        }
+        if (hasSpecial) {
+            score += 2;
+        }
         return score;
     }
 
@@ -281,15 +300,20 @@ public class KeyHandler {
             hash = digest.digest(encodeUtf8Chars(input));
             StringBuilder hex = new StringBuilder();
             for (byte b : hash) {
-                if ((0xff & b) < 0x10) hex.append("0").append(Integer.toHexString(0xFF & b));
-                else hex.append(Integer.toHexString(0xFF & b));
+                if ((0xff & b) < 0x10) {
+                    hex.append("0").append(Integer.toHexString(0xFF & b));
+                } else {
+                    hex.append(Integer.toHexString(0xFF & b));
+                }
             }
             return hex.toString().toCharArray();
         } catch (Exception e) {
             throw new RuntimeException(
                     "Failed to compute SHA-256 for legacy migration" + e.getMessage());
         } finally {
-            if (hash != null) Arrays.fill(hash, (byte) 0);
+            if (hash != null) {
+                Arrays.fill(hash, (byte) 0);
+            }
         }
     }
 
@@ -351,8 +375,9 @@ public class KeyHandler {
     /** Decrypt with the current V2 scheme: AES-CBC, PBKDF2-SHA-256 @ 100 000 iterations. */
     private static String decryptSeedCbc(
             char[] passphrase, byte[] encrypted, byte[] salt, byte[] iv) throws Exception {
-        if (iv == null)
+        if (iv == null) {
             throw new IllegalArgumentException("IV must not be null for CBC decryption");
+        }
         SecretKey key = deriveKey(passphrase, salt, PBKDF2_SHA256, PBKDF2_ITERATIONS_SHA256);
         Cipher cipher = Cipher.getInstance(AES_CBC);
         cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
@@ -441,7 +466,9 @@ public class KeyHandler {
      * @return the backup {@link File}, or {@code null} if there was nothing to back up
      */
     private static File backupKeyFile(File keyFile) {
-        if (!keyFile.exists()) return null;
+        if (!keyFile.exists()) {
+            return null;
+        }
 
         File backupsDir = new File(ConfigHelper.getLocalDataDirectory(), "backups");
         if (!backupsDir.exists() && !backupsDir.mkdirs()) {
@@ -519,8 +546,12 @@ public class KeyHandler {
             LOGGER.severe("[security] Failed to create wallet file");
             return false;
         } finally {
-            if (salt != null) Arrays.fill(salt, (byte) 0);
-            if (mnemonicBytes != null) Arrays.fill(mnemonicBytes, (byte) 0);
+            if (salt != null) {
+                Arrays.fill(salt, (byte) 0);
+            }
+            if (mnemonicBytes != null) {
+                Arrays.fill(mnemonicBytes, (byte) 0);
+            }
         }
     }
 
@@ -587,8 +618,12 @@ public class KeyHandler {
                         "Migration failed with no backup available" + e.getMessage());
             }
         } finally {
-            if (newSalt != null) Arrays.fill(newSalt, (byte) 0);
-            if (seedBytes != null) Arrays.fill(seedBytes, (byte) 0);
+            if (newSalt != null) {
+                Arrays.fill(newSalt, (byte) 0);
+            }
+            if (seedBytes != null) {
+                Arrays.fill(seedBytes, (byte) 0);
+            }
         }
     }
 

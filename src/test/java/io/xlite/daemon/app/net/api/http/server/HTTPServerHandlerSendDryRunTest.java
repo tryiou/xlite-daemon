@@ -73,8 +73,11 @@ class HTTPServerHandlerSendDryRunTest {
     private static JsonArray params(Object... values) {
         JsonArray array = new JsonArray();
         for (Object value : values) {
-            if (value instanceof Number) array.add(new JsonPrimitive((Number) value));
-            else array.add(value.toString());
+            if (value instanceof Number) {
+                array.add(new JsonPrimitive((Number) value));
+            } else {
+                array.add(value.toString());
+            }
         }
         return array;
     }
@@ -253,7 +256,9 @@ class HTTPServerHandlerSendDryRunTest {
 
     private static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) sb.append(String.format("%02x", b));
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
         return sb.toString();
     }
 

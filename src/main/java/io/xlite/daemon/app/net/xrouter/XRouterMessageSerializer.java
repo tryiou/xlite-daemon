@@ -7,7 +7,15 @@ import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPacketHeader;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetParameters;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetUtils;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.AddressMessage;
+import org.bitcoinj.core.BitcoinSerializer;
+import org.bitcoinj.core.Block;
+import org.bitcoinj.core.FilteredBlock;
+import org.bitcoinj.core.InventoryMessage;
+import org.bitcoinj.core.Message;
+import org.bitcoinj.core.MessageSerializer;
+import org.bitcoinj.core.ProtocolException;
+import org.bitcoinj.core.Transaction;
 
 import java.io.IOException;
 import java.io.OutputStream;

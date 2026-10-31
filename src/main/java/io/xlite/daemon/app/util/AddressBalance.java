@@ -75,8 +75,11 @@ public class AddressBalance {
         synchronized (this) {
             // Only add UTXO's that do not exist in our wallet
             UTXO bUtxo = getUtxo(utxo.getTxid(), utxo.getVout());
-            if (bUtxo == null) this.utxos.add(utxo);
-            else return false;
+            if (bUtxo == null) {
+                this.utxos.add(utxo);
+            } else {
+                return false;
+            }
 
             calculateBalance();
             return true;

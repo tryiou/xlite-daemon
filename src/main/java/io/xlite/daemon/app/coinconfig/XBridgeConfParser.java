@@ -23,29 +23,36 @@ import java.util.Map;
 public final class XBridgeConfParser {
 
     public static Map<String, Map<String, String>> parse(String contents) {
-        if (contents.startsWith("\uFEFF")) contents = contents.substring(1);
+        if (contents.startsWith("\uFEFF")) {
+            contents = contents.substring(1);
+        }
         Map<String, Map<String, String>> sections = new LinkedHashMap<>();
         String current = null;
         int lineNo = 0;
         for (String rawLine : contents.split("\\r?\\n", -1)) {
             lineNo++;
             String line = rawLine.trim();
-            if (line.isEmpty() || line.startsWith("#") || line.startsWith(";")) continue;
+            if (line.isEmpty() || line.startsWith("#") || line.startsWith(";")) {
+                continue;
+            }
             if (line.startsWith("[") && line.endsWith("]")) {
                 current = line.substring(1, line.length() - 1).trim();
-                if (current.isEmpty() || current.indexOf('[') >= 0 || current.indexOf(']') >= 0)
+                if (current.isEmpty() || current.indexOf('[') >= 0 || current.indexOf(']') >= 0) {
                     throw new IllegalStateException(
                             "Malformed section header at line " + lineNo + ": '" + rawLine + "'");
+                }
                 sections.putIfAbsent(current, new LinkedHashMap<>());
                 continue;
             }
-            if (current == null)
+            if (current == null) {
                 throw new IllegalStateException(
                         "Malformed line " + lineNo + " outside any section: '" + rawLine + "'");
+            }
             int eq = line.indexOf('=');
-            if (eq <= 0)
+            if (eq <= 0) {
                 throw new IllegalStateException(
                         "Malformed line " + lineNo + " in [" + current + "]: '" + rawLine + "'");
+            }
             String key = line.substring(0, eq).trim();
             String value = line.substring(eq + 1).trim();
             sections.get(current).put(key, value);

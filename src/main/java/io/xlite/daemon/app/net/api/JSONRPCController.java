@@ -125,10 +125,14 @@ public class JSONRPCController {
 
     private static void removeLocked(CoinInstance coinInstance) {
         JSONRPCServer server = servers.get(coinInstance);
-        if (server == null) return;
+        if (server == null) {
+            return;
+        }
 
         LOGGER.info("[rpc] rebind: retiring server " + server.lifecycleState());
-        if (server.isAlive()) server.deinit();
+        if (server.isAlive()) {
+            server.deinit();
+        }
 
         // Wait (bounded) for the old listener to release its socket so an
         // immediate rebind on the same port cannot lose the race. Gate on

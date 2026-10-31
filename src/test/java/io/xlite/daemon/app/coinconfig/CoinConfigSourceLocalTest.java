@@ -60,13 +60,32 @@ class CoinConfigSourceLocalTest {
         Files.writeString(
                 dir.resolve("manifest-latest.json"),
                 "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\",\"xbridge_conf\":\"ltc.conf\"},"
-                        + "{\"blockchain\":\"Blocknet\",\"ticker\":\"BLOCK\",\"xbridge_conf\":\"block.conf\"}]");
+                    + "{\"blockchain\":\"Blocknet\",\"ticker\":\"BLOCK\",\"xbridge_conf\":\"block.conf\"}]");
         Files.writeString(
                 dir.resolve("xbridge-confs").resolve("ltc.conf"),
-                "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nDustAmount=0\nTxVersion=1\n");
+                "[LTC]\n"
+                        + "Title=Litecoin\n"
+                        + "AddressPrefix=48\n"
+                        + "ScriptPrefix=50\n"
+                        + "SecretPrefix=176\n"
+                        + "COIN=100000000\n"
+                        + "FeePerByte=10\n"
+                        + "MinTxFee=5000\n"
+                        + "Port=9332\n"
+                        + "DustAmount=0\n"
+                        + "TxVersion=1\n");
         Files.writeString(
                 dir.resolve("xbridge-confs").resolve("block.conf"),
-                "[BLOCK]\nTitle=Blocknet\nAddressPrefix=26\nScriptPrefix=28\nSecretPrefix=154\nCOIN=100000000\nFeePerByte=20\nMinTxFee=10000\nPort=41414\nTxVersion=1\n");
+                "[BLOCK]\n"
+                        + "Title=Blocknet\n"
+                        + "AddressPrefix=26\n"
+                        + "ScriptPrefix=28\n"
+                        + "SecretPrefix=154\n"
+                        + "COIN=100000000\n"
+                        + "FeePerByte=20\n"
+                        + "MinTxFee=10000\n"
+                        + "Port=41414\n"
+                        + "TxVersion=1\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
         assertEquals(2, all.size());
         assertTrue(all.containsKey("LTC"));
@@ -134,7 +153,15 @@ class CoinConfigSourceLocalTest {
                         + "\"xbridge_conf\":\"doge.conf\"}]}");
         Files.writeString(
                 dir.resolve("xbridge-confs").resolve("doge.conf"),
-                "[DOGE]\nAddressPrefix=30\nFeePerByte=1\nMinTxFee=2\nCOIN=3\nPort=4\nScriptPrefix=22\nSecretPrefix=158\nTxVersion=1\n");
+                "[DOGE]\n"
+                        + "AddressPrefix=30\n"
+                        + "FeePerByte=1\n"
+                        + "MinTxFee=2\n"
+                        + "COIN=3\n"
+                        + "Port=4\n"
+                        + "ScriptPrefix=22\n"
+                        + "SecretPrefix=158\n"
+                        + "TxVersion=1\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
         assertEquals(30, all.get("DOGE").addressPrefix());
     }

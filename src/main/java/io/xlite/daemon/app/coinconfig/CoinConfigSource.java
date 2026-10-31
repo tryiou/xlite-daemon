@@ -253,7 +253,9 @@ public final class CoinConfigSource {
                             + unsupported
                             + " unsupported)");
         }
-        if (!isLocal() && cache != null) cache.storeManifest(manifestJson);
+        if (!isLocal() && cache != null) {
+            cache.storeManifest(manifestJson);
+        }
         return out;
     }
 
@@ -269,13 +271,16 @@ public final class CoinConfigSource {
                 entries = root.getAsJsonArray();
             } else {
                 entries = root.getAsJsonObject().getAsJsonArray("contracts");
-                if (entries == null)
+                if (entries == null) {
                     throw new IllegalStateException("object manifest has no 'contracts' array");
+                }
             }
         } catch (RuntimeException e) {
             throw new IllegalStateException("manifest: " + e.getMessage(), e);
         }
-        if (entries.size() == 0) throw new IllegalStateException("manifest lists no coins");
+        if (entries.size() == 0) {
+            throw new IllegalStateException("manifest lists no coins");
+        }
         return entries;
     }
 
@@ -308,12 +313,18 @@ public final class CoinConfigSource {
             index++;
             JsonObject entry = el.getAsJsonObject();
             String ticker = requiredField(entry, "ticker", index);
-            if (!isSupportedTicker(ticker)) continue;
+            if (!isSupportedTicker(ticker)) {
+                continue;
+            }
             String verId = entry.has("ver_id") ? entry.get("ver_id").getAsString() : "";
             String xbridgeConf = requiredField(entry, "xbridge_conf", index);
-            if (!XBRIDGE_CONF_PATTERN.matcher(xbridgeConf).matches() || xbridgeConf.contains(".."))
+            if (!XBRIDGE_CONF_PATTERN.matcher(xbridgeConf).matches()
+                    || xbridgeConf.contains("..")) {
                 continue;
-            if (plan.texts.containsKey(xbridgeConf) || containsFile(toFetch, xbridgeConf)) continue;
+            }
+            if (plan.texts.containsKey(xbridgeConf) || containsFile(toFetch, xbridgeConf)) {
+                continue;
+            }
             String want = verId + "\0" + xbridgeConf;
             String have = cachedCompare.get(ticker);
             if (cache != null && want.equals(have)) {
@@ -336,7 +347,9 @@ public final class CoinConfigSource {
      */
     private Map<String, String> readCachedCompare(Optional<String> prevCachedManifest) {
         Map<String, String> compare = new LinkedHashMap<>();
-        if (cache == null || !prevCachedManifest.isPresent()) return compare;
+        if (cache == null || !prevCachedManifest.isPresent()) {
+            return compare;
+        }
         JsonArray cachedEntries;
         try {
             cachedEntries = parseManifestEntries(prevCachedManifest.get());
@@ -364,7 +377,9 @@ public final class CoinConfigSource {
 
     private static boolean containsFile(List<String[]> toFetch, String fileName) {
         for (String[] need : toFetch) {
-            if (need[0].equals(fileName)) return true;
+            if (need[0].equals(fileName)) {
+                return true;
+            }
         }
         return false;
     }
@@ -383,7 +398,9 @@ public final class CoinConfigSource {
      * deterministically in the plan.
      */
     private void fetchParallel(List<String[]> toFetch, RemoteTexts plan) {
-        if (toFetch.isEmpty()) return;
+        if (toFetch.isEmpty()) {
+            return;
+        }
         // Daemon threads: a hung fetch (uninterruptible socket I/O) must
         // never delay JVM shutdown past the phase cap.
         ExecutorService pool =
@@ -401,7 +418,9 @@ public final class CoinConfigSource {
                 final String url = xbridgeConfUrl(fileName);
                 tasks.add(() -> {
                     String text = remoteFetch.apply(url);
-                    if (cache != null) cache.storeConf(fileName, text);
+                    if (cache != null) {
+                        cache.storeConf(fileName, text);
+                    }
                     return new String[] {fileName, text};
                 });
             }
@@ -471,9 +490,10 @@ public final class CoinConfigSource {
 
     private static String requiredField(JsonObject entry, String field, int index) {
         JsonElement el = entry.get(field);
-        if (el == null || el.isJsonNull())
+        if (el == null || el.isJsonNull()) {
             throw new IllegalStateException(
                     "manifest entry #" + index + ": missing '" + field + "'");
+        }
         return el.getAsString();
     }
 
@@ -521,7 +541,9 @@ public final class CoinConfigSource {
             conn.setConnectTimeout(10_000);
             conn.setReadTimeout(30_000);
             int code = conn.getResponseCode();
-            if (code != 200) throw new IllegalStateException("HTTP " + code + " fetching " + url);
+            if (code != 200) {
+                throw new IllegalStateException("HTTP " + code + " fetching " + url);
+            }
             try (InputStream in = conn.getInputStream();
                     Scanner s =
                             new Scanner(in, StandardCharsets.UTF_8.name()).useDelimiter("\\A")) {
@@ -530,7 +552,9 @@ public final class CoinConfigSource {
         } catch (IOException e) {
             throw new IllegalStateException("Cannot fetch " + url + ": " + e.getMessage(), e);
         } finally {
-            if (conn != null) conn.disconnect();
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
     }
 }

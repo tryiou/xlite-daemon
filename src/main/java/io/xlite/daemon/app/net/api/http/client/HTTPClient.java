@@ -472,7 +472,8 @@ public class HTTPClient {
         CoinTicker coin = extractCoin(exrParams);
         if (coin == null) {
             LOGGER.severe(
-                    "[httpclient] Cannot route request: no coin extracted from first parameter for method "
+                    "[httpclient] Cannot route request: no coin extracted from first parameter for"
+                            + " method "
                             + method);
             return null; // FAIL instead of using wrong server
         }
@@ -663,16 +664,18 @@ public class HTTPClient {
         }
 
         if (jsonObject == null || utxoArr == null) {
-            if (jsonObject == null)
+            if (jsonObject == null) {
                 LOGGER.warning(
                         "[httpclient] getUtxosUncached "
                                 + coinInstance.getTicker()
                                 + " null jsonObject");
-            if (utxoArr == null)
+            }
+            if (utxoArr == null) {
                 LOGGER.warning(
                         "[httpclient] getUtxosUncached "
                                 + coinInstance.getTicker()
                                 + " null utxoArr");
+            }
             return null;
         }
 
@@ -695,7 +698,9 @@ public class HTTPClient {
             int height = utxoArr.getJSONObject(i).getInt("block_number");
             int currentHeight = CoinInstance.getBlockCountByTicker(coinTicker);
             int confirmations = (currentHeight - height) + 1;
-            if (height == 0) confirmations = 0;
+            if (height == 0) {
+                confirmations = 0;
+            }
 
             utxoJSON.addProperty("confirmations", confirmations);
 
@@ -721,7 +726,9 @@ public class HTTPClient {
         long lastFetchTime =
                 lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getUtxos"), 0L);
         long currentTime = System.currentTimeMillis();
-        if (currentTime - lastFetchTime < expiry) return coinInstance.getAllUTXOS();
+        if (currentTime - lastFetchTime < expiry) {
+            return coinInstance.getAllUTXOS();
+        }
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
@@ -760,12 +767,14 @@ public class HTTPClient {
         }
 
         if (jsonObject == null || utxoArr == null) {
-            if (jsonObject == null)
+            if (jsonObject == null) {
                 LOGGER.warning(
                         "[httpclient] getUtxos " + coinInstance.getTicker() + " null jsonObject");
-            if (utxoArr == null)
+            }
+            if (utxoArr == null) {
                 LOGGER.warning(
                         "[httpclient] getUtxos " + coinInstance.getTicker() + " null utxoArr");
+            }
             return null;
         }
 
@@ -947,7 +956,9 @@ public class HTTPClient {
         String res = executeRequest("/", params);
 
         JsonObject result = parseEnvelope(res, "getBlockCount " + coinTicker);
-        if (result == null) return;
+        if (result == null) {
+            return;
+        }
 
         int blockCount = result.get("result").getAsInt();
 
@@ -1165,8 +1176,9 @@ public class HTTPClient {
         long lastFetchTime =
                 lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getHistory"), 0L);
         long currentTime = System.currentTimeMillis();
-        if (currentTime - lastFetchTime < expiry)
+        if (currentTime - lastFetchTime < expiry) {
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
+        }
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
@@ -1272,8 +1284,9 @@ public class HTTPClient {
         long lastFetchTime =
                 lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getAddressHistory"), 0L);
         long currentTime = System.currentTimeMillis() / 1000;
-        if ((currentTime - lastFetchTime) < expiry)
+        if ((currentTime - lastFetchTime) < expiry) {
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
+        }
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
@@ -1328,7 +1341,9 @@ public class HTTPClient {
 
                 int fails = 1;
                 while (fails > 0) {
-                    if (fails >= 5) fails = 0;
+                    if (fails >= 5) {
+                        fails = 0;
+                    }
 
                     try {
                         rawTransaction = getRawTransaction(coinTicker, txid, true);
@@ -1338,14 +1353,18 @@ public class HTTPClient {
                             fails = 0;
 
                             break;
-                        } else ++fails;
+                        } else {
+                            ++fails;
+                        }
                     } catch (Exception e) {
                         LOGGER.warning("[httpclient] getRawTransaction failed - " + e.getMessage());
                         ++fails;
                     }
                 }
 
-                if (fails != 0) continue;
+                if (fails != 0) {
+                    continue;
+                }
 
                 for (JsonElement vin : rawTransaction.get("vin").getAsJsonArray()) {
                     String vinTxid = vin.getAsJsonObject().get("txid").getAsString();
@@ -1355,7 +1374,9 @@ public class HTTPClient {
 
                     fails = 1;
                     while (fails > 0) {
-                        if (fails >= 5) fails = 0;
+                        if (fails >= 5) {
+                            fails = 0;
+                        }
 
                         try {
                             voutRawTransaction = getRawTransaction(coinTicker, vinTxid, true);
@@ -1366,7 +1387,9 @@ public class HTTPClient {
                                 fails = 0;
 
                                 break;
-                            } else ++fails;
+                            } else {
+                                ++fails;
+                            }
                         } catch (Exception e) {
                             LOGGER.warning(
                                     "[httpclient] getRawTransaction(vout) failed - "
@@ -1375,7 +1398,9 @@ public class HTTPClient {
                         }
                     }
 
-                    if (fails != 0) continue;
+                    if (fails != 0) {
+                        continue;
+                    }
 
                     JsonObject vout =
                             voutRawTransaction
@@ -1386,7 +1411,9 @@ public class HTTPClient {
                     JsonObject scriptPubKey = vout.getAsJsonObject("scriptPubKey");
 
                     if ((scriptPubKey == null || scriptPubKey.isJsonNull())
-                            || scriptPubKey.get("addresses").isJsonNull()) continue;
+                            || scriptPubKey.get("addresses").isJsonNull()) {
+                        continue;
+                    }
 
                     for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
                         String address = addressElement.getAsString();
@@ -1422,8 +1449,10 @@ public class HTTPClient {
                             vout.getAsJsonObject().getAsJsonObject("scriptPubKey");
 
                     try {
-                        if (scriptPubKey.isJsonNull() || scriptPubKey.get("addresses").isJsonNull())
+                        if (scriptPubKey.isJsonNull()
+                                || scriptPubKey.get("addresses").isJsonNull()) {
                             continue;
+                        }
                     } catch (Exception e) {
                         continue;
                     }
@@ -1485,12 +1514,16 @@ public class HTTPClient {
      * @return Filtered transaction list
      */
     private JsonArray filterHistory(JsonArray txs, int startTime, int endTime) {
-        if (endTime <= 0) return txs;
+        if (endTime <= 0) {
+            return txs;
+        }
         Iterator<JsonElement> it = txs.iterator();
         while (it.hasNext()) {
             JsonObject tx = it.next().getAsJsonObject();
             int txTime = tx.get("time").getAsInt();
-            if (txTime < startTime || txTime > endTime) it.remove();
+            if (txTime < startTime || txTime > endTime) {
+                it.remove();
+            }
         }
         return txs;
     }

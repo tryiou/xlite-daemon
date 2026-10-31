@@ -8,8 +8,12 @@ public class DetectOS {
     static {
         String OS = System.getProperty("os.name").toLowerCase();
 
-        if (OS.contains("win")) isWindows = true;
-        else if (OS.contains("mac")) isOSX = true;
-        else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) isUnix = true;
+        if (OS.contains("win")) {
+            isWindows = true;
+        } else if (OS.contains("mac")) {
+            isOSX = true;
+        } else if (OS.contains("nix") || OS.contains("nux") || OS.contains("aix")) {
+            isUnix = true;
+        }
     }
 }

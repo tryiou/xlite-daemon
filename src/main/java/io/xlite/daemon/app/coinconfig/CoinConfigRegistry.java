@@ -51,9 +51,13 @@ public final class CoinConfigRegistry {
             load(source, cache);
             return;
         } catch (RuntimeException first) {
-            if (cache == null) throw first;
+            if (cache == null) {
+                throw first;
+            }
             String warmed = cache.dir().toString();
-            if (!Files.isRegularFile(cache.dir().resolve("manifest-latest.json"))) throw first;
+            if (!Files.isRegularFile(cache.dir().resolve("manifest-latest.json"))) {
+                throw first;
+            }
             try {
                 load(warmed);
             } catch (RuntimeException fallbackFailure) {
@@ -83,7 +87,9 @@ public final class CoinConfigRegistry {
     public static synchronized void load(String source, CoinConfigCache cache) {
         String resolved = source.replaceAll("/+$", "");
         CoinConfigSource src = new CoinConfigSource(resolved);
-        if (cache != null) src.setCache(cache);
+        if (cache != null) {
+            src.setCache(cache);
+        }
         Map<String, CoinConfig> all = src.loadAll();
         LinkedHashMap<String, CoinConfig> filtered = new LinkedHashMap<>();
         int rejected = 0;
@@ -116,8 +122,12 @@ public final class CoinConfigRegistry {
         try {
             FileTime mtime = Files.getLastModifiedTime(cache.dir().resolve("manifest-latest.json"));
             long hours = (System.currentTimeMillis() - mtime.toMillis()) / 3_600_000L;
-            if (hours < 1) return "under an hour old";
-            if (hours < 48) return hours + "h old";
+            if (hours < 1) {
+                return "under an hour old";
+            }
+            if (hours < 48) {
+                return hours + "h old";
+            }
             return (hours / 24) + "d old";
         } catch (Exception e) {
             return "age unknown";
@@ -135,7 +145,9 @@ public final class CoinConfigRegistry {
     /** Snapshot of loaded configs. Empty when not loaded. Defensive copy under lock. */
     public static synchronized Map<String, CoinConfig> list() {
         Map<String, CoinConfig> m = loaded;
-        if (m == null) return Collections.emptyMap();
+        if (m == null) {
+            return Collections.emptyMap();
+        }
         return Collections.unmodifiableMap(new LinkedHashMap<>(m));
     }
 
@@ -155,13 +167,16 @@ public final class CoinConfigRegistry {
      */
     public static CoinConfig get(String ticker) {
         Map<String, CoinConfig> m = loaded;
-        if (m == null)
+        if (m == null) {
             throw new IllegalStateException(
-                    "CoinConfigRegistry not loaded — App.initCoinConfigs() must run before coin init");
+                    "CoinConfigRegistry not loaded — App.initCoinConfigs() must run before coin"
+                            + " init");
+        }
         CoinConfig cfg = m.get(ticker);
-        if (cfg == null)
+        if (cfg == null) {
             throw new IllegalStateException(
                     "[" + ticker + "] not present in loaded coin configs from " + loadedSource);
+        }
         return cfg;
     }
 

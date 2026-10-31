@@ -38,8 +38,12 @@ public final class ConfigSourceResolver {
      * @return the resolved source value (never blank); local dir or base URL.
      */
     public String resolve() {
-        if (flagValue != null) return toBase(flagValue);
-        if (envValue != null) return toBase(envValue);
+        if (flagValue != null) {
+            return toBase(flagValue);
+        }
+        if (envValue != null) {
+            return toBase(envValue);
+        }
         return DEFAULT_UPSTREAM;
     }
 
@@ -49,7 +53,9 @@ public final class ConfigSourceResolver {
      */
     static String toBase(String value) {
         String v = normalize(value);
-        if (v == null) throw new IllegalArgumentException(FLAG_NAME + ": empty config source");
+        if (v == null) {
+            throw new IllegalArgumentException(FLAG_NAME + ": empty config source");
+        }
         String lower = v.toLowerCase(Locale.ROOT);
         if (lower.startsWith("https://github.com/") || lower.startsWith("http://github.com/")) {
             int hostIdx = lower.indexOf("github.com/") + "github.com/".length();
@@ -69,11 +75,13 @@ public final class ConfigSourceResolver {
                 if (idx >= 0) {
                     branch = rest.substring(idx + marker.length());
                     rest = rest.substring(0, idx);
-                    if (branch.isEmpty() || branch.contains("/"))
+                    if (branch.isEmpty() || branch.contains("/")) {
                         throw new IllegalArgumentException(
                                 "unsupported github URL form '"
                                         + value
-                                        + "' (expected github.com/<owner>/<repo>[.git][/tree/<branch>])");
+                                        + "' (expected"
+                                        + " github.com/<owner>/<repo>[.git][/tree/<branch>])");
+                    }
                     break;
                 }
             }
@@ -84,7 +92,9 @@ public final class ConfigSourceResolver {
     }
 
     static String normalize(String v) {
-        if (v == null) return null;
+        if (v == null) {
+            return null;
+        }
         String t = v.trim();
         return t.isEmpty() ? null : t;
     }

@@ -87,7 +87,9 @@ public final class CoinConfigCache {
 
     private static Optional<String> readQuietly(Path p) {
         try {
-            if (!Files.isRegularFile(p)) return Optional.empty();
+            if (!Files.isRegularFile(p)) {
+                return Optional.empty();
+            }
             return Optional.of(Files.readString(p, StandardCharsets.UTF_8));
         } catch (Exception e) {
             LOGGER.warning("[coinconfig] cache read failed (" + p + "): " + e.getMessage());
@@ -124,11 +126,15 @@ public final class CoinConfigCache {
         Set<Path> keep = new LinkedHashSet<>();
         keep.add(current);
         for (Path d : dirs) {
-            if (keep.size() >= KEEP_SOURCES) break;
+            if (keep.size() >= KEEP_SOURCES) {
+                break;
+            }
             keep.add(d);
         }
         for (Path d : dirs) {
-            if (!keep.contains(d)) deleteQuietly(d);
+            if (!keep.contains(d)) {
+                deleteQuietly(d);
+            }
         }
     }
 
@@ -157,9 +163,10 @@ public final class CoinConfigCache {
             byte[] digest =
                     MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder(32);
-            for (byte b : digest)
+            for (byte b : digest) {
                 sb.append(Character.forDigit((b >> 4) & 0xF, 16))
                         .append(Character.forDigit(b & 0xF, 16));
+            }
             return sb.substring(0, 16);
         } catch (Exception e) {
             return Integer.toHexString(s.hashCode());

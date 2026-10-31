@@ -12,7 +12,17 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.CharsetUtil;
 import io.xlite.daemon.app.Version;
 import io.xlite.daemon.app.coinconfig.CoinConfig;
@@ -182,7 +192,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 response.add("result", JsonNull.INSTANCE);
                 if (e instanceof IllegalArgumentException) {
                     LOGGER.finer(
-                            "[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
+                            "[http-server-handler] WARNING: Client sent valid JSON, but did not"
+                                    + " specify method and/or parameters!");
                 } else {
                     LOGGER.finer("[http-server-handler] WARNING: Client sent invalid JSON!");
                 }
@@ -337,10 +348,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                     + "\n"
                                     + "\n"
                                     + "help - Display the help\n"
-                                    + "\n=====RPC Master=====\n"
+                                    + "\n"
+                                    + "=====RPC Master=====\n"
                                     + "ping - Lightweight liveness probe (result 1)\n"
                                     + "stop - Shutdown the server\n"
-                                    + "reloadconfig <token> - Reload configuration for specified token\n"
+                                    + "reloadconfig <token> - Reload configuration for specified"
+                                    + " token\n"
                                     + "getCoins - List coin configurations (alias listCoins)\n"
                                     + "version - Get version\n";
                     //						+ "reloadconfigs - Reload all configuration files\n";
@@ -444,7 +457,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private boolean writeResponse(
             ChannelHandlerContext ctx, FullHttpResponse httpResponse, FullHttpRequest request) {
         boolean keepAlive = false;
-        if (request != null) keepAlive = HttpUtil.isKeepAlive(request);
+        if (request != null) {
+            keepAlive = HttpUtil.isKeepAlive(request);
+        }
 
         httpResponse.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json");
         httpResponse

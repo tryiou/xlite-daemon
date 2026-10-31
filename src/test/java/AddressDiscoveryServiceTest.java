@@ -78,7 +78,9 @@ class AddressDiscoveryServiceTest extends TestHelper {
     @Test
     void testDiscovery_FindsUsedAddresses() {
         int usedAddressIndex = getAddressCountInitial() + 10;
-        for (int i = 0; i < 50; i++) coinInstance.generateAddress(false);
+        for (int i = 0; i < 50; i++) {
+            coinInstance.generateAddress(false);
+        }
 
         String usedAddress =
                 coinInstance.getAddressKeyPairs().get(usedAddressIndex).getAddress().toBase58();
@@ -86,8 +88,11 @@ class AddressDiscoveryServiceTest extends TestHelper {
         when(mockHttpClient.getUtxosUncached(any(), any(String[].class)))
                 .thenAnswer(inv -> {
                     String[] addrs = inv.getArgument(1);
-                    for (String a : addrs)
-                        if (a.equals(usedAddress)) return buildUtxoResponse(usedAddress);
+                    for (String a : addrs) {
+                        if (a.equals(usedAddress)) {
+                            return buildUtxoResponse(usedAddress);
+                        }
+                    }
                     return new JsonArray();
                 });
 
@@ -122,7 +127,9 @@ class AddressDiscoveryServiceTest extends TestHelper {
     @Test
     void testDiscovery_SkipsFailedBatch() {
         int batchSize = AddressDiscoveryService.getBatchSize();
-        for (int i = 0; i < 2 * batchSize; i++) coinInstance.generateAddress(false);
+        for (int i = 0; i < 2 * batchSize; i++) {
+            coinInstance.generateAddress(false);
+        }
 
         int usedAddressIndex = getAddressCountInitial() + batchSize + batchSize / 2; // batch 1
         String usedAddress =
@@ -132,10 +139,15 @@ class AddressDiscoveryServiceTest extends TestHelper {
         when(mockHttpClient.getUtxosUncached(any(), any(String[].class)))
                 .thenAnswer(inv -> {
                     int call = callCount.incrementAndGet();
-                    if (call == 1) throw new RuntimeException("Transient error");
+                    if (call == 1) {
+                        throw new RuntimeException("Transient error");
+                    }
                     String[] addrs = inv.getArgument(1);
-                    for (String a : addrs)
-                        if (a.equals(usedAddress)) return buildUtxoResponse(usedAddress);
+                    for (String a : addrs) {
+                        if (a.equals(usedAddress)) {
+                            return buildUtxoResponse(usedAddress);
+                        }
+                    }
                     return new JsonArray();
                 });
 
@@ -146,7 +158,9 @@ class AddressDiscoveryServiceTest extends TestHelper {
     /** Valid UTXO plus invalid entry. Should still find the address. */
     @Test
     void testDiscovery_UtxoParsingErrors() {
-        for (int i = 0; i < 100; i++) coinInstance.generateAddress(false);
+        for (int i = 0; i < 100; i++) {
+            coinInstance.generateAddress(false);
+        }
 
         int usedAddressIndex = getAddressCountInitial() + 10;
         String usedAddress =
@@ -191,7 +205,9 @@ class AddressDiscoveryServiceTest extends TestHelper {
     /** Concurrent access — all threads return same result. */
     @Test
     void testDiscovery_ConcurrentAccess() throws InterruptedException {
-        for (int i = 0; i < 100; i++) coinInstance.generateAddress(false);
+        for (int i = 0; i < 100; i++) {
+            coinInstance.generateAddress(false);
+        }
 
         when(mockHttpClient.getUtxosUncached(any(), any(String[].class)))
                 .thenReturn(new JsonArray());
@@ -218,7 +234,9 @@ class AddressDiscoveryServiceTest extends TestHelper {
         executor.shutdown();
 
         assertEquals(numThreads, results.size());
-        for (Integer result : results) assertEquals(getAddressCountInitial(), result);
+        for (Integer result : results) {
+            assertEquals(getAddressCountInitial(), result);
+        }
     }
 
     /** Batch probes use BATCH_SIZE addresses. */

@@ -8,7 +8,11 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
 import io.xlite.daemon.app.Version;
-import io.xlite.daemon.app.net.protocols.blocknet.listeners.*;
+import io.xlite.daemon.app.net.protocols.blocknet.listeners.BlocknetOnBlocksDownloadedEventListener;
+import io.xlite.daemon.app.net.protocols.blocknet.listeners.BlocknetOnXRouterMessageReceivedListener;
+import io.xlite.daemon.app.net.protocols.blocknet.listeners.BlocknetPeerConnectedEventListener;
+import io.xlite.daemon.app.net.protocols.blocknet.listeners.BlocknetPeerDisconnectedEventListener;
+import io.xlite.daemon.app.net.protocols.blocknet.listeners.BlocknetPreMessageReceivedEventListener;
 import io.xlite.daemon.app.net.protocols.blocknet.messages.VersionMessageImpl;
 import io.xlite.daemon.app.net.xrouter.XRouterCommandUtils;
 import io.xlite.daemon.app.net.xrouter.XRouterInitialMessagesSentListener;
@@ -16,7 +20,27 @@ import io.xlite.daemon.app.net.xrouter.XRouterMessage;
 import io.xlite.daemon.app.net.xrouter.XRouterMessageSerializer;
 import io.xlite.daemon.app.util.XRouterConfiguration;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.AbstractBlockChain;
+import org.bitcoinj.core.Block;
+import org.bitcoinj.core.BlockLocator;
+import org.bitcoinj.core.Context;
+import org.bitcoinj.core.FilteredBlock;
+import org.bitcoinj.core.GetBlocksMessage;
+import org.bitcoinj.core.GetHeadersMessage;
+import org.bitcoinj.core.Message;
+import org.bitcoinj.core.PeerAddress;
+import org.bitcoinj.core.PeerSocketHandler;
+import org.bitcoinj.core.Ping;
+import org.bitcoinj.core.Pong;
+import org.bitcoinj.core.ProtocolException;
+import org.bitcoinj.core.PrunedException;
+import org.bitcoinj.core.RejectMessage;
+import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.StoredBlock;
+import org.bitcoinj.core.Transaction;
+import org.bitcoinj.core.VerificationException;
+import org.bitcoinj.core.VersionAck;
+import org.bitcoinj.core.VersionMessage;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.utils.ListenerRegistration;
@@ -29,7 +53,11 @@ import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.NotYetConnectedException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -187,7 +215,9 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     @Override
     public void connectionClosed() {
-        if (!activePeer) return;
+        if (!activePeer) {
+            return;
+        }
 
         activePeer = false;
         LOGGER.finer(
@@ -296,7 +326,8 @@ public class BlocknetPeer extends PeerSocketHandler {
         try {
             if (writeTarget == null) {
                 LOGGER.finer(
-                        "[blocknet-peer] ERROR: Attempted to send message on non-connected socket.");
+                        "[blocknet-peer] ERROR: Attempted to send message on non-connected"
+                                + " socket.");
                 throw new NotYetConnectedException();
             }
         } finally {
@@ -308,7 +339,8 @@ public class BlocknetPeer extends PeerSocketHandler {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 xRouterMessageSerializer.serialize(message, outputStream);
                 LOGGER.finer(
-                        "[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding network header) is "
+                        "[blocknet-peer] DEBUG: Sending XRouter message. Actual length (excluding"
+                                + " network header) is "
                                 + (outputStream.size() - BlocknetPacketHeader.HEADER_LENGTH - 4)
                                 + " bytes.");
                 ListenableFuture future = writeTarget.writeBytes(outputStream.toByteArray());
@@ -345,10 +377,14 @@ public class BlocknetPeer extends PeerSocketHandler {
                 message = registration.listener.onPreMessageReceived(this, message);
             }
 
-            if (message == null) break;
+            if (message == null) {
+                break;
+            }
         }
 
-        if (message == null) return;
+        if (message == null) {
+            return;
+        }
 
         if (currentFilteredBlock != null && !(message instanceof Transaction)) {
             endFilteredBlock(currentFilteredBlock);
@@ -423,7 +459,8 @@ public class BlocknetPeer extends PeerSocketHandler {
         if (!peerVersionMessage.hasBlockChain()
                 || (!params.allowEmptyPeerChain() && peerVersionMessage.bestHeight == 0)) {
             LOGGER.finer(
-                    "[blocknet-peer] ERROR: Peer has an empty blockchain while this network does not allow empty blockchains. Disconnecting.");
+                    "[blocknet-peer] ERROR: Peer has an empty blockchain while this network does"
+                            + " not allow empty blockchains. Disconnecting.");
             close();
         }
 
@@ -474,7 +511,9 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     private XRouterMessage getOriginalXRouterMessage(String uuid) {
         for (XRouterMessage msg : messagesPendingReply) {
-            if (msg.getXRouterHeader().getUUID().equalsIgnoreCase(uuid)) return msg;
+            if (msg.getXRouterHeader().getUUID().equalsIgnoreCase(uuid)) {
+                return msg;
+            }
         }
 
         return null;
@@ -503,14 +542,17 @@ public class BlocknetPeer extends PeerSocketHandler {
                 getOriginalXRouterMessage(message.getXRouterHeader().getUUID());
         if (original == null) {
             LOGGER.finer(
-                    "[blocknet-peer] ERROR: Unexpected UUID in reply message! Perhaps the server thinks we sent a packet that we didn't send?");
+                    "[blocknet-peer] ERROR: Unexpected UUID in reply message! Perhaps the server"
+                            + " thinks we sent a packet that we didn't send?");
             throw new ProtocolException("Unexpected UUID in reply message");
         }
 
         int removed = removeUUIDFromPendingReplyList(message.getXRouterHeader().getUUID());
         if (removed != 1) {
             LOGGER.finer(
-                    "[blocknet-peer] Warning: Exception occurred while removing message from pending list! This may break things later on. Amount of messages removed = "
+                    "[blocknet-peer] Warning: Exception occurred while removing message from"
+                            + " pending list! This may break things later on. Amount of messages"
+                            + " removed = "
                             + removed);
             if (removed == 0) {
                 LOGGER.finer("[blocknet-peer] ERROR: Invalid UUID in reply message!");
@@ -577,8 +619,9 @@ public class BlocknetPeer extends PeerSocketHandler {
                             + ", toHash = "
                             + toHash.toString());
 
-            for (Sha256Hash hash : pendingBlockDownloads)
+            for (Sha256Hash hash : pendingBlockDownloads) {
                 LOGGER.finer("[blocknet-peer] Pending block download: " + hash.toString());
+            }
 
             LOGGER.finer(Throwables.getStackTraceAsString(new Throwable()));
             return;
@@ -602,7 +645,9 @@ public class BlocknetPeer extends PeerSocketHandler {
             }
         }
 
-        if (cursor != null) blockLocatorHashes.add(params.getGenesisBlockHash());
+        if (cursor != null) {
+            blockLocatorHashes.add(params.getGenesisBlockHash());
+        }
 
         BlockLocator blockLocator = new BlockLocator(ImmutableList.copyOf(blockLocatorHashes));
 
@@ -631,7 +676,8 @@ public class BlocknetPeer extends PeerSocketHandler {
 
         if (blockChain == null) {
             LOGGER.finer(
-                    "[blocknet-peer] WARNING: Received a block, but a blockchain object was not configured!");
+                    "[blocknet-peer] WARNING: Received a block, but a blockchain object was not"
+                            + " configured!");
             return;
         }
 
@@ -642,7 +688,8 @@ public class BlocknetPeer extends PeerSocketHandler {
             try {
                 if (awaitingFreshFilter != null) {
                     LOGGER.finer(
-                            "[blocknet-peer] Discarding this block because we are waiting for a fresh filter. Hash: "
+                            "[blocknet-peer] Discarding this block because we are waiting for a"
+                                    + " fresh filter. Hash: "
                                     + filteredBlock.getHash().toString());
 
                     awaitingFreshFilter.add(filteredBlock.getHash());

@@ -269,7 +269,9 @@ public class ConfigHelper {
         }
 
         try {
-            if (!configFile.createNewFile() && !configFile.exists()) return null;
+            if (!configFile.createNewFile() && !configFile.exists()) {
+                return null;
+            }
         } catch (IOException e) {
             LOGGER.warning(
                     "[config] IOException creating config file for "

@@ -109,11 +109,12 @@ public final class CompiledCoinSupplement {
      */
     public static Supplement forTicker(String ticker) {
         Supplement s = testOverrides.get().getOrDefault(ticker, BY_TICKER.get(ticker));
-        if (s == null)
+        if (s == null) {
             throw new IllegalArgumentException(
                     "no compiled supplement for ticker '"
                             + ticker
                             + "' — the coin cannot run without its non-config constants");
+        }
         return s;
     }
 

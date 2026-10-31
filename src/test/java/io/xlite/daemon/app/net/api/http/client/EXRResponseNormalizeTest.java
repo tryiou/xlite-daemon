@@ -181,7 +181,8 @@ public class EXRResponseNormalizeTest {
     public void testSendRawTransaction_ErrorEnvelopePassedThroughIntact() {
         HTTPClient client =
                 new CannedClient(
-                        "{\"result\":null,\"error\":{\"code\":-25,\"message\":\"missing inputs\"}}");
+                        "{\"result\":null,\"error\":{\"code\":-25,\"message\":\"missing"
+                                + " inputs\"}}");
         JsonObject res = client.sendRawTransaction(CoinTicker.BLOCKNET, "deadbeef");
         assertNotNull(res);
         assertTrue(res.has("error") && !res.get("error").isJsonNull());

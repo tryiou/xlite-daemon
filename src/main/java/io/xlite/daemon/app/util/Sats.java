@@ -64,8 +64,9 @@ public final class Sats {
             remaining /= 10;
             places++;
         }
-        if (remaining != 1)
+        if (remaining != 1) {
             throw new IllegalArgumentException("coin factor is not a power of ten: " + coinFactor);
+        }
         return places;
     }
 }

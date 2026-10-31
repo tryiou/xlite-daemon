@@ -30,7 +30,9 @@ class CoinConfigSourceRemoteTest {
         public String apply(String url) {
             calls.add(url);
             String body = bodies.get(url);
-            if (body == null) throw new IllegalStateException("HTTP 404 fetching " + url);
+            if (body == null) {
+                throw new IllegalStateException("HTTP 404 fetching " + url);
+            }
             return body;
         }
     }
@@ -40,15 +42,31 @@ class CoinConfigSourceRemoteTest {
         stub.bodies.put(
                 BASE + "/manifest-latest.json",
                 "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\",\"ver_id\":\"litecoin--v0.21.1\",\"xbridge_conf\":\"litecoin--v0.21.1.conf\"},"
-                        + "{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\",\"ver_id\":\"doge--v1\",\"xbridge_conf\":\"doge--v1.conf\"},"
-                        + "{\"blockchain\":\"Fake\",\"ticker\":\"FAKE\",\"ver_id\":\"fake--v1\",\"xbridge_conf\":\"fake--v1.conf\"},"
-                        + "{\"blockchain\":\"BitcoinCash\",\"ticker\":\"BCH\",\"ver_id\":\"bch--v1\",\"xbridge_conf\":\"bch--v1.conf\"}]");
+                    + "{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\",\"ver_id\":\"doge--v1\",\"xbridge_conf\":\"doge--v1.conf\"},"
+                    + "{\"blockchain\":\"Fake\",\"ticker\":\"FAKE\",\"ver_id\":\"fake--v1\",\"xbridge_conf\":\"fake--v1.conf\"},"
+                    + "{\"blockchain\":\"BitcoinCash\",\"ticker\":\"BCH\",\"ver_id\":\"bch--v1\",\"xbridge_conf\":\"bch--v1.conf\"}]");
         stub.bodies.put(
                 BASE + "/xbridge-confs/litecoin--v0.21.1.conf",
-                "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\n");
+                "[LTC]\n"
+                        + "Title=Litecoin\n"
+                        + "AddressPrefix=48\n"
+                        + "ScriptPrefix=50\n"
+                        + "SecretPrefix=176\n"
+                        + "COIN=100000000\n"
+                        + "FeePerByte=10\n"
+                        + "MinTxFee=5000\n"
+                        + "Port=9332\n");
         stub.bodies.put(
                 BASE + "/xbridge-confs/doge--v1.conf",
-                "[DOGE]\nTitle=Dogecoin\nAddressPrefix=30\nScriptPrefix=22\nSecretPrefix=158\nCOIN=100000000\nFeePerByte=10\nMinTxFee=1000\nPort=22555\n");
+                "[DOGE]\n"
+                        + "Title=Dogecoin\n"
+                        + "AddressPrefix=30\n"
+                        + "ScriptPrefix=22\n"
+                        + "SecretPrefix=158\n"
+                        + "COIN=100000000\n"
+                        + "FeePerByte=10\n"
+                        + "MinTxFee=1000\n"
+                        + "Port=22555\n");
         return stub;
     }
 
@@ -93,9 +111,27 @@ class CoinConfigSourceRemoteTest {
     // --- cache / compare / parallel ---
 
     private static final String LTC_CONF_V1 =
-            "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nTxVersion=2\n";
+            "[LTC]\n"
+                    + "Title=Litecoin\n"
+                    + "AddressPrefix=48\n"
+                    + "ScriptPrefix=50\n"
+                    + "SecretPrefix=176\n"
+                    + "COIN=100000000\n"
+                    + "FeePerByte=10\n"
+                    + "MinTxFee=5000\n"
+                    + "Port=9332\n"
+                    + "TxVersion=2\n";
     private static final String DOGE_CONF =
-            "[DOGE]\nTitle=Dogecoin\nAddressPrefix=30\nScriptPrefix=22\nSecretPrefix=158\nCOIN=100000000\nFeePerByte=10\nMinTxFee=1000\nPort=22555\nTxVersion=1\n";
+            "[DOGE]\n"
+                    + "Title=Dogecoin\n"
+                    + "AddressPrefix=30\n"
+                    + "ScriptPrefix=22\n"
+                    + "SecretPrefix=158\n"
+                    + "COIN=100000000\n"
+                    + "FeePerByte=10\n"
+                    + "MinTxFee=1000\n"
+                    + "Port=22555\n"
+                    + "TxVersion=1\n";
 
     private static String manifestOf(String... entries) {
         return "[" + String.join(",", entries) + "]";
@@ -118,8 +154,9 @@ class CoinConfigSourceRemoteTest {
             Path root, String manifestJson, Map<String, String> confs, StubFetch stub) {
         CoinConfigCache cache = CoinConfigCache.forSource(root, BASE);
         cache.storeManifest(manifestJson);
-        for (Map.Entry<String, String> e : confs.entrySet())
+        for (Map.Entry<String, String> e : confs.entrySet()) {
             cache.storeConf(e.getKey(), e.getValue());
+        }
         CoinConfigSource src = new CoinConfigSource(BASE);
         src.setRemoteFetch(stub);
         src.setCache(cache);
@@ -186,8 +223,9 @@ class CoinConfigSourceRemoteTest {
         Map<String, CoinConfig> all = cachedSource(root, oldManifest, oldConfs, stub).loadAll();
         assertEquals(1, all.size());
         assertTrue(all.containsKey("LTC"));
-        for (String url : stub.calls)
+        for (String url : stub.calls) {
             assertFalse(url.contains("doge--v1.conf"), "removed ticker must never be fetched");
+        }
     }
 
     @Test
@@ -221,14 +259,18 @@ class CoinConfigSourceRemoteTest {
         String manifest = manifestOf(entries.toArray(new String[0]));
         Function<String, String> jittered =
                 url -> {
-                    if (url.endsWith("manifest-latest.json")) return manifest;
+                    if (url.endsWith("manifest-latest.json")) {
+                        return manifest;
+                    }
                     try {
                         Thread.sleep(ThreadLocalRandom.current().nextInt(15));
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
                     String body = confBodies.get(url);
-                    if (body == null) throw new IllegalStateException("HTTP 404 fetching " + url);
+                    if (body == null) {
+                        throw new IllegalStateException("HTTP 404 fetching " + url);
+                    }
                     return body;
                 };
         CoinConfigSource first = new CoinConfigSource(BASE);
@@ -255,13 +297,16 @@ class CoinConfigSourceRemoteTest {
         partial.put("litecoin--v1.conf", LTC_CONF_V1);
         CoinConfigCache cache = CoinConfigCache.forSource(root, BASE);
         cache.storeManifest(manifest);
-        for (Map.Entry<String, String> e : partial.entrySet())
+        for (Map.Entry<String, String> e : partial.entrySet()) {
             cache.storeConf(e.getKey(), e.getValue());
+        }
         final List<String> calls = new ArrayList<>();
         Function<String, String> hanging =
                 url -> {
                     calls.add(url);
-                    if (url.endsWith("manifest-latest.json")) return manifest;
+                    if (url.endsWith("manifest-latest.json")) {
+                        return manifest;
+                    }
                     try {
                         new CountDownLatch(1).await();
                     } catch (InterruptedException e) {
@@ -315,8 +360,9 @@ class CoinConfigSourceRemoteTest {
         stub.bodies.put(BASE + "/manifest-latest.json", newManifest);
         CoinConfigCache cache = CoinConfigCache.forSource(root, BASE);
         cache.storeManifest(oldManifest);
-        for (Map.Entry<String, String> e : oldConfs.entrySet())
+        for (Map.Entry<String, String> e : oldConfs.entrySet()) {
             cache.storeConf(e.getKey(), e.getValue());
+        }
         CoinConfigSource src = new CoinConfigSource(BASE);
         src.setRemoteFetch(stub);
         src.setCache(cache);

@@ -49,12 +49,14 @@ public class XRouterPacketManager {
 
         if (r.length > 32) {
             LOGGER.finer(
-                    "[xrouter] WARNING: Signature R is greater than 32 bytes! Trimming from the beginning. Size: "
+                    "[xrouter] WARNING: Signature R is greater than 32 bytes! Trimming from the"
+                            + " beginning. Size: "
                             + r.length);
             LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
         } else if (r.length < 32) {
             LOGGER.finer(
-                    "[xrouter] WARNING: Signature R is less than 32 bytes! Prepending null bytes to the beginning. Size: "
+                    "[xrouter] WARNING: Signature R is less than 32 bytes! Prepending null bytes to"
+                            + " the beginning. Size: "
                             + s.length);
             LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
 
@@ -63,12 +65,14 @@ public class XRouterPacketManager {
 
         if (s.length > 32) {
             LOGGER.finer(
-                    "[xrouter] WARNING: Signature S is greater than 32 bytes! Trimming from the beginning. Size: "
+                    "[xrouter] WARNING: Signature S is greater than 32 bytes! Trimming from the"
+                            + " beginning. Size: "
                             + s.length);
             LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
         } else if (s.length < 32) {
             LOGGER.finer(
-                    "[xrouter] WARNING: Signature S is less than 32 bytes! Prepending null bytes. Size: "
+                    "[xrouter] WARNING: Signature S is less than 32 bytes! Prepending null bytes."
+                            + " Size: "
                             + s.length);
             LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
 
@@ -199,7 +203,9 @@ public class XRouterPacketManager {
 
     private HashMap<String, Object> getBody(@Nullable String paymentTx) {
         HashMap<String, Object> body = new HashMap<>();
-        if (paymentTx != null) body.put("paymentTx", paymentTx);
+        if (paymentTx != null) {
+            body.put("paymentTx", paymentTx);
+        }
 
         return body;
     }
@@ -243,12 +249,16 @@ public class XRouterPacketManager {
         int size = command.length() + 1 + paymentTx.length() + 1 + 4;
 
         for (Object param : params) {
-            if (param instanceof Boolean) size += 4;
-            else if (param instanceof String) size += ((String) param).length() + 1;
-            else if (param instanceof Integer) size += 4;
-            else
+            if (param instanceof Boolean) {
+                size += 4;
+            } else if (param instanceof String) {
+                size += ((String) param).length() + 1;
+            } else if (param instanceof Integer) {
+                size += 4;
+            } else {
                 throw new IllegalArgumentException(
                         "Argument of unsupported class: " + param.getClass().getSimpleName());
+            }
         }
 
         return getPacket(

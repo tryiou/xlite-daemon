@@ -67,18 +67,23 @@ public class XRouterConfiguration {
             } else {
                 String[] rawParamTypes;
 
-                if (properties.containsKey("parameters"))
+                if (properties.containsKey("parameters")) {
                     rawParamTypes = properties.getProperty("parameters").split(",");
-                else if (properties.containsKey("paramsType"))
+                } else if (properties.containsKey("paramsType")) {
                     rawParamTypes = properties.getProperty("paramsType").split(",");
-                else return;
+                } else {
+                    return;
+                }
 
                 for (String rawParamType : rawParamTypes) {
-                    if (rawParamType.isEmpty()) continue;
+                    if (rawParamType.isEmpty()) {
+                        continue;
+                    }
 
                     if (!pluginParamTypes.containsKey(rawParamType)) {
                         LOGGER.finer(
-                                "[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin parameter type: "
+                                "[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin"
+                                        + " parameter type: "
                                         + rawParamType
                                         + ". Failing.");
                         throw new IllegalArgumentException(
@@ -147,7 +152,9 @@ public class XRouterConfiguration {
     public void parseConfig() {
         HashMap<String, Properties> properties = getProperties(rawXRouterConfig);
 
-        if (properties == null) return;
+        if (properties == null) {
+            return;
+        }
 
         LOGGER.finer("[xrouter-config-parser] DEBUG: Properties: " + properties.toString());
 
@@ -197,10 +204,12 @@ public class XRouterConfiguration {
             @Override
             public Object put(Object key, Object value) {
                 String header = (key + " " + value).trim();
-                if (header.startsWith("[") && header.endsWith("]"))
+                if (header.startsWith("[") && header.endsWith("]")) {
                     return result.put(
                             header.substring(1, header.length() - 1), section = new Properties());
-                else return section.put(key, value);
+                } else {
+                    return section.put(key, value);
+                }
             }
         }.load(new StringReader(toRead));
         return result;

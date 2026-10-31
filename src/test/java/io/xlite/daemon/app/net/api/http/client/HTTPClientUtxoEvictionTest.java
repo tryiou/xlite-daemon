@@ -34,7 +34,8 @@ public class HTTPClientUtxoEvictionTest {
 
     // Checksum-valid BIP39 test vector; only used to derive wallet addresses.
     private static final String MNEMONIC =
-            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
+                    + " abandon about";
     private static final String PASSWORD = "eviction-test-password";
 
     @TempDir Path tempDir;
@@ -195,7 +196,8 @@ public class HTTPClientUtxoEvictionTest {
 
         // Backend outage envelope (no "utxos" key): outage must never wipe.
         client.canned =
-                "{\"result\":null,\"error\":{\"code\":-32000,\"message\":\"All addresses failed\"}}";
+                "{\"result\":null,\"error\":{\"code\":-32000,\"message\":\"All addresses"
+                        + " failed\"}}";
         assertNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
     }

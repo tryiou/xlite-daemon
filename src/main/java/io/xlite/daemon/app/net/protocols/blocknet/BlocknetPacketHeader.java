@@ -24,8 +24,7 @@ public class BlocknetPacketHeader extends BitcoinSerializer.BitcoinPacketHeader 
 
         int cursor = 0;
 
-        for (; header[cursor] != 0x00 && cursor < 12; cursor++)
-            ;
+        for (; header[cursor] != 0x00 && cursor < 12; cursor++) {}
 
         byte[] commandBytes = new byte[cursor];
         System.arraycopy(header, 0, commandBytes, 0, cursor);

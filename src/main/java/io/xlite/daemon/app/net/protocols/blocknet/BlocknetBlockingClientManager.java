@@ -37,7 +37,9 @@ public class BlocknetBlockingClientManager extends AbstractIdleService
     public ListenableFuture<SocketAddress> openConnection(
             SocketAddress serverAddress, StreamConnection connection) {
         try {
-            if (!isRunning()) throw new IllegalStateException();
+            if (!isRunning()) {
+                throw new IllegalStateException();
+            }
             return new BlocknetBlockingClient(
                             serverAddress, connection, connectTimeoutMillis, socketFactory, clients)
                     .getConnectFuture();
@@ -56,7 +58,9 @@ public class BlocknetBlockingClientManager extends AbstractIdleService
     @Override
     protected void shutDown() throws Exception {
         synchronized (clients) {
-            for (BlocknetBlockingClient client : clients) client.closeConnection();
+            for (BlocknetBlockingClient client : clients) {
+                client.closeConnection();
+            }
         }
     }
 
@@ -67,10 +71,14 @@ public class BlocknetBlockingClientManager extends AbstractIdleService
 
     @Override
     public void closeConnections(int n) {
-        if (!isRunning()) throw new IllegalStateException();
+        if (!isRunning()) {
+            throw new IllegalStateException();
+        }
         synchronized (clients) {
             Iterator<BlocknetBlockingClient> it = clients.iterator();
-            while (n-- > 0 && it.hasNext()) it.next().closeConnection();
+            while (n-- > 0 && it.hasNext()) {
+                it.next().closeConnection();
+            }
         }
     }
 }

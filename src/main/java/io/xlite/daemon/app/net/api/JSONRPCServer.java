@@ -147,7 +147,9 @@ public class JSONRPCServer extends Thread {
                         // channel the bind produced.
                         Thread.currentThread().interrupt();
                         lastBindError = e;
-                        if (bindFuture != null) bindFuture.channel().close();
+                        if (bindFuture != null) {
+                            bindFuture.channel().close();
+                        }
                         break;
                     } catch (Exception e) {
                         lastBindError = e;
@@ -233,7 +235,9 @@ public class JSONRPCServer extends Thread {
     public boolean awaitBound(long timeoutMillis) {
         long deadline = System.currentTimeMillis() + timeoutMillis;
         while (System.currentTimeMillis() < deadline) {
-            if (bound || bindFailed || stopping) return bound;
+            if (bound || bindFailed || stopping) {
+                return bound;
+            }
             try {
                 Thread.sleep(25);
             } catch (InterruptedException e) {
@@ -249,8 +253,9 @@ public class JSONRPCServer extends Thread {
      * on the same port cannot race the async close.
      */
     public void awaitPortRelease(long timeoutMillis) {
-        if (channel != null)
+        if (channel != null) {
             channel.closeFuture().awaitUninterruptibly(timeoutMillis, TimeUnit.MILLISECONDS);
+        }
     }
 
     /**

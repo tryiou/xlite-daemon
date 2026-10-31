@@ -8,7 +8,9 @@ import com.google.gson.JsonObject;
 import io.xlite.daemon.app.net.api.http.master.HTTPServerHandler;
 import io.xlite.daemon.app.util.ConfigHelper;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
@@ -96,16 +98,22 @@ public class CoinConfigRpcTest {
                         "minTxFee",
                         "port",
                         "dustAmount"
-                    }) assertTrue(o.has(k), "missing " + k);
-            if (!o.get("dustAmount").isJsonNull()) assertTrue(o.get("dustAmount").getAsLong() >= 0);
+                    }) {
+                assertTrue(o.has(k), "missing " + k);
+            }
+            if (!o.get("dustAmount").isJsonNull()) {
+                assertTrue(o.get("dustAmount").getAsLong() >= 0);
+            }
             String t = o.get("ticker").getAsString();
             assertTrue(t.compareTo(prev) >= 0, "not sorted " + prev + ">" + t);
             prev = t;
         }
         JsonObject ltc = null;
-        for (int i = 0; i < arr.size(); i++)
-            if ("LTC".equals(arr.get(i).getAsJsonObject().get("ticker").getAsString()))
+        for (int i = 0; i < arr.size(); i++) {
+            if ("LTC".equals(arr.get(i).getAsJsonObject().get("ticker").getAsString())) {
                 ltc = arr.get(i).getAsJsonObject();
+            }
+        }
         assertNotNull(ltc);
         assertEquals(48, ltc.get("addressPrefix").getAsInt());
         assertEquals(50, ltc.get("scriptPrefix").getAsInt());

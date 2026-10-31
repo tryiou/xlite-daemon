@@ -81,7 +81,9 @@ class WalletHelperFeeTest extends TestHelper {
             String ticker = e.getKey();
             CoinConfig cfg = e.getValue();
             // Only check migrated tickers that WalletHelper knows via HasFeeParams
-            if (!CompiledCoinSupplement.supports(ticker)) continue;
+            if (!CompiledCoinSupplement.supports(ticker)) {
+                continue;
+            }
             ConfigurableNetworkParameters generic = ConfigurableNetworkParameters.from(cfg);
             assertEquals(
                     cfg.feePerByte(),

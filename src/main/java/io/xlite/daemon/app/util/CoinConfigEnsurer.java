@@ -153,12 +153,13 @@ public final class CoinConfigEnsurer {
             throw new IllegalStateException(
                     "config for " + tickerStr + " was not written: " + e.getMessage(), e);
         }
-        if (onDisk.isBlank())
+        if (onDisk.isBlank()) {
             throw new IllegalStateException(
                     "config for "
                             + tickerStr
                             + " was not written to "
                             + ConfigHelper.settingsFile(tickerStr).getAbsolutePath());
+        }
         try {
             new JSONObject(onDisk);
         } catch (Exception e) {

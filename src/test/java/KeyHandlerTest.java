@@ -3,10 +3,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.xlite.daemon.app.crypto.KeyHandler;
 import io.xlite.daemon.app.util.ConfigHelper;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -375,7 +384,9 @@ public class KeyHandlerTest {
 
     /** Read the wallet file and return its lines, or an empty array if absent. */
     private String[] readKeyFileLines() throws IOException {
-        if (!testKeyFile.exists()) return new String[0];
+        if (!testKeyFile.exists()) {
+            return new String[0];
+        }
         try (BufferedReader reader = new BufferedReader(new FileReader(testKeyFile))) {
             return reader.lines().toArray(String[]::new);
         }

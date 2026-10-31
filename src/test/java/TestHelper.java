@@ -208,12 +208,16 @@ public class TestHelper {
      * @return true if deletion was successful
      */
     protected static boolean deleteDir(File path) {
-        if (!path.exists()) return true;
+        if (!path.exists()) {
+            return true;
+        }
         for (File subFile : Objects.requireNonNull(path.listFiles())) {
             if (subFile.isDirectory()) {
                 deleteDir(subFile);
             } else {
-                if (!subFile.delete()) return false;
+                if (!subFile.delete()) {
+                    return false;
+                }
             }
         }
         return path.delete();

@@ -47,7 +47,9 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
         Thread t =
                 new Thread(() -> {
                     Context.propagate(context);
-                    if (clientSet != null) clientSet.add(BlocknetBlockingClient.this);
+                    if (clientSet != null) {
+                        clientSet.add(BlocknetBlockingClient.this);
+                    }
                     try {
                         socket.connect(serverAddress, connectTimeoutMillis);
                         connection.connectionOpened();
@@ -65,12 +67,16 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
                         }
                     } finally {
                         try {
-                            if (!socket.isClosed()) socket.close();
+                            if (!socket.isClosed()) {
+                                socket.close();
+                            }
                         } catch (IOException e1) {
                             // At this point there isn't much we can do, and we can probably assume
                             // the channel is closed
                         }
-                        if (clientSet != null) clientSet.remove(BlocknetBlockingClient.this);
+                        if (clientSet != null) {
+                            clientSet.remove(BlocknetBlockingClient.this);
+                        }
                         connection.connectionClosed();
                     }
                 });
@@ -98,7 +104,9 @@ public class BlocknetBlockingClient implements MessageWriteTarget {
                             readBuff,
                             0,
                             Math.max(1, Math.min(dbuf.remaining(), inputStream.available())));
-            if (read == -1) return;
+            if (read == -1) {
+                return;
+            }
             dbuf.put(readBuff, 0, read);
 
             dbuf.flip();

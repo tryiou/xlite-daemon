@@ -48,9 +48,10 @@ public final class CoinConfig {
 
     private String required(String key) {
         String v = confEntries.get(key);
-        if (v == null || v.trim().isEmpty())
+        if (v == null || v.trim().isEmpty()) {
             throw new IllegalStateException(
                     "[" + ticker + "] missing required config key '" + key + "'");
+        }
         return v.trim();
     }
 
@@ -125,9 +126,15 @@ public final class CoinConfig {
      */
     public boolean txWithTimeField() {
         String v = confEntries.get("TxWithTimeField");
-        if (v == null || v.trim().isEmpty()) return false;
-        if (v.trim().equalsIgnoreCase("true")) return true;
-        if (v.trim().equalsIgnoreCase("false")) return false;
+        if (v == null || v.trim().isEmpty()) {
+            return false;
+        }
+        if (v.trim().equalsIgnoreCase("true")) {
+            return true;
+        }
+        if (v.trim().equalsIgnoreCase("false")) {
+            return false;
+        }
         throw new IllegalStateException(
                 "["
                         + ticker
@@ -174,8 +181,12 @@ public final class CoinConfig {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof CoinConfig)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof CoinConfig)) {
+            return false;
+        }
         CoinConfig that = (CoinConfig) o;
         return ticker.equals(that.ticker)
                 && blockchain.equals(that.blockchain)

@@ -73,16 +73,20 @@ public final class TxTimeFieldSigner {
             Transaction.SigHash sigHash,
             long nTime) {
         requireSameSize(keys, outpoints, scripts);
-        if (keys.isEmpty()) throw new IllegalArgumentException("no inputs to sign");
-        if (nTime < 0 || nTime > 0xFFFFFFFFL)
+        if (keys.isEmpty()) {
+            throw new IllegalArgumentException("no inputs to sign");
+        }
+        if (nTime < 0 || nTime > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("nTime out of uint32 range: " + nTime);
+        }
 
         int hashType = sigHash.value;
 
         // Attach every input first, with an empty script, so each preimage is
         // computed against the finished input set.
-        for (TransactionOutPoint outpoint : outpoints)
+        for (TransactionOutPoint outpoint : outpoints) {
             tx.addInput(new TransactionInput(params, tx, new byte[0], outpoint));
+        }
 
         for (int nIn = 0; nIn < keys.size(); nIn++) {
             Sha256Hash digest = chainSighash(tx, scripts.get(nIn), nIn, hashType, nTime);
@@ -97,7 +101,9 @@ public final class TxTimeFieldSigner {
      */
     private static Script buildScriptSig(ECKey key, Sha256Hash digest, int hashType) {
         ECDSASignature signature = key.sign(digest);
-        if (signature == null) throw new IllegalStateException("signing produced no signature");
+        if (signature == null) {
+            throw new IllegalStateException("signing produced no signature");
+        }
         byte[] der = signature.encodeToDER();
         byte[] encoded = new byte[der.length + 1];
         System.arraycopy(der, 0, encoded, 0, der.length);
@@ -107,7 +113,7 @@ public final class TxTimeFieldSigner {
 
     private static void requireSameSize(
             List<ECKey> keys, List<TransactionOutPoint> outpoints, List<Script> scripts) {
-        if (keys.size() != outpoints.size() || keys.size() != scripts.size())
+        if (keys.size() != outpoints.size() || keys.size() != scripts.size()) {
             throw new IllegalArgumentException(
                     "one key, outpoint and script per input required: "
                             + keys.size()
@@ -115,6 +121,7 @@ public final class TxTimeFieldSigner {
                             + outpoints.size()
                             + "/"
                             + scripts.size());
+        }
     }
 
     /**
@@ -150,15 +157,17 @@ public final class TxTimeFieldSigner {
             one[0] = 1;
             return Sha256Hash.wrap(one);
         }
-        if (tx.getInputs().isEmpty())
+        if (tx.getInputs().isEmpty()) {
             throw new IllegalArgumentException("transaction has no inputs to sign");
-        if (nIn < 0 || nIn >= tx.getInputs().size())
+        }
+        if (nIn < 0 || nIn >= tx.getInputs().size()) {
             throw new IllegalArgumentException(
                     "input index "
                             + nIn
                             + " outside transaction of "
                             + tx.getInputs().size()
                             + " inputs");
+        }
 
         return Sha256Hash.wrap(
                 Sha256Hash.hashTwice(preimageBytes(tx, scriptCode, nIn, hashType, nTime)));
@@ -178,15 +187,17 @@ public final class TxTimeFieldSigner {
         boolean hashSingle = (hashType & 0x1f) == SIGHASH_SINGLE;
         boolean hashNone = (hashType & 0x1f) == SIGHASH_NONE;
 
-        if (tx.getInputs().isEmpty())
+        if (tx.getInputs().isEmpty()) {
             throw new IllegalArgumentException("transaction has no inputs to sign");
-        if (nIn < 0 || nIn >= tx.getInputs().size())
+        }
+        if (nIn < 0 || nIn >= tx.getInputs().size()) {
             throw new IllegalArgumentException(
                     "input index "
                             + nIn
                             + " outside transaction of "
                             + tx.getInputs().size()
                             + " inputs");
+        }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         writeInt32(out, (int) tx.getVersion());
@@ -237,19 +248,29 @@ public final class TxTimeFieldSigner {
      * send path does not call it.
      */
     public static boolean verify(Script scriptSig, Sha256Hash hash) {
-        if (scriptSig == null || hash == null) return false;
+        if (scriptSig == null || hash == null) {
+            return false;
+        }
         List<ScriptChunk> chunks = scriptSig.getChunks();
-        if (chunks.size() < 2) return false;
+        if (chunks.size() < 2) {
+            return false;
+        }
         // A non-push chunk (an opcode, say) carries no data at all.
-        if (!chunks.get(0).isPushData() || !chunks.get(1).isPushData()) return false;
+        if (!chunks.get(0).isPushData() || !chunks.get(1).isPushData()) {
+            return false;
+        }
         byte[] signature = chunks.get(0).data;
         byte[] pubkey = chunks.get(1).data;
-        if (signature == null || pubkey == null || signature.length < 2) return false;
+        if (signature == null || pubkey == null || signature.length < 2) {
+            return false;
+        }
         byte[] der = new byte[signature.length - 1];
         System.arraycopy(signature, 0, der, 0, der.length);
         try {
             ECDSASignature parsed = ECDSASignature.decodeFromDER(der);
-            if (!parsed.isCanonical()) return false;
+            if (!parsed.isCanonical()) {
+                return false;
+            }
             return ECKey.fromPublicOnly(pubkey).verify(hash, parsed);
         } catch (SignatureDecodeException e) {
             return false;
@@ -312,7 +333,9 @@ public final class TxTimeFieldSigner {
 
     private static void writeOutPoint(ByteArrayOutputStream out, TransactionOutPoint outPoint) {
         byte[] hash = outPoint.getHash().getBytes();
-        for (int i = hash.length - 1; i >= 0; i--) out.write(hash[i]);
+        for (int i = hash.length - 1; i >= 0; i--) {
+            out.write(hash[i]);
+        }
         writeUInt32(out, outPoint.getIndex());
     }
 }

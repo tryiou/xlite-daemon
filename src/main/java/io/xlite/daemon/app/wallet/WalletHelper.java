@@ -16,7 +16,18 @@ import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.TxTimeFieldSigner;
 import io.xlite.daemon.app.util.UTXO;
 
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.Address;
+import org.bitcoinj.core.Base58;
+import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.DumpedPrivateKey;
+import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.Transaction;
+import org.bitcoinj.core.TransactionInput;
+import org.bitcoinj.core.TransactionOutPoint;
+import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.wallet.Wallet;
@@ -80,9 +91,13 @@ public class WalletHelper {
         }
 
         long nTime = resolveNTime(coin.getTicker(), utxos, nTimeResolver);
-        if (nTime == INVALID_NTIME) return null;
+        if (nTime == INVALID_NTIME) {
+            return null;
+        }
         Transaction signed = signTransactionWithUtxos(tx, utxos, nTime);
-        if (signed == null) return null;
+        if (signed == null) {
+            return null;
+        }
         // Mark here rather than inside signing: this path builds and hands the
         // transaction to the service node in one step, so there is no later
         // broadcast callback to do it. Signing itself stays free of wallet
@@ -147,7 +162,9 @@ public class WalletHelper {
                 signTimeFieldInputs(tx, selectedUtxos, nTime);
             } else {
                 for (UTXO utxo : selectedUtxos) {
-                    if (utxo.isSpent()) continue;
+                    if (utxo.isSpent()) {
+                        continue;
+                    }
                     org.bitcoinj.core.UTXO bUtxo = utxo.createUTXO();
                     AddressBalance addressBalance = requireAddressBalance(utxo);
                     TransactionOutPoint outPoint =
@@ -183,7 +200,9 @@ public class WalletHelper {
         List<Script> scripts = new ArrayList<>();
 
         for (UTXO utxo : selectedUtxos) {
-            if (utxo.isSpent()) continue;
+            if (utxo.isSpent()) {
+                continue;
+            }
             org.bitcoinj.core.UTXO bUtxo = utxo.createUTXO();
             AddressBalance addressBalance = requireAddressBalance(utxo);
             keys.add(addressBalance.getPrivateKey().getKey());
@@ -196,7 +215,9 @@ public class WalletHelper {
                 networkParameters, tx, keys, outpoints, scripts, Transaction.SigHash.ALL, nTime);
 
         for (UTXO utxo : selectedUtxos) {
-            if (!utxo.isSpent()) logSignedInput(utxo);
+            if (!utxo.isSpent()) {
+                logSignedInput(utxo);
+            }
         }
     }
 
@@ -215,11 +236,14 @@ public class WalletHelper {
     private void markInputsSpent(ArrayList<UTXO> selectedUtxos) {
         List<AddressBalance> touched = new ArrayList<>();
         for (UTXO utxo : selectedUtxos) {
-            if (utxo.isSpent()) continue;
+            if (utxo.isSpent()) {
+                continue;
+            }
             utxo.setSpent(true);
             AddressBalance addressBalance = coin.getAddressBalance(utxo.getAddress());
-            if (addressBalance != null && !touched.contains(addressBalance))
+            if (addressBalance != null && !touched.contains(addressBalance)) {
                 touched.add(addressBalance);
+            }
         }
         // Once per address that actually held an input, rather than once per
         // input: the balance scan covers every tracked address, so a
@@ -292,7 +316,9 @@ public class WalletHelper {
 
         int sizeOfUtxos = utxos.size();
 
-        if (sizeOfUtxos <= 1) return utxos;
+        if (sizeOfUtxos <= 1) {
+            return utxos;
+        }
 
         ArrayList<UTXO> utxosLowerHalf = new ArrayList<>(utxos.subList(0, ((sizeOfUtxos + 1) / 2)));
         ArrayList<UTXO> utxosGreaterHalf =
@@ -380,8 +406,9 @@ public class WalletHelper {
     public double getTotalBalance() {
         double totalBalance = 0.0;
 
-        for (AddressBalance addressBalance : coin.getAddressKeyPairs())
+        for (AddressBalance addressBalance : coin.getAddressKeyPairs()) {
             totalBalance += addressBalance.getBalanceProp();
+        }
 
         return totalBalance;
     }
@@ -399,7 +426,9 @@ public class WalletHelper {
                             + ")");
             return 0.0;
         }
-        for (UTXO utxo : utxos) totalBalance += utxo.getAmount();
+        for (UTXO utxo : utxos) {
+            totalBalance += utxo.getAmount();
+        }
 
         LOGGER.fine(
                 "[wallet-"
@@ -508,12 +537,15 @@ public class WalletHelper {
      */
     static long resolveNTime(
             CoinTicker coinTicker, List<UTXO> selected, NTimeResolver nTimeResolver) {
-        if (!TxTimeField.appliesTo(coinTicker)) return NO_NTIME;
+        if (!TxTimeField.appliesTo(coinTicker)) {
+            return NO_NTIME;
+        }
         if (nTimeResolver == null) {
             LOGGER.warning(
                     "[wallet-"
                             + CoinTickerUtils.tickerToString(coinTicker)
-                            + "] transactions carry nTime but no resolver was supplied; refusing to sign");
+                            + "] transactions carry nTime but no resolver was supplied; refusing to"
+                            + " sign");
             return INVALID_NTIME;
         }
         long nTime;
@@ -860,7 +892,9 @@ public class WalletHelper {
             Sha256Hash txid = input.getOutpoint().getHash();
             long vout = input.getOutpoint().getIndex();
 
-            if (txid == null) continue;
+            if (txid == null) {
+                continue;
+            }
 
             for (AddressBalance addressBalance : coinInstance.getAddressKeyPairs()) {
                 boolean matched = false;
@@ -875,7 +909,9 @@ public class WalletHelper {
                 // unspent set, so on a many-address wallet it made marking a
                 // transaction proportional to inputs times addresses for no gain:
                 // an address with no matching row has the same balance as before.
-                if (matched) addressBalance.calculateBalance();
+                if (matched) {
+                    addressBalance.calculateBalance();
+                }
             }
         }
     }
@@ -887,13 +923,17 @@ public class WalletHelper {
     }
 
     public static long getFeePerByte(NetworkParameters params) {
-        if (params instanceof HasFeeParams) return ((HasFeeParams) params).getFeePerByte();
+        if (params instanceof HasFeeParams) {
+            return ((HasFeeParams) params).getFeePerByte();
+        }
         throw new RuntimeException(
                 "Failed to get feePerByte for " + params.getClass().getSimpleName());
     }
 
     public static long getMinTxFee(NetworkParameters params) {
-        if (params instanceof HasFeeParams) return ((HasFeeParams) params).getMinTxFee();
+        if (params instanceof HasFeeParams) {
+            return ((HasFeeParams) params).getMinTxFee();
+        }
         throw new RuntimeException(
                 "Failed to get minTxFee for " + params.getClass().getSimpleName());
     }
