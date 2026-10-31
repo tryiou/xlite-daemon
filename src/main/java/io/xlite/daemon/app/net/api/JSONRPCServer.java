@@ -4,6 +4,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -149,7 +150,10 @@ public class JSONRPCServer extends Thread {
                         Thread.currentThread().interrupt();
                         lastBindError = e;
                         if (bindFuture != null) {
-                            bindFuture.channel().close();
+                            bindFuture
+                                    .channel()
+                                    .close()
+                                    .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
                         }
                         break;
                     } catch (Exception e) {
@@ -335,7 +339,7 @@ public class JSONRPCServer extends Thread {
         LOGGER.finer("[json-rpc-server] Interrupting server.");
 
         if (channel != null) {
-            channel.close();
+            channel.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
         }
         // Shared group: shutting it down here would retire every other coin.
     }

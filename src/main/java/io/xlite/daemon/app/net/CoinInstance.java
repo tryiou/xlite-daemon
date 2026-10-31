@@ -117,10 +117,16 @@ public final class CoinInstance {
     private final Object cloudTransactionLock = new Object();
 
     private BlocknetPeerGroup blocknetPeerGroup;
+
+    /**
+     * The p2p parameters for a Blocknet-network coin, or null for every other coin. Also the
+     * XRouter capability flag: a coin can only speak XRouter when these exist, so one field answers
+     * both questions and they cannot drift apart.
+     */
     private BlocknetParameters blocknetNetworkParameters;
+
     private NetworkParameters networkParameters;
     private Wallet wallet;
-    private volatile boolean hasXRouter = false;
     private KeyHandler keyHandler;
     private XRouterPacketManager xRouterPacketManager = null;
     private volatile int rpcPort = -1;
@@ -351,7 +357,7 @@ public final class CoinInstance {
     }
 
     public boolean hasXRouter() {
-        return hasXRouter;
+        return blocknetNetworkParameters != null;
     }
 
     public void deinit() {
@@ -413,7 +419,6 @@ public final class CoinInstance {
                     // succeeded. Moving it above that check would throw out of
                     // init() instead of returning the coin error callers handle.
                     blocknetNetworkParameters = new BlocknetNetworkParameters();
-                    hasXRouter = true;
                     break;
                 }
             case BITCOIN:

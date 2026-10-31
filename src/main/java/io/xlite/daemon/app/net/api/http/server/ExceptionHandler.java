@@ -47,7 +47,7 @@ public class ExceptionHandler extends ChannelDuplexHandler {
 
         writeResponse(ctx, httpResponse);
         ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-        ctx.close();
+        ctx.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
     }
 
     private void writeResponse(ChannelHandlerContext ctx, FullHttpResponse httpResponse) {
@@ -58,6 +58,6 @@ public class ExceptionHandler extends ChannelDuplexHandler {
         httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
         httpResponse.headers().set(HttpHeaderNames.SERVER, CoinInstance.getVersionString());
 
-        ctx.write(httpResponse);
+        ctx.write(httpResponse).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
     }
 }

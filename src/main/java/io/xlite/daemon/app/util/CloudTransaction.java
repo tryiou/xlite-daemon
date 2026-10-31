@@ -50,7 +50,7 @@ public class CloudTransaction {
             } else {
                 this.address =
                         new AtomicReference<>(
-                                LegacyAddress.fromP2SHHash(
+                                LegacyAddress.fromScriptHash(
                                                 networkParameters,
                                                 ScriptPattern.extractHashFromP2SH(
                                                         tx.getOutput(1).getScriptPubKey()))

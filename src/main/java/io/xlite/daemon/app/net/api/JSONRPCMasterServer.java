@@ -3,6 +3,7 @@ package io.xlite.daemon.app.net.api;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -89,7 +90,7 @@ public class JSONRPCMasterServer extends Thread {
         LOGGER.finer("[json-rpc-server] Interrupting server.");
 
         if (channel != null) {
-            channel.close();
+            channel.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
         }
         // Shared group: its lifecycle belongs to application shutdown.
     }

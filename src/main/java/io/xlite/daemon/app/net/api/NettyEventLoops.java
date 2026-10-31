@@ -1,7 +1,8 @@
 package io.xlite.daemon.app.net.api;
 
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
 
@@ -48,8 +49,10 @@ final class NettyEventLoops {
     static synchronized EventLoopGroup shared() {
         if (shared == null || shared.isShuttingDown()) {
             shared =
-                    new NioEventLoopGroup(
-                            WORKER_THREADS, new DefaultThreadFactory("rpc-worker", true));
+                    new MultiThreadIoEventLoopGroup(
+                            WORKER_THREADS,
+                            new DefaultThreadFactory("rpc-worker", true),
+                            NioIoHandler.newFactory());
         }
         return shared;
     }

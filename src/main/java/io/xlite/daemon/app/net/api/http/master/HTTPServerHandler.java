@@ -75,8 +75,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         FullHttpResponse httpResponse =
                 new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
         writeResponse(ctx, httpResponse, null);
-        ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-        ctx.close();
+        ctx.writeAndFlush(Unpooled.EMPTY_BUFFER)
+                .addListener(ChannelFutureListener.CLOSE)
+                .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
     }
 
     @Override
@@ -178,7 +179,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 Preconditions.checkNotNull(jsonReq);
 
                 if (!jsonReq.has("method") || !jsonReq.has("params")) {
-                    ctx.close();
+                    ctx.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
                     throw new IllegalArgumentException("Bad JSON-RPC request by client.");
                 }
             } catch (Exception e) {
@@ -470,7 +471,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         LOGGER.finer(
                 "[http-server-handler] Response content: "
                         + httpResponse.content().toString(CharsetUtil.UTF_8));
-        ctx.write(httpResponse);
+        ctx.write(httpResponse).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
 
         return keepAlive;
     }
@@ -478,6 +479,6 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private static void send100Continue(ChannelHandlerContext ctx) {
         FullHttpResponse response =
                 new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE);
-        ctx.write(response);
+        ctx.write(response).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
     }
 }

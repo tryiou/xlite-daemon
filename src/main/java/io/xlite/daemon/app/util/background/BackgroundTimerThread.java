@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -49,6 +50,7 @@ public class BackgroundTimerThread implements Runnable {
     // releases the scheduler explicitly, but daemon status makes the
     // single-anchor invariant structural rather than remembered.
     private ScheduledExecutorService logRotationScheduler;
+    private ScheduledFuture<?> logRotationFuture;
     private static final int DAILY_ROTATION_HOUR = 2; // 2:00 AM
     private static final int DAILY_ROTATION_MINUTE = 0;
 
@@ -75,8 +77,9 @@ public class BackgroundTimerThread implements Runnable {
                     return t;
                 });
         long initialDelay = calculateInitialDelay();
-        logRotationScheduler.scheduleAtFixedRate(
-                this::performDailyLogRotation, initialDelay, 24, TimeUnit.HOURS);
+        logRotationFuture =
+                logRotationScheduler.scheduleAtFixedRate(
+                        this::performDailyLogRotation, initialDelay, 24, TimeUnit.HOURS);
         LocalTime now = LocalTime.now(ZoneId.systemDefault());
         LOGGER.info(
                 "[BackgroundTimer] Scheduled daily log rotation at "
@@ -119,6 +122,9 @@ public class BackgroundTimerThread implements Runnable {
         shutdownRequested = true;
         if (workerThread != null) {
             workerThread.interrupt();
+        }
+        if (logRotationFuture != null) {
+            logRotationFuture.cancel(false);
         }
         if (logRotationScheduler != null && !logRotationScheduler.isShutdown()) {
             logRotationScheduler.shutdown();
