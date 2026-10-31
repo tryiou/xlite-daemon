@@ -29,7 +29,7 @@ import java.security.MessageDigest;
  * chain hashed. The decoded fields come out right, which is what makes this easy to miss: only the
  * identifier is wrong.
  */
-class DecodeTransactionTxidTest {
+class TxWireTxidTest {
 
     private static final long NTIME = 1_790_592_305L;
 
@@ -131,7 +131,7 @@ class DecodeTransactionTxidTest {
 
         assertEquals(
                 chainTxid,
-                HTTPServerHandler.txidForDecoded(CoinTicker.VERGE, wire, parsed),
+                TxWire.txidForDecoded(CoinTicker.VERGE, wire, parsed),
                 "a time-field coin must be reported under the chain's identifier");
     }
 
@@ -145,7 +145,7 @@ class DecodeTransactionTxidTest {
 
         assertEquals(
                 parsed.getHashAsString(),
-                HTTPServerHandler.txidForDecoded(CoinTicker.LITECOIN, wire, parsed),
+                TxWire.txidForDecoded(CoinTicker.LITECOIN, wire, parsed),
                 "a coin with no time field must keep the bitcoinj identifier");
     }
 
@@ -169,7 +169,7 @@ class DecodeTransactionTxidTest {
             }
             assertEquals(
                     expected,
-                    HTTPServerHandler.txidForDecoded(t, wire, parsed),
+                    TxWire.txidForDecoded(t, wire, parsed),
                     t + " declares a time field and must be reported over the wire bytes");
         }
     }

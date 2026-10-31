@@ -33,7 +33,7 @@ import java.util.Map;
  * the transaction that a real send would produce -- the same bytes, the same txid, and the fee
  * actually charged rather than one recomputed from the shape of the finished transaction.
  */
-class HTTPServerHandlerSendDryRunTest {
+class SendTransactionMethodTest {
 
     private static final long XVG_COIN_UNIT = 1_000_000L;
     private static final long XVG_FEE_PER_BYTE = 200L;
@@ -85,18 +85,18 @@ class HTTPServerHandlerSendDryRunTest {
     @Test
     @DisplayName("the dry-run flag is off unless explicitly requested")
     void testDryRunFlagDefaultsOff() {
-        assertFalse(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01), 2));
-        assertFalse(HTTPServerHandler.parseDryRunFlag(params(), 2));
-        assertFalse(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "false"), 2));
-        assertFalse(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "0"), 2));
+        assertFalse(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01), 2));
+        assertFalse(SendTransactionMethod.parseDryRunFlag(params(), 2));
+        assertFalse(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01, "false"), 2));
+        assertFalse(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01, "0"), 2));
     }
 
     @Test
     @DisplayName("the dry-run flag accepts the same true/1 spellings as the verbose flag")
     void testDryRunFlagAcceptsTrueAndOne() {
-        assertTrue(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "true"), 2));
-        assertTrue(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "TRUE"), 2));
-        assertTrue(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "1"), 2));
+        assertTrue(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01, "true"), 2));
+        assertTrue(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01, "TRUE"), 2));
+        assertTrue(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01, "1"), 2));
     }
 
     @Test
@@ -106,7 +106,7 @@ class HTTPServerHandlerSendDryRunTest {
         // from a two-parameter call is how a pre-flag caller keeps working, so
         // that is what is asserted -- not that a boolean can be scraped out of
         // the address or amount, which are never booleans.
-        assertFalse(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01), 2));
+        assertFalse(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01), 2));
     }
 
     @Test
@@ -118,7 +118,9 @@ class HTTPServerHandlerSendDryRunTest {
         IllegalArgumentException e =
                 assertThrows(
                         IllegalArgumentException.class,
-                        () -> HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "ture"), 2),
+                        () ->
+                                SendTransactionMethod.parseDryRunFlag(
+                                        params("addr", 0.01, "ture"), 2),
                         "a misspelling must not resolve to a real broadcast");
         assertTrue(
                 e.getMessage().contains("dryrun"),
@@ -133,7 +135,7 @@ class HTTPServerHandlerSendDryRunTest {
         // RPC and the caller gets no response at all.
         JsonArray withNull = params("addr", 0.01);
         withNull.add(com.google.gson.JsonNull.INSTANCE);
-        assertFalse(HTTPServerHandler.parseDryRunFlag(withNull, 2));
+        assertFalse(SendTransactionMethod.parseDryRunFlag(withNull, 2));
     }
 
     @Test
@@ -151,7 +153,7 @@ class HTTPServerHandlerSendDryRunTest {
             IllegalArgumentException e =
                     assertThrows(
                             IllegalArgumentException.class,
-                            () -> HTTPServerHandler.parseDryRunFlag(withBad, 2),
+                            () -> SendTransactionMethod.parseDryRunFlag(withBad, 2),
                             "a non-primitive flag must not resolve to a broadcast");
             assertTrue(
                     e.getMessage().contains("dryrun"),
@@ -162,7 +164,7 @@ class HTTPServerHandlerSendDryRunTest {
     @Test
     @DisplayName("an index past the end of the parameter list is not a dry run")
     void testDryRunFlagToleratesAbsentIndex() {
-        assertFalse(HTTPServerHandler.parseDryRunFlag(params("addr", 0.01), 7));
+        assertFalse(SendTransactionMethod.parseDryRunFlag(params("addr", 0.01), 7));
     }
 
     @Test
@@ -174,7 +176,7 @@ class HTTPServerHandlerSendDryRunTest {
         String hex = bytesToHex(tx.bitcoinSerialize());
 
         JsonObject result =
-                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
 
         assertTrue(result.get("dryRun").getAsBoolean());
         assertEquals(hex, result.get("hex").getAsString());
@@ -202,7 +204,7 @@ class HTTPServerHandlerSendDryRunTest {
         // formula; the wallet actually reserved for a change input and
         // charged the 120000 it passed in. The payload must show the latter.
         JsonObject result =
-                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 120_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 120_000L, hex, tx);
 
         assertEquals(120_000L, result.get("feeSats").getAsLong());
         assertEquals(0.12, result.get("fee").getAsDouble(), 1e-9);
@@ -225,7 +227,7 @@ class HTTPServerHandlerSendDryRunTest {
         // 100000 base units of a 1e6-divisor coin is 0.1 XVG. With a
         // hardcoded 1e8 divisor this would report 0.001.
         JsonObject result =
-                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
 
         assertEquals(0.1, result.get("fee").getAsDouble(), 1e-9);
     }
@@ -247,7 +249,7 @@ class HTTPServerHandlerSendDryRunTest {
         String hex = bytesToHex(tx.bitcoinSerialize());
 
         JsonObject result =
-                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+                SendTransactionMethod.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
 
         assertEquals(2, result.get("inputs").getAsInt());
         assertEquals(1, result.get("outputs").getAsInt());
@@ -274,7 +276,7 @@ class HTTPServerHandlerSendDryRunTest {
         JsonObject envelope = new JsonObject();
         envelope.addProperty("txid", "abc123");
         JsonObject response = new JsonObject();
-        HTTPServerHandler.buildSendFallbackResult(response, envelope);
+        SendTransactionMethod.buildSendFallbackResult(response, envelope);
         assertEquals(envelope, response.get("result"));
         assertTrue(response.get("error").isJsonNull());
     }

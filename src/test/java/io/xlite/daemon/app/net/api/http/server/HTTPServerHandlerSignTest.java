@@ -58,7 +58,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -206,7 +205,7 @@ class HTTPServerHandlerSignTest {
         return instances;
     }
 
-    private HTTPServerHandler newHandler(CoinTicker ticker, Fixture fixture) throws Exception {
+    private HTTPServerHandler newHandler(CoinTicker ticker, Fixture fixture) {
         ConfigHelper configHelper = mock(ConfigHelper.class);
         when(coin.getConfigHelper()).thenReturn(configHelper);
         when(configHelper.getRpcUsername()).thenReturn(USER);
@@ -216,11 +215,7 @@ class HTTPServerHandlerSignTest {
         when(coin.getNetworkParameters()).thenReturn(fixture.params);
         when(coin.getAddressKeyPairs()).thenReturn(List.of(fixture.addressBalance));
 
-        HTTPServerHandler handler = new HTTPServerHandler(coin);
-        Field field = HTTPServerHandler.class.getDeclaredField("httpClient");
-        field.setAccessible(true);
-        field.set(handler, httpClient);
-        return handler;
+        return new HTTPServerHandler(coin, httpClient);
     }
 
     private FullHttpResponse sign(HTTPServerHandler handler, byte[] unsignedWireBytes) {
@@ -258,7 +253,7 @@ class HTTPServerHandlerSignTest {
 
     private static Transaction parseWire(
             CoinTicker ticker, NetworkParameters params, String wireHex) {
-        return HTTPServerHandler.parseForCoin(ticker, params, bytes(wireHex));
+        return TxWire.parseForCoin(ticker, params, bytes(wireHex));
     }
 
     private static void assertSignatureCovers(
@@ -278,7 +273,7 @@ class HTTPServerHandlerSignTest {
 
     @Test
     @DisplayName("Verge: a newer parent raises the signed nTime, and the wire carries it")
-    void testVergeRaisesNTimeToNewestParent() throws Exception {
+    void testVergeRaisesNTimeToNewestParent() {
         Fixture fixture = new Fixture(CoinTicker.VERGE, true, 1, INCOMING_NTIME);
         long parentNTime = INCOMING_NTIME + 60;
         when(httpClient.getRawTransaction(eq(CoinTicker.VERGE), anyString(), anyBoolean()))
@@ -304,7 +299,7 @@ class HTTPServerHandlerSignTest {
 
     @Test
     @DisplayName("Verge: an older parent leaves the incoming nTime untouched")
-    void testVergeKeepsIncomingNTimeWhenParentsAreOlder() throws Exception {
+    void testVergeKeepsIncomingNTimeWhenParentsAreOlder() {
         Fixture fixture = new Fixture(CoinTicker.VERGE, true, 1, INCOMING_NTIME);
         when(httpClient.getRawTransaction(eq(CoinTicker.VERGE), anyString(), anyBoolean()))
                 .thenReturn(parentResponse(fixture.params, INCOMING_NTIME - 60));
@@ -324,7 +319,7 @@ class HTTPServerHandlerSignTest {
 
     @Test
     @DisplayName("Verge: an unfetchable parent fails the call instead of guessing a time")
-    void testVergeUnfetchableParentFailsClosed() throws Exception {
+    void testVergeUnfetchableParentFailsClosed() {
         Fixture fixture = new Fixture(CoinTicker.VERGE, true, 1, INCOMING_NTIME);
         when(httpClient.getRawTransaction(eq(CoinTicker.VERGE), anyString(), anyBoolean()))
                 .thenReturn(null);
@@ -341,7 +336,7 @@ class HTTPServerHandlerSignTest {
 
     @Test
     @DisplayName("Pocketcoin: version 2 is preserved and no parent is fetched")
-    void testPkoinPreservesVersionWithoutParentFetch() throws Exception {
+    void testPkoinPreservesVersionWithoutParentFetch() {
         Fixture fixture = new Fixture(CoinTicker.PKOIN, true, 2, INCOMING_NTIME);
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
@@ -359,7 +354,7 @@ class HTTPServerHandlerSignTest {
 
     @Test
     @DisplayName("a non-time-field coin keeps its version and never fetches parents")
-    void testStandardCoinPreservesVersion() throws Exception {
+    void testStandardCoinPreservesVersion() {
         Fixture fixture = new Fixture(CoinTicker.LITECOIN, false, 2, INCOMING_NTIME);
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
@@ -376,7 +371,7 @@ class HTTPServerHandlerSignTest {
 
     @Test
     @DisplayName("createrawtransaction uses the coin's BCF version")
-    void testCreateRawTransactionUsesConfiguredVersion() throws Exception {
+    void testCreateRawTransactionUsesConfiguredVersion() {
         Fixture fixture = new Fixture(CoinTicker.PKOIN, true, 2, INCOMING_NTIME);
         LegacyAddress destination = LegacyAddress.fromKey(fixture.params, new ECKey());
 
@@ -401,8 +396,7 @@ class HTTPServerHandlerSignTest {
                     call(newHandler(CoinTicker.PKOIN, fixture), "createrawtransaction", params);
 
             String hex = envelope(response).get("result").getAsString();
-            Transaction created =
-                    HTTPServerHandler.parseForCoin(CoinTicker.PKOIN, fixture.params, bytes(hex));
+            Transaction created = TxWire.parseForCoin(CoinTicker.PKOIN, fixture.params, bytes(hex));
             assertEquals(
                     2,
                     created.getVersion(),
@@ -440,8 +434,7 @@ class HTTPServerHandlerSignTest {
     void testLockTimeSurvivesSigning() throws Exception {
         Fixture fixture = new Fixture(CoinTicker.LITECOIN, false, 2, INCOMING_NTIME);
         Transaction unsigned =
-                HTTPServerHandler.parseForCoin(
-                        CoinTicker.LITECOIN, fixture.params, fixture.unsignedWireBytes);
+                TxWire.parseForCoin(CoinTicker.LITECOIN, fixture.params, fixture.unsignedWireBytes);
         unsigned.setLockTime(123_456L);
         unsigned.setVersion(2);
 

@@ -38,7 +38,7 @@ import java.util.Map;
  * The sighash tests show the signer is self-consistent; they say nothing about whether the bytes
  * handed to it are bytes the chain accepts.
  */
-class HTTPServerHandlerWireLayoutTest {
+class TxWireLayoutTest {
 
     /** A plausible nTime: inside the uint32 range. */
     private static final long NTIME = 1_790_592_305L;
@@ -105,7 +105,7 @@ class HTTPServerHandlerWireLayoutTest {
         NetworkParameters ltc = litecoin();
         byte[] timeField = TxTimeField.insertNTime(standardTransaction(ltc), NTIME);
 
-        Transaction parsed = HTTPServerHandler.parseForCoin(CoinTicker.VERGE, ltc, timeField);
+        Transaction parsed = TxWire.parseForCoin(CoinTicker.VERGE, ltc, timeField);
         assertNotNull(parsed, "a transaction in the right layout must parse");
         assertArrayEquals(
                 timeField,
@@ -125,7 +125,7 @@ class HTTPServerHandlerWireLayoutTest {
         IllegalArgumentException e =
                 assertThrows(
                         IllegalArgumentException.class,
-                        () -> HTTPServerHandler.parseForCoin(CoinTicker.VERGE, ltc, standard),
+                        () -> TxWire.parseForCoin(CoinTicker.VERGE, ltc, standard),
                         "a standard-layout transaction must be refused where nTime is required");
         assertTrue(
                 e.getMessage().contains("wire layout"),
@@ -139,7 +139,7 @@ class HTTPServerHandlerWireLayoutTest {
         // unparseable, and the guard would be worse than nothing.
         NetworkParameters ltc = litecoin();
         assertNotNull(
-                HTTPServerHandler.parseForCoin(CoinTicker.LITECOIN, ltc, standardTransaction(ltc)),
+                TxWire.parseForCoin(CoinTicker.LITECOIN, ltc, standardTransaction(ltc)),
                 "a standard transaction on a standard chain must parse");
     }
 
@@ -153,10 +153,10 @@ class HTTPServerHandlerWireLayoutTest {
         byte[] standard = standardTransaction(ltc);
         assertThrows(
                 IllegalArgumentException.class,
-                () -> HTTPServerHandler.parseForCoin(CoinTicker.VERGE, ltc, standard),
+                () -> TxWire.parseForCoin(CoinTicker.VERGE, ltc, standard),
                 "Verge carries nTime, so standard bytes are wrong for it");
         assertDoesNotThrow(
-                () -> HTTPServerHandler.parseForCoin(CoinTicker.LITECOIN, ltc, standard),
+                () -> TxWire.parseForCoin(CoinTicker.LITECOIN, ltc, standard),
                 "Litecoin carries none, so the same bytes are right for it");
         assertTrue(
                 CoinTickerUtils.tickerToString(CoinTicker.VERGE).equals("XVG"),
@@ -175,7 +175,7 @@ class HTTPServerHandlerWireLayoutTest {
         byte[] standard = standardTransaction(ltc);
         Transaction signed = new Transaction(ltc, standard);
 
-        String hex = HTTPServerHandler.serializeForBroadcast(CoinTicker.VERGE, signed, NTIME);
+        String hex = TxWire.serializeForBroadcast(CoinTicker.VERGE, signed, NTIME);
         byte[] wire = hexToBytes(hex);
 
         assertEquals(
@@ -200,9 +200,7 @@ class HTTPServerHandlerWireLayoutTest {
         RuntimeException e =
                 assertThrows(
                         RuntimeException.class,
-                        () ->
-                                HTTPServerHandler.serializeForBroadcast(
-                                        CoinTicker.VERGE, signed, -1L),
+                        () -> TxWire.serializeForBroadcast(CoinTicker.VERGE, signed, -1L),
                         "an absent nTime must not be broadcast");
         assertTrue(
                 e.getMessage().contains("nTime"),
@@ -218,8 +216,7 @@ class HTTPServerHandlerWireLayoutTest {
 
         assertArrayEquals(
                 standard,
-                hexToBytes(
-                        HTTPServerHandler.serializeForBroadcast(CoinTicker.LITECOIN, signed, -1L)),
+                hexToBytes(TxWire.serializeForBroadcast(CoinTicker.LITECOIN, signed, -1L)),
                 "a coin without the field must broadcast the plain serialization");
     }
 

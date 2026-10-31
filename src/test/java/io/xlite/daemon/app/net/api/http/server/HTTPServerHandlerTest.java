@@ -29,7 +29,6 @@ import io.xlite.daemon.app.util.ConfigHelper;
 
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -46,7 +45,7 @@ import java.util.Map;
  * carries int code + string message) instead of a drop or empty body. Upstream is mocked out, so no
  * mutation can touch the network.
  */
-class HTTPServerHandlerMalformedInputTest {
+class HTTPServerHandlerTest {
 
     private static final String USER = "testuser";
     private static final String PASS = "testpass";
@@ -55,17 +54,14 @@ class HTTPServerHandlerMalformedInputTest {
     private final CoinInstance coin = mock(CoinInstance.class);
     private final HTTPClient httpClient = mock(HTTPClient.class);
 
-    private HTTPServerHandler newHandler() throws Exception {
+    private HTTPServerHandler newHandler() {
         ConfigHelper configHelper = mock(ConfigHelper.class);
         org.mockito.Mockito.when(coin.getConfigHelper()).thenReturn(configHelper);
         org.mockito.Mockito.when(configHelper.getRpcUsername()).thenReturn(USER);
         org.mockito.Mockito.when(configHelper.getRpcPassword()).thenReturn(PASS);
         org.mockito.Mockito.when(coin.getTicker()).thenReturn(CoinTicker.BLOCKNET);
         org.mockito.Mockito.when(coin.isInstanceRunning()).thenReturn(true);
-        HTTPServerHandler handler = new HTTPServerHandler(coin);
-        Field field = HTTPServerHandler.class.getDeclaredField("httpClient");
-        field.setAccessible(true);
-        field.set(handler, httpClient);
+        HTTPServerHandler handler = new HTTPServerHandler(coin, httpClient);
         JsonObject txError = new JsonObject();
         JsonObject txErrorDetail = new JsonObject();
         txErrorDetail.addProperty("code", -5);
@@ -75,11 +71,11 @@ class HTTPServerHandlerMalformedInputTest {
         return handler;
     }
 
-    private FullHttpResponse post(String body) throws Exception {
+    private FullHttpResponse post(String body) {
         return post(HttpMethod.POST, "/", body);
     }
 
-    private FullHttpResponse post(HttpMethod method, String uri, String body) throws Exception {
+    private FullHttpResponse post(HttpMethod method, String uri, String body) {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         FullHttpRequest request =
                 new DefaultFullHttpRequest(
@@ -134,7 +130,7 @@ class HTTPServerHandlerMalformedInputTest {
     }
 
     @Test
-    void testBadHexDecodeReturns1007Envelope() throws Exception {
+    void testBadHexDecodeReturns1007Envelope() {
         FullHttpResponse response =
                 post("{\"method\":\"decoderawtransaction\",\"params\":[\"zz\"]}");
         assertEquals(HttpResponseStatus.OK, response.status());
@@ -142,14 +138,14 @@ class HTTPServerHandlerMalformedInputTest {
     }
 
     @Test
-    void testGetBlockHashStringHeightReturnsMinusOneEnvelope() throws Exception {
+    void testGetBlockHashStringHeightReturnsMinusOneEnvelope() {
         FullHttpResponse response = post("{\"method\":\"getblockhash\",\"params\":[\"abc\"]}");
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(-1, errorCode(response));
     }
 
     @Test
-    void testGetTxOutSwappedTypesReturnsMinusOneEnvelope() throws Exception {
+    void testGetTxOutSwappedTypesReturnsMinusOneEnvelope() {
         FullHttpResponse response =
                 post("{\"method\":\"gettxout\",\"params\":[0,\"" + TXID + "\"]}");
         assertEquals(HttpResponseStatus.OK, response.status());
@@ -157,7 +153,7 @@ class HTTPServerHandlerMalformedInputTest {
     }
 
     @Test
-    void testCreateRawTransactionStringParamsReturnsMinusOneEnvelope() throws Exception {
+    void testCreateRawTransactionStringParamsReturnsMinusOneEnvelope() {
         FullHttpResponse response =
                 post("{\"method\":\"createrawtransaction\",\"params\":[\"[{}]\",\"{}\"]}");
         assertEquals(HttpResponseStatus.OK, response.status());
@@ -165,7 +161,7 @@ class HTTPServerHandlerMalformedInputTest {
     }
 
     @Test
-    void testMissingParamsTreatedAsEmpty() throws Exception {
+    void testMissingParamsTreatedAsEmpty() {
         FullHttpResponse response = post("{\"method\":\"ping\"}");
         assertEquals(HttpResponseStatus.OK, response.status());
         JsonObject envelope = envelopeOf(response);
@@ -174,49 +170,49 @@ class HTTPServerHandlerMalformedInputTest {
     }
 
     @Test
-    void testNullParamsTreatedAsEmpty() throws Exception {
+    void testNullParamsTreatedAsEmpty() {
         FullHttpResponse response = post("{\"method\":\"ping\",\"params\":null}");
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(1, envelopeOf(response).get("result").getAsInt());
     }
 
     @Test
-    void testNonArrayParamsReturns1001Envelope() throws Exception {
+    void testNonArrayParamsReturns1001Envelope() {
         FullHttpResponse response = post("{\"method\":\"ping\",\"params\":\"foo\"}");
         assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
         assertEquals(-1001, errorCode(response));
     }
 
     @Test
-    void testMissingMethodReturns1001Envelope() throws Exception {
+    void testMissingMethodReturns1001Envelope() {
         FullHttpResponse response = post("{\"params\":[]}");
         assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
         assertEquals(-1001, errorCode(response));
     }
 
     @Test
-    void testUnknownMethodReturns32601Envelope() throws Exception {
+    void testUnknownMethodReturns32601Envelope() {
         FullHttpResponse response = post("{\"method\":\"nosuchmethod\",\"params\":[]}");
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(-32601, errorCode(response));
     }
 
     @Test
-    void testInvalidJsonReturns1001Envelope() throws Exception {
+    void testInvalidJsonReturns1001Envelope() {
         FullHttpResponse response = post("this is not json");
         assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
         assertEquals(-1001, errorCode(response));
     }
 
     @Test
-    void testValidateAddressObjectParamReturnsMinusOneEnvelope() throws Exception {
+    void testValidateAddressObjectParamReturnsMinusOneEnvelope() {
         FullHttpResponse response = post("{\"method\":\"validateaddress\",\"params\":[{}]}");
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(-1, errorCode(response));
     }
 
     @Test
-    void testGetNewAddressExtraParamsReturnsMinusOneEnvelope() throws Exception {
+    void testGetNewAddressExtraParamsReturnsMinusOneEnvelope() {
         FullHttpResponse response = post("{\"method\":\"getnewaddress\",\"params\":[\"x\",\"y\"]}");
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(-1, errorCode(response));
@@ -228,7 +224,7 @@ class HTTPServerHandlerMalformedInputTest {
      * envelope invariant.
      */
     @Test
-    void testMutationEngineEveryCallYieldsWellFormedEnvelope() throws Exception {
+    void testMutationEngineEveryCallYieldsWellFormedEnvelope() {
         Map<String, String> baseParams = new LinkedHashMap<>();
         baseParams.put("ping", "[]");
         baseParams.put("help", "[]");
