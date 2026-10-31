@@ -9,7 +9,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -29,6 +31,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * the transaction is committed.
  */
 class WalletHelperNoHiddenSpendTest {
+
+    /** Private config sandbox; the working directory is never written. */
+    @TempDir
+    static Path configDir;
 
     /**
      * The BIP-39 all-ones vector: a published test mnemonic, not a secret, so
@@ -53,11 +59,12 @@ class WalletHelperNoHiddenSpendTest {
 
     @BeforeAll
     static void setup() {
-        // Same prerequisites every CoinInstance-backed test needs: a config
-        // directory, no address discovery (it would race the fixture), and a
-        // loaded coin registry.
+        // Same prerequisites every CoinInstance-backed test needs: a private
+        // config dir, no address discovery (it would race the fixture), and a
+        // loaded coin registry. The dir must not be the working directory:
+        // that wrote xlite-daemon/ and .migration.lock into the source tree.
         previousConfigDir = io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR;
-        io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR = ".";
+        io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR = configDir.toString();
         CoinInstance.setAddressDiscoveryEnabled(false);
         if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {
             java.util.Map<String, String> block = new java.util.LinkedHashMap<>();

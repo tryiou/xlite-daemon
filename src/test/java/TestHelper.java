@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -22,8 +24,22 @@ import java.util.Objects;
  */
 public class TestHelper {
 
+    /**
+     * Per-class config sandbox. Never the working directory: a test that
+     * touches the config layer must not write into the source tree.
+     */
+    protected static final Path testSandbox = createSandbox();
+
     private static final Gson GSON = new GsonBuilder().create();
     protected static JsonObject testConfig;
+
+    private static Path createSandbox() {
+        try {
+            return Files.createTempDirectory("xlite-daemon-test-");
+        } catch (IOException e) {
+            throw new RuntimeException("could not create the test config sandbox", e);
+        }
+    }
 
     static {
         try {
@@ -109,10 +125,16 @@ public class TestHelper {
     /**
      * Common setup method for all test files.
      * Disables address discovery during tests to prevent interference.
+     *
+     * <p>Every test gets a private sandbox: {@code CONFIG_DIR} used to be the
+     * working directory, so a test that touched the config layer wrote
+     * {@code xlite-daemon/} and {@code .migration.lock} into the source tree
+     * (and could delete a sibling checkout's data). A per-class temp dir is
+     * deleted by JUnit, so nothing escapes.
      */
     @BeforeEach
     public void commonSetup() {
-        ConfigHelper.CONFIG_DIR = ".";
+        ConfigHelper.CONFIG_DIR = testSandbox.toString();
         clean();
         // Disable address discovery during tests to prevent interference with deterministic address generation
         CoinInstance.setAddressDiscoveryEnabled(false);
@@ -137,8 +159,9 @@ public class TestHelper {
      */
     @AfterAll
     public static void commonCleanup() {
-        ConfigHelper.CONFIG_DIR = ".";
+        ConfigHelper.CONFIG_DIR = testSandbox.toString();
         clean();
+        deleteDir(testSandbox.toFile());
     }
 
     /**
