@@ -23,8 +23,6 @@ public class EXRServer {
     private volatile boolean capabilitiesProbed;
     // Use centralized configuration constants
     private static final int HEALTH_CHECK_INTERVAL_MS = HttpClientConfig.HEALTH_CHECK_INTERVAL_MS;
-    private static final int CAPABILITY_PROBE_TIMEOUT_MS =
-            HttpClientConfig.CAPABILITY_PROBE_TIMEOUT_MS;
 
     public EXRServer(String endpoint) {
         // Store endpoint with trailing slash for consistency

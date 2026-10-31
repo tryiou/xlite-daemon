@@ -28,12 +28,11 @@ import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
 import io.xlite.daemon.app.wallet.WalletHelper;
 
-import org.bitcoinj.core.BlockChain;
 import org.bitcoinj.core.Context;
-import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Monetary;
 import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.script.Script.ScriptType;
 import org.bitcoinj.utils.ListenerRegistration;
 import org.bitcoinj.utils.MonetaryFormat;
 import org.bitcoinj.utils.Threading;
@@ -42,6 +41,7 @@ import org.bitcoinj.wallet.Wallet;
 import org.json.JSONArray;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,6 +49,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -107,15 +108,22 @@ public final class CoinInstance {
             new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<CloudTransaction> transactionObservableList =
             new CopyOnWriteArrayList<>();
+
+    /**
+     * Serializes the check-then-add in {@link #addCloudTransaction}: the list itself is
+     * copy-on-write, so its own monitor protects nothing and a concurrent duplicate could slip
+     * between the scan and the add.
+     */
+    private final Object cloudTransactionLock = new Object();
+
     private BlocknetPeerGroup blocknetPeerGroup;
     private BlocknetParameters blocknetNetworkParameters;
     private NetworkParameters networkParameters;
     private Wallet wallet;
-    private BlockChain chain;
-    private boolean hasXRouter = false;
+    private volatile boolean hasXRouter = false;
     private KeyHandler keyHandler;
     private XRouterPacketManager xRouterPacketManager = null;
-    private int rpcPort = -1;
+    private volatile int rpcPort = -1;
     private boolean testnet = false;
     // Volatile: written by reloadconfig on a Netty event-loop thread and
     // read by lifecycle code (deinit) on other threads.
@@ -126,7 +134,7 @@ public final class CoinInstance {
     // A stuck clock here with a rising failure streak means the served
     // height is stale — both are now logged, never silent.
     private volatile long lastBlockCountMillis = 0;
-    private int generatedAddressCount;
+    private volatile int generatedAddressCount;
     private AddressDiscoveryService discoveryService = null;
     private static volatile boolean addressDiscoveryEnabled = true;
 
@@ -212,7 +220,6 @@ public final class CoinInstance {
     public AddressBalance generateAddress(boolean updateConfig) {
         AddressBalance addressKeyPair = getWalletHelper().generateAddress();
         LegacyAddress address = (LegacyAddress) addressKeyPair.getAddress();
-        DumpedPrivateKey privateKey = addressKeyPair.getPrivateKey();
         addressKeyPairs.add(addressKeyPair);
         LOGGER.finer(
                 "[wallet] Generated new address, have "
@@ -341,10 +348,6 @@ public final class CoinInstance {
 
     public NetworkParameters getNetworkParameters() {
         return networkParameters;
-    }
-
-    private BlocknetParameters getBlocknetNetworkParameters() {
-        return blocknetNetworkParameters;
     }
 
     public boolean hasXRouter() {
@@ -525,13 +528,11 @@ public final class CoinInstance {
         Context.propagate(new Context(networkParameters));
 
         List<String> baseSeed;
-        boolean existsOnDisk = false;
 
         if (isMnemonic) {
             baseSeed = splitMnemonicChars(pw);
         } else {
             if (KeyHandler.existsBaseECKeyFromLocal()) {
-                existsOnDisk = true;
                 if (userMnemonic != null) {
                     LOGGER.warning(
                             "[wallet] Wallet already exists on disk, ignoring provided mnemonic");
@@ -556,10 +557,10 @@ public final class CoinInstance {
         // In-memory wallet only
         DeterministicSeed seed =
                 new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
-        wallet = Wallet.fromSeed(networkParameters, seed);
+        wallet = Wallet.fromSeed(networkParameters, seed, ScriptType.P2PKH);
         if (isBlocknetNetwork()) {
-            String mnemonic = getMnemonic();
-            // LOGGER.fine("[wallet] Mnemonic = " + mnemonic);
+            LOGGER.fine(
+                    "[wallet] Mnemonic generated for " + CoinTickerUtils.tickerToString(ticker));
         }
 
         // RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
@@ -764,20 +765,6 @@ public final class CoinInstance {
         }
     }
 
-    private void connectToBlocknetNetwork() {
-        try {
-            blocknetPeerGroup.start();
-        } catch (Exception e) {
-            LOGGER.warning(
-                    "[coin] Error initializing blocking client for "
-                            + CoinTickerUtils.tickerToString(ticker)
-                            + e.getMessage());
-            return;
-        }
-
-        LOGGER.fine("[coin] This network is connecting/connected.");
-    }
-
     public Wallet getWallet() {
         return wallet;
     }
@@ -887,15 +874,12 @@ public final class CoinInstance {
     }
 
     public String sendXrMessage(
-            BlocknetPeer blocknetPeer, String command, HashMap<String, Object> params) {
+            BlocknetPeer blocknetPeer, String command, Map<String, Object> params) {
         return sendXrMessage(blocknetPeer, UUID.randomUUID().toString(), command, params);
     }
 
     public String sendXrMessage(
-            BlocknetPeer blocknetPeer,
-            String uuid,
-            String command,
-            HashMap<String, Object> params) {
+            BlocknetPeer blocknetPeer, String uuid, String command, Map<String, Object> params) {
         XRouterMessage message = null;
 
         if (blocknetPeer == null || !blocknetPeer.getHaveConfig().get()) {
@@ -1098,7 +1082,10 @@ public final class CoinInstance {
 
                 utxoJSON.addProperty("amount", amountDecimal);
                 utxoJSON.addProperty(
-                        "scriptPubKey", new String(Hex.encode(bUtxo.getScript().getProgram())));
+                        "scriptPubKey",
+                        new String(
+                                Hex.encode(bUtxo.getScript().getProgram()),
+                                StandardCharsets.UTF_8));
                 utxoJSON.addProperty("spendable", true);
 
                 int totalBlocks = CoinInstance.getBlockCountByTicker(getTicker());
@@ -1143,8 +1130,8 @@ public final class CoinInstance {
         return transactionsJSON;
     }
 
-    public ArrayList<String> getUTXOParams() {
-        ArrayList<String> params = new ArrayList<>();
+    public List<String> getUTXOParams() {
+        List<String> params = new ArrayList<>();
         params.add(CoinTickerUtils.tickerToString(getTicker()));
 
         JSONArray utxoAddresses = new JSONArray();
@@ -1194,7 +1181,7 @@ public final class CoinInstance {
     }
 
     public void addCloudTransaction(CloudTransaction cloudTransaction) {
-        synchronized (transactionObservableList) {
+        synchronized (cloudTransactionLock) {
             if (transactionObservableList.isEmpty()) {
                 transactionObservableList.add(cloudTransaction);
                 return;

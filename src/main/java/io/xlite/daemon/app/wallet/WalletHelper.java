@@ -17,7 +17,6 @@ import io.xlite.daemon.app.util.TxTimeFieldSigner;
 import io.xlite.daemon.app.util.UTXO;
 
 import org.bitcoinj.core.Address;
-import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.ECKey;
@@ -74,12 +73,14 @@ public class WalletHelper {
     }
 
     /**
+     * Builds the raw transaction from every unspent output the wallet holds.
+     *
      * @param nTimeResolver supplies the nTime to sign for time-field coins; must be non-null for
      *     those coins, and is ignored for the rest
      */
     public Transaction createRawTransactionWithAllUTXOs(
             Transaction tx, double amount, NTimeResolver nTimeResolver) {
-        ArrayList<UTXO> utxos = coinSelector(amount);
+        List<UTXO> utxos = coinSelector(amount);
 
         if (utxos == null) {
             LOGGER.warning(
@@ -122,7 +123,7 @@ public class WalletHelper {
      * @param nTime the nTime to sign, or {@link #NO_NTIME} for a coin whose transactions carry none
      */
     Transaction signTransactionWithUtxosForTest(
-            Transaction tx, ArrayList<UTXO> selectedUtxos, long nTime) {
+            Transaction tx, List<UTXO> selectedUtxos, long nTime) {
         return signTransactionWithUtxos(tx, selectedUtxos, nTime);
     }
 
@@ -133,7 +134,7 @@ public class WalletHelper {
      * #signTransactionWithUtxosForTest}.
      */
     private Transaction signTransactionWithUtxos(
-            Transaction tx, ArrayList<UTXO> selectedUtxos, long nTime) {
+            Transaction tx, List<UTXO> selectedUtxos, long nTime) {
         try {
             if (selectedUtxos == null) {
                 LOGGER.warning(
@@ -194,7 +195,7 @@ public class WalletHelper {
      * Collect the unspent inputs with their keys and scripts, then sign them in a single call so
      * every preimage is computed against the complete input set.
      */
-    private void signTimeFieldInputs(Transaction tx, ArrayList<UTXO> selectedUtxos, long nTime) {
+    private void signTimeFieldInputs(Transaction tx, List<UTXO> selectedUtxos, long nTime) {
         List<ECKey> keys = new ArrayList<>();
         List<TransactionOutPoint> outpoints = new ArrayList<>();
         List<Script> scripts = new ArrayList<>();
@@ -233,7 +234,7 @@ public class WalletHelper {
      * transaction already built -- so it marks here; without that, the next XR call would re-select
      * and re-sign the same outputs into a second transaction.
      */
-    private void markInputsSpent(ArrayList<UTXO> selectedUtxos) {
+    private void markInputsSpent(List<UTXO> selectedUtxos) {
         List<AddressBalance> touched = new ArrayList<>();
         for (UTXO utxo : selectedUtxos) {
             if (utxo.isSpent()) {
@@ -271,7 +272,7 @@ public class WalletHelper {
     }
 
     public Transaction createRawTransactionWithAllUTXOs(
-            ArrayList<TransactionOutput> outputs, double amount) {
+            List<TransactionOutput> outputs, double amount) {
         Transaction tx = CoinTransactions.newTransaction(networkParameters, coin.getTicker());
 
         for (TransactionOutput output : outputs) {
@@ -281,8 +282,8 @@ public class WalletHelper {
         return createRawTransactionWithAllUTXOs(tx, amount);
     }
 
-    private ArrayList<UTXO> sortLeastToGreatest() {
-        ArrayList<UTXO> utxos = new ArrayList<>();
+    private List<UTXO> sortLeastToGreatest() {
+        List<UTXO> utxos = new ArrayList<>();
 
         for (AddressBalance addressBalance : coin.getAddressKeyPairs()) {
             utxos.addAll(addressBalance.getUtxos());
@@ -293,8 +294,8 @@ public class WalletHelper {
         return utxos;
     }
 
-    private ArrayList<UTXO> advancedCoinSorting() {
-        ArrayList<UTXO> utxos = new ArrayList<>();
+    private List<UTXO> advancedCoinSorting() {
+        List<UTXO> utxos = new ArrayList<>();
         LOGGER.fine(
                 "[wallet-"
                         + coin.getTicker()
@@ -320,11 +321,11 @@ public class WalletHelper {
             return utxos;
         }
 
-        ArrayList<UTXO> utxosLowerHalf = new ArrayList<>(utxos.subList(0, ((sizeOfUtxos + 1) / 2)));
-        ArrayList<UTXO> utxosGreaterHalf =
+        List<UTXO> utxosLowerHalf = new ArrayList<>(utxos.subList(0, ((sizeOfUtxos + 1) / 2)));
+        List<UTXO> utxosGreaterHalf =
                 new ArrayList<>(utxos.subList(((sizeOfUtxos + 1) / 2), sizeOfUtxos));
 
-        ArrayList<UTXO> res = new ArrayList<>();
+        List<UTXO> res = new ArrayList<>();
 
         while (utxosLowerHalf.size() > 0 || utxosGreaterHalf.size() > 0) {
             if (utxosLowerHalf.size() > 0) {
@@ -341,11 +342,11 @@ public class WalletHelper {
         return res;
     }
 
-    private ArrayList<UTXO> coinSelector(double amount) {
-        ArrayList<UTXO> utxos = new ArrayList<>();
+    private List<UTXO> coinSelector(double amount) {
+        List<UTXO> utxos = new ArrayList<>();
         double totalBalance = 0.0;
 
-        ArrayList<UTXO> sorted = advancedCoinSorting();
+        List<UTXO> sorted = advancedCoinSorting();
         LOGGER.fine(
                 "[wallet-"
                         + coin.getTicker()
@@ -415,7 +416,7 @@ public class WalletHelper {
 
     public double getSpendBalance(double amount) {
         double totalBalance = 0.0;
-        ArrayList<UTXO> utxos = coinSelector(amount);
+        List<UTXO> utxos = coinSelector(amount);
 
         if (utxos == null) {
             LOGGER.warning(
@@ -584,6 +585,8 @@ public class WalletHelper {
     @FunctionalInterface
     public interface NTimeResolver {
         /**
+         * Resolves the nTime to sign.
+         *
          * @return the nTime to sign, in {@link #NO_NTIME} to skip nTime
          * @throws RuntimeException if the parent times cannot be fetched; an unsendable transaction
          *     must fail here rather than be signed against a guess
@@ -592,6 +595,8 @@ public class WalletHelper {
     }
 
     /**
+     * Builds and signs a one-recipient transaction, reporting the fee it commits to.
+     *
      * @param nTimeResolver supplies the nTime to sign for time-field coins; must be non-null for
      *     those coins, and is ignored for the rest
      */
@@ -663,7 +668,7 @@ public class WalletHelper {
             return null;
         }
 
-        ArrayList<UTXO> allUtxos = walletHelper.sortLeastToGreatest();
+        List<UTXO> allUtxos = walletHelper.sortLeastToGreatest();
         allUtxos.removeIf(UTXO::isSpent);
 
         if (allUtxos.isEmpty()) {
@@ -694,8 +699,8 @@ public class WalletHelper {
             return null;
         }
 
-        ArrayList<UTXO> selectedUtxos = new ArrayList<>();
-        ArrayList<UTXO> outputs = new ArrayList<>();
+        List<UTXO> selectedUtxos = new ArrayList<>();
+        List<UTXO> outputs = new ArrayList<>();
         outputs.add(createTransactionOutput(coinTicker, address, amount, params));
 
         long estimatedFeeSats = Math.max(feePerByte * (192 + 34), minTxFee);
@@ -710,8 +715,7 @@ public class WalletHelper {
                         estimatedFee,
                         feePerByte,
                         minTxFee,
-                        coinUnit,
-                        totalAvailable);
+                        coinUnit);
         if (selectedUtxos.isEmpty()) {
             LOGGER.warning(
                     "[wallet-"
@@ -759,18 +763,16 @@ public class WalletHelper {
     }
 
     private static double fundTransaction(
-            ArrayList<UTXO> allUtxos,
-            ArrayList<UTXO> selectedUtxos,
-            ArrayList<UTXO> recipientOutputs,
+            List<UTXO> allUtxos,
+            List<UTXO> selectedUtxos,
+            List<UTXO> recipientOutputs,
             double sendAmount,
             double initialFee,
             long feePerByte,
             long minTxFee,
-            long coinUnit,
-            double totalAvailable) {
+            long coinUnit) {
         double totalSelected = 0.0;
         double fees = initialFee;
-        double changeAmount = 0.0;
 
         allUtxos.sort(Comparator.comparingLong(UTXO::getValue));
 
@@ -789,7 +791,6 @@ public class WalletHelper {
         }
 
         UTXO largestUtxo = allUtxos.get(allUtxos.size() - 1);
-        changeAmount = largestUtxo.getAmount();
 
         for (int i = allUtxos.size() - 1; i >= 0; i--) {
             fees =
@@ -803,26 +804,16 @@ public class WalletHelper {
             UTXO utxo = allUtxos.get(i);
 
             if (largestUtxo.getAmount() < requiredAmount) {
-                if (totalSelected < requiredAmount) {
-                    if (totalSelected == 0.0) {
-                        changeAmount = utxo.getAmount();
-                    }
-                    totalSelected += utxo.getAmount();
-                    selectedUtxos.add(utxo);
-                    continue;
-                } else {
+                if (totalSelected >= requiredAmount) {
                     break;
                 }
-            } else {
-                if (i == 0 || utxo.getAmount() < requiredAmount) {
-                    UTXO prevUtxo = allUtxos.get(i + 1);
-                    if (totalSelected == 0.0) {
-                        changeAmount = prevUtxo.getAmount();
-                    }
-                    totalSelected += prevUtxo.getAmount();
-                    selectedUtxos.add(prevUtxo);
-                    break;
-                }
+                totalSelected += utxo.getAmount();
+                selectedUtxos.add(utxo);
+            } else if (i == 0 || utxo.getAmount() < requiredAmount) {
+                UTXO prevUtxo = allUtxos.get(i + 1);
+                totalSelected += prevUtxo.getAmount();
+                selectedUtxos.add(prevUtxo);
+                break;
             }
         }
 
@@ -916,23 +907,17 @@ public class WalletHelper {
         }
     }
 
-    private static boolean isP2SHAddress(CoinInstance coin, String address) {
-        byte[] versionAndDataBytes = Base58.decodeChecked(address);
-        int version = versionAndDataBytes[0] & 0xFF;
-        return coin.getNetworkParameters().getP2SHHeader() == version;
-    }
-
     public static long getFeePerByte(NetworkParameters params) {
-        if (params instanceof HasFeeParams) {
-            return ((HasFeeParams) params).getFeePerByte();
+        if (params instanceof HasFeeParams feeParams) {
+            return feeParams.getFeePerByte();
         }
         throw new RuntimeException(
                 "Failed to get feePerByte for " + params.getClass().getSimpleName());
     }
 
     public static long getMinTxFee(NetworkParameters params) {
-        if (params instanceof HasFeeParams) {
-            return ((HasFeeParams) params).getMinTxFee();
+        if (params instanceof HasFeeParams feeParams) {
+            return feeParams.getMinTxFee();
         }
         throw new RuntimeException(
                 "Failed to get minTxFee for " + params.getClass().getSimpleName());

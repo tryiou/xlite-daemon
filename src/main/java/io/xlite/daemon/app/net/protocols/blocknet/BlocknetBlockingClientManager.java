@@ -23,7 +23,7 @@ public class BlocknetBlockingClientManager extends AbstractIdleService
     private final Set<BlocknetBlockingClient> clients =
             Collections.synchronizedSet(new HashSet<>());
 
-    private int connectTimeoutMillis = 1000;
+    private volatile int connectTimeoutMillis = 1000;
 
     public BlocknetBlockingClientManager() {
         socketFactory = SocketFactory.getDefault();

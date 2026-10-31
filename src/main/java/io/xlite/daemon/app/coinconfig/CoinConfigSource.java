@@ -11,7 +11,7 @@ import io.xlite.daemon.app.net.CoinTickerUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -100,6 +100,8 @@ public final class CoinConfigSource {
     }
 
     /**
+     * Loads every coin the manifest lists.
+     *
      * @return ticker -> config, ordered by manifest appearance
      */
     public Map<String, CoinConfig> loadAll() {
@@ -537,7 +539,7 @@ public final class CoinConfigSource {
     private static String fetchRemote(String url) {
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
             conn.setConnectTimeout(10_000);
             conn.setReadTimeout(30_000);
             int code = conn.getResponseCode();

@@ -1,12 +1,13 @@
 package io.xlite.daemon.app.net.protocols.blocknet;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class BlocknetSeed {
     private String address;
     private Integer port;
 
-    private volatile int failCount;
+    private final AtomicInteger failCount = new AtomicInteger();
     private volatile long lastFailTime;
 
     private volatile boolean isActivePeer;
@@ -14,7 +15,7 @@ public class BlocknetSeed {
     BlocknetSeed(String address, int port) {
         this.address = address;
         this.port = port;
-        this.failCount = 0;
+        failCount.set(0);
         this.lastFailTime = 0;
         this.isActivePeer = false;
     }
@@ -29,12 +30,12 @@ public class BlocknetSeed {
 
     public void incrementFailCounter() {
         this.lastFailTime = System.currentTimeMillis();
-        failCount++;
+        failCount.incrementAndGet();
     }
 
     public void resetCounters() {
         this.lastFailTime = 0;
-        this.failCount = 0;
+        failCount.set(0);
     }
 
     public void setActivePeer(boolean activePeer) {
@@ -42,7 +43,7 @@ public class BlocknetSeed {
     }
 
     public int getFailCount() {
-        return failCount;
+        return failCount.get();
     }
 
     public long getLastFailTimeDiff() {

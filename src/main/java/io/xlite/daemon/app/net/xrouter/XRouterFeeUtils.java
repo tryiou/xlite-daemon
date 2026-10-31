@@ -18,7 +18,7 @@ import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionOutput;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -37,7 +37,7 @@ public final class XRouterFeeUtils {
 
         Preconditions.checkNotNull(xRouterConfig, "XRouter config was not received yet!");
 
-        HashMap<String, Double> feeMap = xRouterConfig.getFeeMap();
+        Map<String, Double> feeMap = xRouterConfig.getFeeMap();
 
         if (!feeMap.containsKey(xRouterCommand)) {
             LOGGER.finer(
@@ -128,7 +128,7 @@ public final class XRouterFeeUtils {
         CoinInstance blocknetCoin =
                 CoinInstance.getInstance(CoinInstance.getActiveBlocknetNetwork());
         XRouterConfiguration xRouterConfig = blocknetPeer.getxRouterConfiguration();
-        HashMap<String, Double> feeMap = xRouterConfig.getFeeMap();
+        Map<String, Double> feeMap = xRouterConfig.getFeeMap();
         Preconditions.checkState(
                 feeMap.containsKey("xrSendTransaction"),
                 "Fee map has no fee for xrSendTransaction");

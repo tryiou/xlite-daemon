@@ -184,10 +184,9 @@ public final class CoinConfig {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof CoinConfig)) {
+        if (!(o instanceof CoinConfig that)) {
             return false;
         }
-        CoinConfig that = (CoinConfig) o;
         return ticker.equals(that.ticker)
                 && blockchain.equals(that.blockchain)
                 && verId.equals(that.verId)

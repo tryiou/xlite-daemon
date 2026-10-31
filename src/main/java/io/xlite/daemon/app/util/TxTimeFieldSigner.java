@@ -134,9 +134,7 @@ public final class TxTimeFieldSigner {
      */
     public static Sha256Hash chainSighash(
             Transaction tx, Script scriptCode, int nIn, int hashType, long nTime) {
-        boolean anyoneCanPay = (hashType & 0x80) != 0;
         boolean hashSingle = (hashType & 0x1f) == SIGHASH_SINGLE;
-        boolean hashNone = (hashType & 0x1f) == SIGHASH_NONE;
 
         // The chain treats SIGHASH_SINGLE with an out-of-range input as a
         // signature bug and hashes the constant 1 rather than failing. Match it

@@ -11,6 +11,7 @@ import io.xlite.daemon.app.util.XRouterConfiguration;
 
 import java.time.Duration;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -29,17 +30,14 @@ public class BackgroundTimerThread implements Runnable {
     public static final boolean HTTP_BALANCE_UPDATES = true;
 
     private static final int KEEPALIVE_INTERVAL = 10000;
-    private static final int BALANCE_INTERVAL = 10000;
 
     private BlocknetPeerGroup blocknetPeerGroup;
-    private HTTPClient feeUpdateHttpClient;
     private HTTPClient heightUpdateHttpClient;
 
     private long lastKeepAliveTime;
-    private long lastBalanceUpdateTime;
 
     private long lastOut;
-    private boolean shutdownRequested = false;
+    private volatile boolean shutdownRequested = false;
     private volatile Thread workerThread;
 
     private Set<String> lastAvailable = new HashSet<>();
@@ -58,11 +56,9 @@ public class BackgroundTimerThread implements Runnable {
         blocknetPeerGroup =
                 CoinInstance.getInstance(CoinInstance.getActiveBlocknetNetwork())
                         .getBlocknetPeerGroup();
-        feeUpdateHttpClient = App.getFeeUpdateHttpClient();
         heightUpdateHttpClient = App.getHeightUpdateHttpClient();
 
         lastKeepAliveTime = 0;
-        lastBalanceUpdateTime = 0;
 
         lastOut = 0;
 
@@ -81,7 +77,7 @@ public class BackgroundTimerThread implements Runnable {
         long initialDelay = calculateInitialDelay();
         logRotationScheduler.scheduleAtFixedRate(
                 this::performDailyLogRotation, initialDelay, 24, TimeUnit.HOURS);
-        LocalTime now = LocalTime.now();
+        LocalTime now = LocalTime.now(ZoneId.systemDefault());
         LOGGER.info(
                 "[BackgroundTimer] Scheduled daily log rotation at "
                         + String.format("%02d:%02d", DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE)
@@ -96,7 +92,7 @@ public class BackgroundTimerThread implements Runnable {
      * @return Delay in milliseconds until next 2:00 AM
      */
     private long calculateInitialDelay() {
-        LocalTime now = LocalTime.now();
+        LocalTime now = LocalTime.now(ZoneId.systemDefault());
         LocalTime targetTime = LocalTime.of(DAILY_ROTATION_HOUR, DAILY_ROTATION_MINUTE);
         long delay;
         if (now.isBefore(targetTime)) {
@@ -210,48 +206,6 @@ public class BackgroundTimerThread implements Runnable {
         }
 
         lastKeepAliveTime = System.currentTimeMillis();
-    }
-
-    private void sendBalanceUpdate() {
-        long elapsed = (System.currentTimeMillis() - lastBalanceUpdateTime);
-
-        if (elapsed < BALANCE_INTERVAL && lastBalanceUpdateTime != 0) {
-            return;
-        }
-
-        // No longer polling balances and transaction history here. Instead it is requested
-        // on demand when client requests the data. See HTTPServerHandler.java:302-330
-
-        for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
-                continue;
-            }
-
-            if (CoinInstance.getBlockCountByTicker(coinInstance.getTicker()) <= 0) {
-                continue;
-            }
-
-            if (blocknetPeerGroup.getConnectedPeers().isEmpty()) {
-                return;
-            }
-
-            BlocknetPeer blocknetPeer =
-                    blocknetPeerGroup.getBestBlocknetPeer(
-                            coinInstance.getNetworkParameters().getId());
-            if (blocknetPeer == null) {
-                LOGGER.finer(
-                        "[BackgroundTimer] Peer was not found for currency "
-                                + coinInstance.getNetworkParameters().getId());
-                continue;
-            }
-
-            coinInstance.sendXrGetUtxos(blocknetPeer);
-            LOGGER.finer(
-                    "[BackgroundTimer] Sent GetUtxos message: "
-                            + coinInstance.getNetworkParameters().getId());
-        }
-
-        lastBalanceUpdateTime = System.currentTimeMillis();
     }
 
     @Override

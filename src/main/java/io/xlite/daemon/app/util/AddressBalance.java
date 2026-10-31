@@ -36,10 +36,6 @@ public class AddressBalance {
         return addrProperty().get();
     }
 
-    private void setAddrProp(String value) {
-        addrProperty().set(value);
-    }
-
     private AtomicReference<String> addrProperty() {
         return addrProp;
     }

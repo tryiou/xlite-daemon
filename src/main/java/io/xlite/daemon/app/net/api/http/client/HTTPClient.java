@@ -24,7 +24,6 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
@@ -43,6 +42,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -58,7 +58,6 @@ public class HTTPClient {
 
     private CloseableHttpClient client;
     private ConcurrentHashMap<String, Long> lastFetchTimes;
-    private int logCount = 0;
 
     /**
      * Upstream method families for per-coin support tracking. A family groups the read methods
@@ -246,15 +245,6 @@ public class HTTPClient {
     }
 
     /**
-     * Get an available EXR server from the pool.
-     *
-     * @return EXRServer instance or null if no servers available
-     */
-    private EXRServer getEXRServer() {
-        return useEXR() ? App.getExrServerPool().selectServer() : null;
-    }
-
-    /**
      * Convert JsonArray to List<Object> for EXR execution
      *
      * @param exrParams JsonArray of parameters
@@ -278,16 +268,6 @@ public class HTTPClient {
             }
         }
         return paramList;
-    }
-
-    /**
-     * Execute HTTP request with common boilerplate pattern
-     *
-     * @param request The HTTP request to execute
-     * @return Response string or null on error
-     */
-    private <T extends HttpRequestBase> String executeHttpRequest(T request) {
-        return HttpUtils.executeHttpRequest(client, request, "HTTP request");
     }
 
     /**
@@ -458,11 +438,10 @@ public class HTTPClient {
     /**
      * Execute POST request with EXR coin-aware routing
      *
-     * @param endpoint The endpoint to POST to
      * @param params The parameters to POST
      * @return Response from appropriate EXR server, or null (FAIL - NO FALLBACK TO BASE_URL)
      */
-    private String executeEXRPost(String endpoint, JsonObject params) {
+    private String executeEXRPost(JsonObject params) {
         if (!params.has("method") || !params.has("params")) {
             return null;
         }
@@ -599,7 +578,7 @@ public class HTTPClient {
                 return executeEXRGet(endpoint);
             } else {
                 // POST request
-                return executeEXRPost(endpoint, params);
+                return executeEXRPost(params);
             }
         }
 
@@ -622,7 +601,7 @@ public class HTTPClient {
      * caches!
      *
      * @param coinTicker Fetch utxos from this coin
-     * @param address Fetch utxos from this address
+     * @param addresses Fetch utxos from these addresses
      * @return JsonArray or null on error
      */
     public JsonArray getUtxosUncached(CoinTicker coinTicker, String[] addresses) {
@@ -693,7 +672,9 @@ public class HTTPClient {
             LegacyAddress addr =
                     LegacyAddress.fromBase58(coinInstance.getNetworkParameters(), address);
             Script script = ScriptBuilder.createOutputScript(addr);
-            utxoJSON.addProperty("scriptPubKey", new String(Hex.encode(script.getProgram())));
+            utxoJSON.addProperty(
+                    "scriptPubKey",
+                    new String(Hex.encode(script.getProgram()), StandardCharsets.UTF_8));
 
             int height = utxoArr.getJSONObject(i).getInt("block_number");
             int currentHeight = CoinInstance.getBlockCountByTicker(coinTicker);
@@ -730,7 +711,7 @@ public class HTTPClient {
             return coinInstance.getAllUTXOS();
         }
 
-        ArrayList<String> utxoParams = coinInstance.getUTXOParams();
+        List<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
             LOGGER.warning(
                     "[httpclient] getUtxos " + coinInstance.getTicker() + " null param size");
@@ -857,7 +838,7 @@ public class HTTPClient {
      * dropped.
      */
     void evictOmittedAddresses(
-            CoinInstance coinInstance, ArrayList<String> requestedParams, Set<String> returned) {
+            CoinInstance coinInstance, List<String> requestedParams, Set<String> returned) {
         Set<String> requested = new HashSet<>();
         try {
             if (requestedParams.size() > 1) {
@@ -1180,7 +1161,7 @@ public class HTTPClient {
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
         }
 
-        ArrayList<String> utxoParams = coinInstance.getUTXOParams();
+        List<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
             LOGGER.warning(
                     "[httpclient] getHistory " + coinInstance.getTicker() + " null param size");
@@ -1288,7 +1269,7 @@ public class HTTPClient {
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
         }
 
-        ArrayList<String> utxoParams = coinInstance.getUTXOParams();
+        List<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
             LOGGER.warning(
                     "[httpclient] getAddressHistory "

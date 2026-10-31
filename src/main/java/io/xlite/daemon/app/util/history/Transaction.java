@@ -102,6 +102,7 @@ public class Transaction {
         return category;
     }
 
+    @Override
     public String toString() {
         return "\n-------------------------\n"
                 + "Address="

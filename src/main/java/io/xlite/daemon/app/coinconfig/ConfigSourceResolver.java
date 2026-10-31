@@ -27,6 +27,8 @@ public final class ConfigSourceResolver {
     }
 
     /**
+     * Tells a checkout from an endpoint.
+     *
      * @return true when the base is a filesystem directory rather than a URL.
      */
     public static boolean isLocalDirectory(String base) {
@@ -35,6 +37,8 @@ public final class ConfigSourceResolver {
     }
 
     /**
+     * Applies the precedence: CLI flag, then environment, then the default upstream.
+     *
      * @return the resolved source value (never blank); local dir or base URL.
      */
     public String resolve() {

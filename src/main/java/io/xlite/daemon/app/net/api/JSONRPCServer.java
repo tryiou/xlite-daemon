@@ -79,6 +79,7 @@ public class JSONRPCServer extends Thread {
         return bindAddress;
     }
 
+    @Override
     public void run() {
         // Defense in depth: the CoinInstance start/reload gates refuse
         // wildcards first, but the bind site enforces it too — no caller

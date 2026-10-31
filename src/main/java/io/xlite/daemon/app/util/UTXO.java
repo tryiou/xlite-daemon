@@ -119,6 +119,7 @@ public class UTXO {
                 getAddress());
     }
 
+    @Override
     public String toString() {
         return "\n-------------------------\n"
                 + "Address="

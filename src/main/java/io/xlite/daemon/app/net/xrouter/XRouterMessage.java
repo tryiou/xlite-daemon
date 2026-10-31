@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -258,7 +259,7 @@ public class XRouterMessage extends Message {
                                 "Unsupported server xrs plugin: " + command);
                     }
 
-                    ArrayList<Class> pluginParamTypes = pluginConfig.getParamTypes();
+                    List<Class> pluginParamTypes = pluginConfig.getParamTypes();
 
                     stream.write(command.getBytes());
                     stream.write(0x00);

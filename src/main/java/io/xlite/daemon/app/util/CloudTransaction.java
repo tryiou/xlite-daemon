@@ -4,10 +4,12 @@ import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 
+import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
+import org.bitcoinj.script.Script;
+import org.bitcoinj.script.ScriptPattern;
 
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class CloudTransaction {
@@ -17,54 +19,50 @@ public class CloudTransaction {
     private AtomicReference<String> amount;
     private int height;
 
+    private static boolean isP2SHOutput(Script scriptPubKey) {
+        return ScriptPattern.isP2SH(scriptPubKey);
+    }
+
     public CloudTransaction(Object cloudTransaction) {
-        if (cloudTransaction instanceof UTXO) {
+        if (cloudTransaction instanceof UTXO utxo) {
             this.txType = new AtomicReference<>("Receive To: ");
 
-            this.address = new AtomicReference<>(((UTXO) cloudTransaction).getAddress());
-            this.txHash = new AtomicReference<>(((UTXO) cloudTransaction).getTxid());
+            this.address = new AtomicReference<>(utxo.getAddress());
+            this.txHash = new AtomicReference<>(utxo.getTxid());
             this.amount =
                     new AtomicReference<>(
                             formatForTicker(
-                                    ((UTXO) cloudTransaction).getValue(),
-                                    CoinTickerUtils.tickerToString(
-                                            ((UTXO) cloudTransaction).ticker)));
-            this.height = ((UTXO) cloudTransaction).getHeight();
-        } else if (cloudTransaction instanceof Transaction) {
+                                    utxo.getValue(), CoinTickerUtils.tickerToString(utxo.ticker)));
+            this.height = utxo.getHeight();
+        } else if (cloudTransaction instanceof Transaction tx) {
             NetworkParameters networkParameters =
                     CoinInstance.getActiveCurrency().getNetworkParameters();
             this.txType = new AtomicReference<>("Sent To: ");
 
-            if (((Transaction) cloudTransaction).getOutputs().size() > 1
-                    && !Objects.requireNonNull(
-                                    ((Transaction) cloudTransaction)
-                                            .getOutput(1)
-                                            .getAddressFromP2PKHScript(networkParameters))
-                            .isP2SHAddress()) {
+            if (tx.getOutputs().size() > 1 && !isP2SHOutput(tx.getOutput(1).getScriptPubKey())) {
                 this.address =
                         new AtomicReference<>(
-                                Objects.requireNonNull(
-                                                ((Transaction) cloudTransaction)
-                                                        .getOutput(1)
-                                                        .getAddressFromP2PKHScript(
-                                                                networkParameters))
+                                LegacyAddress.fromPubKeyHash(
+                                                networkParameters,
+                                                ScriptPattern.extractHashFromP2PKH(
+                                                        tx.getOutput(1).getScriptPubKey()))
                                         .toString());
             } else {
                 this.address =
                         new AtomicReference<>(
-                                Objects.requireNonNull(
-                                                ((Transaction) cloudTransaction)
-                                                        .getOutput(1)
-                                                        .getAddressFromP2SH(networkParameters))
+                                LegacyAddress.fromP2SHHash(
+                                                networkParameters,
+                                                ScriptPattern.extractHashFromP2SH(
+                                                        tx.getOutput(1).getScriptPubKey()))
                                         .toString());
             }
 
-            this.txHash = new AtomicReference<>(((Transaction) cloudTransaction).getHashAsString());
+            this.txHash = new AtomicReference<>(tx.getTxId().toString());
 
             this.amount =
                     new AtomicReference<>(
                             formatForTicker(
-                                    ((Transaction) cloudTransaction).getOutput(1).getValue().value,
+                                    tx.getOutput(1).getValue().value,
                                     CoinTickerUtils.tickerToString(
                                             CoinInstance.getActiveCurrency().getTicker())));
             this.height = 0;

@@ -18,7 +18,6 @@ public class EXRServerPool {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private final List<EXRServer> servers;
-    private final AtomicInteger currentIndex;
     private final Map<CoinTicker, List<EXRServer>> coinToServersMap;
     private final Map<String, EXRServer> endpointToServerMap;
     private volatile boolean capabilitiesProbed;
@@ -35,7 +34,6 @@ public class EXRServerPool {
      */
     public EXRServerPool(String endpoints, ServerSelector serverSelector) {
         this.servers = new CopyOnWriteArrayList<>();
-        this.currentIndex = new AtomicInteger(0);
         this.coinToServersMap = new ConcurrentHashMap<>();
         this.endpointToServerMap = new ConcurrentHashMap<>();
         this.capabilitiesProbed = false;
@@ -148,7 +146,7 @@ public class EXRServerPool {
         if (endpoints == null || endpoints.trim().isEmpty()) {
             return;
         }
-        String[] endpointArray = endpoints.split(",");
+        String[] endpointArray = endpoints.split(",", -1);
         for (String endpoint : endpointArray) {
             String trimmed = endpoint.trim();
             if (!trimmed.isEmpty()) {

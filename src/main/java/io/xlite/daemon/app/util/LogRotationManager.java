@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 /**
  * Manages log file rotation and cleanup to prevent disk space issues.
@@ -133,16 +135,16 @@ public class LogRotationManager {
                 return files;
             }
 
-            Files.list(logDirectory)
-                    .filter(path -> isLogFile(path.toFile()))
-                    .sorted(Comparator.comparing(Path::getFileName))
-                    .forEach(path -> {
-                        File file = path.toFile();
-                        files.add(
-                                new LogFileInfo(
-                                        file.getName(), file.length(), file.lastModified()));
-                    });
-
+            try (Stream<Path> listing = Files.list(logDirectory)) {
+                listing.filter(path -> isLogFile(path.toFile()))
+                        .sorted(Comparator.comparing(Path::getFileName))
+                        .forEach(path -> {
+                            File file = path.toFile();
+                            files.add(
+                                    new LogFileInfo(
+                                            file.getName(), file.length(), file.lastModified()));
+                        });
+            }
         } catch (IOException e) {
             LOGGER.warning("[log-rotation] Error listing log files");
         }
@@ -198,24 +200,24 @@ public class LogRotationManager {
      */
     private List<File> findOldLogFiles() {
         List<File> oldFiles = new ArrayList<>();
-        LocalDate cutoffDate = LocalDate.now().minusDays(retentionDays);
+        LocalDate cutoffDate = LocalDate.now(ZoneId.systemDefault()).minusDays(retentionDays);
 
         try {
             if (!Files.exists(logDirectory)) {
                 return oldFiles;
             }
 
-            Files.list(logDirectory)
-                    .filter(path -> isLogFile(path.toFile()))
-                    .forEach(path -> {
-                        File file = path.toFile();
-                        LocalDate fileDate = extractDateFromFileName(file.getName());
+            try (Stream<Path> listing = Files.list(logDirectory)) {
+                listing.filter(path -> isLogFile(path.toFile()))
+                        .forEach(path -> {
+                            File file = path.toFile();
+                            LocalDate fileDate = extractDateFromFileName(file.getName());
 
-                        if (fileDate != null && fileDate.isBefore(cutoffDate)) {
-                            oldFiles.add(file);
-                        }
-                    });
-
+                            if (fileDate != null && fileDate.isBefore(cutoffDate)) {
+                                oldFiles.add(file);
+                            }
+                        });
+            }
         } catch (IOException e) {
             LOGGER.warning("[log-rotation] Error finding old log files");
         }

@@ -22,7 +22,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.CharsetUtil;
 import io.xlite.daemon.app.Version;
 import io.xlite.daemon.app.coinconfig.CoinConfig;
@@ -137,7 +136,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 status = HttpResponseStatus.BAD_REQUEST;
             }
 
-            if (request.method() != HttpMethod.POST) {
+            if (!HttpMethod.POST.equals(request.method())) {
                 JsonObject onlyPostAllowedJSON = new JsonObject();
 
                 onlyPostAllowedJSON.addProperty("code", -1003);
@@ -159,7 +158,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             }
         }
 
-        if (status != HttpResponseStatus.OK) {
+        if (!HttpResponseStatus.OK.equals(status)) {
             ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
             FullHttpResponse httpResponse =
                     new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
@@ -201,7 +200,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 status = HttpResponseStatus.BAD_REQUEST;
             }
 
-            if (status == HttpResponseStatus.OK) {
+            if (HttpResponseStatus.OK.equals(status)) {
                 Preconditions.checkNotNull(jsonReq);
 
                 String method = jsonReq.get("method").getAsString();
@@ -232,17 +231,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return;
             }
 
-            if (request instanceof LastHttpContent) {
-                ByteBuf responseContent =
-                        Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
+            // A FullHttpRequest is always its own LastHttpContent, so this is the
+            // only write for a complete request.
+            ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
 
-                FullHttpResponse httpResponse =
-                        new DefaultFullHttpResponse(
-                                request.protocolVersion(), status, responseContent);
+            FullHttpResponse httpResponse =
+                    new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
 
-                if (!writeResponse(ctx, httpResponse, request)) {
-                    ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-                }
+            if (!writeResponse(ctx, httpResponse, request)) {
+                ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
             }
         }
     }

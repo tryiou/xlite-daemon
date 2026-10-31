@@ -21,7 +21,7 @@ public class JSONRPCMasterServer extends Thread {
 
     private final int port;
     private final String bindAddress;
-    private boolean stopping = false;
+    private volatile boolean stopping = false;
 
     private Channel channel;
 
@@ -32,6 +32,7 @@ public class JSONRPCMasterServer extends Thread {
         this.bindAddress = bindAddress;
     }
 
+    @Override
     public void run() {
         if (!ConfigHelper.isBindAddressValid(bindAddress)) {
             LOGGER.severe(

@@ -1,7 +1,9 @@
 package io.xlite.daemon.app.util;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
@@ -17,16 +19,24 @@ import java.util.logging.LogRecord;
  */
 public class FileFormatter extends Formatter {
 
-    private static final String LINE_SEPARATOR = System.getProperty("line.separator");
-    private static final SimpleDateFormat DATE_FORMAT =
-            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+    private static final String LINE_SEPARATOR = System.lineSeparator();
+
+    /**
+     * Immutable and thread-safe, unlike SimpleDateFormat: one handler formats records from every
+     * thread that logs, so a shared mutable formatter would interleave timestamps.
+     */
+    private static final DateTimeFormatter DATE_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
 
     @Override
     public String format(LogRecord record) {
         StringBuilder sb = new StringBuilder();
 
         // Format timestamp
-        sb.append(DATE_FORMAT.format(new Date(record.getMillis())));
+        sb.append(
+                DATE_FORMAT.format(
+                        LocalDateTime.ofInstant(
+                                Instant.ofEpochMilli(record.getMillis()), ZoneId.systemDefault())));
         sb.append(" ");
 
         // Format class and method information

@@ -82,9 +82,7 @@ public class ConsoleMenu {
                     case "--enablerpcandconfigure":
                         autoGenerateRPCConfig();
                         System.exit(0);
-                        break; // unreachable: System.exit never returns, but the
-                    // compiler cannot prove it; without this the new
-                    // -Xlint:fallthrough flags a false positive here.
+                        break;
                     case "--development-endpoint":
                         {
                             if (i + 1 < arguments.length) {
@@ -190,7 +188,7 @@ public class ConsoleMenu {
 
                             System.exit(0);
                         }
-                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                        break;
                     case "--createwalletmnemonic":
                         {
                             if (KeyHandler.existsBaseECKeyFromLocal()) {
@@ -231,7 +229,7 @@ public class ConsoleMenu {
 
                             System.exit(0);
                         }
-                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                        break;
                     case "--password":
                         {
                             char[] password =
@@ -281,7 +279,7 @@ public class ConsoleMenu {
                             }
                             System.exit(0);
                         }
-                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                        break;
                     case "--changepassword":
                         {
                             if (!KeyHandler.existsBaseECKeyFromLocal()) {
@@ -326,11 +324,11 @@ public class ConsoleMenu {
 
                             System.exit(0);
                         }
-                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                        break;
                     case "--help":
                         displayHelp();
                         System.exit(0);
-                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                        break;
                     default:
                         LOGGER.warning("Unrecognized argument: " + argument);
                         break;
@@ -449,7 +447,7 @@ public class ConsoleMenu {
                         LOGGER.info("Exiting...");
                         System.exit(0);
                     }
-                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                    break;
                 default:
                     {
                         LOGGER.info("Unknown Option.");

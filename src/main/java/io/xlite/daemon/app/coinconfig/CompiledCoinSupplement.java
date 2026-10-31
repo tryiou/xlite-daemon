@@ -124,6 +124,8 @@ public final class CompiledCoinSupplement {
     }
 
     /**
+     * Returns the compiled constants for one coin.
+     *
      * @param ticker manifest ticker (case-sensitive, e.g. {@code LTC})
      * @throws IllegalArgumentException for tickers with no compiled entry
      */

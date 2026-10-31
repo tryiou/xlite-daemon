@@ -752,13 +752,14 @@ public class BlocknetPeerGroup {
     private boolean waitForConnection(BlocknetPeer blocknetPeer, int maxWaitSeconds) {
         long startTime = System.currentTimeMillis();
 
-        while ((System.currentTimeMillis() - startTime) < (maxWaitSeconds * 1000)) {
+        while ((System.currentTimeMillis() - startTime) < (maxWaitSeconds * 1000L)) {
             BlocknetPeer filteredPeer =
                     getConnectedPeers().stream()
                             .filter(e ->
-                                    (e.getHaveConfig().get()
-                                            && e.getAddress().getAddr()
-                                                    == blocknetPeer.getAddress().getAddr()))
+                                    e.getHaveConfig().get()
+                                            && e.getAddress()
+                                                    .getAddr()
+                                                    .equals(blocknetPeer.getAddress().getAddr()))
                             .findFirst()
                             .orElse(null);
 

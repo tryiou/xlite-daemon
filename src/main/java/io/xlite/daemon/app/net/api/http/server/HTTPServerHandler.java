@@ -1,7 +1,6 @@
 package io.xlite.daemon.app.net.api.http.server;
 
 import com.google.common.base.Preconditions;
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -26,7 +25,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.CharsetUtil;
 import io.xlite.daemon.app.Version;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
@@ -34,7 +32,6 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
-import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.CoinTransactions;
 import io.xlite.daemon.app.util.ConfigHelper;
@@ -75,10 +72,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -179,7 +174,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if (httpHeaders.contains("Authorization")) {
                 String authorization = httpHeaders.get("Authorization");
 
-                if (authorization != null && authorization.toLowerCase().startsWith("basic")) {
+                if (authorization != null
+                        && authorization.toLowerCase(Locale.ROOT).startsWith("basic")) {
                     String base64Credentials = authorization.substring("Basic".length()).trim();
                     byte[] credDecoded = Base64.decode(base64Credentials);
                     String credentials = new String(credDecoded, StandardCharsets.UTF_8);
@@ -218,7 +214,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 status = HttpResponseStatus.BAD_REQUEST;
             }
 
-            if (request.method() != HttpMethod.POST) {
+            if (!HttpMethod.POST.equals(request.method())) {
                 JsonObject onlyPostAllowedJSON = new JsonObject();
 
                 onlyPostAllowedJSON.addProperty("code", -1003);
@@ -251,7 +247,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             }
         }
 
-        if (status != HttpResponseStatus.OK) {
+        if (!HttpResponseStatus.OK.equals(status)) {
             ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
             FullHttpResponse httpResponse =
                     new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
@@ -303,7 +299,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 status = HttpResponseStatus.BAD_REQUEST;
             }
 
-            if (status == HttpResponseStatus.OK) {
+            if (HttpResponseStatus.OK.equals(status)) {
                 Preconditions.checkNotNull(jsonReq);
 
                 String method = jsonReq.get("method").getAsString();
@@ -367,17 +363,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return;
             }
 
-            if (request instanceof LastHttpContent) {
-                ByteBuf responseContent =
-                        Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
+            // A FullHttpRequest is always its own LastHttpContent, so this is the
+            // only write for a complete request.
+            ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
 
-                FullHttpResponse httpResponse =
-                        new DefaultFullHttpResponse(
-                                request.protocolVersion(), status, responseContent);
+            FullHttpResponse httpResponse =
+                    new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
 
-                if (!writeResponse(ctx, httpResponse, request)) {
-                    ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-                }
+            if (!writeResponse(ctx, httpResponse, request)) {
+                ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
             }
         }
     }
@@ -579,7 +573,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     JsonObject blockHash = httpClient.getBlockHash(coin.getTicker(), blockIndex);
 
                     if (blockHash == null
-                            || blockHash.has("error") && !blockHash.get("error").isJsonNull()) {
+                            || (blockHash.has("error") && !blockHash.get("error").isJsonNull())) {
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
                         errorJSON.addProperty("code", -1);
@@ -641,7 +635,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     }
 
                     JsonObject txid = httpClient.sendRawTransaction(coin.getTicker(), rawTx);
-                    if (txid == null || txid.has("error") && !txid.get("error").isJsonNull()) {
+                    if (txid == null || (txid.has("error") && !txid.get("error").isJsonNull())) {
                         int code = -1;
                         String message = "Error sending transaction!";
 
@@ -725,8 +719,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             httpClient.getRawTransaction(coin.getTicker(), txid, verbose);
 
                     if (rawTransaction == null
-                            || rawTransaction.has("error")
-                                    && !rawTransaction.get("error").isJsonNull()) {
+                            || (rawTransaction.has("error")
+                                    && !rawTransaction.get("error").isJsonNull())) {
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
                         errorJSON.addProperty("code", -5);
@@ -777,7 +771,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     JsonObject rawMempool = httpClient.getRawMempool(coin.getTicker(), verbose);
 
                     if (rawMempool == null
-                            || rawMempool.has("error") && !rawMempool.get("error").isJsonNull()) {
+                            || (rawMempool.has("error") && !rawMempool.get("error").isJsonNull())) {
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
                         errorJSON.addProperty("code", -1);
@@ -836,7 +830,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                     JsonObject block = httpClient.getBlock(coin.getTicker(), hash, true);
 
-                    if (block == null || block.has("error") && !block.get("error").isJsonNull()) {
+                    if (block == null || (block.has("error") && !block.get("error").isJsonNull())) {
                         response.add("result", JsonNull.INSTANCE);
                         JsonObject errorJSON = new JsonObject();
                         errorJSON.addProperty("code", -1);
@@ -1128,9 +1122,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                         Hex.encode(
                                                 TxTimeField.insertNTime(
                                                         tx.bitcoinSerialize(),
-                                                        System.currentTimeMillis() / 1000)));
+                                                        System.currentTimeMillis() / 1000)),
+                                        StandardCharsets.UTF_8);
                     } else {
-                        hexTx = new String(Hex.encode(tx.bitcoinSerialize()));
+                        hexTx =
+                                new String(
+                                        Hex.encode(tx.bitcoinSerialize()), StandardCharsets.UTF_8);
                     }
                     LOGGER.finer("[http-server-handler] DEBUG: Raw transaction = " + hexTx);
                     response.addProperty("result", hexTx);
@@ -1192,7 +1189,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                     "asm", canonicalizeASM(input.getScriptSig().toString()));
                             scriptSig.addProperty(
                                     "hex",
-                                    new String(Hex.encode(input.getScriptSig().getProgram())));
+                                    new String(
+                                            Hex.encode(input.getScriptSig().getProgram()),
+                                            StandardCharsets.UTF_8));
 
                             thisVin.add("scriptSig", scriptSig);
                             thisVin.addProperty("sequence", input.getSequenceNumber());
@@ -1249,7 +1248,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                     "asm", canonicalizeASM(output.getScriptPubKey().toString()));
                             scriptPubKey.addProperty(
                                     "hex",
-                                    new String(Hex.encode(output.getScriptPubKey().getProgram())));
+                                    new String(
+                                            Hex.encode(output.getScriptPubKey().getProgram()),
+                                            StandardCharsets.UTF_8));
 
                             if (type == Script.ScriptType.P2SH) {
                                 scriptPubKey.addProperty("reqSigs", 1);
@@ -1477,7 +1478,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                     if (hasTxTimeField(coin.getTicker()) && signedNTime >= 0) {
                         signedBytes = TxTimeField.insertNTime(signedBytes, signedNTime);
                     }
-                    String signedTxHex = new String(Hex.encode(signedBytes));
+                    String signedTxHex =
+                            new String(Hex.encode(signedBytes), StandardCharsets.UTF_8);
                     JsonObject resultJSON = new JsonObject();
                     resultJSON.addProperty("hex", signedTxHex);
                     resultJSON.addProperty("complete", complete);
@@ -1546,7 +1548,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         JsonObject scriptPubKey = new JsonObject();
                         scriptPubKey.addProperty("asm", utxo.getScript().toString());
                         scriptPubKey.addProperty(
-                                "hex", new String(Hex.encode(utxo.getScript().getProgram())));
+                                "hex",
+                                new String(
+                                        Hex.encode(utxo.getScript().getProgram()),
+                                        StandardCharsets.UTF_8));
                         scriptPubKey.addProperty(
                                 "reqSigs", utxo.getScript().getNumberOfSignaturesRequiredToSpend());
 
@@ -2077,7 +2082,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         }
 
                         JsonObject txid = httpClient.sendRawTransaction(coin.getTicker(), rawTxHex);
-                        if (txid == null || txid.has("error") && !txid.get("error").isJsonNull()) {
+                        if (txid == null
+                                || (txid.has("error") && !txid.get("error").isJsonNull())) {
                             int code = -1;
                             String errorMsg = "Error sending transaction!";
                             if (txid != null) {
@@ -2187,7 +2193,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                             String opVersion =
                                     (version == 0) ? "00" : Integer.toHexString(0x50 + version);
                             String pushOpCode = String.format("%02x", program.length);
-                            scriptPubKey = opVersion + pushOpCode + new String(Hex.encode(program));
+                            scriptPubKey =
+                                    opVersion
+                                            + pushOpCode
+                                            + new String(
+                                                    Hex.encode(program), StandardCharsets.UTF_8);
                             parsed = null;
                         }
                         if (parsed != null && isP2SHAddress(address)) {
@@ -2200,7 +2210,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                             Coin.valueOf(0),
                                             parsed);
                             scriptPubKey =
-                                    new String(Hex.encode(output.getScriptPubKey().getProgram()));
+                                    new String(
+                                            Hex.encode(output.getScriptPubKey().getProgram()),
+                                            StandardCharsets.UTF_8);
                         }
                     }
 
@@ -2338,13 +2350,14 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             CoinTicker ticker, Transaction transaction, long signedNTime) {
         byte[] standard = transaction.bitcoinSerialize();
         if (!hasTxTimeField(ticker)) {
-            return new String(Hex.encode(standard));
+            return new String(Hex.encode(standard), StandardCharsets.UTF_8);
         }
         if (signedNTime < 0 || signedNTime > 0xFFFFFFFFL) {
             throw new RuntimeException(
                     "cannot serialize: no nTime was signed for this transaction");
         }
-        return new String(Hex.encode(TxTimeField.insertNTime(standard, signedNTime)));
+        return new String(
+                Hex.encode(TxTimeField.insertNTime(standard, signedNTime)), StandardCharsets.UTF_8);
     }
 
     /**
@@ -2556,7 +2569,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     static String txidForDecoded(CoinTicker ticker, byte[] wireBytes, Transaction parsed) {
         return hasTxTimeField(ticker)
                 ? io.xlite.daemon.app.util.TxTimeField.txidOfWireBytes(wireBytes)
-                : parsed.getHashAsString();
+                : parsed.getTxId().toString();
     }
 
     /**
@@ -2671,7 +2684,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         System.arraycopy(Utils.bigIntegerToBytes(signature.r, 32), 0, sigData, 1, 32);
         System.arraycopy(Utils.bigIntegerToBytes(signature.s, 32), 0, sigData, 33, 32);
 
-        return new String(Base64.encode(sigData));
+        return new String(Base64.encode(sigData), StandardCharsets.UTF_8);
     }
 
     private ECKey signedMessageToKey(String signatureB64, String message)
@@ -2817,87 +2830,6 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         errorJSON.addProperty("code", -1006);
         errorJSON.addProperty("message", s);
         response.add("error", errorJSON);
-    }
-
-    private boolean isXRouterConfigInvalid(JsonObject response, BlocknetPeer blocknetPeer) {
-        if (blocknetPeer.getxRouterConfiguration() == null) {
-            response.add("result", JsonNull.INSTANCE);
-            JsonObject errorJSON = new JsonObject();
-            errorJSON.addProperty("code", -1005);
-            errorJSON.addProperty(
-                    "message", "Server has not received XRouter configuration from node.");
-            response.add("error", errorJSON);
-
-            return true;
-        }
-        return false;
-    }
-
-    private void getXRouterResponse(
-            JsonObject response,
-            CountDownLatch latch,
-            AtomicReference<String> xRouterResult,
-            BlocknetPeer blocknetPeer) {
-        int timeoutPeriod = blocknetPeer.getxRouterConfiguration().getTimeout();
-
-        try {
-            if (timeoutPeriod == 0) {
-                latch.await(10, TimeUnit.SECONDS);
-            } else {
-                latch.await(timeoutPeriod, TimeUnit.SECONDS);
-            }
-        } catch (InterruptedException e) {
-            LOGGER.warning(
-                    "[http-server-handler] Interrupted waiting for XRouter response for "
-                            + CoinTickerUtils.tickerToString(coin.getTicker())
-                            + ", "
-                            + e.getMessage());
-        }
-
-        if (xRouterResult.get() == null || xRouterResult.get().isEmpty()) {
-            LOGGER.finer(
-                    "[http-server-handler] ERROR: XRouter request timed out or errored! Timeout"
-                            + " period = "
-                            + timeoutPeriod);
-
-            response.add("result", JsonNull.INSTANCE);
-            JsonObject errorJSON = new JsonObject();
-            errorJSON.addProperty("code", -1004);
-            errorJSON.addProperty("message", "XRouter request timed out");
-
-            response.add("error", errorJSON);
-        } else {
-            JsonObject xRouterResObj = null;
-            if (isValidJSON(xRouterResult.get())) {
-                xRouterResObj = new Gson().fromJson(xRouterResult.get(), JsonObject.class);
-            }
-
-            if (xRouterResObj != null && xRouterResObj.has("result")) {
-                if (xRouterResObj.has("code")) {
-                    response.add("code", xRouterResObj.get("code"));
-                }
-                if (xRouterResObj.has("error")) {
-                    response.add("error", xRouterResObj.get("error"));
-                }
-                response.add("result", xRouterResObj.get("result"));
-            } else {
-                if (xRouterResObj != null) {
-                    response.add("result", xRouterResObj);
-                } else {
-                    response.addProperty("result", xRouterResult.get());
-                }
-
-                response.add("error", JsonNull.INSTANCE);
-            }
-        }
-    }
-
-    private boolean isValidJSON(String content) {
-        try {
-            return new Gson().fromJson(content, JsonElement.class) != null;
-        } catch (JsonParseException invalid) {
-            return false;
-        }
     }
 
     private boolean writeResponse(

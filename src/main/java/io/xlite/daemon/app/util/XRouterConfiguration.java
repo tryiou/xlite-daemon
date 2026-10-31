@@ -7,6 +7,8 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -40,7 +42,7 @@ public class XRouterConfiguration {
         private final String rawPluginConfig;
         private final String pluginName;
 
-        private ArrayList<Class> paramTypes = new ArrayList<>();
+        private final List<Class> paramTypes = new ArrayList<>();
         private double fee;
         private int clientRequestLimit;
 
@@ -132,7 +134,7 @@ public class XRouterConfiguration {
             return pluginName;
         }
 
-        public ArrayList<Class> getParamTypes() {
+        public List<Class> getParamTypes() {
             return paramTypes;
         }
 
@@ -150,7 +152,7 @@ public class XRouterConfiguration {
     }
 
     public void parseConfig() {
-        HashMap<String, Properties> properties = getProperties(rawXRouterConfig);
+        Map<String, Properties> properties = getProperties(rawXRouterConfig);
 
         if (properties == null) {
             return;
@@ -175,11 +177,11 @@ public class XRouterConfiguration {
         LOGGER.finer("[xrouter-config-parser] Processing complete.");
     }
 
-    public ArrayList<String> getSupportedWallets() {
+    public List<String> getSupportedWallets() {
         return supportedWallets;
     }
 
-    public HashMap<String, Double> getFeeMap() {
+    public Map<String, Double> getFeeMap() {
         return feeMap;
     }
 
@@ -195,30 +197,29 @@ public class XRouterConfiguration {
         return timeout;
     }
 
-    private static HashMap<String, Properties> parseINI(String toRead) throws IOException {
-        HashMap<String, Properties> result = new HashMap<>();
+    private static Map<String, Properties> parseINI(String toRead) throws IOException {
+        Map<String, Properties> result = new HashMap<>();
         new Properties() {
 
             private Properties section;
 
             @Override
-            public Object put(Object key, Object value) {
+            public synchronized Object put(Object key, Object value) {
                 String header = (key + " " + value).trim();
                 if (header.startsWith("[") && header.endsWith("]")) {
-                    return result.put(
-                            header.substring(1, header.length() - 1), section = new Properties());
-                } else {
-                    return section.put(key, value);
+                    section = new Properties();
+                    return result.put(header.substring(1, header.length() - 1), section);
                 }
+                return section.put(key, value);
             }
         }.load(new StringReader(toRead));
         return result;
     }
 
-    private static HashMap<String, Properties> getProperties(String rawConfig) {
+    private static Map<String, Properties> getProperties(String rawConfig) {
         String formatted = rawConfig.replace("\\n", "\n");
 
-        HashMap<String, Properties> properties;
+        Map<String, Properties> properties;
 
         try {
             properties = parseINI(formatted);

@@ -77,6 +77,6 @@ public class QueueItem {
     public boolean isValidItem() {
         long diff = System.currentTimeMillis() - creationTime;
 
-        return diff < (expiryTimeInMinutes * (1000 * 60));
+        return diff < (expiryTimeInMinutes * 60_000L);
     }
 }
