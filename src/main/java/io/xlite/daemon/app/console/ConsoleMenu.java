@@ -9,6 +9,7 @@ import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.EXRServerPool;
 import io.xlite.daemon.app.util.CoinConfigEnsurer;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.SecureTokens;
 import io.xlite.daemon.app.util.background.BackgroundTimerThread;
 
 import java.io.Console;
@@ -33,7 +34,7 @@ public class ConsoleMenu {
     private BackgroundTimerThread backgroundTimerThread = null;
 
     public ConsoleMenu(String[] args) {
-        this.arguments = args;
+        this.arguments = args == null ? new String[0] : args.clone();
         // Do NOT set the logger level here — App owns logging configuration
         // (XLITE_DAEMON_LOG_LEVEL); clobbering it in this constructor made all
         // FINE/FINER diagnostics unreachable.
@@ -650,20 +651,16 @@ public class ConsoleMenu {
             ConfigHelper configHelper =
                     new ConfigHelper(CoinTickerUtils.tickerToString(cointicker));
 
-            configHelper.setRpcUsername(generateRandomString(24));
-            configHelper.setRpcPassword(generateRandomString(32));
+            configHelper.setRpcUsername(SecureTokens.urlSafe(24));
+            configHelper.setRpcPassword(SecureTokens.urlSafe(32));
             configHelper.setRpcEnabled(true);
             configHelper.writeConfig();
         }
         ConfigHelper masterConf = new ConfigHelper(ConfigHelper.MASTER_TICKER);
-        masterConf.setRpcUsername(generateRandomString(24));
-        masterConf.setRpcPassword(generateRandomString(32));
+        masterConf.setRpcUsername(SecureTokens.urlSafe(24));
+        masterConf.setRpcPassword(SecureTokens.urlSafe(32));
         masterConf.setRpcEnabled(true);
         masterConf.writeConfig();
-    }
-
-    private String generateRandomString(int length) {
-        return CoinConfigEnsurer.randomToken(length);
     }
 
     private String readPassword(

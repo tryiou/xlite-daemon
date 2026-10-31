@@ -99,7 +99,10 @@ public final class CoinConfigCache {
 
     private static void writeQuietly(Path p, String text) {
         try {
-            Files.createDirectories(p.getParent());
+            Path parent = p.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             Files.writeString(p, text, StandardCharsets.UTF_8);
         } catch (Exception e) {
             LOGGER.warning("[coinconfig] cache write failed (" + p + "): " + e.getMessage());

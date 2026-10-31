@@ -28,7 +28,7 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-public class ConfigHelper {
+public final class ConfigHelper {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 

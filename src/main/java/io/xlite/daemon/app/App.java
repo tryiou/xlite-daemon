@@ -42,7 +42,6 @@ public final class App {
     private static final JSONRPCMasterServer MASTER_RPC = JSONRPCController.getMasterServer();
 
     private static ConsoleMenu console = null;
-    private static Dotenv dotenv = null;
 
     public static String getBaseUrl() {
         return baseUrl;
@@ -81,20 +80,31 @@ public final class App {
     }
 
     public static String getEnv(String key) {
-        if (dotenv == null) {
-            try {
-                dotenv = Dotenv.configure().ignoreIfMissing().load();
-            } catch (Exception e) {
-                LOGGER.finer("[app] No .env file found or failed to load" + e.getMessage());
-            }
-        }
-        if (dotenv != null) {
-            String value = dotenv.get(key);
+        Dotenv file = EnvFile.INSTANCE;
+        if (file != null) {
+            String value = file.get(key);
             if (value != null) {
                 return value;
             }
         }
         return System.getenv(key);
+    }
+
+    /**
+     * Holder for the optional {@code .env} file. Class initialisation gives a thread-safe,
+     * once-only load without a mutable static that callers could observe half-initialised.
+     */
+    private static final class EnvFile {
+        private static final Dotenv INSTANCE = load();
+
+        private static Dotenv load() {
+            try {
+                return Dotenv.configure().ignoreIfMissing().load();
+            } catch (Exception e) {
+                LOGGER.finer("[app] No .env file found or failed to load: " + e.getMessage());
+                return null;
+            }
+        }
     }
 
     /**

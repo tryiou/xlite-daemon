@@ -1,6 +1,5 @@
 package io.xlite.daemon.app.net.protocols.blocknet;
 
-import com.google.common.base.Function;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
@@ -54,6 +53,7 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.NotYetConnectedException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -93,7 +93,6 @@ public class BlocknetPeer extends PeerSocketHandler {
             new ArrayList<>();
     private final AtomicBoolean haveConfig = new AtomicBoolean(false);
 
-    private Context context;
     private CopyOnWriteArrayList<XRouterMessage> messagesPendingReply =
             new CopyOnWriteArrayList<>();
 
@@ -135,7 +134,6 @@ public class BlocknetPeer extends PeerSocketHandler {
     private VersionMessage peerVersionMessage = null;
     private final VersionMessage ourVersionMessage;
     private CopyOnWriteArrayList<Wallet> wallets = new CopyOnWriteArrayList<>();
-    private volatile int downloadTxDependencyDepth;
 
     private final SettableFuture<BlocknetPeer> connectionOpenFuture = SettableFuture.create();
     private final SettableFuture<BlocknetPeer> incomingVersionHandshakeFuture =
@@ -153,21 +151,16 @@ public class BlocknetPeer extends PeerSocketHandler {
                             outgoingVersionHandshakeFuture,
                             incomingVersionHandshakeFuture,
                             incomingPingHandshakeFuture),
-                    new Function<List<BlocknetPeer>, BlocknetPeer>() {
-                        @Nullable @Override
-                        public BlocknetPeer apply(@Nullable List<BlocknetPeer> peers) {
-                            if (peers == null) {
-                                throw new NullPointerException("Peer list is null.");
-                            }
-
-                            if (peers.size() != 2 || peers.get(0) != peers.get(1)) {
-                                throw new IllegalStateException("Bad peer list state.");
-                            }
-
-                            return peers.get(0);
-                        }
-                    },
+                    BlocknetPeer::samePeerFromHandshake,
                     Threading.SAME_THREAD);
+
+    /** All three handshake futures must resolve to the same peer instance. */
+    private static BlocknetPeer samePeerFromHandshake(List<BlocknetPeer> peers) {
+        if (peers.size() != 2 || peers.get(0) != peers.get(1)) {
+            throw new IllegalStateException("Bad peer list state.");
+        }
+        return peers.get(0);
+    }
 
     private FilteredBlock currentFilteredBlock;
     private final HashSet<Sha256Hash> pendingBlockDownloads = new HashSet<>();
@@ -178,7 +171,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     private AtomicReference<byte[]> largeReadBuffer = new AtomicReference<>();
     private AtomicInteger largeReadBufferPos = new AtomicInteger();
-    private AtomicReference<BlocknetPacketHeader> header;
+    private final AtomicReference<BlocknetPacketHeader> header = new AtomicReference<>();
 
     protected BlocknetPeer(
             BlocknetParameters params,
@@ -193,7 +186,6 @@ public class BlocknetPeer extends PeerSocketHandler {
 
         this.blockChain = chain;
         this.downloadData = chain != null;
-        this.downloadTxDependencyDepth = chain != null ? Integer.MAX_VALUE : 0;
         this.peerAddress = peerAddress;
 
         this.blocknetSeed = blocknetSeed;
@@ -201,7 +193,7 @@ public class BlocknetPeer extends PeerSocketHandler {
         this.versionHandshakeFuture.addListener(
                 this::versionHandshakeComplete, Threading.SAME_THREAD);
 
-        this.context = Context.getOrCreate(params);
+        Context.getOrCreate(params);
 
         this.ourVersionMessage =
                 new VersionMessageImpl(this.params, chain != null ? chain.getBestChainHeight() : 0);
@@ -419,6 +411,8 @@ public class BlocknetPeer extends PeerSocketHandler {
                             + getAddress().toString()
                             + ": "
                             + message.toString());
+        } else if (message instanceof FilteredBlock) {
+            currentFilteredBlock = (FilteredBlock) message;
         } else if (message instanceof XRouterMessage) {
             processXRouterMessage((XRouterMessage) message);
         } else {
@@ -787,7 +781,7 @@ public class BlocknetPeer extends PeerSocketHandler {
                                         header.get(), ByteBuffer.wrap(largeReadBuffer.get())));
 
                         largeReadBuffer.set(null);
-                        header = null;
+                        header.set(null);
                         firstMessage = false;
                     } else {
                         return buff.position();
@@ -851,18 +845,21 @@ public class BlocknetPeer extends PeerSocketHandler {
         return null;
     }
 
-    public CopyOnWriteArrayList<XRouterMessage> getMessagesPendingReply() {
-        return messagesPendingReply;
+    /** A read-only view; registration goes through the add/remove listener methods. */
+    public List<XRouterMessage> getMessagesPendingReply() {
+        return Collections.unmodifiableList(messagesPendingReply);
     }
 
-    public CopyOnWriteArrayList<ListenerRegistration<XRouterInitialMessagesSentListener>>
+    /** A read-only view; registration goes through {@link #addInitialMessagesSentListener}. */
+    public List<ListenerRegistration<XRouterInitialMessagesSentListener>>
             getInitialMessagesSentListeners() {
-        return initialMessagesSentListeners;
+        return Collections.unmodifiableList(initialMessagesSentListeners);
     }
 
-    public CopyOnWriteArrayList<ListenerRegistration<BlocknetOnXRouterMessageReceivedListener>>
+    /** A read-only view; registration goes through the add/remove listener methods. */
+    public List<ListenerRegistration<BlocknetOnXRouterMessageReceivedListener>>
             getXRouterMessageListeners() {
-        return xRouterMessageListeners;
+        return Collections.unmodifiableList(xRouterMessageListeners);
     }
 
     public void addInitialMessagesSentListener(XRouterInitialMessagesSentListener listener) {
@@ -886,8 +883,9 @@ public class BlocknetPeer extends PeerSocketHandler {
         return xRouterConfiguration;
     }
 
-    public ArrayList<XRouterConfiguration.XRouterPluginConfiguration> getPluginConfigurations() {
-        return pluginConfigurations;
+    /** A read-only view of the plugins this peer advertised. */
+    public List<XRouterConfiguration.XRouterPluginConfiguration> getPluginConfigurations() {
+        return Collections.unmodifiableList(pluginConfigurations);
     }
 
     public boolean isActivePeer() {

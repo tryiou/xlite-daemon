@@ -17,6 +17,7 @@ import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionOutput;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.logging.LogManager;
@@ -117,7 +118,8 @@ public final class XRouterFeeUtils {
                             + "or could not sign them. The reason is logged as a warning above.");
         }
 
-        String feetx = new String(Hex.encode(xRouterFeeTx.bitcoinSerialize()));
+        String feetx =
+                new String(Hex.encode(xRouterFeeTx.bitcoinSerialize()), StandardCharsets.UTF_8);
         LOGGER.finer("[xrouter-fee-utils] XRouter fee transaction string representation:");
         LOGGER.finer(xRouterFeeTx.toString());
         LOGGER.finer("[xrouter-fee-utils] DEBUG: Feetx: " + feetx);

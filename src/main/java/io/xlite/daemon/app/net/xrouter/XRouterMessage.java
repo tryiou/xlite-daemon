@@ -3,7 +3,6 @@ package io.xlite.daemon.app.net.xrouter;
 import com.google.common.base.Preconditions;
 import com.subgraph.orchid.encoders.Hex;
 
-import io.xlite.daemon.app.net.protocols.blocknet.BlocknetParameters;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.XRouterConfiguration;
 
@@ -15,13 +14,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-public class XRouterMessage extends Message {
+public final class XRouterMessage extends Message {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
@@ -31,12 +33,10 @@ public class XRouterMessage extends Message {
     private byte[] data;
 
     private HashMap<String, Object> parsedData;
-    private BlocknetParameters params;
 
-    public XRouterMessage(BlocknetParameters params, byte[] data) {
+    public XRouterMessage(byte[] data) {
         this.data = data;
 
-        this.params = params;
         this.parsedData = new HashMap<>();
         parseHeader();
         parse();
@@ -44,28 +44,26 @@ public class XRouterMessage extends Message {
 
     XRouterMessage(
             BlocknetPeer blocknetPeer,
-            BlocknetParameters params,
             XRouterPacketHeader xRouterHeader,
-            HashMap<String, Object> parsedData) {
+            Map<String, Object> parsedData) {
         this.blocknetPeer = blocknetPeer;
 
         this.xRouterHeader = xRouterHeader;
-        this.parsedData = parsedData;
+        this.parsedData = new HashMap<>(parsedData);
 
-        this.params = params;
         this.data = bitcoinSerialize();
     }
 
     private void writeCurrency(HashMap<String, Object> body, OutputStream out) throws IOException {
-        out.write(((String) body.get("currency")).getBytes());
+        out.write(((String) body.get("currency")).getBytes(StandardCharsets.UTF_8));
         out.write(0x00);
     }
 
     private void writeAccountAndNumber(String account, String number, OutputStream out)
             throws IOException {
-        out.write(account.getBytes());
+        out.write(account.getBytes(StandardCharsets.UTF_8));
         out.write(0x00);
-        out.write(number.getBytes());
+        out.write(number.getBytes(StandardCharsets.UTF_8));
         out.write(0x00);
     }
 
@@ -81,7 +79,7 @@ public class XRouterMessage extends Message {
             return;
         }
 
-        out.write(((String) body.get("paymentTx")).getBytes());
+        out.write(((String) body.get("paymentTx")).getBytes(StandardCharsets.UTF_8));
         out.write(0x00);
     }
 
@@ -89,8 +87,9 @@ public class XRouterMessage extends Message {
         return xRouterHeader;
     }
 
-    public HashMap<String, Object> getParsedData() {
-        return parsedData;
+    /** A read-only view of the fields parsed from this packet. */
+    public Map<String, Object> getParsedData() {
+        return Collections.unmodifiableMap(parsedData);
     }
 
     @Override
@@ -124,7 +123,7 @@ public class XRouterMessage extends Message {
         Utils.uint32ToByteStreamLE(xRouterHeader.getTimestamp(), stream);
         Utils.uint32ToByteStreamLE(xRouterHeader.getSize(), stream);
         stream.write(new byte[8]);
-        stream.write(xRouterHeader.getUUID().getBytes());
+        stream.write(xRouterHeader.getUUID().getBytes(StandardCharsets.UTF_8));
         stream.write(xRouterHeader.getPubkey());
         stream.write(xRouterHeader.getSignature());
 
@@ -132,7 +131,8 @@ public class XRouterMessage extends Message {
             case "xrReply":
             case "xrConfigReply":
                 {
-                    stream.write(((String) parsedData.get("reply")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("reply")).getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -145,7 +145,8 @@ public class XRouterMessage extends Message {
                 }
             case "xrGetConfig":
                 {
-                    stream.write(((String) parsedData.get("addr")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("addr")).getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -161,7 +162,8 @@ public class XRouterMessage extends Message {
                     writeCurrency(parsedData, stream);
                     writePaymentTx(parsedData, stream);
                     Utils.uint32ToByteStreamLE(1, stream); // param count
-                    stream.write(((String) parsedData.get("blockId")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("blockId")).getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -170,7 +172,9 @@ public class XRouterMessage extends Message {
                     writeCurrency(parsedData, stream);
                     writePaymentTx(parsedData, stream);
                     Utils.uint32ToByteStreamLE(1, stream); // param count
-                    stream.write(((String) parsedData.get("blockHash")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("blockHash"))
+                                    .getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -179,7 +183,8 @@ public class XRouterMessage extends Message {
                     writeCurrency(parsedData, stream);
                     writePaymentTx(parsedData, stream);
                     Utils.uint32ToByteStreamLE(1, stream); // param count
-                    stream.write(((String) parsedData.get("txid")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("txid")).getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -188,7 +193,9 @@ public class XRouterMessage extends Message {
                     writeCurrency(parsedData, stream);
                     writePaymentTx(parsedData, stream);
                     Utils.uint32ToByteStreamLE(1, stream); // param count
-                    stream.write(((String) parsedData.get("transaction")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("transaction"))
+                                    .getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -196,7 +203,9 @@ public class XRouterMessage extends Message {
                 {
                     writeCurrency(parsedData, stream);
                     writePaymentTx(parsedData, stream);
-                    stream.write(((String) parsedData.get("numberString")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("numberString"))
+                                    .getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -239,7 +248,8 @@ public class XRouterMessage extends Message {
                 { // OBSOLETE, only implemented for backwards compatibility
                     writeCurrency(parsedData, stream);
                     writePaymentTx(parsedData, stream);
-                    stream.write(((String) parsedData.get("account")).getBytes());
+                    stream.write(
+                            ((String) parsedData.get("account")).getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
                     break;
                 }
@@ -261,7 +271,7 @@ public class XRouterMessage extends Message {
 
                     List<Class> pluginParamTypes = pluginConfig.getParamTypes();
 
-                    stream.write(command.getBytes());
+                    stream.write(command.getBytes(StandardCharsets.UTF_8));
                     stream.write(0x00);
 
                     writePaymentTx(parsedData, stream);
@@ -293,7 +303,7 @@ public class XRouterMessage extends Message {
                             case "string":
                                 {
                                     String typedParam = (String) param;
-                                    stream.write(typedParam.getBytes());
+                                    stream.write(typedParam.getBytes(StandardCharsets.UTF_8));
                                     stream.write(0x00);
                                     break;
                                 }
@@ -377,7 +387,9 @@ public class XRouterMessage extends Message {
     protected void parse() throws ProtocolException {
         parsedData.put("header", xRouterHeader);
 
-        LOGGER.finer("Received raw XRouter packet: " + new String(Hex.encode(data)));
+        LOGGER.finer(
+                "Received raw XRouter packet: "
+                        + new String(Hex.encode(data), StandardCharsets.UTF_8));
         ByteBuffer buf = ByteBuffer.wrap(data);
         buf.position(xRouterHeader.getHeaderLength());
 

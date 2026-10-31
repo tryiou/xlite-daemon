@@ -1172,6 +1172,13 @@ public final class CoinInstance {
     }
 
     public void addBlockCount(CoinTicker ticker, Integer blockCount) {
+        if (blockCount == null) {
+            LOGGER.fine(
+                    "[coin-"
+                            + CoinTickerUtils.tickerToString(ticker)
+                            + "] Ignoring an absent block count");
+            return;
+        }
         // Plain set: the cache must track the true tip. The old Math.max
         // ratchet pinned a stale-high height forever (e.g. after network
         // switch or a rollback), and pre-first-poll zeros poisoned
@@ -1180,7 +1187,7 @@ public final class CoinInstance {
         // The constructor seeds 0: that initializes the map but is not a
         // backend height — only a real (positive) tip starts the freshness
         // clock, so "no height ever received" stays reachable and truthful.
-        if (blockCount != null && blockCount > 0) {
+        if (blockCount > 0) {
             lastBlockCountMillis = System.currentTimeMillis();
         }
     }
@@ -1333,6 +1340,11 @@ public final class CoinInstance {
 
     public BlocknetPeerGroup getBlocknetPeerGroup() {
         return blocknetPeerGroup;
+    }
+
+    /** Called once by {@link BlocknetPeerGroup} as it is constructed for this coin. */
+    public void attachBlocknetPeerGroup(BlocknetPeerGroup group) {
+        blocknetPeerGroup = group;
     }
 
     public BlocknetPeer getBestBlocknetPeer(String currency) {

@@ -14,6 +14,7 @@ import io.xlite.daemon.app.net.api.http.server.HTTPServerInitializer;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.RpcPorts;
 
+import java.io.IOException;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -301,7 +302,7 @@ public class JSONRPCServer extends Thread {
             probe.setReuseAddress(true);
             probe.bind(new InetSocketAddress(InetAddress.getByName(bindAddress), port), 1);
             return true;
-        } catch (Exception e) {
+        } catch (IOException | SecurityException e) {
             // probe failed (held, blocked or unresolvable)
             return false;
         }

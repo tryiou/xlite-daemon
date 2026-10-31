@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -134,8 +136,9 @@ public class XRouterConfiguration {
             return pluginName;
         }
 
+        /** A read-only view of the plugin's declared parameter types. */
         public List<Class> getParamTypes() {
-            return paramTypes;
+            return Collections.unmodifiableList(paramTypes);
         }
 
         public double getFee() {
@@ -160,16 +163,24 @@ public class XRouterConfiguration {
 
         LOGGER.finer("[xrouter-config-parser] DEBUG: Properties: " + properties.toString());
 
-        supportedWallets.addAll(
-                Arrays.asList(((String) properties.get("Main").get("wallets")).split(",")));
-        timeout = Integer.parseInt((String) properties.get("Main").get("timeout"));
-        blockLimit = Integer.parseInt((String) properties.get("Main").get("blocklimit"));
-        feeAddress = (String) properties.get("Main").get("paymentaddress");
+        Properties main = properties.get("Main");
+        if (main == null) {
+            LOGGER.warning("[xrouter-config] No [Main] section; XRouter stays unconfigured.");
+            return;
+        }
 
-        for (String key : properties.keySet()) {
+        String wallets = (String) main.get("wallets");
+        if (wallets != null && !wallets.isEmpty()) {
+            supportedWallets.addAll(Arrays.asList(wallets.split(",")));
+        }
+        timeout = parseInt(main, "timeout");
+        blockLimit = parseInt(main, "blocklimit");
+        feeAddress = (String) main.get("paymentaddress");
+
+        for (Map.Entry<String, Properties> entry : properties.entrySet()) {
+            String key = entry.getKey();
             if (key.startsWith("xr")) {
-                Properties xRouterPropertySet = properties.get(key);
-                double fee = Double.parseDouble((String) xRouterPropertySet.get("fee"));
+                double fee = Double.parseDouble((String) entry.getValue().get("fee"));
                 feeMap.put(key, fee);
             }
         }
@@ -177,12 +188,27 @@ public class XRouterConfiguration {
         LOGGER.finer("[xrouter-config-parser] Processing complete.");
     }
 
-    public List<String> getSupportedWallets() {
-        return supportedWallets;
+    private static int parseInt(Properties properties, String key) {
+        String value = (String) properties.get(key);
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            LOGGER.warning("[xrouter-config] Invalid " + key + " value '" + value + "'");
+            return 0;
+        }
     }
 
+    /** A read-only view of the wallets this node advertises. */
+    public List<String> getSupportedWallets() {
+        return Collections.unmodifiableList(supportedWallets);
+    }
+
+    /** A read-only view of the per-plugin fees. */
     public Map<String, Double> getFeeMap() {
-        return feeMap;
+        return Collections.unmodifiableMap(feeMap);
     }
 
     public String getFeeAddress() {
@@ -197,23 +223,38 @@ public class XRouterConfiguration {
         return timeout;
     }
 
+    /**
+     * Splits an INI document into its sections and hands each body to {@link Properties#load}, so
+     * escaping and continuation rules stay the JDK's. A section must open with a bracketed line;
+     * text before the first header is ignored.
+     */
     private static Map<String, Properties> parseINI(String toRead) throws IOException {
-        Map<String, Properties> result = new HashMap<>();
-        new Properties() {
+        Map<String, Properties> result = new LinkedHashMap<>();
+        String section = null;
+        StringBuilder body = new StringBuilder();
 
-            private Properties section;
-
-            @Override
-            public synchronized Object put(Object key, Object value) {
-                String header = (key + " " + value).trim();
-                if (header.startsWith("[") && header.endsWith("]")) {
-                    section = new Properties();
-                    return result.put(header.substring(1, header.length() - 1), section);
+        for (String line : toRead.split("\r?\n", -1)) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                if (section != null) {
+                    result.put(section, loadSection(body.toString()));
                 }
-                return section.put(key, value);
+                section = trimmed.substring(1, trimmed.length() - 1);
+                body.setLength(0);
+            } else if (section != null) {
+                body.append(line).append('\n');
             }
-        }.load(new StringReader(toRead));
+        }
+        if (section != null) {
+            result.put(section, loadSection(body.toString()));
+        }
         return result;
+    }
+
+    private static Properties loadSection(String body) throws IOException {
+        Properties properties = new Properties();
+        properties.load(new StringReader(body));
+        return properties;
     }
 
     private static Map<String, Properties> getProperties(String rawConfig) {

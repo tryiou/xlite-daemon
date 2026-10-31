@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclusions.
+
+  This is an application, not a library with untrusted callers. Its components
+  deliberately exchange live domain objects: the wallet, the config helper, the
+  key handler, the peer group, the coin registry and the per-address observable
+  properties all have exactly one instance whose identity and state matter. A
+  defensive copy would produce a different object and break the event wiring,
+  the wallet's own key chains or the observable bindings.
+
+  Every entry below is therefore a reviewed, intentional design fact rather than
+  a hidden finding. Anything that could be made a copy was fixed instead: packet
+  checksums, listener lists, parsed XRouter data, queue parameters, CLI argument
+  arrays and history recipient lists are all copied or wrapped at the boundary.
+-->
+<FindBugsFilter>
+
+    <!-- ============================================================
+         Live application services and registries
+         ============================================================ -->
+
+    <!-- The wallet, config helper, wallet helper and peer group are the coin's
+         single instances; callers act on that state. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.CoinInstance"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.CoinInstance"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.CoinInstance"/>
+        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+    </Match>
+    <!-- The coin registry and block-count cache are process-wide shared state. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.CoinInstance"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!-- JSON-RPC master server is a singleton whose lifecycle the controller owns. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.api.JSONRPCController"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.App"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Channel initializer holds the coin whose handler it builds. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.api.http.server.HTTPServerInitializer"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Address discovery drives the coin instance and the HTTP client it was
+         given; both are live services. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.util.AddressDiscoveryService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.wallet.WalletHelper"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- ============================================================
+         Blocknet / XRouter peer plumbing
+         ============================================================ -->
+
+    <!-- Peers, seeds, pending-reply flags and the active-connection counter are
+         the shared state the peer group coordinates; the accessors are how the
+         rest of the node observes it. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeerGroup"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeerGroup"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.protocols.blocknet.BlocknetBlockingClient"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.protocols.blocknet.messagequeue.QueueItem"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.protocols.blocknet.messagequeue.QueueItem"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.xrouter.XRouterMessage"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- ============================================================
+         Immutable value types SpotBugs cannot prove immutable
+         ============================================================ -->
+
+    <!-- CoinConfig is final, all fields final, and its map is an unmodifiable
+         copy taken in the constructor. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- ECKey, LegacyAddress and DumpedPrivateKey carry final key material and
+         expose no mutators; the wallet needs these exact instances for signing. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.crypto.KeyHandler"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.crypto.KeyHandler"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.util.AddressBalance"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.util.AddressBalance"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- A signed transaction is handed to the caller that broadcasts it; it is
+         the point of the record. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.wallet.WalletHelper$BuiltTransaction"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.wallet.WalletHelper$BuiltTransaction"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- ============================================================
+         Observable properties
+         ============================================================ -->
+
+    <!-- AtomicReference/AtomicDouble are the observable itself: the UI binds to
+         them and mutation through the reference is the contract. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.util.CloudTransaction"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- ============================================================
+         Process termination and constructor validation
+         ============================================================ -->
+
+    <!-- The console and the argument menu are the process entry points; exiting
+         on a completed command is their contract, not a library side effect. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.console.ArgMenu"/>
+        <Bug pattern="DM_EXIT"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.console.ConsoleMenu"/>
+        <Bug pattern="DM_EXIT"/>
+    </Match>
+
+    <!-- HTTPClient validates its configuration in the constructor and is
+         intentionally subclassable: six test doubles override its transport
+         methods. No class in this project declares a finalizer (Checkstyle's
+         NoFinalizer enforces that), so the finalizer attack this pattern warns
+         about cannot occur. Every other class that threw from a constructor was
+         made final instead. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.api.http.client.HTTPClient"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!-- ============================================================
+         Disabled XRouter background mode
+         ============================================================ -->
+
+    <!-- The peer group is read only in the p2p block-count branch, which is off
+         while HTTP_BLOCK_COUNT_UPDATES is true. The field and the branch are the
+         unfinished XRouter mode and are kept until that work resumes. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.util.background.BackgroundTimerThread"/>
+        <Bug pattern="URF_UNREAD_FIELD"/>
+    </Match>
+
+</FindBugsFilter>

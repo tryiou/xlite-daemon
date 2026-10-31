@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-public class AddressDiscoveryService {
+public final class AddressDiscoveryService {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 

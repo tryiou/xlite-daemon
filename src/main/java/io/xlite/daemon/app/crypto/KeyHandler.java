@@ -456,7 +456,10 @@ public class KeyHandler {
      */
     private static void writeWalletFile(File file, byte[] salt, String ivB64, String encryptedSeed)
             throws IOException {
-        file.getParentFile().mkdirs();
+        File parent = file.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            throw new IOException("Cannot create wallet directory " + parent);
+        }
         try (BufferedWriter writer =
                 new BufferedWriter(
                         new OutputStreamWriter(
@@ -555,8 +558,8 @@ public class KeyHandler {
 
             LOGGER.info("[security] Wallet created with AES-256-CBC / PBKDF2-SHA-256");
             return true;
-        } catch (Exception e) {
-            LOGGER.severe("[security] Failed to create wallet file");
+        } catch (IOException | NoSuchAlgorithmException | RuntimeException e) {
+            LOGGER.severe("[security] Failed to create wallet file: " + e.getMessage());
             return false;
         } finally {
             if (salt != null) {
@@ -618,7 +621,9 @@ public class KeyHandler {
             LOGGER.severe("[security] Migration failed: " + e.getMessage());
 
             // Rollback: remove the (potentially partial) new file, then restore the backup.
-            keyFile.delete();
+            if (keyFile.exists() && !keyFile.delete()) {
+                LOGGER.warning("[security] Could not remove the partial wallet file " + keyFile);
+            }
             if (legacyBackup != null && legacyBackup.exists()) {
                 if (!legacyBackup.renameTo(keyFile)) {
                     throw new RuntimeException(

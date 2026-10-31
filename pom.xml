@@ -43,6 +43,7 @@
     <spotless.maven.plugin.version>3.10.4</spotless.maven.plugin.version>
     <google.java.format.version>2.0.0</google.java.format.version>
     <error.prone.version>2.43.0</error.prone.version>
+    <spotbugs.maven.plugin.version>4.9.8.2</spotbugs.maven.plugin.version>
   </properties>
 
   <!-- Dependency Management -->
@@ -315,6 +316,35 @@
           <execution>
             <id>checkstyle-check</id>
             <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- SpotBugs: bytecode-level bug patterns (null dereferences,
+           dead stores, wrong map iteration, overlooked return values, ...).
+           It is bound to process-classes, the first phase where the bytecode
+           exists, so `mvn test` runs the same gate as CI instead of needing a
+           full package (the native image build also sits in package).
+           config/spotbugs/spotbugs-exclude.xml records the reviewed,
+           intentional deviations and why each one is not a defect. -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>${spotbugs.maven.plugin.version}</version>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Medium</threshold>
+          <excludeFilterFile>config/spotbugs/spotbugs-exclude.xml</excludeFilterFile>
+          <includeTests>false</includeTests>
+          <failOnError>true</failOnError>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotbugs-check</id>
+            <phase>process-classes</phase>
             <goals>
               <goal>check</goal>
             </goals>

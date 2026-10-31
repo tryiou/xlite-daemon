@@ -11,6 +11,7 @@ import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.Utils;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.LogManager;
@@ -39,7 +40,9 @@ public class XRouterPacketManager {
     }
 
     private byte[] signPacket(byte[] packetBytes, ECKey ecPrivateKey) {
-        LOGGER.finer("[xrouter] DEBUG: Packet bytes: " + new String(Hex.encode(packetBytes)));
+        LOGGER.finer(
+                "[xrouter] DEBUG: Packet bytes: "
+                        + new String(Hex.encode(packetBytes), StandardCharsets.UTF_8));
         Sha256Hash packetHash = Sha256Hash.wrap(Sha256Hash.hash(packetBytes));
         LOGGER.finer("[xrouter] DEBUG: Packet byte hash: " + packetHash.toString());
         ECKey.ECDSASignature rawSignature = ecPrivateKey.sign(packetHash).toCanonicalised();
@@ -52,13 +55,17 @@ public class XRouterPacketManager {
                     "[xrouter] WARNING: Signature R is greater than 32 bytes! Trimming from the"
                             + " beginning. Size: "
                             + r.length);
-            LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature R: "
+                            + new String(Hex.encode(r), StandardCharsets.UTF_8));
         } else if (r.length < 32) {
             LOGGER.finer(
                     "[xrouter] WARNING: Signature R is less than 32 bytes! Prepending null bytes to"
                             + " the beginning. Size: "
                             + s.length);
-            LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature R: "
+                            + new String(Hex.encode(r), StandardCharsets.UTF_8));
 
             r = prependNullTo32(r);
         }
@@ -68,13 +75,17 @@ public class XRouterPacketManager {
                     "[xrouter] WARNING: Signature S is greater than 32 bytes! Trimming from the"
                             + " beginning. Size: "
                             + s.length);
-            LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature S: "
+                            + new String(Hex.encode(s), StandardCharsets.UTF_8));
         } else if (s.length < 32) {
             LOGGER.finer(
                     "[xrouter] WARNING: Signature S is less than 32 bytes! Prepending null bytes."
                             + " Size: "
                             + s.length);
-            LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature S: "
+                            + new String(Hex.encode(s), StandardCharsets.UTF_8));
 
             s = prependNullTo32(s);
         }
@@ -86,7 +97,7 @@ public class XRouterPacketManager {
 
         LOGGER.finer(
                 "[xrouter] Signature: "
-                        + new String(Hex.encode(signature))
+                        + new String(Hex.encode(signature), StandardCharsets.UTF_8)
                         + ", byte length "
                         + signature.length);
 
@@ -153,8 +164,7 @@ public class XRouterPacketManager {
         cursor += 4;
         Utils.uint32ToByteArrayLE(commandId, xRouterHeaderBytes, cursor);
         cursor += 4;
-        Utils.uint32ToByteArrayLE(
-                Math.round(System.currentTimeMillis() / 1000), xRouterHeaderBytes, cursor);
+        Utils.uint32ToByteArrayLE(System.currentTimeMillis() / 1000L, xRouterHeaderBytes, cursor);
         cursor += 4;
         Utils.uint32ToByteArrayLE(size, xRouterHeaderBytes, cursor);
         cursor += 4;
@@ -163,7 +173,7 @@ public class XRouterPacketManager {
         System.arraycopy(new byte[8], 0, xRouterHeaderBytes, cursor, 8);
         cursor += 8;
 
-        System.arraycopy(uuid.getBytes(), 0, xRouterHeaderBytes, cursor, 36);
+        System.arraycopy(uuid.getBytes(StandardCharsets.UTF_8), 0, xRouterHeaderBytes, cursor, 36);
         cursor += 36;
 
         byte[] pubkey = ecPublicKey.getPubKey();
@@ -182,8 +192,7 @@ public class XRouterPacketManager {
         LOGGER.finer("[xrouter] Serializing XRouter message (phase 1).");
         XRouterPacketHeader xRouterHeader =
                 new XRouterPacketHeader(ByteBuffer.wrap(xRouterHeaderBytes));
-        XRouterMessage message =
-                new XRouterMessage(blocknetPeer, blocknetNetworkParameters, xRouterHeader, body);
+        XRouterMessage message = new XRouterMessage(blocknetPeer, xRouterHeader, body);
 
         byte[] rawPktUnsigned = message.bitcoinSerialize();
 
@@ -197,8 +206,7 @@ public class XRouterPacketManager {
 
         LOGGER.finer("[xrouter] Serializing XRouter message (phase 2).");
         XRouterPacketHeader xRouterHeaderSigned = new XRouterPacketHeader(xRouterHeaderBufSigned);
-        return new XRouterMessage(
-                blocknetPeer, blocknetNetworkParameters, xRouterHeaderSigned, body);
+        return new XRouterMessage(blocknetPeer, xRouterHeaderSigned, body);
     }
 
     private HashMap<String, Object> getBody(@Nullable String paymentTx) {

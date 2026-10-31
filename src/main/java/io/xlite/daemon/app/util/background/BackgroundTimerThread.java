@@ -253,8 +253,6 @@ public class BackgroundTimerThread implements Runnable {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 break;
-            } catch (NullPointerException e) {
-                LOGGER.warning("[BackgroundTimer] Null pointer: " + e.getMessage());
             } catch (Exception e) {
                 LOGGER.warning("[BackgroundTimer] Unexpected error: " + e.getMessage());
             }

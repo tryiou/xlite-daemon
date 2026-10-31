@@ -72,8 +72,8 @@ public class BlocknetPeerGroup {
     private final ReentrantLock lock = Threading.lock("blocknetpeergroup");
     private final BlocknetBlockingClientManager clientManager;
 
-    private final int maxReconnectsPerHour = 30; // maximum attempts per hour
-    private final long reconnectTime = 2; // interval between reconnects
+    private static final int MAX_RECONNECTS_PER_HOUR = 30;
+    private static final long RECONNECT_INTERVAL_SECONDS = 2;
 
     private CoinInstance blocknetInstance;
     private BlocknetNetworkParameters blocknetNetworkParameters;
@@ -91,6 +91,7 @@ public class BlocknetPeerGroup {
             BlocknetNetworkParameters blocknetNetworkParameters,
             BlockChain chain) {
         this.blocknetInstance = blocknetInstance;
+        blocknetInstance.attachBlocknetPeerGroup(this);
         this.blocknetNetworkParameters = blocknetNetworkParameters;
         this.blockChain = chain;
 
@@ -398,7 +399,7 @@ public class BlocknetPeerGroup {
                             activeBlocknetNetwork.addBlockCount(
                                     CoinTickerUtils.stringToTicker(originalTicker), blockCount);
                             LOGGER.finer("Blocks for currency " + originalTicker + ": " + reply);
-                        } catch (Exception e) {
+                        } catch (RuntimeException e) {
                             LOGGER.finer(
                                     "[xrouter] ERROR: Error while parsing XRouter reply to"
                                             + " xrGetBlockCount! Dumping reply and stack trace.");
@@ -492,7 +493,7 @@ public class BlocknetPeerGroup {
                                         break;
                                     }
                             }
-                        } catch (Exception e) {
+                        } catch (RuntimeException e) {
                             LOGGER.finer(
                                     "[xrouter] ERROR: Error while parsing XRouter reply to"
                                             + " xrService! Original custom command: "
@@ -629,8 +630,9 @@ public class BlocknetPeerGroup {
                     }
 
                     boolean attemptReconnect =
-                            blocknetSeed.getFailCount() <= maxReconnectsPerHour
-                                    && blocknetSeed.getLastFailTimeDiff() >= reconnectTime;
+                            blocknetSeed.getFailCount() <= MAX_RECONNECTS_PER_HOUR
+                                    && blocknetSeed.getLastFailTimeDiff()
+                                            >= RECONNECT_INTERVAL_SECONDS;
 
                     if (attemptReconnect || forceReconnect) {
                         LOGGER.finer(

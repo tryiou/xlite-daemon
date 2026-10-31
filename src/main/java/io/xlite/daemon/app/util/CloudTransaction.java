@@ -12,7 +12,7 @@ import org.bitcoinj.script.ScriptPattern;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-public class CloudTransaction {
+public final class CloudTransaction {
     private AtomicReference<String> txType;
     private AtomicReference<String> address;
     private AtomicReference<String> txHash;

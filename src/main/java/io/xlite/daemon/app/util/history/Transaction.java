@@ -2,10 +2,6 @@ package io.xlite.daemon.app.util.history;
 
 import com.google.gson.annotations.SerializedName;
 
-import io.xlite.daemon.app.net.CoinTicker;
-
-import java.util.List;
-
 public class Transaction {
     @SerializedName("address")
     private String addressB58;
@@ -24,19 +20,15 @@ public class Transaction {
     private int vout;
     private int confirmations;
     private int blocktime;
-    protected transient List<String> fromAddresses;
-    protected CoinTicker ticker;
 
     public Transaction(
-            CoinTicker ticker,
             String addressB58,
             String txid,
             String blockhash,
             int vout,
             double value,
             int confirmations,
-            int blocktime,
-            List<String> fromAddresses) {
+            int blocktime) {
         this.addressB58 = addressB58;
         this.txid = txid;
         this.blockhash = blockhash;
@@ -45,9 +37,6 @@ public class Transaction {
 
         this.confirmations = confirmations;
         this.blocktime = blocktime;
-        this.fromAddresses = fromAddresses;
-
-        this.ticker = ticker;
     }
 
     public void setCategory(String category) {
@@ -92,10 +81,6 @@ public class Transaction {
 
     public int getConfirmations() {
         return confirmations;
-    }
-
-    public List<String> getFrom_addresses() {
-        return fromAddresses;
     }
 
     public String getCategory() {

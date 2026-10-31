@@ -21,7 +21,7 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.net.SocketFactory;
 
-public class BlocknetBlockingClient implements MessageWriteTarget {
+public final class BlocknetBlockingClient implements MessageWriteTarget {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 

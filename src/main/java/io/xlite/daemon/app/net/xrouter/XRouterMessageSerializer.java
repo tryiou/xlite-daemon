@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -55,7 +56,9 @@ public class XRouterMessageSerializer extends MessageSerializer {
     public XRouterMessage deserializePayload(
             BitcoinSerializer.BitcoinPacketHeader header, ByteBuffer in)
             throws ProtocolException, BufferUnderflowException, UnsupportedOperationException {
-        BlocknetPacketHeader blocknetPacketHeader = (BlocknetPacketHeader) header;
+        if (!(header instanceof BlocknetPacketHeader blocknetPacketHeader)) {
+            throw new ProtocolException("Expected a Blocknet packet header");
+        }
 
         byte[] payloadBytes = new byte[blocknetPacketHeader.getLength()];
         in.get(payloadBytes, 0, payloadBytes.length);
@@ -69,7 +72,7 @@ public class XRouterMessageSerializer extends MessageSerializer {
         byte[] data = new byte[dataLength];
         in.get(data, 0, dataLength);
 
-        return new XRouterMessage(params, data);
+        return new XRouterMessage(data);
     }
 
     @Override
@@ -141,8 +144,8 @@ public class XRouterMessageSerializer extends MessageSerializer {
 
         LOGGER.finer(
                 "[blocknet-serializer] Serialized xrouter message. Bytes: "
-                        + new String(Hex.encode(header))
-                        + new String(Hex.encode(data)));
+                        + new String(Hex.encode(header), StandardCharsets.UTF_8)
+                        + new String(Hex.encode(data), StandardCharsets.UTF_8));
     }
 
     /**

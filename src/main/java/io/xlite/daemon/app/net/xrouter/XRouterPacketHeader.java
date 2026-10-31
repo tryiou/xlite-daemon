@@ -5,6 +5,7 @@ import com.subgraph.orchid.encoders.Hex;
 import org.bitcoinj.core.Utils;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -53,10 +54,10 @@ public class XRouterPacketHeader {
 
         LOGGER.finer(
                 "[xrouter] Retrieved compact size: "
-                        + new String(Hex.encode(new byte[] {compactSize})));
+                        + new String(Hex.encode(new byte[] {compactSize}), StandardCharsets.UTF_8));
         LOGGER.finer(
                 "[xrouter] Retrieved compact size bytes: "
-                        + new String(Hex.encode(compactSizeBytes)));
+                        + new String(Hex.encode(compactSizeBytes), StandardCharsets.UTF_8));
 
         version = (int) Utils.readUint32(rawHeader, cursor);
         cursor += 4;
@@ -79,19 +80,23 @@ public class XRouterPacketHeader {
         System.arraycopy(rawHeader, cursor, uuidArr, 0, uuidArr.length);
         cursor += 36;
 
-        uuid = new String(uuidArr);
+        uuid = new String(uuidArr, StandardCharsets.UTF_8);
         LOGGER.finer("[xrouter] Retrieved UUID: " + uuid);
 
         byte[] pubkeyArr = new byte[33];
         System.arraycopy(rawHeader, cursor, pubkeyArr, 0, pubkeyArr.length);
         cursor += 33;
-        LOGGER.finer("[xrouter] Retrieved pubkey: " + new String(Hex.encode(pubkeyArr)));
+        LOGGER.finer(
+                "[xrouter] Retrieved pubkey: "
+                        + new String(Hex.encode(pubkeyArr), StandardCharsets.UTF_8));
         pubkey = pubkeyArr;
 
         byte[] sigArr = new byte[64];
         System.arraycopy(rawHeader, cursor, sigArr, 0, sigArr.length);
         cursor += 64;
-        LOGGER.finer("[xrouter] Retrieved signature: " + new String(Hex.encode(sigArr)));
+        LOGGER.finer(
+                "[xrouter] Retrieved signature: "
+                        + new String(Hex.encode(sigArr), StandardCharsets.UTF_8));
         signature = sigArr;
 
         LOGGER.finer("[xrouter] XRouter header read complete, at position: " + cursor);

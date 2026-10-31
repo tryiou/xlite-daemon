@@ -8,7 +8,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSyntaxException;
-import com.google.gson.reflect.TypeToken;
 import com.subgraph.orchid.encoders.Hex;
 
 import io.xlite.daemon.app.App;
@@ -1207,23 +1206,15 @@ public class HTTPClient {
                 // LOGGER.warning("*** DEBUG *** [httpclient] getHistory " + element);
                 JsonObject jsonObject = element.getAsJsonObject();
 
-                List<String> fromAddresses =
-                        new Gson()
-                                .fromJson(
-                                        jsonObject.get("from_addresses"),
-                                        new TypeToken<List<String>>() {}.getType());
-
                 Transaction tx =
                         new Transaction(
-                                coinTicker,
                                 jsonObject.get("address").getAsString(),
                                 jsonObject.get("txid").getAsString(),
                                 jsonObject.get("blockhash").getAsString(),
                                 jsonObject.get("vout").getAsInt(),
                                 jsonObject.get("amount").getAsDouble(),
                                 jsonObject.get("confirmations").getAsInt(),
-                                jsonObject.get("blocktime").getAsInt(),
-                                fromAddresses);
+                                jsonObject.get("blocktime").getAsInt());
                 tx.setCategory(jsonObject.get("category").getAsString());
                 tx.setFee(jsonObject.get("fee").getAsDouble());
 
@@ -1234,10 +1225,6 @@ public class HTTPClient {
 
         // Return the latest transaction history
         JsonArray txs = coinInstance.getAllTransactions();
-        if (txs == null) {
-            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null txs");
-            return null;
-        }
 
         // Update last fetch time
         lastFetchTimes.put(lastFetchTimesKey(coinTicker, "getHistory"), currentTime);
@@ -1403,19 +1390,15 @@ public class HTTPClient {
                             String utxoAddress = addressBalance.getAddress().toBase58();
 
                             if (utxoAddress.equals(address)) {
-                                List<String> fromAddresses = new ArrayList<>();
-
                                 Transaction tx =
                                         new Transaction(
-                                                coinTicker,
                                                 address,
                                                 txid,
                                                 rawTransaction.get("blockhash").getAsString(),
                                                 voutInt,
                                                 vout.get("value").getAsDouble(),
                                                 rawTransaction.get("confirmations").getAsInt(),
-                                                rawTransaction.get("blocktime").getAsInt(),
-                                                fromAddresses);
+                                                rawTransaction.get("blocktime").getAsInt());
                                 tx.setCategory("send");
                                 tx.setFee(0.0);
 
@@ -1445,19 +1428,15 @@ public class HTTPClient {
                             String utxoAddress = addressBalance.getAddress().toBase58();
 
                             if (utxoAddress.equals(address)) {
-                                List<String> fromAddresses = new ArrayList<>();
-
                                 Transaction tx =
                                         new Transaction(
-                                                coinTicker,
                                                 address,
                                                 txid,
                                                 rawTransaction.get("blockhash").getAsString(),
                                                 vout.getAsJsonObject().get("n").getAsInt(),
                                                 vout.getAsJsonObject().get("value").getAsDouble(),
                                                 rawTransaction.get("confirmations").getAsInt(),
-                                                rawTransaction.get("blocktime").getAsInt(),
-                                                fromAddresses);
+                                                rawTransaction.get("blocktime").getAsInt());
                                 tx.setCategory("receive");
                                 tx.setFee(0.0);
 
@@ -1472,11 +1451,6 @@ public class HTTPClient {
 
         // Return the latest transaction history
         JsonArray txs = coinInstance.getAllTransactions();
-        if (txs == null) {
-            LOGGER.warning(
-                    "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null txs");
-            return null;
-        }
 
         // Update last fetch time
         lastFetchTimes.put(lastFetchTimesKey(coinTicker, "getAddressHistory"), currentTime);

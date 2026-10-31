@@ -10,7 +10,7 @@ public class ArgMenu {
     private String[] arguments;
 
     public ArgMenu(String[] args) {
-        this.arguments = args;
+        this.arguments = args == null ? new String[0] : args.clone();
     }
 
     public void init() {

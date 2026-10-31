@@ -36,11 +36,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-public class BlocknetSerializer extends BitcoinSerializer {
+public final class BlocknetSerializer extends BitcoinSerializer {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
@@ -96,7 +97,9 @@ public class BlocknetSerializer extends BitcoinSerializer {
             throws ProtocolException, BufferUnderflowException {
         // in.position(0);
         // seekPastMagicBytes(in);
-        BlocknetPacketHeader blocknetPacketHeader = (BlocknetPacketHeader) header;
+        if (!(header instanceof BlocknetPacketHeader blocknetPacketHeader)) {
+            throw new ProtocolException("Expected a Blocknet packet header");
+        }
 
         byte[] payloadBytes = new byte[blocknetPacketHeader.getLength()];
         in.get(payloadBytes, 0, payloadBytes.length);
@@ -110,7 +113,7 @@ public class BlocknetSerializer extends BitcoinSerializer {
                 LOGGER.finer(
                         "[blocknet-serializer] Received XRouter packet, at position: "
                                 + in.position());
-                return new XRouterMessage(params, payloadBytes);
+                return new XRouterMessage(payloadBytes);
             case "version":
                 //				LOGGER.finer("[blocknet-serializer] Version message received");
                 return new VersionMessage(params, payloadBytes);
@@ -255,8 +258,8 @@ public class BlocknetSerializer extends BitcoinSerializer {
                 "[blocknet-serializer] Serialized "
                         + name
                         + " message. Bytes: "
-                        + new String(Hex.encode(header))
-                        + new String(Hex.encode(message)));
+                        + new String(Hex.encode(header), StandardCharsets.UTF_8)
+                        + new String(Hex.encode(message), StandardCharsets.UTF_8));
     }
 
     @Override

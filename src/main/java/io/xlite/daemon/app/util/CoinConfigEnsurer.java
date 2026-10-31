@@ -9,8 +9,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Map;
@@ -135,8 +133,8 @@ public final class CoinConfigEnsurer {
      */
     private static void writeFresh(String tickerStr) {
         ConfigHelper cfg = new ConfigHelper(tickerStr);
-        cfg.setRpcUsername(randomToken(24));
-        cfg.setRpcPassword(randomToken(32));
+        cfg.setRpcUsername(SecureTokens.urlSafe(24));
+        cfg.setRpcPassword(SecureTokens.urlSafe(32));
         cfg.setRpcEnabled(true);
         cfg.writeConfig();
         // Re-read the bytes rather than trusting the writer: configExists uses
@@ -170,16 +168,5 @@ public final class CoinConfigEnsurer {
                             + e.getMessage(),
                     e);
         }
-    }
-
-    /**
-     * URL-safe random token for RPC credentials. Single producer shared with the console
-     * full-repair path.
-     */
-    public static String randomToken(int length) {
-        SecureRandom secureRandom = new SecureRandom();
-        byte[] token = new byte[length];
-        secureRandom.nextBytes(token);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
     }
 }

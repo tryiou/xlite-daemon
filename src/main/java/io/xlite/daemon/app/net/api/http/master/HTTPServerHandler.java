@@ -30,9 +30,9 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.SecureTokens;
 
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -47,20 +47,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         configHelper = new ConfigHelper(ConfigHelper.MASTER_TICKER);
 
         if (configHelper.getRpcUsername().isEmpty() && configHelper.getRpcPassword().isEmpty()) {
-            configHelper.setRpcUsername(generateRandomString(12));
-            configHelper.setRpcPassword(generateRandomString(32));
+            configHelper.setRpcUsername(SecureTokens.urlSafe(12));
+            configHelper.setRpcPassword(SecureTokens.urlSafe(32));
 
             configHelper.writeConfig();
         }
-    }
-
-    private String generateRandomString(int length) {
-        SecureRandom secureRandom = new SecureRandom();
-
-        byte[] token = new byte[length];
-        secureRandom.nextBytes(token);
-
-        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(token);
     }
 
     @Override

@@ -2,14 +2,16 @@ package io.xlite.daemon.app.net.protocols.blocknet.messagequeue;
 
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 
 public class QueueItem {
     private BlocknetPeer originalPeer;
     private BlocknetPeer newPeer;
     private String customUUID;
     private String commmand;
-    private HashMap<String, Object> params;
+    private final Map<String, Object> params;
 
     private MessageSource messageSource;
 
@@ -19,11 +21,11 @@ public class QueueItem {
     public QueueItem(
             BlocknetPeer blocknetPeer,
             String command,
-            HashMap<String, Object> params,
+            Map<String, Object> params,
             MessageSource messageSource) {
         this.originalPeer = blocknetPeer;
         this.commmand = command;
-        this.params = params;
+        this.params = Collections.unmodifiableMap(new HashMap<>(params));
 
         this.messageSource = messageSource;
 
@@ -34,12 +36,12 @@ public class QueueItem {
             BlocknetPeer blocknetPeer,
             String uuid,
             String command,
-            HashMap<String, Object> params,
+            Map<String, Object> params,
             MessageSource messageSource) {
         this.originalPeer = blocknetPeer;
         this.customUUID = uuid;
         this.commmand = command;
-        this.params = params;
+        this.params = Collections.unmodifiableMap(new HashMap<>(params));
 
         this.messageSource = messageSource;
 
@@ -66,7 +68,7 @@ public class QueueItem {
         return commmand;
     }
 
-    public HashMap<String, Object> getParams() {
+    public Map<String, Object> getParams() {
         return params;
     }
 
