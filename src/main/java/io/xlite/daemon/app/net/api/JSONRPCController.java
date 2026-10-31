@@ -21,12 +21,26 @@ public class JSONRPCController {
     // a rebinding coin must not stall unrelated coins' event loops behind
     // its multi-second release-wait.
     private static final ConcurrentHashMap<CoinInstance, ReentrantLock> locks = new ConcurrentHashMap<>();
-    private static final ConfigHelper masterConfig = new ConfigHelper("master");
+    private static final ConfigHelper masterConfig = new ConfigHelper(ConfigHelper.MASTER_TICKER);
     private static JSONRPCMasterServer masterServer = new JSONRPCMasterServer(
             masterConfig.getMasterRpcPort(), masterConfig.getRpcBindAddress());
 
     public static JSONRPCMasterServer getMasterServer() {
         return masterServer;
+    }
+
+    /** The port the master listener is configured to bind. */
+    public static int getMasterPort() {
+        return masterConfig.getMasterRpcPort();
+    }
+
+    /**
+     * Drops every handed-out server and its lock. Tests only: production
+     * keeps one server per coin for the process lifetime.
+     */
+    static void resetForTest() {
+        servers.clear();
+        locks.clear();
     }
 
     /**
@@ -85,8 +99,23 @@ public class JSONRPCController {
     }
 
     private static JSONRPCServer getOrCreateLocked(CoinInstance coinInstance) {
-        return servers.computeIfAbsent(coinInstance,
-                coin -> new JSONRPCServer(coin, coin.getRPCPort(), coin.getRpcBindAddress()));
+        JSONRPCServer existing = servers.get(coinInstance);
+        // A server thread cannot be restarted once it has terminated. A bind
+        // failure or a previous deinit leaves such an instance in the map, so
+        // replace it instead of handing a dead thread to start().
+        if (existing != null && !existing.isAlive()
+                && existing.getState() == Thread.State.TERMINATED) {
+            servers.remove(coinInstance);
+            existing = null;
+        }
+        if (existing != null) {
+            return existing;
+        }
+        JSONRPCServer created = new JSONRPCServer(coinInstance,
+                coinInstance.getRPCPort(), coinInstance.getRpcBindAddress(),
+                coinInstance.getRpcCandidates());
+        servers.put(coinInstance, created);
+        return created;
     }
 
     private static void removeLocked(CoinInstance coinInstance) {

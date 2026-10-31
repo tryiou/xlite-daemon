@@ -2,6 +2,7 @@ package io.xlite.daemon.app.net.api;
 
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.ConfigHelper;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,6 +36,9 @@ public class JSONRPCControllerRebindTest {
     @TempDir
     static Path tempConfigDir;
 
+    /** Restored after the class so a later class never sees a deleted path. */
+    private static String previousConfigDir;
+
     private static int freePort() throws Exception {
         try (ServerSocket s = new ServerSocket(0)) {
             return s.getLocalPort();
@@ -43,7 +47,14 @@ public class JSONRPCControllerRebindTest {
 
     @BeforeAll
     static void isolateConfig() {
+        previousConfigDir = ConfigHelper.CONFIG_DIR;
         ConfigHelper.CONFIG_DIR = tempConfigDir.toString();
+    }
+
+    @AfterAll
+    static void restoreConfig() {
+        JSONRPCController.resetForTest();
+        ConfigHelper.CONFIG_DIR = previousConfigDir;
     }
 
     @Test
@@ -52,6 +63,7 @@ public class JSONRPCControllerRebindTest {
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
         when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
+        when(coin.getRpcCandidates()).thenReturn(new int[]{port});
 
         JSONRPCServer first = JSONRPCController.getRPCServer(coin);
         JSONRPCServer rebound = JSONRPCController.rebindRPCServer(coin);
@@ -67,6 +79,7 @@ public class JSONRPCControllerRebindTest {
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
         when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
+        when(coin.getRpcCandidates()).thenReturn(new int[]{port});
 
         JSONRPCServer live = JSONRPCController.getRPCServer(coin);
         live.start();
@@ -93,6 +106,7 @@ public class JSONRPCControllerRebindTest {
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
         when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
+        when(coin.getRpcCandidates()).thenReturn(new int[]{port});
 
         final int threads = 8;
         final int cyclesPerThread = 25;

@@ -17,6 +17,8 @@ import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.AddressDiscoveryService;
 import io.xlite.daemon.app.util.CloudTransaction;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.RpcPortClaims;
+import io.xlite.daemon.app.util.RpcPorts;
 import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
@@ -333,10 +335,6 @@ public class CoinInstance {
     }
 
     public CoinError init(char[] pw, String userMnemonic, boolean isMnemonic) {
-        return init(pw, userMnemonic, isMnemonic, false);
-    }
-
-    public CoinError init(char[] pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
         switch (ticker) {
             case BLOCKNET: {
                 LOGGER.fine("[coin] Initializing for Blocknet main network.");
@@ -357,84 +355,72 @@ public class CoinInstance {
                 // init() instead of returning the coin error callers handle.
                 blocknetNetworkParameters = new BlocknetNetworkParameters();
                 hasXRouter = true;
-                rpcPort = 41419;
                 break;
             }
             case BITCOIN: {
                 LOGGER.fine("[coin] Initializing for Bitcoin main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 8332;
                 break;
             }
             case LITECOIN: {
                 LOGGER.fine("[coin] Initializing for Litecoin main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 9332;
                 break;
             }
             case DASHCOIN: {
                 LOGGER.fine("[coin] Initializing for Dashcoin main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 9998;
                 break;
             }
             case DIGIBYTE: {
                 LOGGER.fine("[coin] Initializing for Digibyte main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 14022;
                 break;
             }
             case DOGECOIN: {
                 LOGGER.fine("[coin] Initializing for Dogecoin main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 22555;
                 break;
             }
             case SYSCOIN: {
                 LOGGER.fine("[coin] Initializing for Syscoin main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 8370;
                 break;
             }
             case PIVX: {
                 LOGGER.fine("[coin] Initializing for Pivx main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 9951;
                 break;
             }
             case UNOBTANIUM: {
                 LOGGER.fine("[coin] Initializing for Unobtanium main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 65111;
                 break;
             }
             case PKOIN: {
                 LOGGER.fine("[coin] Initializing for Pocketcoin main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 37071;
                 break;
             }
             case RAVENCOIN: {
                 LOGGER.fine("[coin] Initializing for Ravencoin main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 8766;
                 break;
             }
             case VERGE: {
                 LOGGER.fine("[coin] Initializing for Verge main network.");
                 CoinError err = loadMigratedParams();
                 if (err != null) return err;
-                rpcPort = 20102;
                 break;
             }
             default: {
@@ -444,15 +430,6 @@ public class CoinInstance {
         }
 
         configHelper.writeConfig();
-
-        if (xliteRPC) {
-            rpcPort = rpcPort + 1;
-
-            if (!configHelper.setRpcPort(rpcPort)) {
-                LOGGER.warning("[coin] Failed to allocate RPC port, skipping RPC config");
-            }
-            configHelper.writeConfig();
-        }
 
         Context.propagate(new Context(networkParameters));
 
@@ -502,14 +479,7 @@ public class CoinInstance {
         // Make sure wallet addresses are available
         generateForwardAddresses(true);
 
-        if (configHelper.getRpcPort() == -1000) {
-            if (!configHelper.setRpcPort(rpcPort)) {
-                LOGGER.warning("[coin] Failed to allocate RPC port, RPC server will not start");
-            }
-            configHelper.writeConfig();
-        } else {
-            rpcPort = configHelper.getRpcPort();
-        }
+        resolveRpcPort();
 
         if (configHelper.isRpcEnabled() && configHelper.validAuth() && rpcPort != -1) {
             if (!configHelper.validBindAddress()) {
@@ -528,6 +498,20 @@ public class CoinInstance {
                 coinRPCServer.deinit();
 
             coinRPCServer.start();
+
+            // Block until bound: the GUI reads configs after master RPC
+            // announces readiness, so a late write would be a dead port.
+            if (!coinRPCServer.awaitBound(8000)) {
+                int[] candidates = getRpcCandidates();
+                LOGGER.severe("[rpc] Failed to start JSON-RPC server for coin "
+                        + CoinTickerUtils.tickerToString(getTicker())
+                        + " on ports " + describePorts(candidates)
+                        + "; RPC will be unavailable for this coin. State: "
+                        + coinRPCServer.lifecycleState());
+                rpcPort = -1;
+            } else {
+                recordBoundPort();
+            }
         }
 
         // Blocknet Network / XRouter not used (Dec 10)
@@ -573,6 +557,43 @@ public class CoinInstance {
 //		}
 
         return null;
+    }
+
+    /** Configured port, else BCF Port + 3. */
+    private void resolveRpcPort() {
+        int configured = configHelper.getRpcPort();
+        rpcPort = configured != ConfigHelper.UNSET_RPC_PORT
+                ? configured
+                : RpcPorts.xlitePort(
+                        CoinConfigRegistry.get(CoinTickerUtils.tickerToString(ticker)).port());
+    }
+
+    /** Persists the port that bound, so configs and GUI agree next start. */
+    private void recordBoundPort() {
+        int boundPort = coinRPCServer.port();
+        rpcPort = boundPort;
+        if (!configHelper.setRpcPort(boundPort)) {
+            LOGGER.warning("[coin] Bound port " + boundPort
+                    + " could not be recorded in " + configHelper.getFilePath());
+            return;
+        }
+        configHelper.writeConfig();
+    }
+
+    /** Candidate list for diagnostics: a range when contiguous, else a list. */
+    private static String describePorts(int[] ports) {
+        if (ports.length == 0) {
+            return "none";
+        }
+        if (ports.length == 1) {
+            return Integer.toString(ports[0]);
+        }
+        for (int i = 1; i < ports.length; i++) {
+            if (ports[i] != ports[i - 1] + 1) {
+                return Arrays.toString(ports);
+            }
+        }
+        return ports[0] + "-" + ports[ports.length - 1];
     }
 
     private CoinError loadMigratedParams() {
@@ -1052,7 +1073,7 @@ public class CoinInstance {
 
     public void reloadConfig() {
         this.configHelper.loadConfig();
-        rpcPort = configHelper.getRpcPort();
+        resolveRpcPort();
         if (configHelper.getAddressCount() != generatedAddressCount)
             generateForwardAddresses(false);
 
@@ -1075,16 +1096,16 @@ public class CoinInstance {
         LOGGER.finer("[rpc] Requesting start of JSON-RPC server for coin " + CoinTickerUtils.tickerToString(getTicker()) + " on port " + getRPCPort());
         coinRPCServer.start();
 
-        // Verify the rebind actually took — a silent bind failure used to
-        // leave the coin RPC dead while callers already got success. Budget
-        // exceeds the server's own 20x250ms retry window so a slow but
-        // successful late rebind cannot trip this alarm.
+        // Verify the rebind took; a silent bind failure left the coin dead.
         if (!coinRPCServer.awaitBound(10000)) {
             LOGGER.severe("[rpc] Failed to rebind JSON-RPC server for coin "
                     + CoinTickerUtils.tickerToString(getTicker())
                     + " on port " + getRPCPort() + " after reloadconfig"
                     + "; new-server state: "
                     + coinRPCServer.lifecycleState());
+            rpcPort = -1;
+        } else {
+            recordBoundPort();
         }
     }
 
@@ -1121,6 +1142,13 @@ public class CoinInstance {
 
     public int getRPCPort() {
         return rpcPort;
+    }
+
+    /** Ports this listener may bind, in order, excluding other coins' claims. */
+    public int[] getRpcCandidates() {
+        return RpcPorts.candidates(rpcPort, RpcPorts.WINDOW,
+                RpcPortClaims.excluding(CoinTickerUtils.tickerToString(ticker),
+                        JSONRPCController.getMasterPort()));
     }
 
     public String getRpcBindAddress() {

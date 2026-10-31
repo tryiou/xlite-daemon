@@ -30,7 +30,6 @@ public class ConsoleMenu {
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private String[] arguments;
     private BackgroundTimerThread backgroundTimerThread = null;
-    private boolean xliteRPC = false;
 
     public ConsoleMenu(String[] args) {
         this.arguments = args;
@@ -190,10 +189,6 @@ public class ConsoleMenu {
                         System.exit(0);
                     }
                     break; // unreachable (System.exit above); silences -Xlint:fallthrough.
-                    case "--xliterpc": {
-                        xliteRPC = true;
-                        break;
-                    }
                     case "--password": {
                         char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
                         try {
@@ -430,7 +425,7 @@ public class ConsoleMenu {
             LOGGER.info("[coin] Coin config self-healing repaired " + repaired + " coin(s): " + ensureReport);
         }
 
-        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, null, isMnemonic, xliteRPC);
+        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, null, isMnemonic);
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.severe(msg);
@@ -449,7 +444,7 @@ public class ConsoleMenu {
             }
         }
 
-        initializeCoinsConcurrently(otherCoins, password, null, isMnemonic, xliteRPC);
+        initializeCoinsConcurrently(otherCoins, password, null, isMnemonic);
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
@@ -472,7 +467,7 @@ public class ConsoleMenu {
     }
 
     private void initializeCoinsConcurrently(List<CoinTicker> coinTickers, char[] password,
-                                             String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
+                                             String userMnemonic, boolean isMnemonic) {
         if (coinTickers.isEmpty()) {
             return;
         }
@@ -497,7 +492,7 @@ public class ConsoleMenu {
                         try {
                             LOGGER.fine("[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
                             CoinInstance.CoinError coinError = CoinInstance.getInstance(coinTicker)
-                                    .init(password, userMnemonic, isMnemonic, xliteRPC);
+                                    .init(password, userMnemonic, isMnemonic);
                             if (coinError != null) {
                                 LOGGER.warning("[" + coinTicker.name() + "] Error(" +
                                         coinError.getCode().name() + "): " + coinError.getMessage());
@@ -550,7 +545,7 @@ public class ConsoleMenu {
             configHelper.setRpcEnabled(true);
             configHelper.writeConfig();
         }
-        ConfigHelper masterConf = new ConfigHelper("master");
+        ConfigHelper masterConf = new ConfigHelper(ConfigHelper.MASTER_TICKER);
         masterConf.setRpcUsername(generateRandomString(24));
         masterConf.setRpcPassword(generateRandomString(32));
         masterConf.setRpcEnabled(true);
@@ -612,7 +607,6 @@ public class ConsoleMenu {
                 "  --version                  Display the version\n" +
                 "  --createdefaultwallet     Create a default wallet\n" +
                 "  --createwalletmnemonic    Create a wallet with a mnemonic\n" +
-                "  --xliterpc                Increment RPC port by 1\n" +
                 "  --password                Set password without prompt\n" +
                 "                           Example: --password <your_password>\n" +
                 "  --getmnemonic             Retrieve mnemonic for a password\n" +

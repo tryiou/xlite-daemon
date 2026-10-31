@@ -34,7 +34,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private ConfigHelper configHelper;
 
     public HTTPServerHandler() {
-        configHelper = new ConfigHelper("master");
+        configHelper = new ConfigHelper(ConfigHelper.MASTER_TICKER);
 
         if (configHelper.getRpcUsername().isEmpty() && configHelper.getRpcPassword().isEmpty()) {
             configHelper.setRpcUsername(generateRandomString(12));

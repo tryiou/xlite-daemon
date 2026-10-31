@@ -47,6 +47,15 @@ public class ConfigHelper {
      */
     public static final String DEFAULT_RPC_BIND_ADDRESS = "127.0.0.1";
 
+    /** Config value meaning "no port recorded yet": the listener derives one. */
+    public static final int UNSET_RPC_PORT = -1000;
+
+    /** Ticker of the master listener's configuration, as on disk and in code. */
+    public static final String MASTER_TICKER = "master";
+
+    /** Port the master listener uses when its configuration carries none. */
+    public static final int DEFAULT_MASTER_PORT = 9955;
+
     // Override specific configuration directory (useful in unit tests)
     public static String CONFIG_DIR = ""; // Must not end with [/], e.g. /home/user/.config, not /home/user/.config/
 
@@ -159,7 +168,7 @@ public class ConfigHelper {
             } else {
                 rpcPort = config.getInt("rpcPort");
                 if (rpcPort == 0) {
-                    rpcPort = -1000;
+                    rpcPort = UNSET_RPC_PORT;
                     needsWrite = true;
                 }
             }
@@ -277,15 +286,8 @@ public class ConfigHelper {
             LOGGER.warning("[config] Invalid port " + rpcPort + ", must be 1-65535");
             return false;
         }
-        int maxAttempts = 100;
-        for (int i = 0; i < maxAttempts && rpcPort + i <= 65535; i++) {
-            if (PortCheck.available(rpcPort + i)) {
-                this.rpcPort = rpcPort + i;
-                return true;
-            }
-        }
-        LOGGER.warning("[config] No available port in range " + rpcPort + "-" + Math.min(rpcPort + maxAttempts - 1, 65535));
-        return false;
+        this.rpcPort = rpcPort;
+        return true;
     }
 
     public synchronized void setAddressCount(int addressCount) {
@@ -313,12 +315,12 @@ public class ConfigHelper {
     }
 
     private int defaultRpcPort() {
-        return this.tickerStr.equalsIgnoreCase("master") ? 9955 : -1000;
+        return this.tickerStr.equalsIgnoreCase(MASTER_TICKER) ? DEFAULT_MASTER_PORT : UNSET_RPC_PORT;
     }
 
     public synchronized int getMasterRpcPort() {
-        if (rpcPort == -1000) {
-            return 9955;
+        if (rpcPort == UNSET_RPC_PORT) {
+            return DEFAULT_MASTER_PORT;
         }
         return rpcPort;
     }
