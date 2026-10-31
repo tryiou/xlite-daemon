@@ -41,17 +41,17 @@ source ~/.jabba/jabba.sh && jabba use graalvm_community@21.0.2
 # Compile
 mvn compile -q
 
-# Run all tests
+# Run all tests plus every gate (Spotless, Checkstyle, Error Prone, SpotBugs)
 mvn test
 
 # OpenRewrite code cleanup (opt-in; NOT part of routine builds)
 mvn -Prewrite process-classes
 
 # Run a single test class
-mvn test -pl . -Dtest=KeyHandlerTest
+mvn test -Dtest=KeyHandlerTest
 
 # Run a single test method
-mvn test -pl . -Dtest=KeyHandlerTest#testGetBaseSeedRoundTrip
+mvn test -Dtest=KeyHandlerTest#testGetBaseSeedRoundTrip
 
 # Build shaded JAR
 mvn package -q
@@ -64,26 +64,40 @@ mvn package -Pnative -Pnative-fast -q
 
 ## Code Style
 
-### Imports
-
-- Group order: third-party libraries, then `java.*`, then `javax.*`
-- Wildcard imports are acceptable for large groups (e.g., `java.io.*`, `org.bitcoinj.core.*`)
-- No unused imports; OpenRewrite cleanup is opt-in via `mvn -Prewrite process-classes`
+The rules are enforced, not advised: `./mvnw test` fails on any violation.
 
 ### Formatting
 
-- 4-space indentation, no tabs
-- Opening braces on same line
-- Blank line between methods, between logical sections within methods
-- No trailing whitespace
+Owned entirely by Spotless (google-java-format, AOSP style): 4-space indent,
+100 columns, import order and grouping, no trailing whitespace, final newline.
+Do not hand-format; run `./mvnw spotless:apply` and review the result.
+
+Checkstyle deliberately does **not** duplicate layout rules (indentation,
+whitespace, import order, line length) — two tools answering the same question
+produced 15 000 conflicts. It enforces only what a formatter cannot see:
+braces, naming, banned imports, file shape, class structure.
+
+### Imports
+
+- No wildcard imports. Static JUnit/Mockito member imports are allowed.
+- No unused, redundant or `sun`/`com.sun` imports.
+
+### Structure
+
+- `private static final` for constants (Checkstyle `ModifierOrder`).
+- Braces on every control-flow body.
+- One top-level class per file, named after the file.
+- Utility classes are `final` with a private constructor.
+- Classes that are never extended are `final`; a constructor that validates and
+  throws must not be overridable.
 
 ### Logging
 
 Every class uses this logger pattern:
 
 ```java
-private final static LogManager LOGMANAGER = LogManager.getLogManager();
-private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+private static final LogManager LOGMANAGER = LogManager.getLogManager();
+private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 ```
 
 Log levels: `SEVERE` for critical failures, `WARNING` for recoverable errors,
@@ -96,10 +110,21 @@ Log messages use bracketed prefixes: `[security]`, `[discovery-BLOCK]`, `[wallet
 - Classes: `PascalCase`
 - Methods/variables: `camelCase`
 - Constants: `UPPER_SNAKE_CASE`
-- Test classes: `<ClassUnderTest>Test.java`
-- Test methods: `test<Behavior>` (e.g., `testGetBaseSeedRoundTrip`, `testDiscovery_FindsUsedAddresses`)
-- Tests use `@TestMethodOrder(OrderAnnotation.class)` + `@Order(n)` for sequencing
-- Use `static import org.junit.jupiter.api.Assertions.*` for assertions
+- Test classes: `<ClassUnderTest>Test.java`, in the package of the class under
+  test; shared fixtures live in `io.xlite.daemon.app.testing`
+- Test methods: `camelCase` behaviour sentences (`readsCommandLengthAndChecksum`);
+  older classes still use the `test<Behavior>` prefix
+
+### Static analysis
+
+- Error Prone runs on every compile. The Blocknet/XRouter packages are excluded
+  from its unused-code rules because that path is unfinished work in progress;
+  the exclusion and its removal condition are commented in `pom.xml`.
+- SpotBugs runs at maximum effort, Medium threshold, on every build. Anything it
+  cannot be told about mechanically belongs in
+  `config/spotbugs/spotbugs-exclude.xml` with a reason.
+- No `@SuppressWarnings` and no per-file suppressions: fix the code, or document
+  the design decision in the filter.
 
 ### Error Handling & Security
 
@@ -123,9 +148,9 @@ src/main/java/io/xlite/daemon/app/
   wallet/        WalletHelper
   App.java       Main entry point
 
-src/test/java/
-  KeyHandlerTest, CoinInstanceTest, ConfigHelperTest,
-  AddressDiscoveryServiceTest, TestHelper
+src/test/java/io/xlite/daemon/app/
+  AppTest, coinconfig/, net/, testing/, util/, wallet/
+  (shared fixtures in testing/TestHelper)
 ```
 
 ## Key Dependencies
@@ -157,10 +182,13 @@ Some older commits use `[category] description` style (e.g., `[security] Upgrade
   per build); it executes only under the `-Prewrite` profile and may auto-modify
   imports and formatting. Run it before releases or style sweeps, and always
   review `git diff` afterwards.
-- `ConfigHelper.CONFIG_DIR` is a mutable static used to override config path in tests.
+- `ConfigHelper.getConfigDir()`/`setConfigDir()` override the config root in tests.
 - Tests use `@TempDir` (JUnit 5 auto-cleanup); never run with parallel execution
-  due to mutable `ConfigHelper.CONFIG_DIR` static state.
+  due to the mutable config-root static in `ConfigHelper`.
 - Mockito requires ByteBuddy agent (configured in pom.xml surefire plugin).
 - App reads `.env` via java-dotenv (`App.getEnv()` wraps `Dotenv`).
 - Javadoc uses `<p>` tags and `{@code}` inline; section dividers use `// ===` / `// ---`.
 - The enforcer plugin requires Java 21 and Maven 3.8.6+.
+- `mvn` on this host prints French, so Checkstyle messages are in French.
+- `target/checkstyle-cachefile` caches by ruleset hash; delete it when comparing
+  two rulesets, or it replays the old findings.

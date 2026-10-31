@@ -1,168 +1,130 @@
-# Xlite Wallet Backend
+# XLite Daemon
 
-The Xlite Wallet Backend is a Java-based project that serves as the backend infrastructure for the Xlite wallet application. It is built using Java with JDK version 21 and utilizes Maven for build automation. The project incorporates the org.bitcoinj library version 0.14.7 for Bitcoin-related functionality.
+The wallet backend behind the XLite desktop and mobile GUIs. It runs one local
+JSON-RPC endpoint per supported coin and sources all chain data from a provider
+over HTTP — it does not run a full node.
 
-## Table of Contents
+Chain parameters are **not** compiled in: address prefixes, ports, fees, dust
+thresholds and the coin list are read at runtime from
+[blockchain-configuration-files](https://github.com/blocknetdx/blockchain-configuration-files).
+Adding a coin means adding a configuration there, not changing this code.
 
-- [Project Overview](#project-overview)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Maven Build Commands](#maven-build-commands)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-- [License](#license)
+## Requirements
 
-## Project Overview
+- JDK 21 (GraalVM CE for a native image)
+- Maven 3.8.6+ — the wrapper pins its own version, so `./mvnw` is enough
 
-Provide a brief description of the Xlite Wallet Backend project. Explain its purpose, key features, and how it fits into the overall Xlite wallet application architecture.
-
-## Prerequisites
-
-List the prerequisites required to set up and run the Xlite Wallet Backend. Include the following:
-
-- JDK 21: Install the Java Development Kit version 21 or a compatible version.
-- Maven 3.8.6 or higher: Install Apache Maven for build automation.
-
-## Getting Started
-
-Provide step-by-step instructions on how to set up and run the Xlite Wallet Backend locally. Include the following:
-
-1. Clone the repository:
+```bash
+# Only needed if you build outside the wrapper:
+source ~/.jabba/jabba.sh && jabba use graalvm_community@21.0.2
 ```
-git clone https://github.com/blocknetdx/xlite-daemon
-```
-2. Build the project:
-```
-cd xlite-daemon
 
-# Make Maven wrapper executable (mac/linux):
+## Build and test
+
+```bash
 chmod +x mvnw
 
-# Build native image:
-./mvnw clean package -Pnative
-
-# Or for faster build without tests:
-./mvnw clean package -Pnative-fast
+./mvnw test                    # gates + unit tests (see below)
+./mvnw package -DskipTests     # shaded JAR
+./mvnw package -Pnative       # native image at target/xlite-daemon
+./mvnw package -Pnative-fast  # native image, tests skipped
 ```
-3. Configuration: If any configuration files or settings need to be modified, provide instructions on how to set them up.
 
-4. Run the application:
+`./mvnw test` is the whole gate, because every check is bound to the build
+lifecycle:
+
+| check | phase | what it enforces |
+|---|---|---|
+| Spotless + google-java-format (AOSP) | `process-sources` | layout: 4-space indent, 100 columns, import order |
+| Checkstyle 14.4 | `validate` | semantics: braces, naming, import bans, file shape |
+| Error Prone 2.43 | `compile` | compiler-level bug patterns |
+| SpotBugs 4.9 | `process-classes` | bytecode-level bug patterns |
+| JUnit 5 | `test` | unit tests |
+
+SpotBugs runs at maximum effort and the Medium threshold. Its reviewed
+deviations live in `config/spotbugs/spotbugs-exclude.xml`, one entry per case
+with the reason. Checkstyle's rules and the reasoning behind every exclusion are
+in `config/checkstyle/checkstyle.xml`.
+
+To fix formatting rather than read a failure:
+
+```bash
+./mvnw spotless:apply
 ```
+
+## Running
+
+```bash
 ./target/xlite-daemon
 ```
 
-## Maven Build Commands
-
-### Basic Maven Operations
+or, from a JAR build:
 
 ```bash
-# Clean and compile
-mvn clean compile
-
-# Run tests
-mvn test
-
-# Package JAR (without native compilation)
-mvn package -DskipTests
-
-# Build native image
-mvn clean package -Pnative
-
-# Run application
-mvn exec:java
-
-# Skip tests for faster builds
-mvn clean package -Pnative-fast
+./mvnw exec:java
 ```
 
-### Profile-Specific Commands
+The process starts a console menu unless `WALLET_MNEMONIC` and
+`WALLET_PASSWORD` are set:
 
-- **native**: Full native image compilation with all optimizations
-- **native-fast**: Faster native compilation with reduced optimizations for development
-
-### Common Maven Goals
-
-- `mvn clean`: Remove build artifacts
-- `mvn compile`: Compile source code
-- `mvn test`: Run unit tests
-- `mvn package`: Package compiled code into distributable format
-- `mvn install`: Install package into local repository
-- `mvn dependency:tree`: Display dependency tree
-```
-## Usage
-
-Explain how to use the Xlite Wallet Backend. Provide information on available APIs, endpoints, or functionalities. Include any code snippets or examples to demonstrate usage patterns.
-
-https://docs.blocknet.org/xlite/access-coin-daemons-via-rpc/
-
-Runtime Environment Variables:
-```
-WALLET_MNEMONIC
-WALLET_PASSWORD
-```
-
-Supported RPC calls
-```
-Calls requiring XRouter calls: getblockhash, getblock, gettransaction, sendrawtransaction
-help - This command help.
-stop - Shutdown the server
-=====Blockchain=====
-gettxout <txid> <vout> - Get info about an unspent transaction output
-=====Network=====
-getinfo - Get information such as balances, protocol version, and more
-getnetworkinfo - Get network information
-getfees - Get fee per byte and minimum transaction fee for the current coin
-getrawmempool - Get raw mempool
-getblockchaininfo - Get blockchain info
-getblockhash <height> - Get the hash of a block at a given height
-getblock <hash> - Get a block's JSON representation given its hash
-=====Wallet=====
-listunspent - Get all UTXOs in the wallet
-getnewaddress - Generate a new address
-gettransaction <txid> - Get a transaction given its TXID
-getaddressesbyaccount <account> - Get addresses belonging to a given account. The only account available is 'main' which contains all addresses
-importprivkey <privkey> - Import an address given it's privkey
-dumpprivkey <address> - Dump an addresses private key
-=====Utilities=====
-signmessage <address> <message> - Sign a message with a given address' private key
-verifymessage <address> <signature> <message> - Verify a signature for a message signed by a given address
-=====Raw Transactions=====
-createrawtransaction <inputs> <outputs> - Create a raw transaction given inputs and outputs in JSON format. For more info, run createrawtransaction with no arguments.
-decoderawtransaction <rawtx> - Get a raw transaction's JSON representation
-signrawtransaction <rawtx> - Sign a raw transaction
-sendrawtransaction <rawtx> - Broadcast a signed raw transaction to the network
+```bash
+export WALLET_MNEMONIC="word1 word2 ... word12"
+export WALLET_PASSWORD="..."
 ```
 
 ## Configuration
 
-Describe any configuration options available for the Xlite Wallet Backend. Explain the purpose of each configuration file or setting and how to modify them as needed. Include instructions on any environment variables or external configurations required for proper functioning.
-
-one file per coin,
-xlite-daemon (Backend) Configuration Files:
+One configuration file per coin, plus one for the master endpoint:
 
 ```
-Windows
-%appdata%\xlite-daemon\settings\config-*.json
-
-MacOS
-~/Library/Application Support/xlite-daemon/settings/config-*.json
-
-Linux
-~/.config/xlite-daemon/settings/config-*.json
+Windows   %APPDATA%\xlite-daemon\settings\config-*.json
+macOS     ~/Library/Application Support/xlite-daemon/settings/config-*.json
+Linux     ~/.config/xlite-daemon/settings/config-*.json
 ```
 
-Set `XLITE_DATA_HOME` to override the platform directory above. The
-daemon aborts at startup when no override is set and the platform
-default is missing (Windows with unset `%AppData%`, or an empty
-`user.home`).
+Set `XLITE_DATA_HOME` to move that root. The daemon aborts at startup when no
+override is set and the platform default cannot be resolved (for example
+Windows with `%APPDATA%` unset).
 
-## Contributing
+Each coin's RPC credentials, bind address and port live in its own file; the
+daemon generates credentials on first run and never listens off loopback unless
+an operator configures it otherwise.
 
+## Data providers
 
-Explain how others can contribute to the Xlite Wallet Backend project. Describe the guidelines for submitting bug reports, feature requests, or code contributions. Include information on how to set up the development environment, coding conventions, and the contribution workflow.
+By default the daemon uses a hosted provider. Two environment variables or
+command-line flags change that:
+
+| setting | flag | environment |
+|---|---|---|
+| EXR endpoint pool (comma-separated) | `--exr-endpoint` | `EXR_ENDPOINT` |
+| Development upstream | `--development-endpoint` | `BASE_URL` |
+| Configuration source | `--blockchain-configuration-files` | `BLOCKCHAIN_CONFIGURATION_FILES` |
+
+EXR is a pool of provider servers. Capabilities are probed once, health is
+re-checked every 5 seconds, and a request is routed to a server that supports the
+coin. When EXR is configured there is no fallback to the development upstream: a
+coin no EXR server supports fails rather than silently using another path.
+
+## RPC surface
+
+Each coin endpoint speaks a Bitcoin-RPC-compatible subset. `help` lists it:
+
+```
+getinfo, getnetworkinfo, getfees, getblockchaininfo, getrawmempool
+getblockcount, getblockhash <height>, getblock <hash>
+listunspent, listtransactions, gettransaction <txid>
+getaddressesbyaccount <account>, getnewaddress
+importprivkey <privkey>, dumpprivkey <address>
+createrawtransaction, decoderawtransaction, signrawtransaction, sendrawtransaction
+gettxout <txid> <vout>
+signmessage <address> <message>, verifymessage <address> <signature> <message>
+stop
+```
+
+`getblockhash`, `getblock`, `gettransaction` and `sendrawtransaction` are served
+from provider data, the rest from the local wallet.
 
 ## License
 
-Specify the license under which the Xlite Wallet Backend project is released. Choose an appropriate license that suits your project's requirements. If you're not sure, consult with your team or a legal professional.
-
+MIT — see [LICENSE](LICENSE).

@@ -9,7 +9,16 @@
   <packaging>jar</packaging>
 
   <name>XLite Daemon</name>
+
   <description>XLite Daemon - Multi-cryptocurrency wallet daemon</description>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
   <url>https://github.com/blocknetdx/xlite-daemon</url>
 
   <!-- Properties -->

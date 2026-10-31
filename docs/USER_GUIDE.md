@@ -17,11 +17,13 @@
 The XLite Daemon is a multi-cryptocurrency wallet backend that provides secure wallet management, blockchain connectivity, and JSON-RPC API services for various cryptocurrencies. It serves as the backend infrastructure for the XLite wallet application.
 
 ### Key Features
-- **Multi-Currency Support**: Supports 10+ cryptocurrencies including Bitcoin, Litecoin, Dash, and more
+- **Multi-Currency Support**: every coin the configured
+  blockchain-configuration-files manifest lists, with no coin list compiled in
 - **Secure Wallet Management**: Industry-standard encryption with PBKDF2 key derivation
 - **Address Discovery**: Automatic detection of used addresses for wallet recovery
 - **JSON-RPC API**: Comprehensive API for wallet operations and blockchain queries
-- **XRouter Integration**: Support for cross-chain communication (Blocknet network)
+- **XRouter Integration**: cross-chain messaging over the Blocknet p2p network.
+  This path is present but disabled in the current build; see `AGENTS.md`
 - **Native Compilation**: Optimized native binary for better performance
 
 ## System Requirements
