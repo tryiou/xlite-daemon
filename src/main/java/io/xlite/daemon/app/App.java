@@ -219,10 +219,11 @@ public class App {
             System.exit(1);
         }
 
+        // Diagnostics to stderr, payloads and prompts to stdout.
         ConsoleHandler consoleHandler = new ConsoleHandler(){
             @Override
             protected synchronized void setOutputStream(OutputStream out) throws SecurityException {
-                super.setOutputStream(System.out);
+                super.setOutputStream(System.err);
             }
         };
         consoleHandler.setFormatter(new ConsoleFormatter());
