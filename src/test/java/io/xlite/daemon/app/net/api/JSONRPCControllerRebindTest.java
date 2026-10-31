@@ -49,14 +49,14 @@ public class JSONRPCControllerRebindTest {
 
     @BeforeAll
     static void isolateConfig() {
-        previousConfigDir = ConfigHelper.CONFIG_DIR;
-        ConfigHelper.CONFIG_DIR = tempConfigDir.toString();
+        previousConfigDir = ConfigHelper.getConfigDir();
+        ConfigHelper.setConfigDir(tempConfigDir.toString());
     }
 
     @AfterAll
     static void restoreConfig() {
         JSONRPCController.resetForTest();
-        ConfigHelper.CONFIG_DIR = previousConfigDir;
+        ConfigHelper.setConfigDir(previousConfigDir);
     }
 
     @Test

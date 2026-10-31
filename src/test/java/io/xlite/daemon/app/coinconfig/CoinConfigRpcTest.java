@@ -50,14 +50,14 @@ public class CoinConfigRpcTest {
 
     @BeforeEach
     void reset() {
-        savedConfigDir = ConfigHelper.CONFIG_DIR;
+        savedConfigDir = ConfigHelper.getConfigDir();
         CoinConfigRegistry.resetForTest();
     }
 
     @AfterEach
     void resetAfter() {
         CoinConfigRegistry.resetForTest();
-        ConfigHelper.CONFIG_DIR = savedConfigDir;
+        ConfigHelper.setConfigDir(savedConfigDir);
     }
 
     private JsonObject call(String method, JsonArray params) {
@@ -67,7 +67,7 @@ public class CoinConfigRpcTest {
 
     @Test
     public void testNotLoadedReturnsMinusOne(@TempDir Path tmp) {
-        ConfigHelper.CONFIG_DIR = tmp.toString();
+        ConfigHelper.setConfigDir(tmp.toString());
         JsonObject resp = call("getCoins", new JsonArray());
         assertEquals(-1, resp.getAsJsonObject("error").get("code").getAsInt());
         assertTrue(resp.get("result").isJsonNull());
@@ -75,7 +75,7 @@ public class CoinConfigRpcTest {
 
     @Test
     public void testReturnsFullDtoSorted(@TempDir Path tmp) {
-        ConfigHelper.CONFIG_DIR = tmp.toString();
+        ConfigHelper.setConfigDir(tmp.toString());
         CoinConfigRegistry.loadForTest(simpleCfgs());
         JsonObject resp = call("getCoins", new JsonArray());
         assertTrue(resp.get("error").isJsonNull());
@@ -130,7 +130,7 @@ public class CoinConfigRpcTest {
 
     @Test
     public void testAliasListCoinsDeepEquality(@TempDir Path tmp) {
-        ConfigHelper.CONFIG_DIR = tmp.toString();
+        ConfigHelper.setConfigDir(tmp.toString());
         CoinConfigRegistry.loadForTest(simpleCfgs());
         JsonArray a = call("listCoins", new JsonArray()).getAsJsonArray("result");
         JsonArray b = call("getCoins", new JsonArray()).getAsJsonArray("result");
@@ -139,7 +139,7 @@ public class CoinConfigRpcTest {
 
     @Test
     public void testCaseInsensitive(@TempDir Path tmp) {
-        ConfigHelper.CONFIG_DIR = tmp.toString();
+        ConfigHelper.setConfigDir(tmp.toString());
         CoinConfigRegistry.loadForTest(simpleCfgs());
         assertTrue(call("GETCOINS", new JsonArray()).get("error").isJsonNull());
         assertTrue(call("ListCoins", new JsonArray()).get("error").isJsonNull());
@@ -147,7 +147,7 @@ public class CoinConfigRpcTest {
 
     @Test
     public void testRejectsParams(@TempDir Path tmp) {
-        ConfigHelper.CONFIG_DIR = tmp.toString();
+        ConfigHelper.setConfigDir(tmp.toString());
         CoinConfigRegistry.loadForTest(simpleCfgs());
         JsonArray p = new JsonArray();
         p.add("extra");

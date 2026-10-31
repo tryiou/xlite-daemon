@@ -47,30 +47,30 @@ public class BlocknetSerializer extends BitcoinSerializer {
     private BlocknetParameters params;
     private boolean parseRetain;
 
-    private static final HashMap<Class<? extends Message>, String> messageNames = new HashMap<>();
+    private static final HashMap<Class<? extends Message>, String> MESSAGE_NAMES = new HashMap<>();
 
     static {
-        messageNames.put(VersionMessage.class, "version");
-        messageNames.put(VersionMessageImpl.class, "version");
-        messageNames.put(InventoryMessage.class, "inv");
-        messageNames.put(Block.class, "block");
-        messageNames.put(GetDataMessage.class, "getdata");
-        messageNames.put(Transaction.class, "tx");
-        messageNames.put(AddressMessage.class, "addr");
-        messageNames.put(Ping.class, "ping");
-        messageNames.put(Pong.class, "pong");
-        messageNames.put(VersionAck.class, "verack");
-        messageNames.put(GetBlocksMessage.class, "getblocks");
-        messageNames.put(GetHeadersMessage.class, "getheaders");
-        messageNames.put(GetAddrMessage.class, "getaddr");
-        messageNames.put(HeadersMessage.class, "headers");
-        messageNames.put(BloomFilter.class, "filterload");
-        messageNames.put(FilteredBlock.class, "merkleblock");
-        messageNames.put(NotFoundMessage.class, "notfound");
-        messageNames.put(MemoryPoolMessage.class, "mempool");
-        messageNames.put(RejectMessage.class, "reject");
-        messageNames.put(GetUTXOsMessage.class, "getutxos");
-        messageNames.put(UTXOsMessage.class, "utxos");
+        MESSAGE_NAMES.put(VersionMessage.class, "version");
+        MESSAGE_NAMES.put(VersionMessageImpl.class, "version");
+        MESSAGE_NAMES.put(InventoryMessage.class, "inv");
+        MESSAGE_NAMES.put(Block.class, "block");
+        MESSAGE_NAMES.put(GetDataMessage.class, "getdata");
+        MESSAGE_NAMES.put(Transaction.class, "tx");
+        MESSAGE_NAMES.put(AddressMessage.class, "addr");
+        MESSAGE_NAMES.put(Ping.class, "ping");
+        MESSAGE_NAMES.put(Pong.class, "pong");
+        MESSAGE_NAMES.put(VersionAck.class, "verack");
+        MESSAGE_NAMES.put(GetBlocksMessage.class, "getblocks");
+        MESSAGE_NAMES.put(GetHeadersMessage.class, "getheaders");
+        MESSAGE_NAMES.put(GetAddrMessage.class, "getaddr");
+        MESSAGE_NAMES.put(HeadersMessage.class, "headers");
+        MESSAGE_NAMES.put(BloomFilter.class, "filterload");
+        MESSAGE_NAMES.put(FilteredBlock.class, "merkleblock");
+        MESSAGE_NAMES.put(NotFoundMessage.class, "notfound");
+        MESSAGE_NAMES.put(MemoryPoolMessage.class, "mempool");
+        MESSAGE_NAMES.put(RejectMessage.class, "reject");
+        MESSAGE_NAMES.put(GetUTXOsMessage.class, "getutxos");
+        MESSAGE_NAMES.put(UTXOsMessage.class, "utxos");
     }
 
     public BlocknetSerializer(NetworkParameters params, boolean parseRetain) {
@@ -264,7 +264,7 @@ public class BlocknetSerializer extends BitcoinSerializer {
         if (message instanceof XRouterMessage) {
             params.getXRouterMessageSerializer(parseRetain).serialize(message, out);
         } else {
-            String name = messageNames.get(message.getClass());
+            String name = MESSAGE_NAMES.get(message.getClass());
             if (name == null) {
                 LOGGER.finer(
                         "[blocknet-serializer] ERROR: BlocknetSerializer cannot serialize "

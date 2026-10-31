@@ -24,7 +24,7 @@ public class Transaction {
     private int vout;
     private int confirmations;
     private int blocktime;
-    protected transient List<String> from_addresses;
+    protected transient List<String> fromAddresses;
     protected CoinTicker ticker;
 
     public Transaction(
@@ -36,7 +36,7 @@ public class Transaction {
             double value,
             int confirmations,
             int blocktime,
-            List<String> from_addresses) {
+            List<String> fromAddresses) {
         this.addressB58 = addressB58;
         this.txid = txid;
         this.blockhash = blockhash;
@@ -45,7 +45,7 @@ public class Transaction {
 
         this.confirmations = confirmations;
         this.blocktime = blocktime;
-        this.from_addresses = from_addresses;
+        this.fromAddresses = fromAddresses;
 
         this.ticker = ticker;
     }
@@ -95,7 +95,7 @@ public class Transaction {
     }
 
     public List<String> getFrom_addresses() {
-        return from_addresses;
+        return fromAddresses;
     }
 
     public String getCategory() {

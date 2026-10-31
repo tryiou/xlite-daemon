@@ -22,7 +22,7 @@ class CoinConfigSourceRemoteTest {
 
     private static final String BASE = "https://example.invalid/bcf";
 
-    private static class StubFetch implements java.util.function.Function<String, String> {
+    private static final class StubFetch implements java.util.function.Function<String, String> {
         final Map<String, String> bodies = new LinkedHashMap<>();
         final List<String> calls = new ArrayList<>();
 

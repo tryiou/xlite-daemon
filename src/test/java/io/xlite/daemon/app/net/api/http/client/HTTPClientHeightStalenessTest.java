@@ -47,7 +47,7 @@ class HTTPClientHeightStalenessTest {
         }
     }
 
-    private static class CollectingHandler extends Handler {
+    private static final class CollectingHandler extends Handler {
         final List<LogRecord> records = new ArrayList<>();
 
         @Override

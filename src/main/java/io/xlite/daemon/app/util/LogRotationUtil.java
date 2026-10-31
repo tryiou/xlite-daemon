@@ -11,7 +11,9 @@ import java.util.logging.Logger;
  * Utility class for log rotation management. Provides a simple interface to perform log cleanup
  * during application startup.
  */
-public class LogRotationUtil {
+public final class LogRotationUtil {
+    private LogRotationUtil() {}
+
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private static final int DEFAULT_LOG_RETENTION_DAYS = 30;

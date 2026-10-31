@@ -57,9 +57,23 @@ public class ConfigHelper {
     /** Port the master listener uses when its configuration carries none. */
     public static final int DEFAULT_MASTER_PORT = 9955;
 
-    // Override specific configuration directory (useful in unit tests)
-    public static String CONFIG_DIR =
-            ""; // Must not end with [/], e.g. /home/user/.config, not /home/user/.config/
+    /**
+     * Overrides the platform configuration root. Empty means "use the platform default"; it must
+     * not end with a separator. Mutable static because the daemon resolves it once at startup and
+     * the test harness redirects it per class; access it through the accessors so the resolution
+     * rule stays in one place.
+     */
+    private static String configDir = "";
+
+    /** The configuration root in force, or the empty string for the platform default. */
+    public static String getConfigDir() {
+        return configDir;
+    }
+
+    /** Redirects the configuration root. Empty restores the platform default. */
+    public static void setConfigDir(String dir) {
+        configDir = dir;
+    }
 
     // Data directory names under the platform config root.
     public static final String DATA_DIR_NAME = "xlite-daemon";
@@ -446,10 +460,10 @@ public class ConfigHelper {
 
     public static String getLocalDataDirectory() {
         String baseDir;
-        if (CONFIG_DIR == null || CONFIG_DIR.isEmpty()) {
+        if (configDir == null || configDir.isEmpty()) {
             baseDir = App.getUserConfigDir();
         } else {
-            baseDir = CONFIG_DIR;
+            baseDir = configDir;
         }
         // Fail fast on a null/blank base (e.g. missing Windows AppData)
         // instead of stringifying to a bogus "null/xlite-daemon/" dir.

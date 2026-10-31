@@ -34,13 +34,13 @@ class AppTest {
      */
     @BeforeAll
     static void isolateConfigDir() {
-        savedConfigDir = ConfigHelper.CONFIG_DIR;
-        ConfigHelper.CONFIG_DIR = sandbox.toString();
+        savedConfigDir = ConfigHelper.getConfigDir();
+        ConfigHelper.setConfigDir(sandbox.toString());
     }
 
     @AfterAll
     static void restoreConfigDir() {
-        ConfigHelper.CONFIG_DIR = savedConfigDir;
+        ConfigHelper.setConfigDir(savedConfigDir);
     }
 
     @Test

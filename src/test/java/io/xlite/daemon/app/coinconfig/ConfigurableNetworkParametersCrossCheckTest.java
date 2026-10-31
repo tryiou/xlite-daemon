@@ -90,8 +90,8 @@ class ConfigurableNetworkParametersCrossCheckTest {
         CompiledCoinSupplement.Supplement s = CompiledCoinSupplement.forTicker(cfg.getTicker());
         ConfigurableNetworkParameters p = ConfigurableNetworkParameters.from(cfg);
 
-        assertEquals(s.id, p.getId(), "network id from the supplement");
-        assertEquals(s.chainName, p.getPaymentProtocolId(), "payment protocol id");
+        assertEquals(s.id(), p.getId(), "network id from the supplement");
+        assertEquals(s.chainName(), p.getPaymentProtocolId(), "payment protocol id");
         // Wallet creation rejects the unit-test network id, so a supplement row
         // carrying it would let a coin start against a throwaway network.
         assertNotEquals(
@@ -99,7 +99,7 @@ class ConfigurableNetworkParametersCrossCheckTest {
                 p.getId(),
                 "a coin must not report the unit-test network id");
         assertEquals(
-                s.protocolVersion,
+                s.protocolVersion(),
                 p.getProtocolVersionNum(NetworkParameters.ProtocolVersion.CURRENT),
                 "protocol version");
         assertNotNull(p.getSerializer(false), "serializer");

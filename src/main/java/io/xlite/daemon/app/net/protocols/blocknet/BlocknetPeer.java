@@ -118,7 +118,7 @@ public class BlocknetPeer extends PeerSocketHandler {
         final Sha256Hash hash;
         final SettableFuture future;
 
-        public GetDataRequest(Sha256Hash hash, SettableFuture future) {
+        GetDataRequest(Sha256Hash hash, SettableFuture future) {
             this.hash = hash;
             this.future = future;
         }
@@ -127,7 +127,9 @@ public class BlocknetPeer extends PeerSocketHandler {
     private final CopyOnWriteArrayList<GetDataRequest> getDataFutures =
             new CopyOnWriteArrayList<>();
 
-    @GuardedBy("lock") private Sha256Hash lastGetBlocksBegin, lastGetBlocksEnd;
+    @GuardedBy("lock") private Sha256Hash lastGetBlocksBegin;
+
+    @GuardedBy("lock") private Sha256Hash lastGetBlocksEnd;
 
     private final CopyOnWriteArrayList<Ping> pendingPings = new CopyOnWriteArrayList<>();
     private VersionMessage peerVersionMessage = null;
@@ -172,7 +174,7 @@ public class BlocknetPeer extends PeerSocketHandler {
 
     @GuardedBy("lock") @Nullable private List<Sha256Hash> awaitingFreshFilter;
 
-    private static final int minProtocolVersion = 70712;
+    private static final int MIN_PROTOCOL_VERSION = 70712;
 
     private AtomicReference<byte[]> largeReadBuffer = new AtomicReference<>();
     private AtomicInteger largeReadBufferPos = new AtomicInteger();
@@ -498,12 +500,12 @@ public class BlocknetPeer extends PeerSocketHandler {
                     () -> registration.listener.onPeerConnected(BlocknetPeer.this, 1));
         }
 
-        if (peerVersionMessage.clientVersion < minProtocolVersion) {
+        if (peerVersionMessage.clientVersion < MIN_PROTOCOL_VERSION) {
             LOGGER.finer(
                     "[blocknet-peer] Peer's protocol version ("
                             + peerVersionMessage.clientVersion
                             + ") is lower than the minimum ("
-                            + minProtocolVersion
+                            + MIN_PROTOCOL_VERSION
                             + ")! Disconnecting.");
             close();
         }

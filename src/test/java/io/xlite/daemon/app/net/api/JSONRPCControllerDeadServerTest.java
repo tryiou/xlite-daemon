@@ -32,13 +32,13 @@ public class JSONRPCControllerDeadServerTest {
 
     @BeforeAll
     static void isolateConfig() {
-        previousConfigDir = io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR;
-        io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR = tempConfigDir.toString();
+        previousConfigDir = io.xlite.daemon.app.util.ConfigHelper.getConfigDir();
+        io.xlite.daemon.app.util.ConfigHelper.setConfigDir(tempConfigDir.toString());
     }
 
     @AfterAll
     static void restoreConfig() {
-        io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR = previousConfigDir;
+        io.xlite.daemon.app.util.ConfigHelper.setConfigDir(previousConfigDir);
     }
 
     private static int freePort() throws Exception {

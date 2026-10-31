@@ -1,3 +1,5 @@
+package io.xlite.daemon.app.testing;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.xlite.daemon.app.util.ConfigHelper;
@@ -212,9 +214,9 @@ class ConfigHelperTest extends TestHelper {
     @Test
     void testMigration_movesLegacyCloudChainsToXliteDaemon(@TempDir Path tmp) throws IOException {
         // Arrange: create legacy CloudChains directory with a settings file
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
-            ConfigHelper.CONFIG_DIR = tmp.toString();
+            ConfigHelper.setConfigDir(tmp.toString());
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
             org.junit.jupiter.api.Assertions.assertFalse(
@@ -240,7 +242,7 @@ class ConfigHelperTest extends TestHelper {
             org.junit.jupiter.api.Assertions.assertFalse(
                     Files.exists(oldDir), "old CloudChains dir must be moved (not remain)");
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
             // Cleanup temp-data dirs created via CONFIG_DIR override so commonCleanup().deleteDir
             // on the default "." path still succeeds; remove any leftover tmp subdirs eagerly.
             // JUnit @TempDir will delete tmp itself, but ensure CONFIG_DIR restored.
@@ -249,9 +251,9 @@ class ConfigHelperTest extends TestHelper {
 
     @Test
     void testMigration_doesNotOverwriteExistingNewDir(@TempDir Path tmp) throws IOException {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
-            ConfigHelper.CONFIG_DIR = tmp.toString();
+            ConfigHelper.setConfigDir(tmp.toString());
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
             Files.createDirectories(oldDir.resolve("settings"));
@@ -279,15 +281,15 @@ class ConfigHelperTest extends TestHelper {
                     Files.exists(tmp.resolve("CloudChains.bak")),
                     "legacy dir must be preserved as backup");
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 
     @Test
     void testMigration_resumesPartialNewDir(@TempDir Path tmp) throws IOException {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
-            ConfigHelper.CONFIG_DIR = tmp.toString();
+            ConfigHelper.setConfigDir(tmp.toString());
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
             Files.createDirectories(oldDir.resolve("settings"));
@@ -314,15 +316,15 @@ class ConfigHelperTest extends TestHelper {
             org.junit.jupiter.api.Assertions.assertFalse(
                     Files.exists(oldDir), "legacy dir must be archived after resume");
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 
     @Test
     void testMigration_conflictingFilesThrowFailClosed(@TempDir Path tmp) throws IOException {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
-            ConfigHelper.CONFIG_DIR = tmp.toString();
+            ConfigHelper.setConfigDir(tmp.toString());
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
             Files.createDirectories(oldDir.resolve("settings"));
@@ -346,46 +348,46 @@ class ConfigHelperTest extends TestHelper {
                     Files.exists(newDir.resolve("settings").resolve("config-d.json")),
                     "refusal must leave the live dir untouched");
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 
     @Test
     void testMigration_uncreatableDataDirThrowsFailClosed(@TempDir Path tmp) throws IOException {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
             // Base is a regular file: no directory can ever be created beneath it.
             Path blocker = tmp.resolve("blocker");
             Files.write(blocker, "x".getBytes(StandardCharsets.UTF_8));
-            ConfigHelper.CONFIG_DIR = blocker.toString();
+            ConfigHelper.setConfigDir(blocker.toString());
 
             // Must fail loudly, never return a bogus path and boot empty.
             assertThrows(IllegalStateException.class, ConfigHelper::getLocalDataDirectory);
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 
     @Test
     void testMigration_blankBaseDirThrowsFailClosed(@TempDir Path tmp) {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
             // Whitespace-only override must fail fast. (A null CONFIG_DIR is
             // treated exactly like the default empty string and resolves via
             // App.getUserConfigDir, so it cannot be asserted hermetically.)
-            ConfigHelper.CONFIG_DIR = "   ";
+            ConfigHelper.setConfigDir("   ");
 
             assertThrows(IllegalStateException.class, ConfigHelper::getLocalDataDirectory);
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 
     @Test
     void testMigration_existingBackupRefusesToBoot(@TempDir Path tmp) throws IOException {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
-            ConfigHelper.CONFIG_DIR = tmp.toString();
+            ConfigHelper.setConfigDir(tmp.toString());
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
             Files.createDirectories(oldDir.resolve("settings"));
@@ -408,15 +410,15 @@ class ConfigHelperTest extends TestHelper {
                     Files.exists(newDir.resolve("settings").resolve("config-old.json")),
                     "refusal must leave the live dir untouched");
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 
     @Test
     void testMigration_stagingLeftoverIsRedone(@TempDir Path tmp) throws IOException {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
-            ConfigHelper.CONFIG_DIR = tmp.toString();
+            ConfigHelper.setConfigDir(tmp.toString());
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
             Path staging = tmp.resolve("xlite-daemon.migrating");
@@ -441,15 +443,15 @@ class ConfigHelperTest extends TestHelper {
             org.junit.jupiter.api.Assertions.assertFalse(
                     Files.exists(oldDir), "legacy dir must be archived after redo");
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 
     @Test
     void testSettingsAsFileFailsClosed(@TempDir Path tmp) throws IOException {
-        String originalConfigDir = ConfigHelper.CONFIG_DIR;
+        String originalConfigDir = ConfigHelper.getConfigDir();
         try {
-            ConfigHelper.CONFIG_DIR = tmp.toString();
+            ConfigHelper.setConfigDir(tmp.toString());
             // Poison the settings path with a regular file: every config
             // write below it would fail, so construction must refuse.
             Path dataDir = tmp.resolve("xlite-daemon");
@@ -462,7 +464,7 @@ class ConfigHelperTest extends TestHelper {
                     e.getMessage().contains("data directory unusable"),
                     "message must name the failure, got: " + e.getMessage());
         } finally {
-            ConfigHelper.CONFIG_DIR = originalConfigDir;
+            ConfigHelper.setConfigDir(originalConfigDir);
         }
     }
 }

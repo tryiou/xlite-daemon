@@ -5,7 +5,9 @@ import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.SegwitAddress;
 
-public class Utility {
+public final class Utility {
+    private Utility() {}
+
     public static boolean isValidAddress(NetworkParameters params, String address) {
         if (address == null || address.isEmpty()) {
             return false;

@@ -255,7 +255,10 @@ public class KeyHandler {
         }
 
         int score = password.length >= 10 ? 2 : 1;
-        boolean hasDigit = false, hasLower = false, hasUpper = false, hasSpecial = false;
+        boolean hasDigit = false;
+        boolean hasLower = false;
+        boolean hasUpper = false;
+        boolean hasSpecial = false;
 
         for (char c : password) {
             if (Character.isDigit(c)) {
@@ -417,7 +420,9 @@ public class KeyHandler {
             String firstLine = reader.readLine();
             int version = detectWalletVersion(firstLine);
 
-            String saltB64, ivB64 = null, encB64;
+            String saltB64;
+            String ivB64 = null;
+            String encB64;
             if (version == VERSION_2_SHA256) {
                 saltB64 = reader.readLine();
                 ivB64 = reader.readLine();

@@ -18,7 +18,7 @@ import java.util.logging.LogRecord;
 public class FileFormatter extends Formatter {
 
     private static final String LINE_SEPARATOR = System.getProperty("line.separator");
-    private static final SimpleDateFormat dateFormat =
+    private static final SimpleDateFormat DATE_FORMAT =
             new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
 
     @Override
@@ -26,7 +26,7 @@ public class FileFormatter extends Formatter {
         StringBuilder sb = new StringBuilder();
 
         // Format timestamp
-        sb.append(dateFormat.format(new Date(record.getMillis())));
+        sb.append(DATE_FORMAT.format(new Date(record.getMillis())));
         sb.append(" ");
 
         // Format class and method information

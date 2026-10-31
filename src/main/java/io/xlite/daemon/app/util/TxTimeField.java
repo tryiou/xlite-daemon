@@ -79,7 +79,7 @@ public final class TxTimeField {
      */
     public static boolean requiresParentNTime(CoinTicker ticker) {
         return CompiledCoinSupplement.forTicker(CoinTickerUtils.tickerToString(ticker))
-                .requiresParentNTime;
+                .requiresParentNTime();
     }
 
     /**

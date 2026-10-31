@@ -57,6 +57,7 @@ public class JSONRPCServerPortGateTest {
                                     Thread.sleep(250);
                                     holder.close();
                                 } catch (Exception ignored) {
+                                    // The holder is closed either way; nothing to report.
                                 }
                             })
                     .start();

@@ -10,23 +10,25 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-public class JSONRPCController {
+public final class JSONRPCController {
+    private JSONRPCController() {}
+
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-    private static final ConcurrentHashMap<CoinInstance, JSONRPCServer> servers =
+    private static final ConcurrentHashMap<CoinInstance, JSONRPCServer> SERVERS =
             new ConcurrentHashMap<>();
     // Per-coin serialization of every map access: retire→create happens
     // under the coin's lock, and plain lookups take it too, so no consumer
     // can observe a mid-retirement server. Per-coin (not global) scope:
     // a rebinding coin must not stall unrelated coins' event loops behind
     // its multi-second release-wait.
-    private static final ConcurrentHashMap<CoinInstance, ReentrantLock> locks =
+    private static final ConcurrentHashMap<CoinInstance, ReentrantLock> LOCKS =
             new ConcurrentHashMap<>();
-    private static final ConfigHelper masterConfig = new ConfigHelper(ConfigHelper.MASTER_TICKER);
+    private static final ConfigHelper MASTER_CONFIG = new ConfigHelper(ConfigHelper.MASTER_TICKER);
     private static JSONRPCMasterServer masterServer =
             new JSONRPCMasterServer(
-                    masterConfig.getMasterRpcPort(), masterConfig.getRpcBindAddress());
+                    MASTER_CONFIG.getMasterRpcPort(), MASTER_CONFIG.getRpcBindAddress());
 
     public static JSONRPCMasterServer getMasterServer() {
         return masterServer;
@@ -34,7 +36,7 @@ public class JSONRPCController {
 
     /** The port the master listener is configured to bind. */
     public static int getMasterPort() {
-        return masterConfig.getMasterRpcPort();
+        return MASTER_CONFIG.getMasterRpcPort();
     }
 
     /**
@@ -42,8 +44,8 @@ public class JSONRPCController {
      * for the process lifetime.
      */
     static void resetForTest() {
-        servers.clear();
-        locks.clear();
+        SERVERS.clear();
+        LOCKS.clear();
     }
 
     /**
@@ -96,18 +98,18 @@ public class JSONRPCController {
     }
 
     private static ReentrantLock lockFor(CoinInstance coinInstance) {
-        return locks.computeIfAbsent(coinInstance, coin -> new ReentrantLock());
+        return LOCKS.computeIfAbsent(coinInstance, coin -> new ReentrantLock());
     }
 
     private static JSONRPCServer getOrCreateLocked(CoinInstance coinInstance) {
-        JSONRPCServer existing = servers.get(coinInstance);
+        JSONRPCServer existing = SERVERS.get(coinInstance);
         // A server thread cannot be restarted once it has terminated. A bind
         // failure or a previous deinit leaves such an instance in the map, so
         // replace it instead of handing a dead thread to start().
         if (existing != null
                 && !existing.isAlive()
                 && existing.getState() == Thread.State.TERMINATED) {
-            servers.remove(coinInstance);
+            SERVERS.remove(coinInstance);
             existing = null;
         }
         if (existing != null) {
@@ -119,12 +121,12 @@ public class JSONRPCController {
                         coinInstance.getRPCPort(),
                         coinInstance.getRpcBindAddress(),
                         coinInstance.getRpcCandidates());
-        servers.put(coinInstance, created);
+        SERVERS.put(coinInstance, created);
         return created;
     }
 
     private static void removeLocked(CoinInstance coinInstance) {
-        JSONRPCServer server = servers.get(coinInstance);
+        JSONRPCServer server = SERVERS.get(coinInstance);
         if (server == null) {
             return;
         }
@@ -163,6 +165,6 @@ public class JSONRPCController {
         }
         LOGGER.info("[rpc] rebind: after release-wait " + server.lifecycleState());
 
-        servers.remove(coinInstance);
+        SERVERS.remove(coinInstance);
     }
 }

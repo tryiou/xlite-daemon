@@ -18,17 +18,17 @@ public final class CompiledCoinSupplement {
 
     /** A coin's non-bcf-carried constants. */
     public static final class Supplement {
-        public final long maxMoneyCoins;
-        public final int protocolVersion;
-        public final String id;
-        public final String chainName;
+        private final long maxMoneyCoins;
+        private final int protocolVersion;
+        private final String id;
+        private final String chainName;
 
         /**
          * Whether spending an output requires the spending transaction's nTime to be at least every
          * input parent's nTime. BCF's {@code TxWithTimeField} covers only the field's presence, so
          * the input-time rule is recorded here, from the chain's own source.
          */
-        public final boolean requiresParentNTime;
+        private final boolean requiresParentNTime;
 
         public Supplement(long maxMoneyCoins, int protocolVersion, String id, String chainName) {
             this(maxMoneyCoins, protocolVersion, id, chainName, false);
@@ -45,6 +45,26 @@ public final class CompiledCoinSupplement {
             this.id = id;
             this.chainName = chainName;
             this.requiresParentNTime = requiresParentNTime;
+        }
+
+        public long maxMoneyCoins() {
+            return maxMoneyCoins;
+        }
+
+        public int protocolVersion() {
+            return protocolVersion;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public String chainName() {
+            return chainName;
+        }
+
+        public boolean requiresParentNTime() {
+            return requiresParentNTime;
         }
     }
 
@@ -86,7 +106,7 @@ public final class CompiledCoinSupplement {
      * class on that thread. The reset in {@code CoinInstanceDivisorTest}'s {@code @AfterEach} is
      * what clears it. Nothing in the daemon sets it.
      */
-    private static final ThreadLocal<Map<String, Supplement>> testOverrides =
+    private static final ThreadLocal<Map<String, Supplement>> TEST_OVERRIDES =
             ThreadLocal.withInitial(Map::of);
 
     /**
@@ -95,12 +115,12 @@ public final class CompiledCoinSupplement {
      * @param overrides ticker to supplement; replaces the compiled entry
      */
     public static void loadSupplementsForTest(Map<String, Supplement> overrides) {
-        testOverrides.set(Map.copyOf(overrides));
+        TEST_OVERRIDES.set(Map.copyOf(overrides));
     }
 
     /** Visible for tests only. */
     public static void resetSupplementsForTest() {
-        testOverrides.remove();
+        TEST_OVERRIDES.remove();
     }
 
     /**
@@ -108,7 +128,7 @@ public final class CompiledCoinSupplement {
      * @throws IllegalArgumentException for tickers with no compiled entry
      */
     public static Supplement forTicker(String ticker) {
-        Supplement s = testOverrides.get().getOrDefault(ticker, BY_TICKER.get(ticker));
+        Supplement s = TEST_OVERRIDES.get().getOrDefault(ticker, BY_TICKER.get(ticker));
         if (s == null) {
             throw new IllegalArgumentException(
                     "no compiled supplement for ticker '"
@@ -119,7 +139,7 @@ public final class CompiledCoinSupplement {
     }
 
     public static boolean supports(String ticker) {
-        return testOverrides.get().containsKey(ticker) || BY_TICKER.containsKey(ticker);
+        return TEST_OVERRIDES.get().containsKey(ticker) || BY_TICKER.containsKey(ticker);
     }
 
     private CompiledCoinSupplement() {}

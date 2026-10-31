@@ -92,12 +92,12 @@ public class ConsoleMenu {
                                     LOGGER.warning("Invalid endpoint: " + customEndpoint);
                                     break;
                                 }
-                                App.BASE_URL = customEndpoint;
+                                App.setBaseUrl(customEndpoint);
                                 i++;
                             } else {
                                 String envEndpoint = App.getEnv("BASE_URL");
                                 if (envEndpoint != null && !envEndpoint.isEmpty()) {
-                                    App.BASE_URL = envEndpoint;
+                                    App.setBaseUrl(envEndpoint);
                                 } else {
                                     LOGGER.warning(
                                             "Missing custom endpoint after"
@@ -114,25 +114,25 @@ public class ConsoleMenu {
                                     LOGGER.warning("Invalid endpoint: " + exrEndpoint);
                                     break;
                                 }
-                                App.EXR_ENDPOINT = exrEndpoint;
-                                App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
+                                App.setExrEndpoint(exrEndpoint);
+                                App.setExrServerPool(new EXRServerPool(App.getExrEndpoint()));
                                 LOGGER.info(
                                         "[console] EXR mode enabled with "
-                                                + App.exrServerPool.getServerCount()
+                                                + App.getExrServerPool().getServerCount()
                                                 + " servers: "
-                                                + App.EXR_ENDPOINT);
+                                                + App.getExrEndpoint());
                                 spawnExrCapabilityProbe();
                                 i++;
                             } else {
                                 String envExrEndpoint = App.getEnv("EXR_ENDPOINT");
                                 if (envExrEndpoint != null && !envExrEndpoint.isEmpty()) {
-                                    App.EXR_ENDPOINT = envExrEndpoint;
-                                    App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
+                                    App.setExrEndpoint(envExrEndpoint);
+                                    App.setExrServerPool(new EXRServerPool(App.getExrEndpoint()));
                                     LOGGER.info(
                                             "[console] EXR mode enabled with "
-                                                    + App.exrServerPool.getServerCount()
+                                                    + App.getExrServerPool().getServerCount()
                                                     + " servers: "
-                                                    + App.EXR_ENDPOINT);
+                                                    + App.getExrEndpoint());
                                     spawnExrCapabilityProbe();
                                 } else {
                                     LOGGER.warning("Missing EXR endpoint after '--exr-endpoint'");
@@ -330,6 +330,9 @@ public class ConsoleMenu {
                         displayHelp();
                         System.exit(0);
                         break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                    default:
+                        LOGGER.warning("Unrecognized argument: " + argument);
+                        break;
                 }
             }
         }
@@ -525,7 +528,7 @@ public class ConsoleMenu {
         long totalTime = endTime - startTime;
         LOGGER.info("[coin] Concurrent coins initialization completed in " + totalTime + " ms");
 
-        App.masterRPC.start();
+        App.getMasterRpc().start();
         backgroundTimerThread = new BackgroundTimerThread();
         // Sole deliberate non-daemon anchor: this named thread is what
         // keeps the JVM alive while the wallet runs. Every long-lived
@@ -535,8 +538,8 @@ public class ConsoleMenu {
         // this anchor on shutdown.
         Thread timerAnchor = new Thread(backgroundTimerThread, "background-timer-anchor");
         timerAnchor.start();
-        if (App.exrServerPool != null) {
-            App.exrServerPool.probeAllCapabilities();
+        if (App.getExrServerPool() != null) {
+            App.getExrServerPool().probeAllCapabilities();
         }
     }
 
@@ -633,7 +636,7 @@ public class ConsoleMenu {
                         () -> {
                             try {
                                 Thread.sleep(1000);
-                                App.exrServerPool.probeAllCapabilities();
+                                App.getExrServerPool().probeAllCapabilities();
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             }

@@ -93,7 +93,7 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 
     @Override
     public String getPaymentProtocolId() {
-        return supplement().chainName;
+        return supplement().chainName();
     }
 
     @Override
@@ -127,12 +127,12 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
-        return supplement().protocolVersion;
+        return supplement().protocolVersion();
     }
 
     @Override
     public String getId() {
-        return supplement().id;
+        return supplement().id();
     }
 
     /**

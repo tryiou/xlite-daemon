@@ -193,7 +193,7 @@ public class HTTPClient {
             return false;
         }
 
-        if (App.exrServerPool.isCapabilitiesProbed()) {
+        if (App.getExrServerPool().isCapabilitiesProbed()) {
             return true;
         }
 
@@ -203,7 +203,7 @@ public class HTTPClient {
                         + "ms)");
 
         int waitTime = 0;
-        while (!App.exrServerPool.isCapabilitiesProbed() && waitTime < timeoutMs) {
+        while (!App.getExrServerPool().isCapabilitiesProbed() && waitTime < timeoutMs) {
             try {
                 Thread.sleep(HttpClientConfig.CAPABILITY_PROBE_WAIT_INTERVAL_MS);
                 waitTime += HttpClientConfig.CAPABILITY_PROBE_WAIT_INTERVAL_MS;
@@ -214,7 +214,7 @@ public class HTTPClient {
             }
         }
 
-        boolean probed = App.exrServerPool.isCapabilitiesProbed();
+        boolean probed = App.getExrServerPool().isCapabilitiesProbed();
         LOGGER.fine(
                 "[httpclient] EXR capabilities "
                         + (probed ? "probed successfully" : "still not probed")
@@ -231,7 +231,7 @@ public class HTTPClient {
      * @return true if EXR pool is configured, false otherwise
      */
     boolean useEXR() {
-        return App.exrServerPool != null && App.exrServerPool.getServerCount() > 0;
+        return App.getExrServerPool() != null && App.getExrServerPool().getServerCount() > 0;
     }
 
     /**
@@ -251,7 +251,7 @@ public class HTTPClient {
      * @return EXRServer instance or null if no servers available
      */
     private EXRServer getEXRServer() {
-        return useEXR() ? App.exrServerPool.selectServer() : null;
+        return useEXR() ? App.getExrServerPool().selectServer() : null;
     }
 
     /**
@@ -297,7 +297,7 @@ public class HTTPClient {
      * @return Response string or null on error
      */
     private String executeGetRequest(String endpoint) {
-        HttpGet httpGet = new HttpGet(App.BASE_URL + endpoint);
+        HttpGet httpGet = new HttpGet(App.getBaseUrl() + endpoint);
         return HttpUtils.executeHttpRequest(client, httpGet, "GET " + endpoint);
     }
 
@@ -310,7 +310,7 @@ public class HTTPClient {
      */
     private String executePostRequest(String endpoint, JsonObject params) {
         HttpPost httpPost = new HttpPost();
-        httpPost.setURI(URI.create(App.BASE_URL + endpoint));
+        httpPost.setURI(URI.create(App.getBaseUrl() + endpoint));
         try {
             httpPost.setEntity(new StringEntity(params.toString()));
         } catch (UnsupportedEncodingException e) {
@@ -398,7 +398,7 @@ public class HTTPClient {
         JsonObject aggregatedResult = new JsonObject();
         JsonArray aggregatedErrors = new JsonArray();
 
-        for (EXRServer server : App.exrServerPool.getServers()) {
+        for (EXRServer server : App.getExrServerPool().getServers()) {
             if (!server.isHealthy()) {
                 continue;
             }
@@ -478,7 +478,7 @@ public class HTTPClient {
             return null; // FAIL instead of using wrong server
         }
 
-        if (!App.exrServerPool.isCapabilitiesProbed()
+        if (!App.getExrServerPool().isCapabilitiesProbed()
                 && !waitForCapabilities(HttpClientConfig.CAPABILITY_PROBE_WAIT_TIMEOUT_MS)) {
             LOGGER.warning(
                     "[httpclient] EXR capabilities not probed yet for coin: "
@@ -486,7 +486,7 @@ public class HTTPClient {
             return null; // FAIL - NO FALLBACK TO BASE_URL
         }
 
-        EXRServer server = App.exrServerPool.selectServerForCoin(coin);
+        EXRServer server = App.getExrServerPool().selectServerForCoin(coin);
         if (server == null) {
             LOGGER.warning(
                     "[httpclient] NO EXR SERVER SUPPORTS COIN: "

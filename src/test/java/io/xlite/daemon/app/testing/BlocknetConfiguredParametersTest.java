@@ -1,3 +1,5 @@
+package io.xlite.daemon.app.testing;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.xlite.daemon.app.coinconfig.CoinConfig;
@@ -146,9 +148,9 @@ class BlocknetConfiguredParametersTest extends TestHelper {
         // Six decimals, as Verge and Emercoin actually use. Every other fixture
         // in the suite is 1e8, which is why a hardcoded 1e8 divisor can sit in
         // two places at once and still make them agree.
-        final long SIX_DECIMALS = 1_000_000L;
-        final long BLOCK_SUPPLY_IN_COINS = 43_199_500L;
-        final long EXPECTED_CEILING = BLOCK_SUPPLY_IN_COINS * SIX_DECIMALS;
+        final long sixDecimals = 1_000_000L;
+        final long blockSupplyInCoins = 43_199_500L;
+        final long expectedCeiling = blockSupplyInCoins * sixDecimals;
 
         CoinConfigRegistry.loadForTest(
                 Map.of(
@@ -162,13 +164,13 @@ class BlocknetConfiguredParametersTest extends TestHelper {
                                 41414,
                                 FEE_PER_BYTE,
                                 MIN_TX_FEE,
-                                SIX_DECIMALS)));
+                                sixDecimals)));
         ConfigurableNetworkParameters fromConfig =
                 ConfigurableNetworkParameters.from(CoinConfigRegistry.get("BLOCK"));
         BlocknetNetworkParameters peer = new BlocknetNetworkParameters();
 
         assertEquals(
-                EXPECTED_CEILING,
+                expectedCeiling,
                 fromConfig.getMaxMoney().value,
                 "the ceiling must be the supply expressed in the coin's own base units");
         assertEquals(
@@ -186,7 +188,7 @@ class BlocknetConfiguredParametersTest extends TestHelper {
         // arrives from a fetch rather than from a constant: the failure has to
         // arrive as the coin error callers already handle, not as an exception
         // thrown out of init().
-        final long UNREPRESENTABLE = 1_000_000_000_000_000_000L;
+        final long unrepresentable = 1_000_000_000_000_000_000L;
 
         CoinConfigRegistry.loadForTest(
                 Map.of(
@@ -200,7 +202,7 @@ class BlocknetConfiguredParametersTest extends TestHelper {
                                 41414,
                                 FEE_PER_BYTE,
                                 MIN_TX_FEE,
-                                UNREPRESENTABLE)));
+                                unrepresentable)));
         CoinInstance blocknet = CoinInstance.getInstance(CoinTicker.BLOCKNET);
         assertNotNull(blocknet, "BLOCKNET instance");
         char[] pw = getPassword().toCharArray();

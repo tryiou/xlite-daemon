@@ -82,18 +82,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-// Define a helper class for output entries
-class OutputEntry {
-    public String address;
-    public double amount;
-
-    public OutputEntry(String address, double amount) {
-        this.address = address;
-        this.amount = amount;
-    }
-}
-
 public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+
+    /** One recipient of a {@code createrawtransaction} request. */
+    private record OutputEntry(String address, double amount) {}
+
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
@@ -1059,13 +1052,14 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         try {
                             LegacyAddress address =
                                     LegacyAddress.fromBase58(
-                                            coin.getNetworkParameters(), entry.address);
+                                            coin.getNetworkParameters(), entry.address());
                             Coin outputValue =
-                                    Coin.valueOf(Sats.fromWholeCoins(entry.amount, outputCoinUnit));
-                            if (isP2SHAddress(entry.address)) {
+                                    Coin.valueOf(
+                                            Sats.fromWholeCoins(entry.amount(), outputCoinUnit));
+                            if (isP2SHAddress(entry.address())) {
                                 LOGGER.fine(
                                         "[http-server-handler] P2SH Address Found: "
-                                                + entry.address);
+                                                + entry.address());
                                 Script p2shScript =
                                         ScriptBuilder.createP2SHOutputScript(address.getHash());
                                 tx.addOutput(outputValue, p2shScript);
@@ -1092,10 +1086,11 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         try {
                             LegacyAddress address =
                                     LegacyAddress.fromBase58(
-                                            coin.getNetworkParameters(), entry.address);
+                                            coin.getNetworkParameters(), entry.address());
                             Coin outputValue =
-                                    Coin.valueOf(Sats.fromWholeCoins(entry.amount, outputCoinUnit));
-                            if (!isP2SHAddress(entry.address)) {
+                                    Coin.valueOf(
+                                            Sats.fromWholeCoins(entry.amount(), outputCoinUnit));
+                            if (!isP2SHAddress(entry.address())) {
                                 tx.addOutput(outputValue, address);
                             }
                         } catch (Exception e) {

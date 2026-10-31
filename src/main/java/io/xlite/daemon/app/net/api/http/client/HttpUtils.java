@@ -15,7 +15,7 @@ import java.util.logging.Logger;
  * Central HTTP operations utility class. This class extracts common HTTP patterns from HTTPClient
  * and EXRWrapper to eliminate code duplication and provide a unified HTTP execution interface.
  */
-public class HttpUtils {
+public final class HttpUtils {
 
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);

@@ -60,7 +60,7 @@ public class HTTPClientUtxoEvictionTest {
 
     @BeforeEach
     void setup() {
-        ConfigHelper.CONFIG_DIR = tempDir.toString();
+        ConfigHelper.setConfigDir(tempDir.toString());
         CoinInstance.getCoinInstances().clear();
         CoinInstance.setAddressDiscoveryEnabled(false);
         Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs = new LinkedHashMap<>();

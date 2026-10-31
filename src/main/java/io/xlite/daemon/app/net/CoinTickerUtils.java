@@ -2,7 +2,9 @@ package io.xlite.daemon.app.net;
 
 import com.google.common.collect.HashBiMap;
 
-public class CoinTickerUtils {
+public final class CoinTickerUtils {
+    private CoinTickerUtils() {}
+
     private static HashBiMap<CoinTicker, String> tickers;
 
     static {

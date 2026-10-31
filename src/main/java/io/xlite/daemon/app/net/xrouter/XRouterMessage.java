@@ -71,8 +71,8 @@ public class XRouterMessage extends Message {
     /**
      * Write Payment TX to unserialized XRouter Packet
      *
-     * @param body HashMap<String, Object> The parsed XRouter packet body
-     * @param out OutputStream The output stream to which to write the serialized transaction info
+     * @param body the parsed XRouter packet body
+     * @param out the stream the serialized transaction info is written to
      * @throws IOException If writing fails or another error occurs
      */
     private void writePaymentTx(HashMap<String, Object> body, OutputStream out) throws IOException {
@@ -195,7 +195,7 @@ public class XRouterMessage extends Message {
                 {
                     writeCurrency(parsedData, stream);
                     writePaymentTx(parsedData, stream);
-                    stream.write(((String) parsedData.get("number_s")).getBytes());
+                    stream.write(((String) parsedData.get("numberString")).getBytes());
                     stream.write(0x00);
                     break;
                 }
@@ -223,7 +223,7 @@ public class XRouterMessage extends Message {
                     writePaymentTx(parsedData, stream);
                     writeAccountAndNumber(
                             (String) parsedData.get("account"),
-                            (String) parsedData.get("number_s"),
+                            (String) parsedData.get("numberString"),
                             stream);
                     break;
                 }
@@ -460,7 +460,7 @@ public class XRouterMessage extends Message {
                     readCurrency(buf);
                     readPaymentTx(buf);
 
-                    readAccountAndNumber(buf, "number_s");
+                    readAccountAndNumber(buf, "numberString");
                     break;
                 }
             case "xrGetBalance":
@@ -478,8 +478,8 @@ public class XRouterMessage extends Message {
                     readCurrency(buf);
                     readPaymentTx(buf);
 
-                    String number_s = readStringNT(buf);
-                    parsedData.put("number_s", number_s);
+                    String numberString = readStringNT(buf);
+                    parsedData.put("numberString", numberString);
                     break;
                 }
             case "xrSendTransaction":

@@ -28,13 +28,13 @@ public class ConfigBindAddressTest {
 
     @BeforeEach
     void setup() {
-        savedConfigDir = ConfigHelper.CONFIG_DIR;
-        ConfigHelper.CONFIG_DIR = tmp.toString();
+        savedConfigDir = ConfigHelper.getConfigDir();
+        ConfigHelper.setConfigDir(tmp.toString());
     }
 
     @AfterEach
     void restore() {
-        ConfigHelper.CONFIG_DIR = savedConfigDir;
+        ConfigHelper.setConfigDir(savedConfigDir);
     }
 
     private File settingsFile(String ticker) {

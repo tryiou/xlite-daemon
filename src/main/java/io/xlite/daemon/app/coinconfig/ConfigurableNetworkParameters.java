@@ -61,7 +61,8 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
         // unchecked arithmetic failure from init().
         try {
             this.maxMoney =
-                    Coin.valueOf(Math.multiplyExact(supplement.maxMoneyCoins, config.coinFactor()));
+                    Coin.valueOf(
+                            Math.multiplyExact(supplement.maxMoneyCoins(), config.coinFactor()));
         } catch (ArithmeticException e) {
             throw new IllegalStateException(
                     "["
@@ -96,7 +97,7 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
 
     @Override
     public String getPaymentProtocolId() {
-        return ready() ? supplement.chainName : "main";
+        return ready() ? supplement.chainName() : "main";
     }
 
     @Override
@@ -139,7 +140,7 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
         return ready()
-                ? supplement.protocolVersion
+                ? supplement.protocolVersion()
                 : ProtocolVersion.CURRENT.getBitcoinProtocolVersion();
     }
 
@@ -171,7 +172,7 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
     @Override
     public String getId() {
         // must be non-null and != ID_UNITTESTNET (wallet creation checks it)
-        return ready() ? supplement.id : "";
+        return ready() ? supplement.id() : "";
     }
 
     @Override

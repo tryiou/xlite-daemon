@@ -58,8 +58,8 @@ public class BackgroundTimerThread implements Runnable {
         blocknetPeerGroup =
                 CoinInstance.getInstance(CoinInstance.getActiveBlocknetNetwork())
                         .getBlocknetPeerGroup();
-        feeUpdateHttpClient = App.feeUpdateHttpClient;
-        heightUpdateHttpClient = App.heightUpdateHttpClient;
+        feeUpdateHttpClient = App.getFeeUpdateHttpClient();
+        heightUpdateHttpClient = App.getHeightUpdateHttpClient();
 
         lastKeepAliveTime = 0;
         lastBalanceUpdateTime = 0;
@@ -267,11 +267,12 @@ public class BackgroundTimerThread implements Runnable {
             Thread historyThread =
                     new Thread(
                             () -> {
-                                App.feeUpdateHttpClient.getHistory(
-                                        coinInstance.getTicker(),
-                                        0,
-                                        (int) System.currentTimeMillis(),
-                                        30000);
+                                App.getFeeUpdateHttpClient()
+                                        .getHistory(
+                                                coinInstance.getTicker(),
+                                                0,
+                                                (int) System.currentTimeMillis(),
+                                                30000);
                             },
                             "history-fetch-"
                                     + CoinTickerUtils.tickerToString(coinInstance.getTicker()));

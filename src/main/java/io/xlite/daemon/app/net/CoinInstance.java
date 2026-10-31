@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-public class CoinInstance {
+public final class CoinInstance {
     public static class CoinError {
         public enum CoinErrorCode {
             BADPASSWORD,
@@ -91,7 +91,7 @@ public class CoinInstance {
 
     private static final int FORWARD_ADDRESS_COUNT = 0;
 
-    private static final List<CoinInstance> coinInstances = new CopyOnWriteArrayList<>();
+    private static final List<CoinInstance> COIN_INSTANCES = new CopyOnWriteArrayList<>();
     private static volatile CoinInstance activeCurrency;
     private static CoinTicker activeBlocknetNetwork = null;
     private static CopyOnWriteArrayList<ListenerRegistration<ActiveCoinChangedEventListener>>
@@ -169,7 +169,7 @@ public class CoinInstance {
     }
 
     public static List<CoinInstance> getCoinInstances() {
-        return coinInstances;
+        return COIN_INSTANCES;
     }
 
     public boolean isBlocknetNetwork() {
@@ -247,7 +247,7 @@ public class CoinInstance {
     }
 
     private static CoinInstance getInstanceByTicker(CoinTicker ticker) {
-        for (CoinInstance instance : coinInstances) {
+        for (CoinInstance instance : COIN_INSTANCES) {
             if (instance.getTicker() == ticker) {
                 return instance;
             }
@@ -283,9 +283,9 @@ public class CoinInstance {
                 }
                 instance = new CoinInstance(ticker, cfg);
                 if (ticker == CoinTicker.BLOCKNET) {
-                    coinInstances.add(0, instance);
+                    COIN_INSTANCES.add(0, instance);
                 } else {
-                    coinInstances.add(instance);
+                    COIN_INSTANCES.add(instance);
                 }
             }
 
@@ -1037,7 +1037,7 @@ public class CoinInstance {
                 Sats.decimalPlaces(
                         CoinConfigRegistry.get(CoinTickerUtils.tickerToString(getTicker()))
                                 .coinFactor());
-        MonetaryFormat PLAIN_FORMAT =
+        MonetaryFormat plainFormat =
                 MonetaryFormat.BTC
                         .withLocale(Locale.ROOT)
                         .minDecimals(coinDecimals)
@@ -1094,7 +1094,7 @@ public class CoinInstance {
                             }
                         };
 
-                BigDecimal amountDecimal = new BigDecimal(PLAIN_FORMAT.format(monetary).toString());
+                BigDecimal amountDecimal = new BigDecimal(plainFormat.format(monetary).toString());
 
                 utxoJSON.addProperty("amount", amountDecimal);
                 utxoJSON.addProperty(
@@ -1228,7 +1228,8 @@ public class CoinInstance {
                         + " UTXOs, tracking "
                         + addressKeyPairs.size()
                         + " addresses locally");
-        int added = 0, skipped = 0;
+        int added = 0;
+        int skipped = 0;
 
         Set<String> clearedAddresses = new HashSet<>();
         for (UTXO utxo : utxoList) {

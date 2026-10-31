@@ -6,7 +6,8 @@ import org.bitcoinj.core.Utils;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class BlocknetUtils {
+public final class BlocknetUtils {
+    private BlocknetUtils() {}
 
     public static void seekPastMagicBytes(ByteBuffer in, BlocknetParameters params) {
         int magicCursor = 3;

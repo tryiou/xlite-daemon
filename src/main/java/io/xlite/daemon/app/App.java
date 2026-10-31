@@ -23,22 +23,60 @@ import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-public class App {
+public final class App {
+    private App() {}
+
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-    // DEBUG ENDPOINT
-    public static String BASE_URL = "https://xliterevp.mywire.org/";
-    // "http://xl-dae-prox.airdns.org:42111/";
-    // DEBUG ENDPOINT
-    public static volatile String EXR_ENDPOINT = null;
-    public static volatile EXRServerPool exrServerPool = null;
-    public static volatile String BLOCKCHAIN_CONFIGURATION_FILES = null;
-    public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
-    public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
-    public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();
-    public static ConsoleMenu console = null;
-    public static Dotenv dotenv = null;
+    /** Upstream used when no EXR pool is configured. */
+    private static volatile String baseUrl = "https://xliterevp.mywire.org/";
+
+    private static volatile String exrEndpoint = null;
+    private static volatile EXRServerPool exrServerPool = null;
+
+    private static final HTTPClient FEE_UPDATE_HTTP_CLIENT = new HTTPClient(2);
+    private static final HTTPClient HEIGHT_UPDATE_HTTP_CLIENT = new HTTPClient(2);
+    private static final JSONRPCMasterServer MASTER_RPC = JSONRPCController.getMasterServer();
+
+    private static ConsoleMenu console = null;
+    private static Dotenv dotenv = null;
+
+    public static String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public static void setBaseUrl(String url) {
+        baseUrl = url;
+    }
+
+    public static String getExrEndpoint() {
+        return exrEndpoint;
+    }
+
+    public static void setExrEndpoint(String endpoint) {
+        exrEndpoint = endpoint;
+    }
+
+    public static EXRServerPool getExrServerPool() {
+        return exrServerPool;
+    }
+
+    public static void setExrServerPool(EXRServerPool pool) {
+        exrServerPool = pool;
+    }
+
+    public static HTTPClient getFeeUpdateHttpClient() {
+        return FEE_UPDATE_HTTP_CLIENT;
+    }
+
+    public static HTTPClient getHeightUpdateHttpClient() {
+        return HEIGHT_UPDATE_HTTP_CLIENT;
+    }
+
+    public static JSONRPCMasterServer getMasterRpc() {
+        return MASTER_RPC;
+    }
 
     public static String getEnv(String key) {
         if (dotenv == null) {
@@ -77,8 +115,8 @@ public class App {
         if (dataHomeEnv != null && !dataHomeEnv.trim().isEmpty()) {
             return new File(dataHomeEnv.trim()).getAbsoluteFile().getPath();
         }
-        String OS = osName.toLowerCase();
-        if (OS.contains("win")) {
+        String platform = osName.toLowerCase();
+        if (platform.contains("win")) {
             // Fail fast: returning a null AppData would stringify into a
             // bogus relative "null/xlite-daemon/" dir and fork the wallet.
             if (appDataEnv == null || appDataEnv.trim().isEmpty()) {
@@ -87,7 +125,7 @@ public class App {
                                 + "Set XLITE_DATA_HOME to an explicit path.");
             }
             return appDataEnv;
-        } else if (OS.contains("mac")) {
+        } else if (platform.contains("mac")) {
             if (userHome == null || userHome.trim().isEmpty()) {
                 throw new IllegalStateException(
                         "[app] Cannot resolve config dir on macOS: user.home is not set. "
@@ -125,18 +163,18 @@ public class App {
     }
 
     public static void initExrEndpoint() {
-        if (EXR_ENDPOINT != null) {
+        if (exrEndpoint != null) {
             return;
         }
-        String exrEndpoint = getEnv("EXR_ENDPOINT");
-        if (exrEndpoint != null && !exrEndpoint.isEmpty()) {
-            EXR_ENDPOINT = exrEndpoint;
-            exrServerPool = new EXRServerPool(EXR_ENDPOINT);
+        String endpoint = getEnv("EXR_ENDPOINT");
+        if (endpoint != null && !endpoint.isEmpty()) {
+            exrEndpoint = endpoint;
+            exrServerPool = new EXRServerPool(endpoint);
             LOGGER.info(
                     "[app] EXR mode enabled with "
                             + exrServerPool.getServerCount()
                             + " servers: "
-                            + EXR_ENDPOINT);
+                            + endpoint);
         }
     }
 
@@ -167,7 +205,6 @@ public class App {
                     Level.WARNING, "[coinconfig] invalid source, using default: " + e.getMessage());
             source = io.xlite.daemon.app.coinconfig.ConfigSourceResolver.DEFAULT_UPSTREAM;
         }
-        BLOCKCHAIN_CONFIGURATION_FILES = source;
         try {
             io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadWithFallback(
                     source, cacheFor(source));
@@ -288,7 +325,7 @@ public class App {
     }
 
     private static void shutdownInner() {
-        if (masterRPC != null && masterRPC.isAlive()) {
+        if (MASTER_RPC.isAlive()) {
             System.out.println("Shutting down...");
         }
 
@@ -296,21 +333,14 @@ public class App {
             console.deinit();
         }
 
-        if (feeUpdateHttpClient != null) {
-            feeUpdateHttpClient.close();
-        }
-
-        if (heightUpdateHttpClient != null) {
-            heightUpdateHttpClient.close();
-        }
+        FEE_UPDATE_HTTP_CLIENT.close();
+        HEIGHT_UPDATE_HTTP_CLIENT.close();
 
         if (exrServerPool != null) {
             exrServerPool.close();
         }
 
-        if (masterRPC != null) {
-            masterRPC.deinit();
-        }
+        MASTER_RPC.deinit();
 
         // Every listener is retired by now; release the worker group they
         // all borrowed. Bounded so a wedged event loop cannot stall exit

@@ -64,8 +64,8 @@ class WalletHelperNoHiddenSpendTest {
         // config dir, no address discovery (it would race the fixture), and a
         // loaded coin registry. The dir must not be the working directory:
         // that wrote xlite-daemon/ and .migration.lock into the source tree.
-        previousConfigDir = io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR;
-        io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR = configDir.toString();
+        previousConfigDir = io.xlite.daemon.app.util.ConfigHelper.getConfigDir();
+        io.xlite.daemon.app.util.ConfigHelper.setConfigDir(configDir.toString());
         CoinInstance.setAddressDiscoveryEnabled(false);
         if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {
             java.util.Map<String, String> block = new java.util.LinkedHashMap<>();
@@ -97,7 +97,7 @@ class WalletHelperNoHiddenSpendTest {
      */
     @AfterAll
     static void releaseGlobals() {
-        io.xlite.daemon.app.util.ConfigHelper.CONFIG_DIR = previousConfigDir;
+        io.xlite.daemon.app.util.ConfigHelper.setConfigDir(previousConfigDir);
         CoinInstance.setAddressDiscoveryEnabled(true);
         io.xlite.daemon.app.coinconfig.CoinConfigRegistry.resetForTest();
     }

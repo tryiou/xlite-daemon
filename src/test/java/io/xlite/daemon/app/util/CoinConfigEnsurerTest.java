@@ -29,13 +29,13 @@ class CoinConfigEnsurerTest {
 
     @BeforeEach
     void setup() {
-        savedConfigDir = ConfigHelper.CONFIG_DIR;
-        ConfigHelper.CONFIG_DIR = tmp.toString();
+        savedConfigDir = ConfigHelper.getConfigDir();
+        ConfigHelper.setConfigDir(tmp.toString());
     }
 
     @AfterEach
     void restore() {
-        ConfigHelper.CONFIG_DIR = savedConfigDir;
+        ConfigHelper.setConfigDir(savedConfigDir);
     }
 
     private File settingsFile(String ticker) {
@@ -137,7 +137,7 @@ class CoinConfigEnsurerTest {
     void testUnwritableSkippedWithoutThrow() throws Exception {
         // CONFIG_DIR pointing at a regular file: no settings dir can exist
         File blocker = File.createTempFile("ensurer-blocker", ".tmp", tmp.toFile());
-        ConfigHelper.CONFIG_DIR = blocker.getAbsolutePath();
+        ConfigHelper.setConfigDir(blocker.getAbsolutePath());
 
         Map<CoinTicker, CoinConfigEnsurer.Outcome> report =
                 CoinConfigEnsurer.ensureMissing(Arrays.asList(CoinTicker.VERGE));

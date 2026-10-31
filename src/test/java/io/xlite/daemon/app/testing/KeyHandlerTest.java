@@ -1,3 +1,5 @@
+package io.xlite.daemon.app.testing;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.xlite.daemon.app.crypto.KeyHandler;
@@ -44,8 +46,8 @@ import javax.crypto.spec.SecretKeySpec;
  *       third-party encoder, removing an accidental cross-library coupling.
  * </ul>
  *
- * <p><b>Thread safety</b>: {@code ConfigHelper.CONFIG_DIR} is a mutable static field. Do not run
- * these tests with JUnit 5 parallel execution enabled unless you isolate the static state per
+ * <p><b>Thread safety</b>: {@code ConfigHelper.getConfigDir()} is a mutable static field. Do not
+ * run these tests with JUnit 5 parallel execution enabled unless you isolate the static state per
  * worker.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -76,7 +78,7 @@ public class KeyHandlerTest {
     @BeforeEach
     void setUp() {
         // Point ConfigHelper at the isolated temp directory for every test.
-        ConfigHelper.CONFIG_DIR = tempDir.toString();
+        ConfigHelper.setConfigDir(tempDir.toString());
         testKeyFile = tempDir.resolve("xlite-daemon").resolve("key.dat").toFile();
         testBackupDir = tempDir.resolve("xlite-daemon").resolve("backups").toFile();
     }

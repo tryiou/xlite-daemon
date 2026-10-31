@@ -1,3 +1,5 @@
+package io.xlite.daemon.app.testing;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.xlite.daemon.app.net.CoinInstance;

@@ -516,7 +516,7 @@ public class BlocknetPeerGroup {
         sendMessage(peer, getXRouterConfigMessage);
     }
 
-    private class PeerStartupListener
+    private final class PeerStartupListener
             implements BlocknetPeerConnectedEventListener, BlocknetPeerDisconnectedEventListener {
         @Override
         public void onPeerConnected(BlocknetPeer peer, int peerCount) {

@@ -21,6 +21,7 @@ import java.util.Map;
  * repeated section name merges into the first occurrence.
  */
 public final class XBridgeConfParser {
+    private XBridgeConfParser() {}
 
     public static Map<String, Map<String, String>> parse(String contents) {
         if (contents.startsWith("\uFEFF")) {

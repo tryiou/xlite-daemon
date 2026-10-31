@@ -1,8 +1,13 @@
+package io.xlite.daemon.app.testing;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
+import io.xlite.daemon.app.App;
+import io.xlite.daemon.app.coinconfig.CoinConfig;
+import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.ConfigHelper;
 
@@ -17,20 +22,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
  * Test helper class providing shared utilities for all test files. This avoids code duplication
  * across test files.
  */
-public class TestHelper {
+public abstract class TestHelper {
 
     /**
      * Per-class config sandbox. Never the working directory: a test that touches the config layer
      * must not write into the source tree.
      */
-    protected static final Path testSandbox = createSandbox();
+    protected static final Path TEST_SANDBOX = createSandbox();
 
     private static final Gson GSON = new GsonBuilder().create();
     protected static JsonObject testConfig;
@@ -70,7 +77,7 @@ public class TestHelper {
     protected static final String COIN_TICKER = "LITECOIN";
 
     /** A coin configuration for tests, with every value supplied explicitly. */
-    protected static io.xlite.daemon.app.coinconfig.CoinConfig testCoinConfig(
+    protected static CoinConfig testCoinConfig(
             String ticker,
             String blockchain,
             int addr,
@@ -89,7 +96,7 @@ public class TestHelper {
      * with fewer than eight decimals are real here, so a test that wants to catch that has to be
      * able to ask for one.
      */
-    protected static io.xlite.daemon.app.coinconfig.CoinConfig testCoinConfig(
+    protected static CoinConfig testCoinConfig(
             String ticker,
             String blockchain,
             int addr,
@@ -99,7 +106,7 @@ public class TestHelper {
             long feePerByte,
             long minTxFee,
             long coinFactor) {
-        java.util.Map<String, String> e = new java.util.LinkedHashMap<>();
+        Map<String, String> e = new LinkedHashMap<>();
         e.put("AddressPrefix", Integer.toString(addr));
         e.put("ScriptPrefix", Integer.toString(p2sh));
         e.put("SecretPrefix", Integer.toString(dpk));
@@ -110,8 +117,7 @@ public class TestHelper {
         e.put("DustAmount", "0");
         e.put("TxVersion", "1");
         e.put("Title", blockchain);
-        return new io.xlite.daemon.app.coinconfig.CoinConfig(
-                ticker, blockchain, ticker.toLowerCase() + "--test", e);
+        return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", e);
     }
 
     protected static int getAddressCount() {
@@ -152,22 +158,21 @@ public class TestHelper {
      */
     @BeforeEach
     public void commonSetup() {
-        ConfigHelper.CONFIG_DIR = testSandbox.toString();
+        ConfigHelper.setConfigDir(TEST_SANDBOX.toString());
         clean();
         // Disable address discovery during tests to prevent interference with deterministic address
         // generation
         CoinInstance.setAddressDiscoveryEnabled(false);
         // Ensure coin configs are available — simple in-memory set, no filesystem
-        if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {
-            java.util.Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs =
-                    new java.util.LinkedHashMap<>();
+        if (!CoinConfigRegistry.isLoaded()) {
+            Map<String, CoinConfig> cfgs = new LinkedHashMap<>();
             // The prefixes and ports are the coins' real published values,
             // because address derivation depends on them. The fees are chosen
             // by the test and are not claims about current configuration, which
             // changes; nothing here should be updated when it does.
             cfgs.put("LTC", testCoinConfig("LTC", "Litecoin", 48, 50, 176, 9332, 10L, 5000L));
             cfgs.put("BLOCK", testCoinConfig("BLOCK", "Blocknet", 26, 28, 154, 41414, 20L, 10000L));
-            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadForTest(cfgs);
+            CoinConfigRegistry.loadForTest(cfgs);
         }
     }
 
@@ -178,9 +183,9 @@ public class TestHelper {
      */
     @AfterAll
     public static void commonCleanup() {
-        ConfigHelper.CONFIG_DIR = testSandbox.toString();
+        ConfigHelper.setConfigDir(TEST_SANDBOX.toString());
         clean();
-        deleteDir(testSandbox.toFile());
+        deleteDir(TEST_SANDBOX.toFile());
     }
 
     /** Cleans up test data and resets CoinInstance state. */
@@ -188,9 +193,9 @@ public class TestHelper {
         CoinInstance.getCoinInstances().clear();
         assertTrue(deleteDir(new File(ConfigHelper.getLocalDataDirectory())));
         String base =
-                ConfigHelper.CONFIG_DIR == null || ConfigHelper.CONFIG_DIR.trim().isEmpty()
-                        ? io.xlite.daemon.app.App.getUserConfigDir()
-                        : ConfigHelper.CONFIG_DIR;
+                ConfigHelper.getConfigDir() == null || ConfigHelper.getConfigDir().trim().isEmpty()
+                        ? App.getUserConfigDir()
+                        : ConfigHelper.getConfigDir();
         File migrationLock = new File(base, ConfigHelper.MIGRATION_LOCK_FILE);
         if (migrationLock.exists()) {
             assertTrue(migrationLock.delete());

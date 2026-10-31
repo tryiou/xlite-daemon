@@ -49,8 +49,8 @@ class WalletHelperRecipientDustTest {
     static void setup() {
         // Own the config dir: the wallet this test funds must be the one it
         // created, not whatever wallet a previous class left on disk.
-        previousConfigDir = ConfigHelper.CONFIG_DIR;
-        ConfigHelper.CONFIG_DIR = configDir.toString();
+        previousConfigDir = ConfigHelper.getConfigDir();
+        ConfigHelper.setConfigDir(configDir.toString());
         CoinInstance.setAddressDiscoveryEnabled(false);
         CoinConfigRegistry.resetForTest();
 
@@ -73,7 +73,7 @@ class WalletHelperRecipientDustTest {
 
     @AfterAll
     static void releaseGlobals() {
-        ConfigHelper.CONFIG_DIR = previousConfigDir;
+        ConfigHelper.setConfigDir(previousConfigDir);
         CoinInstance.setAddressDiscoveryEnabled(true);
         CoinConfigRegistry.resetForTest();
     }

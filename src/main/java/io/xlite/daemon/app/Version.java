@@ -1,6 +1,8 @@
 package io.xlite.daemon.app;
 
-public class Version {
+public final class Version {
+    private Version() {}
+
     private static final String CLIENT_NAME = "xlite-daemon";
     private static final String CLIENT_PROTOCOL_VERSION = "0.5.15";
 

@@ -66,11 +66,11 @@ class ConfigHelperMigrationTest {
 
     @Test
     void testConstructorPropagatesUnusableDataDir(@TempDir Path tmp) throws IOException {
-        String saved = ConfigHelper.CONFIG_DIR;
+        String saved = ConfigHelper.getConfigDir();
         try {
             Path blocker = tmp.resolve("blocker");
             Files.write(blocker, "x".getBytes(StandardCharsets.UTF_8));
-            ConfigHelper.CONFIG_DIR = blocker.toString();
+            ConfigHelper.setConfigDir(blocker.toString());
 
             // Must propagate fail-closed, never boot on defaults with no wallet.
             IllegalStateException e =
@@ -79,7 +79,7 @@ class ConfigHelperMigrationTest {
                     e.getMessage().contains("data directory unusable"),
                     "message must name the failure, got: " + e.getMessage());
         } finally {
-            ConfigHelper.CONFIG_DIR = saved;
+            ConfigHelper.setConfigDir(saved);
         }
     }
 }
