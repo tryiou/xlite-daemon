@@ -11,8 +11,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class EXRServerPool {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private final List<EXRServer> servers;
     private final AtomicInteger currentIndex;
     private final Map<CoinTicker, List<EXRServer>> coinToServersMap;
@@ -25,6 +25,7 @@ public class EXRServerPool {
 
     /**
      * Constructor with dependency injection for flexible server selection.
+     *
      * @param endpoints Comma-separated list of server endpoints
      * @param serverSelector Server selection strategy implementation
      */
@@ -41,13 +42,16 @@ public class EXRServerPool {
 
     /**
      * Backward compatibility constructor using default round-robin selection.
+     *
      * @param endpoints Comma-separated list of server endpoints
      */
     public EXRServerPool(String endpoints) {
         this(endpoints, new EXRServerSelectorImpl(new AtomicInteger(0)));
     }
+
     // Use centralized configuration constants
-    private static final int CAPABILITY_PROBE_TIMEOUT_MS = HttpClientConfig.CAPABILITY_PROBE_TIMEOUT_MS;
+    private static final int CAPABILITY_PROBE_TIMEOUT_MS =
+            HttpClientConfig.CAPABILITY_PROBE_TIMEOUT_MS;
 
     public void startCapabilityProbing() {
         if (capabilitiesProbed || servers.isEmpty()) {
@@ -69,13 +73,18 @@ public class EXRServerPool {
         // Probe each server concurrently
         List<Thread> probeThreads = new ArrayList<>();
         for (EXRServer server : servers) {
-            Thread t = new Thread(() -> {
-                try {
-                    server.probeCapabilities();
-                } catch (Exception e) {
-                    LOGGER.warning("[exr-pool] Failed to probe server " + server.getEndpoint() + ", " + e.getMessage());
-                }
-            });
+            Thread t =
+                    new Thread(() -> {
+                        try {
+                            server.probeCapabilities();
+                        } catch (Exception e) {
+                            LOGGER.warning(
+                                    "[exr-pool] Failed to probe server "
+                                            + server.getEndpoint()
+                                            + ", "
+                                            + e.getMessage());
+                        }
+                    });
             t.setDaemon(true);
             probeThreads.add(t);
             t.start();
@@ -107,9 +116,11 @@ public class EXRServerPool {
         LOGGER.info("[exr-pool] === EXR Server Capabilities ===");
         for (EXRServer server : servers) {
             if (server.isCapabilitiesProbed()) {
-                String supportedCoins = server.getSupportedCoins().stream()
-                        .map(coin -> CoinTickerUtils.tickerToString(coin))
-                        .reduce((a, b) -> a + ", " + b).orElse("none");
+                String supportedCoins =
+                        server.getSupportedCoins().stream()
+                                .map(coin -> CoinTickerUtils.tickerToString(coin))
+                                .reduce((a, b) -> a + ", " + b)
+                                .orElse("none");
                 LOGGER.info("[exr-pool] " + server.getEndpoint() + " supports: " + supportedCoins);
             } else {
                 LOGGER.warning("[exr-pool] " + server.getEndpoint() + " capability probe failed");
@@ -119,7 +130,12 @@ public class EXRServerPool {
         for (CoinTicker coin : CoinTicker.coins()) {
             List<EXRServer> supportingServers = coinToServersMap.get(coin);
             if (supportingServers != null && !supportingServers.isEmpty()) {
-                LOGGER.info("[exr-pool] " + CoinTickerUtils.tickerToString(coin) + " supported by " + supportingServers.size() + " servers");
+                LOGGER.info(
+                        "[exr-pool] "
+                                + CoinTickerUtils.tickerToString(coin)
+                                + " supported by "
+                                + supportingServers.size()
+                                + " servers");
             }
         }
     }
@@ -149,6 +165,7 @@ public class EXRServerPool {
 
     /**
      * Select a server for a specific coin with proper error handling
+     *
      * @param coin The coin to select a server for
      * @return Selected server or null if none available
      * @throws IllegalArgumentException if coin is null

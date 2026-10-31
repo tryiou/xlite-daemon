@@ -17,15 +17,13 @@ import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 /**
- * Raw-byte write-through cache for remote coin-config sources. Mirrors the
- * remote layout ({@code manifest-latest.json} + {@code xbridge-confs/}) under
- * a per-source namespaced directory, so a cache directory doubles as a
- * local-directory source for offline fallback.
+ * Raw-byte write-through cache for remote coin-config sources. Mirrors the remote layout ({@code
+ * manifest-latest.json} + {@code xbridge-confs/}) under a per-source namespaced directory, so a
+ * cache directory doubles as a local-directory source for offline fallback.
  *
- * <p>Bytes only: parsing, comparison and fetch policy belong to
- * {@link CoinConfigSource}. Every method fails open — cache I/O problems
- * are logged and the boot continues in-memory; a boot must never fail on
- * cache I/O.</p>
+ * <p>Bytes only: parsing, comparison and fetch policy belong to {@link CoinConfigSource}. Every
+ * method fails open — cache I/O problems are logged and the boot continues in-memory; a boot must
+ * never fail on cache I/O.
  */
 public final class CoinConfigCache {
 
@@ -42,10 +40,9 @@ public final class CoinConfigCache {
     }
 
     /**
-     * Resolves (creating) the cache directory for a source, namespaced by
-     * the sha16 of the resolved source string so flag/env/default switches
-     * never read each other's bytes. Retains the current directory plus the
-     * most recently created other one; older sources are pruned.
+     * Resolves (creating) the cache directory for a source, namespaced by the sha16 of the resolved
+     * source string so flag/env/default switches never read each other's bytes. Retains the current
+     * directory plus the most recently created other one; older sources are pruned.
      */
     public static CoinConfigCache forSource(Path root, String source) {
         Path dir = root.resolve("src-" + sha16(source));
@@ -53,8 +50,12 @@ public final class CoinConfigCache {
             Files.createDirectories(dir.resolve("xbridge-confs"));
             pruneOldSources(root, dir);
         } catch (Exception e) {
-            LOGGER.warning("[coinconfig] cache dir unavailable (" + dir + "): " + e.getMessage()
-                    + " — continuing without cache persistence");
+            LOGGER.warning(
+                    "[coinconfig] cache dir unavailable ("
+                            + dir
+                            + "): "
+                            + e.getMessage()
+                            + " — continuing without cache persistence");
         }
         return new CoinConfigCache(dir);
     }
@@ -86,8 +87,7 @@ public final class CoinConfigCache {
 
     private static Optional<String> readQuietly(Path p) {
         try {
-            if (!Files.isRegularFile(p))
-                return Optional.empty();
+            if (!Files.isRegularFile(p)) return Optional.empty();
             return Optional.of(Files.readString(p, StandardCharsets.UTF_8));
         } catch (Exception e) {
             LOGGER.warning("[coinconfig] cache read failed (" + p + "): " + e.getMessage());
@@ -111,35 +111,41 @@ public final class CoinConfigCache {
         } catch (IOException e) {
             return;
         }
-        dirs.sort(Comparator.comparing((Path d) -> {
-            try {
-                return Files.getLastModifiedTime(d);
-            } catch (IOException e) {
-                return FileTime.fromMillis(0);
-            }
-        }).reversed());
+        dirs.sort(
+                Comparator.comparing(
+                                (Path d) -> {
+                                    try {
+                                        return Files.getLastModifiedTime(d);
+                                    } catch (IOException e) {
+                                        return FileTime.fromMillis(0);
+                                    }
+                                })
+                        .reversed());
         Set<Path> keep = new LinkedHashSet<>();
         keep.add(current);
         for (Path d : dirs) {
-            if (keep.size() >= KEEP_SOURCES)
-                break;
+            if (keep.size() >= KEEP_SOURCES) break;
             keep.add(d);
         }
         for (Path d : dirs) {
-            if (!keep.contains(d))
-                deleteQuietly(d);
+            if (!keep.contains(d)) deleteQuietly(d);
         }
     }
 
     private static void deleteQuietly(Path d) {
         try (Stream<Path> walk = Files.walk(d)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (IOException e) {
-                    LOGGER.warning("[coinconfig] cache prune failed (" + p + "): " + e.getMessage());
-                }
-            });
+            walk.sorted(Comparator.reverseOrder())
+                    .forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (IOException e) {
+                            LOGGER.warning(
+                                    "[coinconfig] cache prune failed ("
+                                            + p
+                                            + "): "
+                                            + e.getMessage());
+                        }
+                    });
             LOGGER.info("[coinconfig] pruned old cache source " + d.getFileName());
         } catch (IOException e) {
             LOGGER.warning("[coinconfig] cache prune failed (" + d + "): " + e.getMessage());
@@ -148,11 +154,12 @@ public final class CoinConfigCache {
 
     private static String sha16(String s) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(s.getBytes(StandardCharsets.UTF_8));
+            byte[] digest =
+                    MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder(32);
             for (byte b : digest)
-                sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16))
+                        .append(Character.forDigit(b & 0xF, 16));
             return sb.substring(0, 16);
         } catch (Exception e) {
             return Integer.toHexString(s.hashCode());

@@ -16,7 +16,11 @@ public class QueueItem {
     private long creationTime;
     private int expiryTimeInMinutes = 2;
 
-    public QueueItem(BlocknetPeer blocknetPeer, String command, HashMap<String, Object> params, MessageSource messageSource) {
+    public QueueItem(
+            BlocknetPeer blocknetPeer,
+            String command,
+            HashMap<String, Object> params,
+            MessageSource messageSource) {
         this.originalPeer = blocknetPeer;
         this.commmand = command;
         this.params = params;
@@ -26,7 +30,12 @@ public class QueueItem {
         this.creationTime = System.currentTimeMillis();
     }
 
-    public QueueItem(BlocknetPeer blocknetPeer, String uuid, String command, HashMap<String, Object> params, MessageSource messageSource) {
+    public QueueItem(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String command,
+            HashMap<String, Object> params,
+            MessageSource messageSource) {
         this.originalPeer = blocknetPeer;
         this.customUUID = uuid;
         this.commmand = command;

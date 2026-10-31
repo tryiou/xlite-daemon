@@ -2,19 +2,14 @@ package io.xlite.daemon.app.crypto;
 
 import com.google.common.base.Joiner;
 import com.subgraph.orchid.encoders.Base64;
+
 import io.xlite.daemon.app.util.ConfigHelper;
+
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bitcoinj.wallet.DeterministicSeed;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -30,24 +25,32 @@ import java.util.Objects;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+
 /**
- * Handles BIP39 mnemonic seed storage, AES-CBC encryption/decryption,
- * and automatic migration from the legacy AES-ECB (SHA-1) format.
+ * Handles BIP39 mnemonic seed storage, AES-CBC encryption/decryption, and automatic migration from
+ * the legacy AES-ECB (SHA-1) format.
  *
- * <p><b>Passphrase handling</b>: all public methods accept {@code char[]} so callers
- * can zero the array immediately after use. Passing a {@code String} literal is
- * intentionally unsupported — {@code String} is immutable and cannot be wiped.
+ * <p><b>Passphrase handling</b>: all public methods accept {@code char[]} so callers can zero the
+ * array immediately after use. Passing a {@code String} literal is intentionally unsupported —
+ * {@code String} is immutable and cannot be wiped.
  */
 public class KeyHandler {
 
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     // -------------------------------------------------------------------------
     // Version constants
     // -------------------------------------------------------------------------
-    private static final int VERSION_1_SHA1 = 1;   // Legacy: AES-ECB, PBKDF2-SHA-1, 16k iters
-    private static final int VERSION_2_SHA256 = 2;   // Current: AES-CBC, PBKDF2-SHA-256, 100k iters
+    private static final int VERSION_1_SHA1 = 1; // Legacy: AES-ECB, PBKDF2-SHA-1, 16k iters
+    private static final int VERSION_2_SHA256 = 2; // Current: AES-CBC, PBKDF2-SHA-256, 100k iters
     private static final int CURRENT_VERSION = VERSION_2_SHA256;
     private static final String VERSION_HEADER = "VERSION:";
 
@@ -55,13 +58,13 @@ public class KeyHandler {
     // Crypto parameters
     // -------------------------------------------------------------------------
     private static final int PBKDF2_ITERATIONS_SHA256 = 100_000;
-    private static final int PBKDF2_ITERATIONS_SHA1 = 16_384;  // legacy only
-    private static final int KEY_LENGTH = 256;   // AES key bits
-    private static final int SALT_LENGTH = 20;   // bytes
-    private static final int IV_LENGTH = 16;   // bytes, AES block size
+    private static final int PBKDF2_ITERATIONS_SHA1 = 16_384; // legacy only
+    private static final int KEY_LENGTH = 256; // AES key bits
+    private static final int SALT_LENGTH = 20; // bytes
+    private static final int IV_LENGTH = 16; // bytes, AES block size
 
     private static final String PBKDF2_SHA256 = "PBKDF2WithHmacSHA256";
-    private static final String PBKDF2_SHA1 = "PBKDF2WithHmacSHA1";   // legacy only
+    private static final String PBKDF2_SHA1 = "PBKDF2WithHmacSHA1"; // legacy only
     private static final String AES = "AES";
     private static final String AES_CBC = "AES/CBC/PKCS5Padding";
     private static final String AES_ECB = "AES/ECB/PKCS5Padding"; // legacy migration only
@@ -114,9 +117,7 @@ public class KeyHandler {
     // Public API
     // =========================================================================
 
-    /**
-     * Return {@code true} if a wallet file already exists on disk.
-     */
+    /** Return {@code true} if a wallet file already exists on disk. */
     public static boolean existsBaseECKeyFromLocal() {
         return keyFile().exists();
     }
@@ -124,11 +125,11 @@ public class KeyHandler {
     /**
      * Decrypt and return the mnemonic seed phrase.
      *
-     * <p>If no wallet file exists, a new one is generated and persisted.
-     * Legacy wallets (V1 / AES-ECB) are migrated to V2 (AES-CBC) transparently.
+     * <p>If no wallet file exists, a new one is generated and persisted. Legacy wallets (V1 /
+     * AES-ECB) are migrated to V2 (AES-CBC) transparently.
      *
-     * @param passphrase caller-owned char array; <b>must</b> be zeroed by the
-     *                   caller immediately after this method returns
+     * @param passphrase caller-owned char array; <b>must</b> be zeroed by the caller immediately
+     *     after this method returns
      * @return the mnemonic word list, or {@code null} if decryption fails
      */
     public static List<String> getBaseSeed(char[] passphrase) {
@@ -169,8 +170,8 @@ public class KeyHandler {
      * Import a wallet from a BIP39 mnemonic word list.
      *
      * @param mnemonicList the BIP39 word list (12 / 15 / 18 / 21 / 24 words)
-     * @param passphrase   caller-owned char array; <b>must</b> be zeroed by the
-     *                     caller immediately after this method returns
+     * @param passphrase caller-owned char array; <b>must</b> be zeroed by the caller immediately
+     *     after this method returns
      * @return {@code true} on success
      * @throws IllegalArgumentException if {@code mnemonicList} is null or empty
      */
@@ -181,8 +182,8 @@ public class KeyHandler {
         byte[] entropy = null;
         try {
             entropy = MNEMONIC_CODE.toEntropy(mnemonicList);
-            DeterministicSeed seed = new DeterministicSeed(
-                    entropy, "", System.currentTimeMillis() / 1000);
+            DeterministicSeed seed =
+                    new DeterministicSeed(entropy, "", System.currentTimeMillis() / 1000);
             List<String> derived = Objects.requireNonNull(seed.getMnemonicCode());
             if (!derived.equals(mnemonicList)) {
                 return false;
@@ -213,8 +214,8 @@ public class KeyHandler {
     }
 
     /**
-     * Parse a space-separated mnemonic string into a word list.
-     * Tolerates leading/trailing whitespace and runs of multiple spaces.
+     * Parse a space-separated mnemonic string into a word list. Tolerates leading/trailing
+     * whitespace and runs of multiple spaces.
      *
      * @param mnemonic the raw mnemonic string
      * @return list of mnemonic words
@@ -269,9 +270,9 @@ public class KeyHandler {
     // =========================================================================
 
     /**
-     * Hash a raw password with SHA-256 and return the hex digest as a char[].
-     * Used only for decrypting legacy V1 wallets where the passphrase was
-     * pre-hashed via {@code LoginUtils.loginToEntropy()} before PBKDF2.
+     * Hash a raw password with SHA-256 and return the hex digest as a char[]. Used only for
+     * decrypting legacy V1 wallets where the passphrase was pre-hashed via {@code
+     * LoginUtils.loginToEntropy()} before PBKDF2.
      */
     private static char[] sha256ToChars(char[] input) {
         byte[] hash = null;
@@ -280,42 +281,38 @@ public class KeyHandler {
             hash = digest.digest(encodeUtf8Chars(input));
             StringBuilder hex = new StringBuilder();
             for (byte b : hash) {
-                if ((0xff & b) < 0x10)
-                    hex.append("0").append(Integer.toHexString(0xFF & b));
-                else
-                    hex.append(Integer.toHexString(0xFF & b));
+                if ((0xff & b) < 0x10) hex.append("0").append(Integer.toHexString(0xFF & b));
+                else hex.append(Integer.toHexString(0xFF & b));
             }
             return hex.toString().toCharArray();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to compute SHA-256 for legacy migration" + e.getMessage());
+            throw new RuntimeException(
+                    "Failed to compute SHA-256 for legacy migration" + e.getMessage());
         } finally {
             if (hash != null) Arrays.fill(hash, (byte) 0);
         }
     }
 
     /**
-     * Encode a char[] as UTF-8 bytes without creating an intermediate String.
-     * Caller must zero the returned byte array after use.
+     * Encode a char[] as UTF-8 bytes without creating an intermediate String. Caller must zero the
+     * returned byte array after use.
      */
     private static byte[] encodeUtf8Chars(char[] chars) {
-        ByteBuffer buf = StandardCharsets.UTF_8.encode(
-                CharBuffer.wrap(chars));
+        ByteBuffer buf = StandardCharsets.UTF_8.encode(CharBuffer.wrap(chars));
         byte[] bytes = new byte[buf.remaining()];
         buf.get(bytes);
         return bytes;
     }
 
     /**
-     * Derive a 256-bit AES key from a passphrase using PBKDF2.
-     * The intermediate raw key bytes are zeroed before returning.
+     * Derive a 256-bit AES key from a passphrase using PBKDF2. The intermediate raw key bytes are
+     * zeroed before returning.
      */
-    private static SecretKey deriveKey(char[] passphrase, byte[] salt,
-                                       String algorithm, int iterations) {
+    private static SecretKey deriveKey(
+            char[] passphrase, byte[] salt, String algorithm, int iterations) {
         PBEKeySpec spec = new PBEKeySpec(passphrase, salt, iterations, KEY_LENGTH);
         try {
-            byte[] raw = SecretKeyFactory.getInstance(algorithm)
-                    .generateSecret(spec)
-                    .getEncoded();
+            byte[] raw = SecretKeyFactory.getInstance(algorithm).generateSecret(spec).getEncoded();
             try {
                 return new SecretKeySpec(raw, AES);
             } finally {
@@ -333,8 +330,8 @@ public class KeyHandler {
      *
      * @return {@code String[2]} — {@code [0]} = Base64 IV, {@code [1]} = Base64 ciphertext
      */
-    private static String[] encryptBaseSeedWithIv(char[] passphrase,
-                                                  byte[] seedBytes, byte[] salt) {
+    private static String[] encryptBaseSeedWithIv(
+            char[] passphrase, byte[] seedBytes, byte[] salt) {
         SecretKey key = deriveKey(passphrase, salt, PBKDF2_SHA256, PBKDF2_ITERATIONS_SHA256);
         try {
             byte[] iv = new byte[IV_LENGTH];
@@ -342,21 +339,20 @@ public class KeyHandler {
             Cipher cipher = Cipher.getInstance(AES_CBC);
             cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
             byte[] encrypted = cipher.doFinal(seedBytes);
-            return new String[]{
-                    new String(Base64.encode(iv), StandardCharsets.UTF_8),
-                    new String(Base64.encode(encrypted), StandardCharsets.UTF_8)
+            return new String[] {
+                new String(Base64.encode(iv), StandardCharsets.UTF_8),
+                new String(Base64.encode(encrypted), StandardCharsets.UTF_8)
             };
         } catch (Exception e) {
             throw new RuntimeException("Failed to encrypt seed" + e.getMessage());
         }
     }
 
-    /**
-     * Decrypt with the current V2 scheme: AES-CBC, PBKDF2-SHA-256 @ 100 000 iterations.
-     */
-    private static String decryptSeedCbc(char[] passphrase, byte[] encrypted,
-                                         byte[] salt, byte[] iv) throws Exception {
-        if (iv == null) throw new IllegalArgumentException("IV must not be null for CBC decryption");
+    /** Decrypt with the current V2 scheme: AES-CBC, PBKDF2-SHA-256 @ 100 000 iterations. */
+    private static String decryptSeedCbc(
+            char[] passphrase, byte[] encrypted, byte[] salt, byte[] iv) throws Exception {
+        if (iv == null)
+            throw new IllegalArgumentException("IV must not be null for CBC decryption");
         SecretKey key = deriveKey(passphrase, salt, PBKDF2_SHA256, PBKDF2_ITERATIONS_SHA256);
         Cipher cipher = Cipher.getInstance(AES_CBC);
         cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
@@ -364,11 +360,11 @@ public class KeyHandler {
     }
 
     /**
-     * Decrypt with the legacy V1 scheme: AES-ECB, PBKDF2-SHA-1 @ 16 384 iterations.
-     * <b>Do not use for anything other than migrating legacy wallets.</b>
+     * Decrypt with the legacy V1 scheme: AES-ECB, PBKDF2-SHA-1 @ 16 384 iterations. <b>Do not use
+     * for anything other than migrating legacy wallets.</b>
      */
-    private static String decryptSeedEcb(char[] passphrase, byte[] encrypted,
-                                         byte[] salt) throws Exception {
+    private static String decryptSeedEcb(char[] passphrase, byte[] encrypted, byte[] salt)
+            throws Exception {
         SecretKey key = deriveKey(passphrase, salt, PBKDF2_SHA1, PBKDF2_ITERATIONS_SHA1);
         Cipher cipher = Cipher.getInstance(AES_ECB);
         cipher.init(Cipher.DECRYPT_MODE, key);
@@ -415,17 +411,16 @@ public class KeyHandler {
                     version,
                     Base64.decode(saltB64),
                     ivB64 != null ? Base64.decode(ivB64) : null,
-                    Base64.decode(encB64)
-            );
+                    Base64.decode(encB64));
         }
     }
 
     /**
-     * Write the versioned 4-line wallet format to {@code file}.
-     * Creates parent directories if they do not exist.
+     * Write the versioned 4-line wallet format to {@code file}. Creates parent directories if they
+     * do not exist.
      */
-    private static void writeWalletFile(File file, byte[] salt,
-                                        String ivB64, String encryptedSeed) throws IOException {
+    private static void writeWalletFile(File file, byte[] salt, String ivB64, String encryptedSeed)
+            throws IOException {
         file.getParentFile().mkdirs();
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
             writer.write(VERSION_HEADER + CURRENT_VERSION);
@@ -440,8 +435,7 @@ public class KeyHandler {
     }
 
     /**
-     * Move the current wallet file into the {@code backups/} subdirectory with
-     * a timestamp suffix.
+     * Move the current wallet file into the {@code backups/} subdirectory with a timestamp suffix.
      *
      * @param keyFile the wallet file to back up
      * @return the backup {@link File}, or {@code null} if there was nothing to back up
@@ -451,7 +445,8 @@ public class KeyHandler {
 
         File backupsDir = new File(ConfigHelper.getLocalDataDirectory(), "backups");
         if (!backupsDir.exists() && !backupsDir.mkdirs()) {
-            LOGGER.warning("[security] Failed to create backups directory: " + backupsDir.getPath());
+            LOGGER.warning(
+                    "[security] Failed to create backups directory: " + backupsDir.getPath());
         }
 
         String timestamp = TIMESTAMP_FORMAT.format(LocalDateTime.now());
@@ -470,7 +465,8 @@ public class KeyHandler {
             try {
                 return Integer.parseInt(firstLine.substring(VERSION_HEADER.length()));
             } catch (NumberFormatException e) {
-                LOGGER.warning("[security] Unrecognised version header — treating wallet as legacy V1");
+                LOGGER.warning(
+                        "[security] Unrecognised version header — treating wallet as legacy V1");
             }
         }
         return VERSION_1_SHA1;
@@ -483,10 +479,9 @@ public class KeyHandler {
     /** Generate a fresh BIP39 seed, persist it, and return the mnemonic word list. */
     private static List<String> generateAndPersistNewSeed(char[] passphrase, File file) {
         try {
-            DeterministicSeed seed = new DeterministicSeed(
-                    SecureRandom.getInstanceStrong(), 128, "");
-            String mnemonic = Joiner.on(" ").join(
-                    Objects.requireNonNull(seed.getMnemonicCode()));
+            DeterministicSeed seed =
+                    new DeterministicSeed(SecureRandom.getInstanceStrong(), 128, "");
+            String mnemonic = Joiner.on(" ").join(Objects.requireNonNull(seed.getMnemonicCode()));
             if (writeInitialData(file, mnemonic, passphrase)) {
                 return seed.getMnemonicCode();
             }
@@ -500,8 +495,8 @@ public class KeyHandler {
     /**
      * Back up any existing wallet, then encrypt and persist the mnemonic.
      *
-     * @param keyFile    destination wallet file
-     * @param mnemonic   space-separated mnemonic string
+     * @param keyFile destination wallet file
+     * @param mnemonic space-separated mnemonic string
      * @param passphrase caller-owned; never copied to a String
      * @return {@code true} on success
      */
@@ -533,12 +528,13 @@ public class KeyHandler {
      * Re-encrypt a legacy V1 wallet in the V2 format.
      *
      * <p>Safety contract:
+     *
      * <ol>
      *   <li>The legacy file is renamed to a timestamped legacy-backup before any write.
      *   <li>After writing, the new file is verified by attempting decryption.
-     *   <li>If verification fails, the new file is deleted and the legacy backup is
-     *       restored. If restoration itself fails, a {@link RuntimeException} is thrown
-     *       so the caller knows the wallet is in an inconsistent state.
+     *   <li>If verification fails, the new file is deleted and the legacy backup is restored. If
+     *       restoration itself fails, a {@link RuntimeException} is thrown so the caller knows the
+     *       wallet is in an inconsistent state.
      * </ol>
      */
     private static void migrateToNewFormat(char[] passphrase, String seed, File keyFile) {
@@ -552,8 +548,10 @@ public class KeyHandler {
             // Create a distinctly named legacy backup (not in the backups/ subdir, so
             // it is easy to find and recover manually).
             String timestamp = TIMESTAMP_FORMAT.format(LocalDateTime.now());
-            legacyBackup = new File(ConfigHelper.getLocalDataDirectory(),
-                    "key-backup-legacy-" + timestamp + ".dat");
+            legacyBackup =
+                    new File(
+                            ConfigHelper.getLocalDataDirectory(),
+                            "key-backup-legacy-" + timestamp + ".dat");
             if (!keyFile.renameTo(legacyBackup)) {
                 throw new RuntimeException("Cannot back up legacy wallet — migration aborted");
             }
@@ -566,7 +564,8 @@ public class KeyHandler {
             writeWalletFile(keyFile, newSalt, parts[0], parts[1]);
 
             if (!validateMigration(passphrase, keyFile)) {
-                throw new RuntimeException("Post-migration validation failed — new file is unreadable");
+                throw new RuntimeException(
+                        "Post-migration validation failed — new file is unreadable");
             }
 
             LOGGER.info("[security] Wallet successfully migrated to V2 (SHA-256/CBC)");
@@ -579,11 +578,13 @@ public class KeyHandler {
             if (legacyBackup != null && legacyBackup.exists()) {
                 if (!legacyBackup.renameTo(keyFile)) {
                     throw new RuntimeException(
-                            "[security] CRITICAL: migration failed AND backup restoration failed" + e.getMessage());
+                            "[security] CRITICAL: migration failed AND backup restoration failed"
+                                    + e.getMessage());
                 }
                 LOGGER.info("[security] Legacy wallet restored from backup");
             } else {
-                throw new RuntimeException("Migration failed with no backup available" + e.getMessage());
+                throw new RuntimeException(
+                        "Migration failed with no backup available" + e.getMessage());
             }
         } finally {
             if (newSalt != null) Arrays.fill(newSalt, (byte) 0);
@@ -604,18 +605,23 @@ public class KeyHandler {
     }
 
     /**
-     * Verify that the migrated wallet can be decrypted and yields a valid BIP39
-     * word count (12, 15, 18, 21, or 24).
+     * Verify that the migrated wallet can be decrypted and yields a valid BIP39 word count (12, 15,
+     * 18, 21, or 24).
      */
     private static boolean validateMigration(char[] passphrase, File keyFile) {
         try {
             WalletData data = readWalletFile(keyFile);
             String decrypted = decryptSeedCbc(passphrase, data.encrypted, data.salt, data.iv);
             int wordCount = decrypted.trim().split("\\s+").length;
-            boolean valid = wordCount == 12 || wordCount == 15 || wordCount == 18
-                    || wordCount == 21 || wordCount == 24;
+            boolean valid =
+                    wordCount == 12
+                            || wordCount == 15
+                            || wordCount == 18
+                            || wordCount == 21
+                            || wordCount == 24;
             if (!valid) {
-                LOGGER.warning("[security] Migration validation: unexpected word count " + wordCount);
+                LOGGER.warning(
+                        "[security] Migration validation: unexpected word count " + wordCount);
             }
             return valid;
         } catch (Exception e) {
@@ -631,7 +637,7 @@ public class KeyHandler {
     private static final class WalletData {
         final int version;
         final byte[] salt;
-        final byte[] iv;        // null for V1 (ECB) wallets
+        final byte[] iv; // null for V1 (ECB) wallets
         final byte[] encrypted;
 
         WalletData(int version, byte[] salt, byte[] iv, byte[] encrypted) {

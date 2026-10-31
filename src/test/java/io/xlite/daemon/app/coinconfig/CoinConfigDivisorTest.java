@@ -1,5 +1,8 @@
 package io.xlite.daemon.app.coinconfig;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,22 +10,17 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 /**
  * The divisor must be right, and it must be reachable.
  *
- * <p>What this pins: each coin's factor is read from its own configuration, so
- * a 6-decimal coin is not priced with 1e8.
+ * <p>What this pins: each coin's factor is read from its own configuration, so a 6-decimal coin is
+ * not priced with 1e8.
  *
- * <p>On the other failure mode -- no factor available at all -- it pins the
- * throw, not the absence of one. An unloaded registry does throw from
- * {@link CoinConfigRegistry#get}, and the daemon stays up because
- * CoinInstance turns that into UNSUPPORTEDCOIN while initialising a coin. The
- * amount paths therefore stay unreachable in that mode rather than never
- * throwing: which coins reach them is a property of coin initialisation, not of
- * the conversion.
+ * <p>On the other failure mode -- no factor available at all -- it pins the throw, not the absence
+ * of one. An unloaded registry does throw from {@link CoinConfigRegistry#get}, and the daemon stays
+ * up because CoinInstance turns that into UNSUPPORTEDCOIN while initialising a coin. The amount
+ * paths therefore stay unreachable in that mode rather than never throwing: which coins reach them
+ * is a property of coin initialisation, not of the conversion.
  */
 class CoinConfigDivisorTest {
 
@@ -61,27 +59,24 @@ class CoinConfigDivisorTest {
         assertEquals(EIGHT_DECIMAL, CoinConfigRegistry.get("BLOCK").coinFactor());
     }
 
-
-
-
     @Test
     @DisplayName("another coin still fails fast without configuration")
     void testOtherCoinsStillFailFast() {
-        assertThrows(IllegalStateException.class, () -> CoinConfigRegistry.get("PIVX"),
+        assertThrows(
+                IllegalStateException.class,
+                () -> CoinConfigRegistry.get("PIVX"),
                 "a coin with no built-in config and no registry must fail loudly "
                         + "rather than guess a divisor");
     }
-
 
     @Test
     @DisplayName("a config whose COIN is not a power of ten is rejected at load")
     void testGateRejectsNonPowerOfTenCoin() {
         CoinConfig bad = config("ODD", "Odd", 3L);
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> CoinConfigGate.validate(bad));
+        IllegalStateException e =
+                assertThrows(IllegalStateException.class, () -> CoinConfigGate.validate(bad));
         org.junit.jupiter.api.Assertions.assertTrue(
                 e.getMessage().contains("power of ten"),
                 "the rejection must name the problem: " + e.getMessage());
     }
-
 }

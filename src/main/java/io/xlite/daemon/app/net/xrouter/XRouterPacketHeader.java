@@ -1,6 +1,7 @@
 package io.xlite.daemon.app.net.xrouter;
 
 import com.subgraph.orchid.encoders.Hex;
+
 import org.bitcoinj.core.Utils;
 
 import java.nio.ByteBuffer;
@@ -8,8 +9,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class XRouterPacketHeader {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private byte[] compactSizeBytes;
     private int version;
@@ -50,8 +51,12 @@ public class XRouterPacketHeader {
         System.arraycopy(rawHeader, cursor, compactSizeBytes, 0, compactSizeBytes.length);
         cursor += compactSizeBytes.length;
 
-        LOGGER.finer("[xrouter] Retrieved compact size: " + new String(Hex.encode(new byte[]{compactSize})));
-        LOGGER.finer("[xrouter] Retrieved compact size bytes: " + new String(Hex.encode(compactSizeBytes)));
+        LOGGER.finer(
+                "[xrouter] Retrieved compact size: "
+                        + new String(Hex.encode(new byte[] {compactSize})));
+        LOGGER.finer(
+                "[xrouter] Retrieved compact size bytes: "
+                        + new String(Hex.encode(compactSizeBytes)));
 
         version = (int) Utils.readUint32(rawHeader, cursor);
         cursor += 4;
@@ -66,8 +71,8 @@ public class XRouterPacketHeader {
         cursor += 4;
         LOGGER.finer("[xrouter] Retrieved size: " + size);
 
-        //reserved header fields
-        //we don't use these fields, so we skip them
+        // reserved header fields
+        // we don't use these fields, so we skip them
         cursor += 8;
 
         byte[] uuidArr = new byte[36];
@@ -91,7 +96,7 @@ public class XRouterPacketHeader {
 
         LOGGER.finer("[xrouter] XRouter header read complete, at position: " + cursor);
         headerLength = cursor;
-        //should have read 157 bytes at this point (excluding compact size)
+        // should have read 157 bytes at this point (excluding compact size)
     }
 
     byte[] getCompactSizeBytes() {

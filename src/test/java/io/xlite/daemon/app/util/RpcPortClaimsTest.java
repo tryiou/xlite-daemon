@@ -1,7 +1,10 @@
 package io.xlite.daemon.app.util;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -9,12 +12,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Pins which ports a stepping listener may not take: the master listener's
- * port, another coin's own daemon port, and another coin's derived listener
- * port.
+ * Pins which ports a stepping listener may not take: the master listener's port, another coin's own
+ * daemon port, and another coin's derived listener port.
  */
 class RpcPortClaimsTest {
 

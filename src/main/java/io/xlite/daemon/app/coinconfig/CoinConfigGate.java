@@ -6,9 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Sanity gate applied to a {@link CoinConfig} before its values may drive
- * live address/fee behavior. Violations abort with every problem listed —
- * a config that fails here must never silently fall back to anything.
+ * Sanity gate applied to a {@link CoinConfig} before its values may drive live address/fee
+ * behavior. Violations abort with every problem listed — a config that fails here must never
+ * silently fall back to anything.
  */
 public final class CoinConfigGate {
 
@@ -39,25 +39,21 @@ public final class CoinConfigGate {
                 v.add("COIN is not a power of ten: " + cfg.coinFactor());
             }
         }
-        if (cfg.feePerByte() <= 0)
-            v.add("FeePerByte must be positive, got " + cfg.feePerByte());
-        if (cfg.minTxFee() <= 0)
-            v.add("MinTxFee must be positive, got " + cfg.minTxFee());
+        if (cfg.feePerByte() <= 0) v.add("FeePerByte must be positive, got " + cfg.feePerByte());
+        if (cfg.minTxFee() <= 0) v.add("MinTxFee must be positive, got " + cfg.minTxFee());
 
         // A dust floor is required: absent fails here rather than silently
         // meaning "no floor". Zero is legal (Firo has no dust gate); negative
         // would let every change output through, paying it to the miner.
         try {
             long dust = cfg.dustAmount();
-            if (dust < 0)
-                v.add("DustAmount must not be negative, got " + dust);
+            if (dust < 0) v.add("DustAmount must not be negative, got " + dust);
         } catch (RuntimeException e) {
             v.add("DustAmount invalid: " + e.getMessage());
         }
 
         int port = cfg.port();
-        if (port < 1024 || port > 65_535)
-            v.add("Port out of range 1024..65535: " + port);
+        if (port < 1024 || port > 65_535) v.add("Port out of range 1024..65535: " + port);
 
         // TxWithTimeField decides whether signatures are computed over an
         // nTime-bearing preimage. A malformed value throws when the send path
@@ -76,23 +72,20 @@ public final class CoinConfigGate {
         // not capped at 2 -- BCF carries larger values (Particl's 160).
         try {
             int txVersion = cfg.txVersion();
-            if (txVersion < 1)
-                v.add("TxVersion must be positive, got " + txVersion);
+            if (txVersion < 1) v.add("TxVersion must be positive, got " + txVersion);
         } catch (RuntimeException e) {
             v.add("TxVersion invalid: " + e.getMessage());
         }
 
         if (!v.isEmpty()) {
-            throw new IllegalStateException("["
-                    + cfg.getTicker() + "] coin config rejected: " + String.join("; ", v));
+            throw new IllegalStateException(
+                    "[" + cfg.getTicker() + "] coin config rejected: " + String.join("; ", v));
         }
     }
 
     private static void checkByteRange(String key, int value, List<String> violations) {
-        if (value < 0 || value > 255)
-            violations.add(key + " out of byte range 0..255: " + value);
+        if (value < 0 || value > 255) violations.add(key + " out of byte range 0..255: " + value);
     }
 
-    private CoinConfigGate() {
-    }
+    private CoinConfigGate() {}
 }

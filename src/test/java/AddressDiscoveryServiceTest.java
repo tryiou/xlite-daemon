@@ -1,9 +1,15 @@
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
 import io.xlite.daemon.app.util.AddressDiscoveryService;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,15 +25,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 /**
  * Tests for AddressDiscoveryService sequential batch scan.
  *
- * Algorithm: scan batches 0, 1, 2, ... Stop at first empty batch.
- * 3 consecutive HTTP failures → abort. No gap limit.
+ * <p>Algorithm: scan batches 0, 1, 2, ... Stop at first empty batch. 3 consecutive HTTP failures →
+ * abort. No gap limit.
  */
 class AddressDiscoveryServiceTest extends TestHelper {
 
@@ -78,7 +80,8 @@ class AddressDiscoveryServiceTest extends TestHelper {
         int usedAddressIndex = getAddressCountInitial() + 10;
         for (int i = 0; i < 50; i++) coinInstance.generateAddress(false);
 
-        String usedAddress = coinInstance.getAddressKeyPairs().get(usedAddressIndex).getAddress().toBase58();
+        String usedAddress =
+                coinInstance.getAddressKeyPairs().get(usedAddressIndex).getAddress().toBase58();
 
         when(mockHttpClient.getUtxosUncached(any(), any(String[].class)))
                 .thenAnswer(inv -> {
@@ -113,14 +116,17 @@ class AddressDiscoveryServiceTest extends TestHelper {
         verify(mockHttpClient, times(3)).getUtxosUncached(any(), any(String[].class));
     }
 
-    /** Batch 0 fails (1 error), batch 1 has UTXOs, batch 2 empty. Error counter resets on success. */
+    /**
+     * Batch 0 fails (1 error), batch 1 has UTXOs, batch 2 empty. Error counter resets on success.
+     */
     @Test
     void testDiscovery_SkipsFailedBatch() {
         int batchSize = AddressDiscoveryService.getBatchSize();
         for (int i = 0; i < 2 * batchSize; i++) coinInstance.generateAddress(false);
 
         int usedAddressIndex = getAddressCountInitial() + batchSize + batchSize / 2; // batch 1
-        String usedAddress = coinInstance.getAddressKeyPairs().get(usedAddressIndex).getAddress().toBase58();
+        String usedAddress =
+                coinInstance.getAddressKeyPairs().get(usedAddressIndex).getAddress().toBase58();
 
         AtomicInteger callCount = new AtomicInteger(0);
         when(mockHttpClient.getUtxosUncached(any(), any(String[].class)))
@@ -143,7 +149,8 @@ class AddressDiscoveryServiceTest extends TestHelper {
         for (int i = 0; i < 100; i++) coinInstance.generateAddress(false);
 
         int usedAddressIndex = getAddressCountInitial() + 10;
-        String usedAddress = coinInstance.getAddressKeyPairs().get(usedAddressIndex).getAddress().toBase58();
+        String usedAddress =
+                coinInstance.getAddressKeyPairs().get(usedAddressIndex).getAddress().toBase58();
 
         when(mockHttpClient.getUtxosUncached(any(), any(String[].class)))
                 .thenAnswer(inv -> {
@@ -165,10 +172,9 @@ class AddressDiscoveryServiceTest extends TestHelper {
     }
 
     /**
-     * All NUM_BATCHES have UTXOs. Scans all batches.
-     * No wallet address pre-generation is needed: discovery derives each batch
-     * independently via deriveAddressRange(), so the mocked UTXO feed alone
-     * drives the scan.
+     * All NUM_BATCHES have UTXOs. Scans all batches. No wallet address pre-generation is needed:
+     * discovery derives each batch independently via deriveAddressRange(), so the mocked UTXO feed
+     * alone drives the scan.
      */
     @Test
     void testDiscovery_AllBatchesFunded() {
@@ -212,8 +218,7 @@ class AddressDiscoveryServiceTest extends TestHelper {
         executor.shutdown();
 
         assertEquals(numThreads, results.size());
-        for (Integer result : results)
-            assertEquals(getAddressCountInitial(), result);
+        for (Integer result : results) assertEquals(getAddressCountInitial(), result);
     }
 
     /** Batch probes use BATCH_SIZE addresses. */

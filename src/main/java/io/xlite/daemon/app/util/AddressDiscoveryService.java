@@ -4,9 +4,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
+
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -24,11 +26,11 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class AddressDiscoveryService {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private static final int BATCH_SIZE = 500;
-    private static final int NUM_BATCHES = 100;  // 500 * 100 = 50,000 address range
+    private static final int NUM_BATCHES = 100; // 500 * 100 = 50,000 address range
     private static final int MAX_CONSECUTIVE_ERRORS = 3;
     private static int DISCOVERY_TIMEOUT_MS = 30000; // non-final for testing
 
@@ -64,9 +66,9 @@ public class AddressDiscoveryService {
     }
 
     /**
-     * Derive and cache the external chain key from the wallet seed.
-     * Clears the seed copy immediately after derivation per security conventions.
-     * Note: the wallet's original seed is never modified.
+     * Derive and cache the external chain key from the wallet seed. Clears the seed copy
+     * immediately after derivation per security conventions. Note: the wallet's original seed is
+     * never modified.
      */
     private static DeterministicKey initExternalChainKey(Wallet wallet) {
         byte[] seedBytes = wallet.getKeyChainSeed().getSeedBytes();
@@ -87,9 +89,7 @@ public class AddressDiscoveryService {
         }
     }
 
-    /**
-     * Clear the cached external chain key from memory after address discovery is complete.
-     */
+    /** Clear the cached external chain key from memory after address discovery is complete. */
     public void clearExternalChainKey() {
         this.externalChainKey = null;
     }
@@ -101,12 +101,12 @@ public class AddressDiscoveryService {
     /**
      * Discovers the correct address count by scanning batches sequentially from batch 0.
      *
-     * Each batch (100 addresses) is checked for any UTXOs. As long as a batch has funds,
-     * the scan continues to the next batch. The first empty batch marks the boundary.
-     * Within the last non-empty batch, the exact highest funded address is found.
+     * <p>Each batch (100 addresses) is checked for any UTXOs. As long as a batch has funds, the
+     * scan continues to the next batch. The first empty batch marks the boundary. Within the last
+     * non-empty batch, the exact highest funded address is found.
      *
-     * Returns the index of the last funded address + 1 as the discovered address count.
-     * Returns the current config value if batch 0 is empty (wallet unused) or on failure.
+     * <p>Returns the index of the last funded address + 1 as the discovered address count. Returns
+     * the current config value if batch 0 is empty (wallet unused) or on failure.
      */
     public int discoverAddressCount() {
         long startTime = System.currentTimeMillis();
@@ -132,8 +132,11 @@ public class AddressDiscoveryService {
                 if (utxos == null) {
                     consecutiveErrors++;
                     if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                        LOGGER.warning(getLogPrefix()
-                                + " Aborting: " + MAX_CONSECUTIVE_ERRORS + " consecutive HTTP failures");
+                        LOGGER.warning(
+                                getLogPrefix()
+                                        + " Aborting: "
+                                        + MAX_CONSECUTIVE_ERRORS
+                                        + " consecutive HTTP failures");
                         break;
                     }
                     continue;
@@ -162,9 +165,15 @@ public class AddressDiscoveryService {
                 addr.clearPrivateKey();
             }
 
-            LOGGER.info(getLogPrefix() + " Discovery complete: lastBatch="
-                    + lastNonEmptyBatch + ", count=" + discoveredCount
-                    + ", time=" + (System.currentTimeMillis() - startTime) + "ms");
+            LOGGER.info(
+                    getLogPrefix()
+                            + " Discovery complete: lastBatch="
+                            + lastNonEmptyBatch
+                            + ", count="
+                            + discoveredCount
+                            + ", time="
+                            + (System.currentTimeMillis() - startTime)
+                            + "ms");
 
             return discoveredCount;
 
@@ -176,6 +185,7 @@ public class AddressDiscoveryService {
 
     /**
      * Probe a batch for UTXOs.
+     *
      * @return UTXO list (may be empty), or null on HTTP failure
      */
     private List<UTXO> probeBatch(int batchIndex) {
@@ -191,8 +201,8 @@ public class AddressDiscoveryService {
     }
 
     /**
-     * Derive addresses at specific HD indices without modifying wallet state.
-     * Uses the pre-derived external chain key, bypassing the wallet lookahead window limitation.
+     * Derive addresses at specific HD indices without modifying wallet state. Uses the pre-derived
+     * external chain key, bypassing the wallet lookahead window limitation.
      */
     private List<AddressBalance> deriveAddressRange(int startIndex, int count) {
         List<AddressBalance> result = new ArrayList<>(count);
@@ -203,8 +213,10 @@ public class AddressDiscoveryService {
 
         for (int i = 0; i < count; i++) {
             int index = startIndex + i;
-            DeterministicKey addressKey = HDKeyDerivation.deriveChildKey(externalChainKey, new ChildNumber(index, false));
-            LegacyAddress address = LegacyAddress.fromPubKeyHash(params, addressKey.getPubKeyHash());
+            DeterministicKey addressKey =
+                    HDKeyDerivation.deriveChildKey(externalChainKey, new ChildNumber(index, false));
+            LegacyAddress address =
+                    LegacyAddress.fromPubKeyHash(params, addressKey.getPubKeyHash());
             DumpedPrivateKey privKey = addressKey.getPrivateKeyEncoded(params);
             result.add(new AddressBalance(address, privKey));
         }
@@ -217,21 +229,27 @@ public class AddressDiscoveryService {
 
     /**
      * Check a batch of addresses for UTXOs via HTTP.
+     *
      * @return list of UTXOs found (may be empty), or null on HTTP failure
      */
     private List<UTXO> checkBatchForUtxos(List<AddressBalance> batch) {
         if (batch.isEmpty()) {
             return new ArrayList<>();
         }
-        String[] addresses = batch.stream()
-                .map(addr -> addr.getAddress().toBase58())
-                .toArray(String[]::new);
+        String[] addresses =
+                batch.stream().map(addr -> addr.getAddress().toBase58()).toArray(String[]::new);
         JsonArray utxoResponse = null;
         try {
             utxoResponse = httpClient.getUtxosUncached(coinInstance.getTicker(), addresses);
         } catch (Exception e) {
-            LOGGER.warning(getLogPrefix() + " HTTP request failed for addresses "
-                    + addresses[0] + "..." + addresses[addresses.length - 1] + " - " + e.getMessage());
+            LOGGER.warning(
+                    getLogPrefix()
+                            + " HTTP request failed for addresses "
+                            + addresses[0]
+                            + "..."
+                            + addresses[addresses.length - 1]
+                            + " - "
+                            + e.getMessage());
             return null;
         }
         if (utxoResponse == null || utxoResponse.size() == 0) {
@@ -248,33 +266,44 @@ public class AddressDiscoveryService {
                 JsonElement confirmationsElement = utxoJson.get("confirmations");
                 JsonElement valueElement = utxoJson.get("value");
 
-                if (addressElement == null || txidElement == null || voutElement == null ||
-                        confirmationsElement == null || valueElement == null ||
-                        addressElement.isJsonNull() || txidElement.isJsonNull() || voutElement.isJsonNull() ||
-                        confirmationsElement.isJsonNull() || valueElement.isJsonNull()) {
-                    LOGGER.warning(getLogPrefix() + " Skipping invalid UTXO - missing required fields");
+                if (addressElement == null
+                        || txidElement == null
+                        || voutElement == null
+                        || confirmationsElement == null
+                        || valueElement == null
+                        || addressElement.isJsonNull()
+                        || txidElement.isJsonNull()
+                        || voutElement.isJsonNull()
+                        || confirmationsElement.isJsonNull()
+                        || valueElement.isJsonNull()) {
+                    LOGGER.warning(
+                            getLogPrefix() + " Skipping invalid UTXO - missing required fields");
                     continue;
                 }
 
-                UTXO utxo = new UTXO(
-                        coinInstance.getTicker(),
-                        addressElement.getAsString(),
-                        txidElement.getAsString(),
-                        voutElement.getAsInt(),
-                        confirmationsElement.getAsInt(),
-                        UTXO.baseUnitsForTicker(coinInstance.getTicker(), valueElement.getAsDouble())
-                );
+                UTXO utxo =
+                        new UTXO(
+                                coinInstance.getTicker(),
+                                addressElement.getAsString(),
+                                txidElement.getAsString(),
+                                voutElement.getAsInt(),
+                                confirmationsElement.getAsInt(),
+                                UTXO.baseUnitsForTicker(
+                                        coinInstance.getTicker(), valueElement.getAsDouble()));
                 utxos.add(utxo);
             } catch (Exception e) {
-                LOGGER.warning(getLogPrefix() + " Failed to parse UTXO response element: " + e.getMessage());
+                LOGGER.warning(
+                        getLogPrefix()
+                                + " Failed to parse UTXO response element: "
+                                + e.getMessage());
             }
         }
         return utxos;
     }
 
     /**
-     * Find the highest address index within a batch that has UTXOs.
-     * Uses HashMap for O(1) lookups when batch size > 20.
+     * Find the highest address index within a batch that has UTXOs. Uses HashMap for O(1) lookups
+     * when batch size > 20.
      */
     private int findLastUsedIndexInBatch(List<AddressBalance> batch, List<UTXO> utxos) {
         Map<String, Integer> addressToIndex = new HashMap<>(batch.size());

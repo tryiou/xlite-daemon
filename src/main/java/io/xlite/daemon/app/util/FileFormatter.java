@@ -7,20 +7,19 @@ import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
 /**
- * Custom formatter for file output that produces detailed logs with timestamps and class information.
- * Format: yyyy-MM-dd HH:mm:ss class.method: message
- * Example: 2025-12-12 12:01:51 io.xlite.daemon.app.console.ConsoleMenu.init: Wallet initialized
- * 
- * This formatter:
- * - Uses English locale for consistent date formatting
- * - Includes full timestamp with seconds precision
- * - Includes fully qualified class name and method
- * - Provides detailed information for debugging and auditing
+ * Custom formatter for file output that produces detailed logs with timestamps and class
+ * information. Format: yyyy-MM-dd HH:mm:ss class.method: message Example: 2025-12-12 12:01:51
+ * io.xlite.daemon.app.console.ConsoleMenu.init: Wallet initialized
+ *
+ * <p>This formatter: - Uses English locale for consistent date formatting - Includes full timestamp
+ * with seconds precision - Includes fully qualified class name and method - Provides detailed
+ * information for debugging and auditing
  */
 public class FileFormatter extends Formatter {
 
     private static final String LINE_SEPARATOR = System.getProperty("line.separator");
-    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+    private static final SimpleDateFormat dateFormat =
+            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
 
     @Override
     public String format(LogRecord record) {

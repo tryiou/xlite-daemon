@@ -1,10 +1,13 @@
 package io.xlite.daemon.app.wallet;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.UTXO;
+
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
 import org.junit.jupiter.api.AfterAll;
@@ -16,16 +19,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 /**
  * The nTime resolution contract, and the fee the send path reports.
  *
- * <p>Two properties are load-bearing: {@link WalletHelper#resolveNTime} must
- * fail closed -- a time-field coin with no resolver, an out-of-range value or a
- * throwing resolver must abandon the transaction rather than sign a guess -- and
- * {@link WalletHelper#feeActuallyCharged} must report the fee the network
- * actually charges, including when change is calculated but dropped as dust and
+ * <p>Two properties are load-bearing: {@link WalletHelper#resolveNTime} must fail closed -- a
+ * time-field coin with no resolver, an out-of-range value or a throwing resolver must abandon the
+ * transaction rather than sign a guess -- and {@link WalletHelper#feeActuallyCharged} must report
+ * the fee the network actually charges, including when change is calculated but dropped as dust and
  * for a 6-decimal coin where whole-coin rounding would erase the fee entirely.
  */
 class WalletHelperNTimeTest {
@@ -47,9 +47,15 @@ class WalletHelperNTimeTest {
         CoinConfigRegistry.resetForTest();
     }
 
-    private static CoinConfig fixture(String ticker, String blockchain,
-            int addrPrefix, int scriptPrefix, int secretPrefix,
-            long coin, int port, String txWithTimeField) {
+    private static CoinConfig fixture(
+            String ticker,
+            String blockchain,
+            int addrPrefix,
+            int scriptPrefix,
+            int secretPrefix,
+            long coin,
+            int port,
+            String txWithTimeField) {
         Map<String, String> entries = new LinkedHashMap<>();
         entries.put("AddressPrefix", Integer.toString(addrPrefix));
         entries.put("ScriptPrefix", Integer.toString(scriptPrefix));
@@ -76,7 +82,8 @@ class WalletHelperNTimeTest {
     @Test
     @DisplayName("a coin whose transactions carry nTime needs a resolver")
     void testTimeFieldCoinWithoutResolverFailsClosed() {
-        assertEquals(WalletHelper.INVALID_NTIME,
+        assertEquals(
+                WalletHelper.INVALID_NTIME,
                 WalletHelper.resolveNTime(
                         io.xlite.daemon.app.net.CoinTicker.VERGE, selected(), null),
                 "signing a time-field coin without an nTime would produce a "
@@ -86,12 +93,14 @@ class WalletHelperNTimeTest {
     @Test
     @DisplayName("a resolver that throws abandons the transaction")
     void testThrowingResolverFailsClosed() {
-        assertEquals(WalletHelper.INVALID_NTIME,
+        assertEquals(
+                WalletHelper.INVALID_NTIME,
                 WalletHelper.resolveNTime(
-                        io.xlite.daemon.app.net.CoinTicker.VERGE, selected(),
-                                utxos -> {
-                                    throw new RuntimeException("Cannot fetch parent abc for nTime");
-                                }),
+                        io.xlite.daemon.app.net.CoinTicker.VERGE,
+                        selected(),
+                        utxos -> {
+                            throw new RuntimeException("Cannot fetch parent abc for nTime");
+                        }),
                 "an unfetchable parent nTime must fail the send, not fall back "
                         + "to wall-clock time");
     }
@@ -99,32 +108,41 @@ class WalletHelperNTimeTest {
     @Test
     @DisplayName("an out-of-range nTime is refused")
     void testOutOfRangeNTimeFailsClosed() {
-        assertEquals(WalletHelper.INVALID_NTIME,
-                WalletHelper.resolveNTime(io.xlite.daemon.app.net.CoinTicker.VERGE,
-                        selected(), utxos -> 0x1_0000_0000L));
-        assertEquals(WalletHelper.INVALID_NTIME,
-                WalletHelper.resolveNTime(io.xlite.daemon.app.net.CoinTicker.VERGE,
-                        selected(), utxos -> -5L));
+        assertEquals(
+                WalletHelper.INVALID_NTIME,
+                WalletHelper.resolveNTime(
+                        io.xlite.daemon.app.net.CoinTicker.VERGE,
+                        selected(),
+                        utxos -> 0x1_0000_0000L));
+        assertEquals(
+                WalletHelper.INVALID_NTIME,
+                WalletHelper.resolveNTime(
+                        io.xlite.daemon.app.net.CoinTicker.VERGE, selected(), utxos -> -5L));
     }
 
     @Test
     @DisplayName("a valid nTime passes through unchanged")
     void testValidNTimePassesThrough() {
-        assertEquals(GOOD_NTIME,
-                WalletHelper.resolveNTime(io.xlite.daemon.app.net.CoinTicker.VERGE,
-                        selected(), utxos -> GOOD_NTIME));
+        assertEquals(
+                GOOD_NTIME,
+                WalletHelper.resolveNTime(
+                        io.xlite.daemon.app.net.CoinTicker.VERGE, selected(), utxos -> GOOD_NTIME));
     }
 
     @Test
     @DisplayName("a coin without nTime never consults a resolver")
     void testCoinWithoutTimeFieldSkipsResolution() {
-        assertEquals(WalletHelper.NO_NTIME,
-                WalletHelper.resolveNTime(io.xlite.daemon.app.net.CoinTicker.BLOCKNET,
-                        selected(), null),
+        assertEquals(
+                WalletHelper.NO_NTIME,
+                WalletHelper.resolveNTime(
+                        io.xlite.daemon.app.net.CoinTicker.BLOCKNET, selected(), null),
                 "a standard coin has no nTime to resolve");
-        assertEquals(WalletHelper.NO_NTIME,
-                WalletHelper.resolveNTime(io.xlite.daemon.app.net.CoinTicker.BLOCKNET,
-                        selected(), utxos -> {
+        assertEquals(
+                WalletHelper.NO_NTIME,
+                WalletHelper.resolveNTime(
+                        io.xlite.daemon.app.net.CoinTicker.BLOCKNET,
+                        selected(),
+                        utxos -> {
                             throw new IllegalStateException("must not be called");
                         }),
                 "the resolver must not be consulted for a standard coin");
@@ -135,16 +153,17 @@ class WalletHelperNTimeTest {
     // ------------------------------------------------------------------
 
     /**
-     * A transaction spending {@code outputValues} as outputs, built on XVG's
-     * own network parameters so the amounts are interpreted at 6 decimals.
-     * Callers pair it with {@link #utxos} to pin {@link WalletHelper#feeActuallyCharged}.
+     * A transaction spending {@code outputValues} as outputs, built on XVG's own network parameters
+     * so the amounts are interpreted at 6 decimals. Callers pair it with {@link #utxos} to pin
+     * {@link WalletHelper#feeActuallyCharged}.
      */
     private static Transaction txWithOutputs(long... outputValues) {
-        NetworkParameters params = ConfigurableNetworkParameters
-                .from(CoinConfigRegistry.get("XVG"));
+        NetworkParameters params =
+                ConfigurableNetworkParameters.from(CoinConfigRegistry.get("XVG"));
         Transaction tx = new Transaction(params);
         for (long v : outputValues) {
-            tx.addOutput(org.bitcoinj.core.Coin.valueOf(v),
+            tx.addOutput(
+                    org.bitcoinj.core.Coin.valueOf(v),
                     org.bitcoinj.core.LegacyAddress.fromPubKeyHash(params, new byte[20]));
         }
         return tx;
@@ -153,8 +172,14 @@ class WalletHelperNTimeTest {
     private static ArrayList<UTXO> utxos(long... values) {
         ArrayList<UTXO> list = new ArrayList<>();
         for (int i = 0; i < values.length; i++) {
-            list.add(new UTXO(io.xlite.daemon.app.net.CoinTicker.VERGE, "addr", "txid", i, 100,
-                    values[i]));
+            list.add(
+                    new UTXO(
+                            io.xlite.daemon.app.net.CoinTicker.VERGE,
+                            "addr",
+                            "txid",
+                            i,
+                            100,
+                            values[i]));
         }
         return list;
     }
@@ -171,8 +196,7 @@ class WalletHelperNTimeTest {
         // round values survive whole-coin rounding intact, so they cannot
         // distinguish an exact base-unit sum from a rounded one.
         Transaction tx = txWithOutputs(78_901L, 45_003L);
-        assertEquals(234_122L,
-                WalletHelper.feeActuallyCharged(utxos(123_457L, 234_569L), tx));
+        assertEquals(234_122L, WalletHelper.feeActuallyCharged(utxos(123_457L, 234_569L), tx));
     }
 
     @Test
@@ -213,9 +237,8 @@ class WalletHelperNTimeTest {
         // 312_345 + 234_567 + 411_223 in (958_135), 812_345 out, so 145_790
         // is charged. Summing only the first input would say -499_878.
         Transaction tx = txWithOutputs(812_345L);
-        assertEquals(145_790L,
-                WalletHelper.feeActuallyCharged(
-                        utxos(312_345L, 234_567L, 411_223L), tx));
+        assertEquals(
+                145_790L, WalletHelper.feeActuallyCharged(utxos(312_345L, 234_567L, 411_223L), tx));
     }
 
     // ------------------------------------------------------------------
@@ -232,7 +255,8 @@ class WalletHelperNTimeTest {
     @Test
     @DisplayName("the sentinels are distinguishable")
     void testSentinelsAreDistinct() {
-        org.junit.jupiter.api.Assertions.assertNotEquals(WalletHelper.NO_NTIME,
+        org.junit.jupiter.api.Assertions.assertNotEquals(
+                WalletHelper.NO_NTIME,
                 WalletHelper.INVALID_NTIME,
                 "a coin without nTime and a failed resolution must not look alike");
     }

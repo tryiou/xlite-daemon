@@ -1,16 +1,19 @@
 package io.xlite.daemon.app.coinconfig;
 
-import io.xlite.daemon.app.net.api.http.master.HTTPServerHandler;
-import io.xlite.daemon.app.util.ConfigHelper;
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+
+import io.xlite.daemon.app.net.api.http.master.HTTPServerHandler;
+import io.xlite.daemon.app.util.ConfigHelper;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class CoinConfigRpcTest {
 
@@ -19,14 +22,26 @@ public class CoinConfigRpcTest {
     private static Map<String, CoinConfig> simpleCfgs() {
         Map<String, CoinConfig> m = new LinkedHashMap<>();
         Map<String, String> ltc = new LinkedHashMap<>();
-        ltc.put("AddressPrefix", "48"); ltc.put("ScriptPrefix", "50"); ltc.put("SecretPrefix", "176");
-        ltc.put("COIN", "100000000"); ltc.put("FeePerByte", "10"); ltc.put("MinTxFee", "5000");
-        ltc.put("Port", "9332"); ltc.put("DustAmount", "0"); ltc.put("TxVersion", "2");
+        ltc.put("AddressPrefix", "48");
+        ltc.put("ScriptPrefix", "50");
+        ltc.put("SecretPrefix", "176");
+        ltc.put("COIN", "100000000");
+        ltc.put("FeePerByte", "10");
+        ltc.put("MinTxFee", "5000");
+        ltc.put("Port", "9332");
+        ltc.put("DustAmount", "0");
+        ltc.put("TxVersion", "2");
         m.put("LTC", new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", ltc));
         Map<String, String> block = new LinkedHashMap<>();
-        block.put("AddressPrefix", "26"); block.put("ScriptPrefix", "28"); block.put("SecretPrefix", "154");
-        block.put("COIN", "100000000"); block.put("FeePerByte", "20"); block.put("MinTxFee", "10000");
-        block.put("Port", "41414"); block.put("DustAmount", "0"); block.put("TxVersion", "1");
+        block.put("AddressPrefix", "26");
+        block.put("ScriptPrefix", "28");
+        block.put("SecretPrefix", "154");
+        block.put("COIN", "100000000");
+        block.put("FeePerByte", "20");
+        block.put("MinTxFee", "10000");
+        block.put("Port", "41414");
+        block.put("DustAmount", "0");
+        block.put("TxVersion", "1");
         m.put("BLOCK", new CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", block));
         return m;
     }
@@ -68,16 +83,29 @@ public class CoinConfigRpcTest {
         String prev = "";
         for (int i = 0; i < arr.size(); i++) {
             JsonObject o = arr.get(i).getAsJsonObject();
-            for (String k : new String[]{"ticker","blockchain","verId","addressPrefix","scriptPrefix","secretPrefix","coin","feePerByte","minTxFee","port","dustAmount"})
-                assertTrue(o.has(k), "missing " + k);
-            if (!o.get("dustAmount").isJsonNull())
-                assertTrue(o.get("dustAmount").getAsLong() >= 0);
+            for (String k :
+                    new String[] {
+                        "ticker",
+                        "blockchain",
+                        "verId",
+                        "addressPrefix",
+                        "scriptPrefix",
+                        "secretPrefix",
+                        "coin",
+                        "feePerByte",
+                        "minTxFee",
+                        "port",
+                        "dustAmount"
+                    }) assertTrue(o.has(k), "missing " + k);
+            if (!o.get("dustAmount").isJsonNull()) assertTrue(o.get("dustAmount").getAsLong() >= 0);
             String t = o.get("ticker").getAsString();
             assertTrue(t.compareTo(prev) >= 0, "not sorted " + prev + ">" + t);
             prev = t;
         }
         JsonObject ltc = null;
-        for (int i = 0; i < arr.size(); i++) if ("LTC".equals(arr.get(i).getAsJsonObject().get("ticker").getAsString())) ltc = arr.get(i).getAsJsonObject();
+        for (int i = 0; i < arr.size(); i++)
+            if ("LTC".equals(arr.get(i).getAsJsonObject().get("ticker").getAsString()))
+                ltc = arr.get(i).getAsJsonObject();
         assertNotNull(ltc);
         assertEquals(48, ltc.get("addressPrefix").getAsInt());
         assertEquals(50, ltc.get("scriptPrefix").getAsInt());
@@ -86,7 +114,9 @@ public class CoinConfigRpcTest {
         assertEquals(10, ltc.get("feePerByte").getAsLong());
         assertEquals(5000, ltc.get("minTxFee").getAsLong());
         assertEquals(9332, ltc.get("port").getAsInt());
-        assertEquals(0, ltc.get("dustAmount").getAsLong(),
+        assertEquals(
+                0,
+                ltc.get("dustAmount").getAsLong(),
                 "a real 0 (no dust gate) must be passed through, not nulled");
     }
 
@@ -111,7 +141,8 @@ public class CoinConfigRpcTest {
     public void testRejectsParams(@TempDir Path tmp) {
         ConfigHelper.CONFIG_DIR = tmp.toString();
         CoinConfigRegistry.loadForTest(simpleCfgs());
-        JsonArray p = new JsonArray(); p.add("extra");
+        JsonArray p = new JsonArray();
+        p.add("extra");
         assertEquals(-1, call("getCoins", p).getAsJsonObject("error").get("code").getAsInt());
         assertEquals(-1, call("getCoins", null).getAsJsonObject("error").get("code").getAsInt());
     }

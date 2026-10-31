@@ -1,17 +1,23 @@
 package io.xlite.daemon.app.net.api.http.server;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
+
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.script.ScriptBuilder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -20,18 +26,12 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * Pins the dry-run half of the sendtransaction contract.
  *
- * <p>A dry run must be reviewable without touching the network or the wallet,
- * and it must describe the transaction that a real send would produce -- the
- * same bytes, the same txid, and the fee actually charged rather than one
- * recomputed from the shape of the finished transaction.
+ * <p>A dry run must be reviewable without touching the network or the wallet, and it must describe
+ * the transaction that a real send would produce -- the same bytes, the same txid, and the fee
+ * actually charged rather than one recomputed from the shape of the finished transaction.
  */
 class HTTPServerHandlerSendDryRunTest {
 
@@ -73,10 +73,8 @@ class HTTPServerHandlerSendDryRunTest {
     private static JsonArray params(Object... values) {
         JsonArray array = new JsonArray();
         for (Object value : values) {
-            if (value instanceof Number)
-                array.add(new JsonPrimitive((Number) value));
-            else
-                array.add(value.toString());
+            if (value instanceof Number) array.add(new JsonPrimitive((Number) value));
+            else array.add(value.toString());
         }
         return array;
     }
@@ -114,10 +112,13 @@ class HTTPServerHandlerSendDryRunTest {
         // The asymmetry that matters: a wrong `verbose` only degrades output,
         // but a wrong `dryrun` read as false would broadcast the transaction the
         // caller asked to have reviewed first.
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "ture"), 2),
-                "a misspelling must not resolve to a real broadcast");
-        assertTrue(e.getMessage().contains("dryrun"),
+        IllegalArgumentException e =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> HTTPServerHandler.parseDryRunFlag(params("addr", 0.01, "ture"), 2),
+                        "a misspelling must not resolve to a real broadcast");
+        assertTrue(
+                e.getMessage().contains("dryrun"),
                 "the failure must name the flag, got: " + e.getMessage());
     }
 
@@ -138,14 +139,19 @@ class HTTPServerHandlerSendDryRunTest {
         // It used to be read as false, which meant an object in the flag position
         // produced a real broadcast. On this axis guessing is not symmetric: the
         // caller asked to review the transaction before it was spent.
-        for (com.google.gson.JsonElement bad : new com.google.gson.JsonElement[]{
-                new com.google.gson.JsonObject(), new com.google.gson.JsonArray()}) {
+        for (com.google.gson.JsonElement bad :
+                new com.google.gson.JsonElement[] {
+                    new com.google.gson.JsonObject(), new com.google.gson.JsonArray()
+                }) {
             JsonArray withBad = params("addr", 0.01);
             withBad.add(bad);
-            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                    () -> HTTPServerHandler.parseDryRunFlag(withBad, 2),
-                    "a non-primitive flag must not resolve to a broadcast");
-            assertTrue(e.getMessage().contains("dryrun"),
+            IllegalArgumentException e =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> HTTPServerHandler.parseDryRunFlag(withBad, 2),
+                            "a non-primitive flag must not resolve to a broadcast");
+            assertTrue(
+                    e.getMessage().contains("dryrun"),
                     "the failure must name the flag, got: " + e.getMessage());
         }
     }
@@ -164,14 +170,16 @@ class HTTPServerHandlerSendDryRunTest {
         tx.addOutput(Coin.valueOf(10_000L), LegacyAddress.fromPubKeyHash(params, new byte[20]));
         String hex = bytesToHex(tx.bitcoinSerialize());
 
-        JsonObject result = HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+        JsonObject result =
+                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
 
         assertTrue(result.get("dryRun").getAsBoolean());
         assertEquals(hex, result.get("hex").getAsString());
         // Independently recomputed: the txid must be the double-SHA256 of the
         // returned bytes, reversed. A txid computed from the in-memory
         // transaction would not match for time-field coins.
-        String expected = Sha256Hash.wrapReversed(Sha256Hash.hashTwice(tx.bitcoinSerialize())).toString();
+        String expected =
+                Sha256Hash.wrapReversed(Sha256Hash.hashTwice(tx.bitcoinSerialize())).toString();
         assertEquals(expected, result.get("txid").getAsString());
     }
 
@@ -180,14 +188,18 @@ class HTTPServerHandlerSendDryRunTest {
     void testDryRunReportsChargedFee() {
         NetworkParameters params = xvgParams();
         Transaction tx = new Transaction(params);
-        tx.addInput(Sha256Hash.wrapReversed(new byte[32]), 0, new org.bitcoinj.script.ScriptBuilder().build());
+        tx.addInput(
+                Sha256Hash.wrapReversed(new byte[32]),
+                0,
+                new org.bitcoinj.script.ScriptBuilder().build());
         tx.addOutput(Coin.valueOf(10_000L), LegacyAddress.fromPubKeyHash(params, new byte[20]));
         String hex = bytesToHex(tx.bitcoinSerialize());
 
         // 1 input / 1 output would be max(200 * 226, 100000) = 100000 by
         // formula; the wallet actually reserved for a change input and
         // charged the 120000 it passed in. The payload must show the latter.
-        JsonObject result = HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 120_000L, hex, tx);
+        JsonObject result =
+                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 120_000L, hex, tx);
 
         assertEquals(120_000L, result.get("feeSats").getAsLong());
         assertEquals(0.12, result.get("fee").getAsDouble(), 1e-9);
@@ -201,12 +213,16 @@ class HTTPServerHandlerSendDryRunTest {
     void testDryRunFeeUsesCoinUnit() {
         NetworkParameters params = xvgParams();
         Transaction tx = new Transaction(params);
-        tx.addInput(Sha256Hash.wrapReversed(new byte[32]), 0, new org.bitcoinj.script.ScriptBuilder().build());
+        tx.addInput(
+                Sha256Hash.wrapReversed(new byte[32]),
+                0,
+                new org.bitcoinj.script.ScriptBuilder().build());
         String hex = bytesToHex(tx.bitcoinSerialize());
 
         // 100000 base units of a 1e6-divisor coin is 0.1 XVG. With a
         // hardcoded 1e8 divisor this would report 0.001.
-        JsonObject result = HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+        JsonObject result =
+                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
 
         assertEquals(0.1, result.get("fee").getAsDouble(), 1e-9);
     }
@@ -216,12 +232,19 @@ class HTTPServerHandlerSendDryRunTest {
     void testDryRunReportsShape() {
         NetworkParameters params = xvgParams();
         Transaction tx = new Transaction(params);
-        tx.addInput(Sha256Hash.wrapReversed(new byte[32]), 0, new org.bitcoinj.script.ScriptBuilder().build());
-        tx.addInput(Sha256Hash.wrapReversed(new byte[32]), 1, new org.bitcoinj.script.ScriptBuilder().build());
+        tx.addInput(
+                Sha256Hash.wrapReversed(new byte[32]),
+                0,
+                new org.bitcoinj.script.ScriptBuilder().build());
+        tx.addInput(
+                Sha256Hash.wrapReversed(new byte[32]),
+                1,
+                new org.bitcoinj.script.ScriptBuilder().build());
         tx.addOutput(Coin.valueOf(10_000L), LegacyAddress.fromPubKeyHash(params, new byte[20]));
         String hex = bytesToHex(tx.bitcoinSerialize());
 
-        JsonObject result = HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
+        JsonObject result =
+                HTTPServerHandler.buildDryRunResult(params, XVG_COIN_UNIT, 100_000L, hex, tx);
 
         assertEquals(2, result.get("inputs").getAsInt());
         assertEquals(1, result.get("outputs").getAsInt());
@@ -230,8 +253,7 @@ class HTTPServerHandlerSendDryRunTest {
 
     private static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes)
-            sb.append(String.format("%02x", b));
+        for (byte b : bytes) sb.append(String.format("%02x", b));
         return sb.toString();
     }
 

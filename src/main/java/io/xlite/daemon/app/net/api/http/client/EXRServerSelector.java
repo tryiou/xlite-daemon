@@ -10,23 +10,20 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 /**
- * Server selection interface defining the contract for server selection strategies.
- * This interface enables dependency injection and loose coupling between
- * server pool management and server selection logic.
+ * Server selection interface defining the contract for server selection strategies. This interface
+ * enables dependency injection and loose coupling between server pool management and server
+ * selection logic.
  *
- * Implementations can provide different selection algorithms such as:
- * - Round-robin selection (default implementation)
- * - Weighted selection based on server performance
- * - Random selection
- * - Health-based selection
- * - Load-aware selection
+ * <p>Implementations can provide different selection algorithms such as: - Round-robin selection
+ * (default implementation) - Weighted selection based on server performance - Random selection -
+ * Health-based selection - Load-aware selection
  */
 interface ServerSelector {
 
     /**
-     * Select a healthy server from the provided list using the selection strategy.
-     * The selection algorithm is implementation-specific and may use various criteria
-     * such as round-robin, random selection, or performance-based selection.
+     * Select a healthy server from the provided list using the selection strategy. The selection
+     * algorithm is implementation-specific and may use various criteria such as round-robin, random
+     * selection, or performance-based selection.
      *
      * @param servers List of servers to select from (must not be null)
      * @return Selected healthy server or null if none available
@@ -35,9 +32,8 @@ interface ServerSelector {
     EXRServer selectHealthyServer(List<EXRServer> servers);
 
     /**
-     * Select a server for a specific coin with proper error handling.
-     * This method ensures that the selected server supports the requested coin
-     * and is in a healthy state.
+     * Select a server for a specific coin with proper error handling. This method ensures that the
+     * selected server supports the requested coin and is in a healthy state.
      *
      * @param supportingServers List of servers that support the coin (can be null)
      * @param coin The coin to select a server for (must not be null)
@@ -48,19 +44,20 @@ interface ServerSelector {
 }
 
 /**
- * Default implementation of ServerSelector using round-robin selection strategy.
- * This class provides the original server selection logic extracted from
- * EXRServerPool to separate server selection concerns from pool management.
+ * Default implementation of ServerSelector using round-robin selection strategy. This class
+ * provides the original server selection logic extracted from EXRServerPool to separate server
+ * selection concerns from pool management.
  */
 class EXRServerSelectorImpl implements ServerSelector {
 
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private final AtomicInteger currentIndex;
 
     /**
      * Constructor for EXRServerSelectorImpl.
+     *
      * @param currentIndex Shared atomic integer for round-robin selection
      */
     public EXRServerSelectorImpl(AtomicInteger currentIndex) {
@@ -68,9 +65,8 @@ class EXRServerSelectorImpl implements ServerSelector {
     }
 
     /**
-     * Select a healthy server from the provided list using round-robin.
-     * This method implements the same logic as EXRServerPool.selectServer()
-     * but extracts it into a separate utility class.
+     * Select a healthy server from the provided list using round-robin. This method implements the
+     * same logic as EXRServerPool.selectServer() but extracts it into a separate utility class.
      *
      * @param servers List of servers to select from (must not be null)
      * @return Selected healthy server or null if none available
@@ -99,9 +95,8 @@ class EXRServerSelectorImpl implements ServerSelector {
     }
 
     /**
-     * Select a server for a specific coin with proper error handling.
-     * This method implements coin-aware server selection logic,
-     * extracting it from EXRServerPool.selectServerForCoin().
+     * Select a server for a specific coin with proper error handling. This method implements
+     * coin-aware server selection logic, extracting it from EXRServerPool.selectServerForCoin().
      *
      * @param supportingServers List of servers that support the coin (can be null)
      * @param coin The coin to select a server for (must not be null)
@@ -111,8 +106,9 @@ class EXRServerSelectorImpl implements ServerSelector {
     @Override
     public EXRServer selectServerForCoin(List<EXRServer> supportingServers, CoinTicker coin) {
         if (supportingServers == null || supportingServers.isEmpty()) {
-            LOGGER.warning("[server-selector] NO EXR SERVERS SUPPORT COIN: " +
-                    CoinTickerUtils.tickerToString(coin));
+            LOGGER.warning(
+                    "[server-selector] NO EXR SERVERS SUPPORT COIN: "
+                            + CoinTickerUtils.tickerToString(coin));
             return null; // FAIL - NO FALLBACK TO BASE_URL
         }
 
@@ -124,8 +120,7 @@ class EXRServerSelectorImpl implements ServerSelector {
     }
 
     /**
-     * Extract health filtering logic.
-     * This method filters the list to only include healthy servers.
+     * Extract health filtering logic. This method filters the list to only include healthy servers.
      *
      * @param supportingServers List of servers that support the coin
      * @return List of healthy servers that support the coin
@@ -141,8 +136,7 @@ class EXRServerSelectorImpl implements ServerSelector {
     }
 
     /**
-     * Extract server selection logic.
-     * This method selects a server from the healthy servers list
+     * Extract server selection logic. This method selects a server from the healthy servers list
      * using round-robin selection.
      *
      * @param healthyServers List of healthy servers
@@ -151,8 +145,9 @@ class EXRServerSelectorImpl implements ServerSelector {
      */
     private EXRServer selectFromHealthyServers(List<EXRServer> healthyServers, CoinTicker coin) {
         if (healthyServers.isEmpty()) {
-            LOGGER.warning("[server-selector] NO HEALTHY EXR SERVERS FOR COIN: " +
-                    CoinTickerUtils.tickerToString(coin));
+            LOGGER.warning(
+                    "[server-selector] NO HEALTHY EXR SERVERS FOR COIN: "
+                            + CoinTickerUtils.tickerToString(coin));
             return null;
         }
 
@@ -161,13 +156,14 @@ class EXRServerSelectorImpl implements ServerSelector {
 
         // Double-check that the selected server actually supports the coin
         if (!selectedServer.hasCapability(coin)) {
-            LOGGER.severe("[server-selector] CRITICAL ERROR: Selected server " +
-                    selectedServer.getEndpoint() + " does NOT support coin " +
-                    CoinTickerUtils.tickerToString(coin));
+            LOGGER.severe(
+                    "[server-selector] CRITICAL ERROR: Selected server "
+                            + selectedServer.getEndpoint()
+                            + " does NOT support coin "
+                            + CoinTickerUtils.tickerToString(coin));
             return null;
         }
 
         return selectedServer;
     }
-
 }

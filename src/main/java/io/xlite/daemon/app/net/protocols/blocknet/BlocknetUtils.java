@@ -50,5 +50,4 @@ public class BlocknetUtils {
 
         return header;
     }
-
 }

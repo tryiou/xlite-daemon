@@ -10,6 +10,7 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.subgraph.orchid.encoders.Hex;
+
 import io.xlite.daemon.app.App;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
@@ -17,6 +18,7 @@ import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.UTXO;
 import io.xlite.daemon.app.util.history.Transaction;
+
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.config.RequestConfig;
@@ -51,42 +53,40 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class HTTPClient {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private CloseableHttpClient client;
     private ConcurrentHashMap<String, Long> lastFetchTimes;
     private int logCount = 0;
 
     /**
-     * Upstream method families for per-coin support tracking. A family groups the
-     * read methods served by the same backend capability, so one definitive
-     * rejection covers every method in the family.
+     * Upstream method families for per-coin support tracking. A family groups the read methods
+     * served by the same backend capability, so one definitive rejection covers every method in the
+     * family.
      */
     static final String UPSTREAM_FAMILY_UTXO = "utxo";
+
     static final String UPSTREAM_FAMILY_HISTORY = "history";
     static final String UPSTREAM_FAMILY_TX = "tx";
     static final String UPSTREAM_FAMILY_BLOCK = "block";
 
     /**
-     * Distinctive backend message proving a coin has no upstream plugin. Matched
-     * as a substring, deliberately biased toward precision: a missed match
-     * degrades to today's retry behavior, while a false positive would suppress
-     * a working coin.
-     * <p>
-     * The code alone ({@code -32000}) is not sufficient: the backend reuses it for
-     * transient failures ({@code "utxo-plugin unreachable …"}, batch failures) and
-     * for address-level failures ({@code "All addresses failed"}), none of which
-     * may be cached.
+     * Distinctive backend message proving a coin has no upstream plugin. Matched as a substring,
+     * deliberately biased toward precision: a missed match degrades to today's retry behavior,
+     * while a false positive would suppress a working coin.
+     *
+     * <p>The code alone ({@code -32000}) is not sufficient: the backend reuses it for transient
+     * failures ({@code "utxo-plugin unreachable …"}, batch failures) and for address-level failures
+     * ({@code "All addresses failed"}), none of which may be cached.
      */
     static final String NO_UPSTREAM_MARKER = "No utxo-plugin configured for coin ";
 
     /**
-     * (family, ticker) pairs the backend definitively rejected this session. The
-     * backend reads its coin list once at startup, so it cannot gain a plugin
-     * without a restart; a daemon restart clears this with it. Legacy mode only:
-     * the backend is singular there, while EXR selects among multiple servers and
-     * a global record could suppress a working one.
+     * (family, ticker) pairs the backend definitively rejected this session. The backend reads its
+     * coin list once at startup, so it cannot gain a plugin without a restart; a daemon restart
+     * clears this with it. Legacy mode only: the backend is singular there, while EXR selects among
+     * multiple servers and a global record could suppress a working one.
      */
     private static final Set<String> UNSUPPORTED_UPSTREAM = ConcurrentHashMap.newKeySet();
 
@@ -95,9 +95,10 @@ public class HTTPClient {
     }
 
     /**
-     * Whether this (family, coin) was definitively rejected upstream. Legacy-mode
-     * callers check this before opening a socket and return null, the existing
-     * "not ready" contract every caller already handles.
+     * Whether this (family, coin) was definitively rejected upstream. Legacy-mode callers check
+     * this before opening a socket and return null, the existing "not ready" contract every caller
+     * already handles.
+     *
      * @param family One of the {@code UPSTREAM_FAMILY_*} constants
      * @param ticker Coin to look up
      * @return true when no request should be issued
@@ -106,23 +107,21 @@ public class HTTPClient {
         return UNSUPPORTED_UPSTREAM.contains(upstreamRejectionKey(family, ticker));
     }
 
-    /**
-     * Test-only reset for the session rejection memory.
-     */
+    /** Test-only reset for the session rejection memory. */
     static void clearUpstreamRejectionsForTest() {
         UNSUPPORTED_UPSTREAM.clear();
     }
 
     /**
-     * Record a definitive no-upstream rejection carried by a raw upstream response.
-     * Accepts the producer envelope
-     * ({@code {"result":null,"error":{"code":…,"message":…}}}) and, tolerantly, a
+     * Record a definitive no-upstream rejection carried by a raw upstream response. Accepts the
+     * producer envelope ({@code {"result":null,"error":{"code":…,"message":…}}}) and, tolerantly, a
      * bare ({@code {"code":…,"message":…}}) object.
+     *
      * @param family One of the {@code UPSTREAM_FAMILY_*} constants
      * @param ticker Coin the response was fetched for
      * @param res Raw upstream response text
-     * @return true iff the response is definitive (caller returns null); false on
-     *         any doubt, preserving today's retry behavior (fail-open)
+     * @return true iff the response is definitive (caller returns null); false on any doubt,
+     *     preserving today's retry behavior (fail-open)
      */
     static boolean recordUpstreamRejection(String family, CoinTicker ticker, String res) {
         JsonObject error = upstreamError(res);
@@ -146,17 +145,21 @@ public class HTTPClient {
         }
         String key = upstreamRejectionKey(family, ticker);
         if (UNSUPPORTED_UPSTREAM.add(key)) {
-            LOGGER.info("[httpclient] " + CoinTickerUtils.tickerToString(ticker)
-                    + " has no upstream for " + family + " - will not retry this session");
+            LOGGER.info(
+                    "[httpclient] "
+                            + CoinTickerUtils.tickerToString(ticker)
+                            + " has no upstream for "
+                            + family
+                            + " - will not retry this session");
         }
         return true;
     }
 
     /**
-     * Extract the candidate error object from a raw upstream response: the
-     * {@code error} member of an envelope, else the object itself for bare-shape
-     * tolerance (the caller decides via {@code has("code")}). Null when absent
-     * or unparseable. Never throws.
+     * Extract the candidate error object from a raw upstream response: the {@code error} member of
+     * an envelope, else the object itself for bare-shape tolerance (the caller decides via {@code
+     * has("code")}). Null when absent or unparseable. Never throws.
+     *
      * @param res Raw upstream response text
      * @return Error object or null
      */
@@ -181,6 +184,7 @@ public class HTTPClient {
 
     /**
      * Helper method to wait for EXR capabilities to be probed with a timeout.
+     *
      * @param timeoutMs Maximum time to wait in milliseconds
      * @return true if capabilities are probed within timeout, false otherwise
      */
@@ -193,7 +197,10 @@ public class HTTPClient {
             return true;
         }
 
-        LOGGER.fine("[httpclient] Waiting for EXR capabilities to be probed (timeout: " + timeoutMs + "ms)");
+        LOGGER.fine(
+                "[httpclient] Waiting for EXR capabilities to be probed (timeout: "
+                        + timeoutMs
+                        + "ms)");
 
         int waitTime = 0;
         while (!App.exrServerPool.isCapabilitiesProbed() && waitTime < timeoutMs) {
@@ -208,15 +215,19 @@ public class HTTPClient {
         }
 
         boolean probed = App.exrServerPool.isCapabilitiesProbed();
-        LOGGER.fine("[httpclient] EXR capabilities " +
-                (probed ? "probed successfully" : "still not probed") +
-                " after waiting " + waitTime + "ms");
+        LOGGER.fine(
+                "[httpclient] EXR capabilities "
+                        + (probed ? "probed successfully" : "still not probed")
+                        + " after waiting "
+                        + waitTime
+                        + "ms");
 
         return probed;
     }
 
     /**
      * Helper method to check if EXR pool is available and configured.
+     *
      * @return true if EXR pool is configured, false otherwise
      */
     boolean useEXR() {
@@ -225,17 +236,18 @@ public class HTTPClient {
 
     /**
      * Check if EXR should be used for the given endpoint
+     *
      * @param endpoint The API endpoint
      * @return true if EXR should be used, false otherwise
      */
     boolean shouldUseEXR(String endpoint) {
-        return useEXR() && (endpoint.equals("/fees") ||
-                endpoint.equals("/height") ||
-                endpoint.equals("/"));
+        return useEXR()
+                && (endpoint.equals("/fees") || endpoint.equals("/height") || endpoint.equals("/"));
     }
 
     /**
      * Get an available EXR server from the pool.
+     *
      * @return EXRServer instance or null if no servers available
      */
     private EXRServer getEXRServer() {
@@ -244,6 +256,7 @@ public class HTTPClient {
 
     /**
      * Convert JsonArray to List<Object> for EXR execution
+     *
      * @param exrParams JsonArray of parameters
      * @return List of parameters
      */
@@ -269,6 +282,7 @@ public class HTTPClient {
 
     /**
      * Execute HTTP request with common boilerplate pattern
+     *
      * @param request The HTTP request to execute
      * @return Response string or null on error
      */
@@ -278,6 +292,7 @@ public class HTTPClient {
 
     /**
      * Execute GET request with common pattern
+     *
      * @param endpoint The endpoint to GET
      * @return Response string or null on error
      */
@@ -288,6 +303,7 @@ public class HTTPClient {
 
     /**
      * Execute POST request with common pattern
+     *
      * @param endpoint The endpoint to POST to
      * @param params The parameters to POST
      * @return Response string or null on error
@@ -298,7 +314,11 @@ public class HTTPClient {
         try {
             httpPost.setEntity(new StringEntity(params.toString()));
         } catch (UnsupportedEncodingException e) {
-            LOGGER.warning("executePostRequest failed to set entity " + endpoint + " err: " + e.getMessage());
+            LOGGER.warning(
+                    "executePostRequest failed to set entity "
+                            + endpoint
+                            + " err: "
+                            + e.getMessage());
             httpPost.reset();
             return null;
         }
@@ -306,10 +326,9 @@ public class HTTPClient {
     }
 
     /**
-     * Builds a context-rich operation label from what's already in hand:
-     * every legacy POST caller sends {method, params:[first, ...]} where
-     * the first param is the ticker for coin-first-param methods. Never
-     * throws: a description must not break the request it describes.
+     * Builds a context-rich operation label from what's already in hand: every legacy POST caller
+     * sends {method, params:[first, ...]} where the first param is the ticker for coin-first-param
+     * methods. Never throws: a description must not break the request it describes.
      */
     private static String describePost(String endpoint, JsonObject params) {
         String method = "?";
@@ -341,20 +360,23 @@ public class HTTPClient {
         requestBuilder.setConnectionRequestTimeout(HttpClientConfig.HTTP_TIMEOUT_MS);
         requestBuilder.setSocketTimeout(HttpClientConfig.HTTP_TIMEOUT_MS);
 
-        PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(
-                RegistryBuilder.<ConnectionSocketFactory>create()
-                        .register("http", PlainConnectionSocketFactory.INSTANCE)
-                        .register("https", SSLConnectionSocketFactory.getSystemSocketFactory())
-                        .build()
-        );
+        PoolingHttpClientConnectionManager connectionManager =
+                new PoolingHttpClientConnectionManager(
+                        RegistryBuilder.<ConnectionSocketFactory>create()
+                                .register("http", PlainConnectionSocketFactory.INSTANCE)
+                                .register(
+                                        "https",
+                                        SSLConnectionSocketFactory.getSystemSocketFactory())
+                                .build());
         connectionManager.setDefaultMaxPerRoute(maximumSockets);
         connectionManager.setMaxTotal(maximumSockets);
 
-        client = HttpClients.custom()
-                .setDefaultHeaders(headers)
-                .setConnectionManager(connectionManager)
-                .setDefaultRequestConfig(requestBuilder.build())
-                .build();
+        client =
+                HttpClients.custom()
+                        .setDefaultHeaders(headers)
+                        .setConnectionManager(connectionManager)
+                        .setDefaultRequestConfig(requestBuilder.build())
+                        .build();
     }
 
     public void close() {
@@ -367,6 +389,7 @@ public class HTTPClient {
 
     /**
      * Aggregate responses from all healthy EXR servers for a given method
+     *
      * @param method The EXR method to call (e.g., "fees", "heights")
      * @return Aggregated response from all healthy EXR servers
      */
@@ -408,6 +431,7 @@ public class HTTPClient {
 
     /**
      * Execute GET request with EXR aggregation for /fees and /height endpoints
+     *
      * @param endpoint The endpoint to GET
      * @return Aggregated response from all healthy EXR servers
      */
@@ -418,11 +442,13 @@ public class HTTPClient {
 
     /**
      * Extract the coin ticker from the first parameter of an EXR request.
+     *
      * @param exrParams The parameter array
      * @return Ticker or null if the first parameter is not a known coin
      */
     static CoinTicker extractCoin(JsonArray exrParams) {
-        if (exrParams.size() == 0 || !exrParams.get(0).isJsonPrimitive()
+        if (exrParams.size() == 0
+                || !exrParams.get(0).isJsonPrimitive()
                 || !exrParams.get(0).getAsJsonPrimitive().isString()) {
             return null;
         }
@@ -431,6 +457,7 @@ public class HTTPClient {
 
     /**
      * Execute POST request with EXR coin-aware routing
+     *
      * @param endpoint The endpoint to POST to
      * @param params The parameters to POST
      * @return Response from appropriate EXR server, or null (FAIL - NO FALLBACK TO BASE_URL)
@@ -444,41 +471,54 @@ public class HTTPClient {
 
         CoinTicker coin = extractCoin(exrParams);
         if (coin == null) {
-            LOGGER.severe("[httpclient] Cannot route request: no coin extracted from first parameter for method " + method);
+            LOGGER.severe(
+                    "[httpclient] Cannot route request: no coin extracted from first parameter for method "
+                            + method);
             return null; // FAIL instead of using wrong server
         }
 
         if (!App.exrServerPool.isCapabilitiesProbed()
                 && !waitForCapabilities(HttpClientConfig.CAPABILITY_PROBE_WAIT_TIMEOUT_MS)) {
-            LOGGER.warning("[httpclient] EXR capabilities not probed yet for coin: "
-                    + CoinTickerUtils.tickerToString(coin));
+            LOGGER.warning(
+                    "[httpclient] EXR capabilities not probed yet for coin: "
+                            + CoinTickerUtils.tickerToString(coin));
             return null; // FAIL - NO FALLBACK TO BASE_URL
         }
 
         EXRServer server = App.exrServerPool.selectServerForCoin(coin);
         if (server == null) {
-            LOGGER.warning("[httpclient] NO EXR SERVER SUPPORTS COIN: "
-                    + CoinTickerUtils.tickerToString(coin));
+            LOGGER.warning(
+                    "[httpclient] NO EXR SERVER SUPPORTS COIN: "
+                            + CoinTickerUtils.tickerToString(coin));
             return null; // FAIL - NO FALLBACK TO BASE_URL
         }
-        LOGGER.info("[httpclient] Routed " + method + " "
-                + CoinTickerUtils.tickerToString(coin) + " to " + server.getEndpoint());
+        LOGGER.info(
+                "[httpclient] Routed "
+                        + method
+                        + " "
+                        + CoinTickerUtils.tickerToString(coin)
+                        + " to "
+                        + server.getEndpoint());
 
         List<Object> paramList = convertParams(exrParams);
         JsonElement response = server.execute(method, paramList);
         if (response == null) {
-            LOGGER.warning("[httpclient] EXR request failed for " + method + " via " + server.getEndpoint());
+            LOGGER.warning(
+                    "[httpclient] EXR request failed for "
+                            + method
+                            + " via "
+                            + server.getEndpoint());
             return null;
         }
         return normalizeEXRResponse(response);
     }
 
     /**
-     * Normalize a parsed EXR response body into the text form consumers expect.
-     * Upstream payload shapes are preserved verbatim: JSON-RPC style envelopes,
-     * bare objects and bare arrays all pass through unchanged. A JSON text
-     * delivered as a string-typed {@code result} member is unwrapped exactly
-     * once; scalar string results (e.g. broadcast txids) are kept wrapped.
+     * Normalize a parsed EXR response body into the text form consumers expect. Upstream payload
+     * shapes are preserved verbatim: JSON-RPC style envelopes, bare objects and bare arrays all
+     * pass through unchanged. A JSON text delivered as a string-typed {@code result} member is
+     * unwrapped exactly once; scalar string results (e.g. broadcast txids) are kept wrapped.
+     *
      * @param response Parsed response element
      * @return Response text or null if the element carried no content
      */
@@ -488,7 +528,8 @@ public class HTTPClient {
         }
         if (response.isJsonObject()) {
             JsonObject obj = response.getAsJsonObject();
-            if (obj.has("result") && obj.get("result").isJsonPrimitive()
+            if (obj.has("result")
+                    && obj.get("result").isJsonPrimitive()
                     && obj.get("result").getAsJsonPrimitive().isString()) {
                 try {
                     JsonElement inner = JsonParser.parseString(obj.get("result").getAsString());
@@ -505,10 +546,11 @@ public class HTTPClient {
     }
 
     /**
-     * Parse an upstream JSON-RPC style envelope ({@code {"result":…,"error":…}}),
-     * returning null (with a logged reason) when the payload is absent, empty,
-     * an error, malformed, or not an object. Consumers receive the full envelope
-     * so they can read the {@code result} member exactly as with the legacy backend.
+     * Parse an upstream JSON-RPC style envelope ({@code {"result":…,"error":…}}), returning null
+     * (with a logged reason) when the payload is absent, empty, an error, malformed, or not an
+     * object. Consumers receive the full envelope so they can read the {@code result} member
+     * exactly as with the legacy backend.
+     *
      * @param res Raw response text
      * @param opName Operation description for log messages
      * @return Envelope object or null on failure
@@ -530,7 +572,8 @@ public class HTTPClient {
         }
         JsonObject obj = parsed.getAsJsonObject();
         if (obj.has("error") && !obj.get("error").isJsonNull()) {
-            LOGGER.warning("[httpclient] " + opName + " upstream error - " + obj.get("error").toString());
+            LOGGER.warning(
+                    "[httpclient] " + opName + " upstream error - " + obj.get("error").toString());
             return null;
         }
         if (!obj.has("result") || obj.get("result").isJsonNull()) {
@@ -542,6 +585,7 @@ public class HTTPClient {
 
     /**
      * Execute request with proper routing logic (EXR vs BASE_URL)
+     *
      * @param endpoint The endpoint to request
      * @param params Parameters for POST requests, null for GET
      * @return Response string or null on error
@@ -573,11 +617,11 @@ public class HTTPClient {
     }
 
     /**
-     * Returns all utxos for a list of addresses.
-     * Note: This method does neither use nor update any caches!
-     * 
+     * Returns all utxos for a list of addresses. Note: This method does neither use nor update any
+     * caches!
+     *
      * @param coinTicker Fetch utxos from this coin
-     * @param address    Fetch utxos from this address
+     * @param address Fetch utxos from this address
      * @return JsonArray or null on error
      */
     public JsonArray getUtxosUncached(CoinTicker coinTicker, String[] addresses) {
@@ -597,7 +641,6 @@ public class HTTPClient {
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " " + res);
 
-
         if (res == null) {
             return null;
         }
@@ -612,14 +655,24 @@ public class HTTPClient {
             jsonObject = new JSONObject(res);
             utxoArr = jsonObject.getJSONArray("utxos");
         } catch (Exception e) {
-            LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " parse error - " + e.getMessage());
+            LOGGER.warning(
+                    "[httpclient] getUtxosUncached "
+                            + coinInstance.getTicker()
+                            + " parse error - "
+                            + e.getMessage());
         }
 
         if (jsonObject == null || utxoArr == null) {
             if (jsonObject == null)
-                LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null jsonObject");
+                LOGGER.warning(
+                        "[httpclient] getUtxosUncached "
+                                + coinInstance.getTicker()
+                                + " null jsonObject");
             if (utxoArr == null)
-                LOGGER.warning("[httpclient] getUtxosUncached " + coinInstance.getTicker() + " null utxoArr");
+                LOGGER.warning(
+                        "[httpclient] getUtxosUncached "
+                                + coinInstance.getTicker()
+                                + " null utxoArr");
             return null;
         }
 
@@ -634,15 +687,15 @@ public class HTTPClient {
             String address = utxoArr.getJSONObject(i).getString("address");
             utxoJSON.addProperty("address", address);
 
-            LegacyAddress addr = LegacyAddress.fromBase58(coinInstance.getNetworkParameters(), address);
+            LegacyAddress addr =
+                    LegacyAddress.fromBase58(coinInstance.getNetworkParameters(), address);
             Script script = ScriptBuilder.createOutputScript(addr);
             utxoJSON.addProperty("scriptPubKey", new String(Hex.encode(script.getProgram())));
 
             int height = utxoArr.getJSONObject(i).getInt("block_number");
             int currentHeight = CoinInstance.getBlockCountByTicker(coinTicker);
             int confirmations = (currentHeight - height) + 1;
-            if (height == 0)
-                confirmations = 0;
+            if (height == 0) confirmations = 0;
 
             utxoJSON.addProperty("confirmations", confirmations);
 
@@ -652,9 +705,9 @@ public class HTTPClient {
         return utxoList;
     }
 
-
     /**
      * Returns all utxos.
+     *
      * @param coinTicker Fetch utxos from this coin
      * @param expiry Time in milliseconds until cache expires
      * @return JsonArray or null on error
@@ -665,14 +718,15 @@ public class HTTPClient {
             return null;
         }
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
-        long lastFetchTime = lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getUtxos"), 0L);
+        long lastFetchTime =
+                lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getUtxos"), 0L);
         long currentTime = System.currentTimeMillis();
-        if (currentTime - lastFetchTime < expiry)
-            return coinInstance.getAllUTXOS();
+        if (currentTime - lastFetchTime < expiry) return coinInstance.getAllUTXOS();
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
-            LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null param size");
+            LOGGER.warning(
+                    "[httpclient] getUtxos " + coinInstance.getTicker() + " null param size");
             return null;
         }
 
@@ -683,7 +737,6 @@ public class HTTPClient {
         params.add("params", innerParams);
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getUtxos " + coinInstance.getTicker() + " " + res);
-
 
         if (res == null) {
             return null;
@@ -699,14 +752,20 @@ public class HTTPClient {
             jsonObject = new JSONObject(res);
             utxoArr = jsonObject.getJSONArray("utxos");
         } catch (Exception e) {
-            LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " parse error - " + e.getMessage());
+            LOGGER.warning(
+                    "[httpclient] getUtxos "
+                            + coinInstance.getTicker()
+                            + " parse error - "
+                            + e.getMessage());
         }
 
         if (jsonObject == null || utxoArr == null) {
             if (jsonObject == null)
-                LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null jsonObject");
+                LOGGER.warning(
+                        "[httpclient] getUtxos " + coinInstance.getTicker() + " null jsonObject");
             if (utxoArr == null)
-                LOGGER.warning("[httpclient] getUtxos " + coinInstance.getTicker() + " null utxoArr");
+                LOGGER.warning(
+                        "[httpclient] getUtxos " + coinInstance.getTicker() + " null utxoArr");
             return null;
         }
 
@@ -721,12 +780,15 @@ public class HTTPClient {
             if (failedAddresses.contains(rowAddress)) {
                 continue;
             }
-            UTXO utxo = new UTXO(coinTicker,
-                    rowAddress,
-                    utxoArr.getJSONObject(i).getString("txhash"),
-                    utxoArr.getJSONObject(i).getInt("vout"),
-                    utxoArr.getJSONObject(i).getInt("block_number"),
-                    UTXO.baseUnitsForTicker(coinTicker, utxoArr.getJSONObject(i).getDouble("value")));
+            UTXO utxo =
+                    new UTXO(
+                            coinTicker,
+                            rowAddress,
+                            utxoArr.getJSONObject(i).getString("txhash"),
+                            utxoArr.getJSONObject(i).getInt("vout"),
+                            utxoArr.getJSONObject(i).getInt("block_number"),
+                            UTXO.baseUnitsForTicker(
+                                    coinTicker, utxoArr.getJSONObject(i).getDouble("value")));
 
             utxoList.add(utxo);
             returnedAddresses.add(rowAddress);
@@ -751,11 +813,10 @@ public class HTTPClient {
     }
 
     /**
-     * Reads the backend-declared per-address failures from a getutxos
-     * response ("errors" array of {address, message} items the adapter
-     * attaches; absent/null on clean responses). Never throws: an
-     * unparseable array degrades to a (possibly partial) set (the omission
-     * diff below still applies).
+     * Reads the backend-declared per-address failures from a getutxos response ("errors" array of
+     * {address, message} items the adapter attaches; absent/null on clean responses). Never throws:
+     * an unparseable array degrades to a (possibly partial) set (the omission diff below still
+     * applies).
      */
     Set<String> failedAddresses(JSONObject response) {
         Set<String> failed = new HashSet<>();
@@ -770,25 +831,24 @@ public class HTTPClient {
                 }
             }
         } catch (Exception e) {
-            LOGGER.warning("[httpclient] failedAddresses unparseable errors array - " + e.getMessage());
+            LOGGER.warning(
+                    "[httpclient] failedAddresses unparseable errors array - " + e.getMessage());
         }
         return failed;
     }
 
     /**
-     * Clears stored UTXO rows for tracked addresses the backend omitted from
-     * a successful getutxos response. requestedParams is the
-     * [ticker, "[addr...]"] list built by CoinInstance.getUTXOParams (the
-     * second element is a stringified JSONArray); returned holds the
-     * addresses present in the response. Backend-declared failures never
-     * reach returned (their rows are skipped before recording above), so a
-     * requested address missing from returned is confirmed to hold nothing.
-     * Unknown/non-tracked addresses are ignored (processUtxos
-     * warns on those itself). clearUtxos spares spent-marked rows, so only
-     * live-looking stale rows are dropped.
+     * Clears stored UTXO rows for tracked addresses the backend omitted from a successful getutxos
+     * response. requestedParams is the [ticker, "[addr...]"] list built by
+     * CoinInstance.getUTXOParams (the second element is a stringified JSONArray); returned holds
+     * the addresses present in the response. Backend-declared failures never reach returned (their
+     * rows are skipped before recording above), so a requested address missing from returned is
+     * confirmed to hold nothing. Unknown/non-tracked addresses are ignored (processUtxos warns on
+     * those itself). clearUtxos spares spent-marked rows, so only live-looking stale rows are
+     * dropped.
      */
-    void evictOmittedAddresses(CoinInstance coinInstance, ArrayList<String> requestedParams,
-            Set<String> returned) {
+    void evictOmittedAddresses(
+            CoinInstance coinInstance, ArrayList<String> requestedParams, Set<String> returned) {
         Set<String> requested = new HashSet<>();
         try {
             if (requestedParams.size() > 1) {
@@ -798,7 +858,9 @@ public class HTTPClient {
                 }
             }
         } catch (Exception e) {
-            LOGGER.warning("[httpclient] evictOmittedAddresses unparseable request params - " + e.getMessage());
+            LOGGER.warning(
+                    "[httpclient] evictOmittedAddresses unparseable request params - "
+                            + e.getMessage());
             return;
         }
         for (String addr : requested) {
@@ -840,7 +902,6 @@ public class HTTPClient {
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getRawTransaction " + res);
 
-
         // Definitive no-upstream rejection becomes this session's answer.
         if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_TX, coinTicker, res)) {
             return null;
@@ -864,7 +925,6 @@ public class HTTPClient {
         params.add("params", innerParams);
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getRawMempool " + res);
-
 
         // Definitive no-upstream rejection becomes this session's answer.
         if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_TX, coinTicker, res)) {
@@ -947,8 +1007,13 @@ public class HTTPClient {
             coinInstance.addBlockCount(coinInstance.getTicker(), blockCount);
             int recovered = coinInstance.resetUpdateFailures();
             if (recovered > 0) {
-                LOGGER.warning("[httpclient] " + ticker + " height updates recovered after "
-                        + recovered + " consecutive failures; fresh height " + blockCount);
+                LOGGER.warning(
+                        "[httpclient] "
+                                + ticker
+                                + " height updates recovered after "
+                                + recovered
+                                + " consecutive failures; fresh height "
+                                + blockCount);
             }
 
             LOGGER.finer("[httpclient] Got blockcount for currency " + ticker + " - " + blockCount);
@@ -956,11 +1021,10 @@ public class HTTPClient {
     }
 
     /**
-     * Records one missed height update, LOUD exactly twice per episode:
-     * first miss and recovery. Everything between is silent by operator
-     * order — a persistent backend gap re-warning every minute is spam,
-     * not signal. The -1112s in consumer logs are the visible symptom
-     * while a coin is unavailable.
+     * Records one missed height update, LOUD exactly twice per episode: first miss and recovery.
+     * Everything between is silent by operator order — a persistent backend gap re-warning every
+     * minute is spam, not signal. The -1112s in consumer logs are the visible symptom while a coin
+     * is unavailable.
      */
     private static void noteHeightMiss(CoinInstance coinInstance, String reason) {
         String ticker = CoinTickerUtils.tickerToString(coinInstance.getTicker());
@@ -968,12 +1032,20 @@ public class HTTPClient {
         if (streak != 1) {
             return;
         }
-        long ageSec = coinInstance.getLastBlockCountMillis() <= 0 ? -1
-                : (System.currentTimeMillis() - coinInstance.getLastBlockCountMillis()) / 1000;
-        String lastGood = ageSec < 0 ? "no height ever received"
-                : "last-good height age " + ageSec + "s";
-        LOGGER.warning("[httpclient] " + ticker + " height update failed (" + reason
-                + "); streak 1, serving stale height, " + lastGood);
+        long ageSec =
+                coinInstance.getLastBlockCountMillis() <= 0
+                        ? -1
+                        : (System.currentTimeMillis() - coinInstance.getLastBlockCountMillis())
+                                / 1000;
+        String lastGood =
+                ageSec < 0 ? "no height ever received" : "last-good height age " + ageSec + "s";
+        LOGGER.warning(
+                "[httpclient] "
+                        + ticker
+                        + " height update failed ("
+                        + reason
+                        + "); streak 1, serving stale height, "
+                        + lastGood);
     }
 
     public JsonObject getBlock(CoinTicker coinTicker, String hash, boolean verbose) {
@@ -993,7 +1065,6 @@ public class HTTPClient {
         params.add("params", innerParams);
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getBlock " + res);
-
 
         // Definitive no-upstream rejection becomes this session's answer.
         if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_BLOCK, coinTicker, res)) {
@@ -1016,7 +1087,6 @@ public class HTTPClient {
         params.add("params", innerParams);
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getBlockHash " + res);
-
 
         // Definitive no-upstream rejection becomes this session's answer.
         if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_BLOCK, coinTicker, res)) {
@@ -1042,7 +1112,6 @@ public class HTTPClient {
         params.add("params", innerParams);
         String res = executeRequest("/", params);
         LOGGER.finer("[httpclient] getTransaction " + res);
-
 
         // Definitive no-upstream rejection becomes this session's answer.
         if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_TX, coinTicker, res)) {
@@ -1072,13 +1141,15 @@ public class HTTPClient {
         try {
             return JsonParser.parseString(res).getAsJsonObject();
         } catch (JsonSyntaxException | IllegalStateException e) {
-            LOGGER.warning("[httpclient] sendRawTransaction invalid upstream JSON - " + e.getMessage());
+            LOGGER.warning(
+                    "[httpclient] sendRawTransaction invalid upstream JSON - " + e.getMessage());
             return null;
         }
     }
 
     /**
      * Return all transactions associated with the coin.
+     *
      * @param coinTicker Coin
      * @param startTime Beginning of the time frame in unix time
      * @param endTime End of the time frame in unix time
@@ -1091,14 +1162,16 @@ public class HTTPClient {
             return null;
         }
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
-        long lastFetchTime = lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getHistory"), 0L);
+        long lastFetchTime =
+                lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getHistory"), 0L);
         long currentTime = System.currentTimeMillis();
         if (currentTime - lastFetchTime < expiry)
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
-            LOGGER.warning("[httpclient] getHistory " + coinInstance.getTicker() + " null param size");
+            LOGGER.warning(
+                    "[httpclient] getHistory " + coinInstance.getTicker() + " null param size");
             return null;
         }
 
@@ -1109,20 +1182,24 @@ public class HTTPClient {
         params.add("params", innerParams);
 
         String res = executeRequest("/", params);
-          LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
-          if (res == null) {
-              return null;
-          }
-          // Definitive no-upstream rejection becomes this session's answer.
-          if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_HISTORY, coinTicker, res)) {
-              return null;
-          }
+        LOGGER.finer("[httpclient] getHistory " + coinInstance.getTicker() + " " + res);
+        if (res == null) {
+            return null;
+        }
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_HISTORY, coinTicker, res)) {
+            return null;
+        }
 
         JsonArray json;
         try {
             json = new Gson().fromJson(res, JsonArray.class);
         } catch (Exception e) {
-            LOGGER.warning("[httpclient] getHistory parsing error - Response: " + res + " - " + e.getMessage());
+            LOGGER.warning(
+                    "[httpclient] getHistory parsing error - Response: "
+                            + res
+                            + " - "
+                            + e.getMessage());
             return null;
         }
 
@@ -1134,21 +1211,26 @@ public class HTTPClient {
         List<Transaction> historyList = new ArrayList<>();
         for (JsonElement elements : json) {
             for (JsonElement element : elements.getAsJsonArray()) {
-                //LOGGER.warning("*** DEBUG *** [httpclient] getHistory " + element);
+                // LOGGER.warning("*** DEBUG *** [httpclient] getHistory " + element);
                 JsonObject jsonObject = element.getAsJsonObject();
 
-                List<String> fromAddresses = new Gson().fromJson(jsonObject.get("from_addresses"), new TypeToken<List<String>>() {
-                }.getType());
+                List<String> fromAddresses =
+                        new Gson()
+                                .fromJson(
+                                        jsonObject.get("from_addresses"),
+                                        new TypeToken<List<String>>() {}.getType());
 
-                Transaction tx = new Transaction(coinTicker,
-                        jsonObject.get("address").getAsString(),
-                        jsonObject.get("txid").getAsString(),
-                        jsonObject.get("blockhash").getAsString(),
-                        jsonObject.get("vout").getAsInt(),
-                        jsonObject.get("amount").getAsDouble(),
-                        jsonObject.get("confirmations").getAsInt(),
-                        jsonObject.get("blocktime").getAsInt(),
-                        fromAddresses);
+                Transaction tx =
+                        new Transaction(
+                                coinTicker,
+                                jsonObject.get("address").getAsString(),
+                                jsonObject.get("txid").getAsString(),
+                                jsonObject.get("blockhash").getAsString(),
+                                jsonObject.get("vout").getAsInt(),
+                                jsonObject.get("amount").getAsDouble(),
+                                jsonObject.get("confirmations").getAsInt(),
+                                jsonObject.get("blocktime").getAsInt(),
+                                fromAddresses);
                 tx.setCategory(jsonObject.get("category").getAsString());
                 tx.setFee(jsonObject.get("fee").getAsDouble());
 
@@ -1173,26 +1255,32 @@ public class HTTPClient {
 
     /**
      * Return all transaction hashes associated with the coin.
+     *
      * @param coinTicker Coin
      * @param startTime Beginning of the time frame in unix time
      * @param endTime End of the time frame in unix time
      * @param expiry Time in milliseconds until cache expires
      * @return JsonArray or null on error
      */
-    public JsonArray getTransactionHistory(CoinTicker coinTicker, int startTime, int endTime, int expiry) {
+    public JsonArray getTransactionHistory(
+            CoinTicker coinTicker, int startTime, int endTime, int expiry) {
         // Coin has no upstream plugin: skip the request entirely (legacy mode only).
         if (!useEXR() && isUpstreamRejected(UPSTREAM_FAMILY_HISTORY, coinTicker)) {
             return null;
         }
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
-        long lastFetchTime = lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getAddressHistory"), 0L);
+        long lastFetchTime =
+                lastFetchTimes.getOrDefault(lastFetchTimesKey(coinTicker, "getAddressHistory"), 0L);
         long currentTime = System.currentTimeMillis() / 1000;
         if ((currentTime - lastFetchTime) < expiry)
             return filterHistory(coinInstance.getAllTransactions(), startTime, endTime);
 
         ArrayList<String> utxoParams = coinInstance.getUTXOParams();
         if (utxoParams.size() == 0) {
-            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null param size");
+            LOGGER.warning(
+                    "[httpclient] getAddressHistory "
+                            + coinInstance.getTicker()
+                            + " null param size");
             return null;
         }
 
@@ -1203,31 +1291,36 @@ public class HTTPClient {
         params.add("params", innerParams);
 
         String res = executeRequest("/", params);
-          LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
-          if (res == null) {
-              return null;
-          }
-          // Definitive no-upstream rejection becomes this session's answer.
-          if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_HISTORY, coinTicker, res)) {
-              return null;
-          }
+        LOGGER.finer("[httpclient] getAddressHistory " + coinInstance.getTicker() + " " + res);
+        if (res == null) {
+            return null;
+        }
+        // Definitive no-upstream rejection becomes this session's answer.
+        if (!useEXR() && recordUpstreamRejection(UPSTREAM_FAMILY_HISTORY, coinTicker, res)) {
+            return null;
+        }
 
         JsonArray json;
         try {
             json = new Gson().fromJson(res, JsonArray.class);
         } catch (Exception e) {
-            LOGGER.warning("[httpclient] getAddressHistory parsing error - Response: " + res + " - " + e.getMessage());
+            LOGGER.warning(
+                    "[httpclient] getAddressHistory parsing error - Response: "
+                            + res
+                            + " - "
+                            + e.getMessage());
             return null;
         }
         if (json == null) {
-            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null json");
+            LOGGER.warning(
+                    "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null json");
             return null;
         }
 
         List<Transaction> historyList = new ArrayList<>();
         for (JsonElement elements : json) {
             for (JsonElement element : elements.getAsJsonArray()) {
-                //LOGGER.warning("*** DEBUG *** [httpclient] getAddressHistory " + element );
+                // LOGGER.warning("*** DEBUG *** [httpclient] getAddressHistory " + element );
                 JsonObject jsonObject = element.getAsJsonObject();
 
                 String txid = jsonObject.get("tx_hash").getAsString();
@@ -1235,8 +1328,7 @@ public class HTTPClient {
 
                 int fails = 1;
                 while (fails > 0) {
-                    if (fails >= 5)
-                        fails = 0;
+                    if (fails >= 5) fails = 0;
 
                     try {
                         rawTransaction = getRawTransaction(coinTicker, txid, true);
@@ -1246,16 +1338,14 @@ public class HTTPClient {
                             fails = 0;
 
                             break;
-                        } else
-                            ++fails;
+                        } else ++fails;
                     } catch (Exception e) {
                         LOGGER.warning("[httpclient] getRawTransaction failed - " + e.getMessage());
                         ++fails;
                     }
                 }
 
-                if (fails != 0)
-                    continue;
+                if (fails != 0) continue;
 
                 for (JsonElement vin : rawTransaction.get("vin").getAsJsonArray()) {
                     String vinTxid = vin.getAsJsonObject().get("txid").getAsString();
@@ -1265,33 +1355,38 @@ public class HTTPClient {
 
                     fails = 1;
                     while (fails > 0) {
-                        if (fails >= 5)
-                            fails = 0;
+                        if (fails >= 5) fails = 0;
 
                         try {
                             voutRawTransaction = getRawTransaction(coinTicker, vinTxid, true);
 
-                            if (voutRawTransaction != null && !voutRawTransaction.get("result").isJsonNull()) {
+                            if (voutRawTransaction != null
+                                    && !voutRawTransaction.get("result").isJsonNull()) {
                                 voutRawTransaction = voutRawTransaction.getAsJsonObject("result");
                                 fails = 0;
 
                                 break;
-                            } else
-                                ++fails;
+                            } else ++fails;
                         } catch (Exception e) {
-                            LOGGER.warning("[httpclient] getRawTransaction(vout) failed - " + e.getMessage());
+                            LOGGER.warning(
+                                    "[httpclient] getRawTransaction(vout) failed - "
+                                            + e.getMessage());
                             ++fails;
                         }
                     }
 
-                    if (fails != 0)
-                        continue;
+                    if (fails != 0) continue;
 
-                    JsonObject vout = voutRawTransaction.get("vout").getAsJsonArray().get(voutInt).getAsJsonObject();
+                    JsonObject vout =
+                            voutRawTransaction
+                                    .get("vout")
+                                    .getAsJsonArray()
+                                    .get(voutInt)
+                                    .getAsJsonObject();
                     JsonObject scriptPubKey = vout.getAsJsonObject("scriptPubKey");
 
-                    if ((scriptPubKey == null || scriptPubKey.isJsonNull()) || scriptPubKey.get("addresses").isJsonNull())
-                        continue;
+                    if ((scriptPubKey == null || scriptPubKey.isJsonNull())
+                            || scriptPubKey.get("addresses").isJsonNull()) continue;
 
                     for (JsonElement addressElement : scriptPubKey.getAsJsonArray("addresses")) {
                         String address = addressElement.getAsString();
@@ -1302,15 +1397,17 @@ public class HTTPClient {
                             if (utxoAddress.equals(address)) {
                                 List<String> fromAddresses = new ArrayList<>();
 
-                                Transaction tx = new Transaction(coinTicker,
-                                        address,
-                                        txid,
-                                        rawTransaction.get("blockhash").getAsString(),
-                                        voutInt,
-                                        vout.get("value").getAsDouble(),
-                                        rawTransaction.get("confirmations").getAsInt(),
-                                        rawTransaction.get("blocktime").getAsInt(),
-                                        fromAddresses);
+                                Transaction tx =
+                                        new Transaction(
+                                                coinTicker,
+                                                address,
+                                                txid,
+                                                rawTransaction.get("blockhash").getAsString(),
+                                                voutInt,
+                                                vout.get("value").getAsDouble(),
+                                                rawTransaction.get("confirmations").getAsInt(),
+                                                rawTransaction.get("blocktime").getAsInt(),
+                                                fromAddresses);
                                 tx.setCategory("send");
                                 tx.setFee(0.0);
 
@@ -1320,9 +1417,9 @@ public class HTTPClient {
                     }
                 }
 
-
                 for (JsonElement vout : rawTransaction.get("vout").getAsJsonArray()) {
-                    JsonObject scriptPubKey = vout.getAsJsonObject().getAsJsonObject("scriptPubKey");
+                    JsonObject scriptPubKey =
+                            vout.getAsJsonObject().getAsJsonObject("scriptPubKey");
 
                     try {
                         if (scriptPubKey.isJsonNull() || scriptPubKey.get("addresses").isJsonNull())
@@ -1340,15 +1437,17 @@ public class HTTPClient {
                             if (utxoAddress.equals(address)) {
                                 List<String> fromAddresses = new ArrayList<>();
 
-                                Transaction tx = new Transaction(coinTicker,
-                                        address,
-                                        txid,
-                                        rawTransaction.get("blockhash").getAsString(),
-                                        vout.getAsJsonObject().get("n").getAsInt(),
-                                        vout.getAsJsonObject().get("value").getAsDouble(),
-                                        rawTransaction.get("confirmations").getAsInt(),
-                                        rawTransaction.get("blocktime").getAsInt(),
-                                        fromAddresses);
+                                Transaction tx =
+                                        new Transaction(
+                                                coinTicker,
+                                                address,
+                                                txid,
+                                                rawTransaction.get("blockhash").getAsString(),
+                                                vout.getAsJsonObject().get("n").getAsInt(),
+                                                vout.getAsJsonObject().get("value").getAsDouble(),
+                                                rawTransaction.get("confirmations").getAsInt(),
+                                                rawTransaction.get("blocktime").getAsInt(),
+                                                fromAddresses);
                                 tx.setCategory("receive");
                                 tx.setFee(0.0);
 
@@ -1364,7 +1463,8 @@ public class HTTPClient {
         // Return the latest transaction history
         JsonArray txs = coinInstance.getAllTransactions();
         if (txs == null) {
-            LOGGER.warning("[httpclient] getAddressHistory " + coinInstance.getTicker() + " null txs");
+            LOGGER.warning(
+                    "[httpclient] getAddressHistory " + coinInstance.getTicker() + " null txs");
             return null;
         }
 
@@ -1376,28 +1476,28 @@ public class HTTPClient {
     }
 
     /**
-     * Filters the transaction array in place. This does not make a copy but modifies
-     * the existing list.
+     * Filters the transaction array in place. This does not make a copy but modifies the existing
+     * list.
+     *
      * @param txs List to filter
      * @param startTime Transaction on or after this time
      * @param endTime Transaction on or before this time
      * @return Filtered transaction list
      */
     private JsonArray filterHistory(JsonArray txs, int startTime, int endTime) {
-        if (endTime <= 0)
-            return txs;
+        if (endTime <= 0) return txs;
         Iterator<JsonElement> it = txs.iterator();
         while (it.hasNext()) {
             JsonObject tx = it.next().getAsJsonObject();
             int txTime = tx.get("time").getAsInt();
-            if (txTime < startTime || txTime > endTime)
-                it.remove();
+            if (txTime < startTime || txTime > endTime) it.remove();
         }
         return txs;
     }
 
     /**
      * Returns the key used with last fetch times.
+     *
      * @param ticker Coin
      * @param method Storage key name
      * @return Storage key

@@ -1,7 +1,12 @@
 package io.xlite.daemon.app.net.api;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.ConfigHelper;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -14,27 +19,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 /**
- * Pins the controller's rebind handoff contract: a rebind retires the
- * previous instance and installs a fresh one atomically from the caller's
- * point of view, including when the retiring server is LIVE (real socket
- * teardown path).
+ * Pins the controller's rebind handoff contract: a rebind retires the previous instance and
+ * installs a fresh one atomically from the caller's point of view, including when the retiring
+ * server is LIVE (real socket teardown path).
  *
- * Coverage honesty: the concurrent soak exercises interleaved rebinds on
- * unstarted servers and proves robustness/coherence, but cannot make the
- * kernel-release lag window materialize on demand — full interleaved
- * reproduction of the retirement race is covered by the stack wave
- * detectors (per-coin post-rebind port probe, lifecycle-anomaly logsweep),
- * which have proven this path across all coins.
+ * <p>Coverage honesty: the concurrent soak exercises interleaved rebinds on unstarted servers and
+ * proves robustness/coherence, but cannot make the kernel-release lag window materialize on demand
+ * — full interleaved reproduction of the retirement race is covered by the stack wave detectors
+ * (per-coin post-rebind port probe, lifecycle-anomaly logsweep), which have proven this path across
+ * all coins.
  */
 public class JSONRPCControllerRebindTest {
 
-    @TempDir
-    static Path tempConfigDir;
+    @TempDir static Path tempConfigDir;
 
     /** Restored after the class so a later class never sees a deleted path. */
     private static String previousConfigDir;
@@ -63,7 +61,7 @@ public class JSONRPCControllerRebindTest {
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
         when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
-        when(coin.getRpcCandidates()).thenReturn(new int[]{port});
+        when(coin.getRpcCandidates()).thenReturn(new int[] {port});
 
         JSONRPCServer first = JSONRPCController.getRPCServer(coin);
         JSONRPCServer rebound = JSONRPCController.rebindRPCServer(coin);
@@ -79,7 +77,7 @@ public class JSONRPCControllerRebindTest {
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
         when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
-        when(coin.getRpcCandidates()).thenReturn(new int[]{port});
+        when(coin.getRpcCandidates()).thenReturn(new int[] {port});
 
         JSONRPCServer live = JSONRPCController.getRPCServer(coin);
         live.start();
@@ -106,12 +104,11 @@ public class JSONRPCControllerRebindTest {
         int port = freePort();
         when(coin.getRPCPort()).thenReturn(port);
         when(coin.getRpcBindAddress()).thenReturn("127.0.0.1");
-        when(coin.getRpcCandidates()).thenReturn(new int[]{port});
+        when(coin.getRpcCandidates()).thenReturn(new int[] {port});
 
         final int threads = 8;
         final int cyclesPerThread = 25;
-        List<JSONRPCServer> handedOut =
-                Collections.synchronizedList(new ArrayList<>());
+        List<JSONRPCServer> handedOut = Collections.synchronizedList(new ArrayList<>());
 
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         List<Callable<Void>> tasks = new ArrayList<>();

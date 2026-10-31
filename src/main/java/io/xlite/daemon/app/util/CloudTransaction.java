@@ -3,6 +3,7 @@ package io.xlite.daemon.app.util;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
+
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
 
@@ -22,25 +23,50 @@ public class CloudTransaction {
 
             this.address = new AtomicReference<>(((UTXO) cloudTransaction).getAddress());
             this.txHash = new AtomicReference<>(((UTXO) cloudTransaction).getTxid());
-            this.amount = new AtomicReference<>(formatForTicker(
-                    ((UTXO) cloudTransaction).getValue(),
-                    CoinTickerUtils.tickerToString(((UTXO) cloudTransaction).ticker)));
+            this.amount =
+                    new AtomicReference<>(
+                            formatForTicker(
+                                    ((UTXO) cloudTransaction).getValue(),
+                                    CoinTickerUtils.tickerToString(
+                                            ((UTXO) cloudTransaction).ticker)));
             this.height = ((UTXO) cloudTransaction).getHeight();
         } else if (cloudTransaction instanceof Transaction) {
-            NetworkParameters networkParameters = CoinInstance.getActiveCurrency().getNetworkParameters();
+            NetworkParameters networkParameters =
+                    CoinInstance.getActiveCurrency().getNetworkParameters();
             this.txType = new AtomicReference<>("Sent To: ");
 
-            if (((Transaction) cloudTransaction).getOutputs().size() > 1 && !Objects.requireNonNull(((Transaction) cloudTransaction).getOutput(1).getAddressFromP2PKHScript(networkParameters)).isP2SHAddress()) {
-                this.address = new AtomicReference<>(Objects.requireNonNull(((Transaction) cloudTransaction).getOutput(1).getAddressFromP2PKHScript(networkParameters)).toString());
+            if (((Transaction) cloudTransaction).getOutputs().size() > 1
+                    && !Objects.requireNonNull(
+                                    ((Transaction) cloudTransaction)
+                                            .getOutput(1)
+                                            .getAddressFromP2PKHScript(networkParameters))
+                            .isP2SHAddress()) {
+                this.address =
+                        new AtomicReference<>(
+                                Objects.requireNonNull(
+                                                ((Transaction) cloudTransaction)
+                                                        .getOutput(1)
+                                                        .getAddressFromP2PKHScript(
+                                                                networkParameters))
+                                        .toString());
             } else {
-                this.address = new AtomicReference<>(Objects.requireNonNull(((Transaction) cloudTransaction).getOutput(1).getAddressFromP2SH(networkParameters)).toString());
+                this.address =
+                        new AtomicReference<>(
+                                Objects.requireNonNull(
+                                                ((Transaction) cloudTransaction)
+                                                        .getOutput(1)
+                                                        .getAddressFromP2SH(networkParameters))
+                                        .toString());
             }
 
             this.txHash = new AtomicReference<>(((Transaction) cloudTransaction).getHashAsString());
 
-            this.amount = new AtomicReference<>(formatForTicker(
-                    ((Transaction) cloudTransaction).getOutput(1).getValue().value,
-                    CoinTickerUtils.tickerToString(CoinInstance.getActiveCurrency().getTicker())));
+            this.amount =
+                    new AtomicReference<>(
+                            formatForTicker(
+                                    ((Transaction) cloudTransaction).getOutput(1).getValue().value,
+                                    CoinTickerUtils.tickerToString(
+                                            CoinInstance.getActiveCurrency().getTicker())));
             this.height = 0;
         }
     }
@@ -55,8 +81,7 @@ public class CloudTransaction {
         // format and so silently truncated every amount: 100000 base units
         // rendered as "0.00", 123456789 as "1,23" -- and used the locale's
         // decimal mark. Nothing a user of a 6-decimal coin could reconcile.
-        return Sats.toWholeCoinsString(baseUnits,
-                CoinConfigRegistry.get(ticker).coinFactor());
+        return Sats.toWholeCoinsString(baseUnits, CoinConfigRegistry.get(ticker).coinFactor());
     }
 
     public String getTxType() {

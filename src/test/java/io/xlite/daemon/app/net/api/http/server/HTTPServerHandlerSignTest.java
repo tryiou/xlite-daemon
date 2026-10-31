@@ -1,9 +1,23 @@
 package io.xlite.daemon.app.net.api.http.server;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.subgraph.orchid.encoders.Hex;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -26,6 +40,7 @@ import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.TxTimeFieldSigner;
 import io.xlite.daemon.app.util.UTXO;
+
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
@@ -50,34 +65,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 /**
- * The signrawtransaction contract: the version BCF assigns survives signing,
- * and the nTime that was signed is the one the wire bytes carry.
+ * The signrawtransaction contract: the version BCF assigns survives signing, and the nTime that was
+ * signed is the one the wire bytes carry.
  *
- * <p>Signing must not rewrite the transaction's version or locktime: the caller
- * built the transaction from the coin's configuration, and the signed bytes
- * have to match. On a chain that enforces the input-time rule (Verge), the
- * signed nTime is the later of the unsigned transaction's value and the newest
- * parent's nTime; an unfetchable parent fails the call instead of producing a
+ * <p>Signing must not rewrite the transaction's version or locktime: the caller built the
+ * transaction from the coin's configuration, and the signed bytes have to match. On a chain that
+ * enforces the input-time rule (Verge), the signed nTime is the later of the unsigned transaction's
+ * value and the newest parent's nTime; an unfetchable parent fails the call instead of producing a
  * transaction the node rejects at consensus.
  *
- * <p>Signature verification goes through {@link TxTimeFieldSigner#chainSighash}
- * and {@link TxTimeFieldSigner#verify}, so the assertion is that the returned
- * bytes verify against the nTime the response carries -- not merely that the
- * handler returned something.
+ * <p>Signature verification goes through {@link TxTimeFieldSigner#chainSighash} and {@link
+ * TxTimeFieldSigner#verify}, so the assertion is that the returned bytes verify against the nTime
+ * the response carries -- not merely that the handler returned something.
  */
 class HTTPServerHandlerSignTest {
 
@@ -102,8 +102,15 @@ class HTTPServerHandlerSignTest {
         CoinConfigRegistry.resetForTest();
     }
 
-    private static CoinConfig config(String ticker, int addr, int p2sh, int dpk,
-            long coinFactor, int port, int txVersion, boolean timeField) {
+    private static CoinConfig config(
+            String ticker,
+            int addr,
+            int p2sh,
+            int dpk,
+            long coinFactor,
+            int port,
+            int txVersion,
+            boolean timeField) {
         Map<String, String> e = new LinkedHashMap<>();
         e.put("AddressPrefix", Integer.toString(addr));
         e.put("ScriptPrefix", Integer.toString(p2sh));
@@ -152,34 +159,45 @@ class HTTPServerHandlerSignTest {
 
             Transaction tx = new Transaction(params);
             tx.setVersion(txVersion);
-            tx.addInput(new TransactionInput(params, tx, new byte[0],
-                    new TransactionOutPoint(params, 0, Sha256Hash.wrap(parentTxid))));
-            tx.addOutput(new TransactionOutput(params, tx, Coin.valueOf(9_000_000L),
-                    LegacyAddress.fromKey(params, new ECKey())));
+            tx.addInput(
+                    new TransactionInput(
+                            params,
+                            tx,
+                            new byte[0],
+                            new TransactionOutPoint(params, 0, Sha256Hash.wrap(parentTxid))));
+            tx.addOutput(
+                    new TransactionOutput(
+                            params,
+                            tx,
+                            Coin.valueOf(9_000_000L),
+                            LegacyAddress.fromKey(params, new ECKey())));
 
             byte[] standard = tx.bitcoinSerialize();
-            unsignedWireBytes = timeField
-                    ? TxTimeField.insertNTime(standard, incomingNTime)
-                    : standard;
+            unsignedWireBytes =
+                    timeField ? TxTimeField.insertNTime(standard, incomingNTime) : standard;
         }
     }
 
     /** A parent raw transaction carrying {@code nTime}, as getrawtransaction returns it. */
     private static JsonObject parentResponse(NetworkParameters params, long nTime) {
         Transaction parent = new Transaction(params);
-        parent.addOutput(new TransactionOutput(params, parent, Coin.valueOf(1L),
-                LegacyAddress.fromKey(params, new ECKey())));
+        parent.addOutput(
+                new TransactionOutput(
+                        params,
+                        parent,
+                        Coin.valueOf(1L),
+                        LegacyAddress.fromKey(params, new ECKey())));
         JsonObject response = new JsonObject();
-        response.addProperty("result",
-                hex(TxTimeField.insertNTime(parent.bitcoinSerialize(), nTime)));
+        response.addProperty(
+                "result", hex(TxTimeField.insertNTime(parent.bitcoinSerialize(), nTime)));
         return response;
     }
 
     /**
-     * Static mocks for the two {@link CoinInstance} statics the handler touches
-     * indirectly: {@code UTXO.createUTXO()} resolves the coin instance by
-     * ticker, and the response writer reads the daemon version string. A static
-     * mock answers everything else with a default, so both are stubbed.
+     * Static mocks for the two {@link CoinInstance} statics the handler touches indirectly: {@code
+     * UTXO.createUTXO()} resolves the coin instance by ticker, and the response writer reads the
+     * daemon version string. A static mock answers everything else with a default, so both are
+     * stubbed.
      */
     private MockedStatic<CoinInstance> staticCoinInstance() {
         MockedStatic<CoinInstance> instances = mockStatic(CoinInstance.class);
@@ -213,10 +231,12 @@ class HTTPServerHandlerSignTest {
         body.add("params", params);
 
         byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-        FullHttpRequest request = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.wrappedBuffer(bytes));
-        String credentials = Base64.getEncoder().encodeToString(
-                (USER + ":" + PASS).getBytes(StandardCharsets.UTF_8));
+        FullHttpRequest request =
+                new DefaultFullHttpRequest(
+                        HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.wrappedBuffer(bytes));
+        String credentials =
+                Base64.getEncoder()
+                        .encodeToString((USER + ":" + PASS).getBytes(StandardCharsets.UTF_8));
         request.headers().set(HttpHeaderNames.AUTHORIZATION, "Basic " + credentials);
         request.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, bytes.length);
 
@@ -232,20 +252,27 @@ class HTTPServerHandlerSignTest {
 
     private static JsonObject envelope(FullHttpResponse response) {
         assertNotNull(response, "handler dropped the connection");
-        return JsonParser.parseString(
-                response.content().toString(CharsetUtil.UTF_8)).getAsJsonObject();
+        return JsonParser.parseString(response.content().toString(CharsetUtil.UTF_8))
+                .getAsJsonObject();
     }
 
-    private static Transaction parseWire(CoinTicker ticker, NetworkParameters params, String wireHex) {
+    private static Transaction parseWire(
+            CoinTicker ticker, NetworkParameters params, String wireHex) {
         return HTTPServerHandler.parseForCoin(ticker, params, bytes(wireHex));
     }
 
-    private static void assertSignatureCovers(CoinTicker ticker, Fixture fixture,
-            String wireHex, long expectedNTime) {
+    private static void assertSignatureCovers(
+            CoinTicker ticker, Fixture fixture, String wireHex, long expectedNTime) {
         Transaction signed = parseWire(ticker, fixture.params, wireHex);
-        Sha256Hash hash = TxTimeFieldSigner.chainSighash(
-                signed, fixture.spentScript, 0, Transaction.SigHash.ALL.value, expectedNTime);
-        assertTrue(TxTimeFieldSigner.verify(signed.getInputs().get(0).getScriptSig(), hash),
+        Sha256Hash hash =
+                TxTimeFieldSigner.chainSighash(
+                        signed,
+                        fixture.spentScript,
+                        0,
+                        Transaction.SigHash.ALL.value,
+                        expectedNTime);
+        assertTrue(
+                TxTimeFieldSigner.verify(signed.getInputs().get(0).getScriptSig(), hash),
                 "the signature must verify against the nTime carried on the wire");
     }
 
@@ -258,8 +285,8 @@ class HTTPServerHandlerSignTest {
                 .thenReturn(parentResponse(fixture.params, parentNTime));
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
-            FullHttpResponse response = sign(newHandler(CoinTicker.VERGE, fixture),
-                    fixture.unsignedWireBytes);
+            FullHttpResponse response =
+                    sign(newHandler(CoinTicker.VERGE, fixture), fixture.unsignedWireBytes);
 
             JsonObject result = envelope(response).getAsJsonObject("result");
             assertNotNull(result, "a valid parent must produce a signed transaction");
@@ -267,7 +294,9 @@ class HTTPServerHandlerSignTest {
             assertTrue(result.get("complete").getAsBoolean());
 
             assertEquals(parentNTime, TxTimeField.parentNTime(bytes(wireHex)));
-            assertEquals(1, parseWire(CoinTicker.VERGE, fixture.params, wireHex).getVersion(),
+            assertEquals(
+                    1,
+                    parseWire(CoinTicker.VERGE, fixture.params, wireHex).getVersion(),
                     "the BCF version must survive signing");
             assertSignatureCovers(CoinTicker.VERGE, fixture, wireHex, parentNTime);
         }
@@ -281,11 +310,13 @@ class HTTPServerHandlerSignTest {
                 .thenReturn(parentResponse(fixture.params, INCOMING_NTIME - 60));
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
-            FullHttpResponse response = sign(newHandler(CoinTicker.VERGE, fixture),
-                    fixture.unsignedWireBytes);
+            FullHttpResponse response =
+                    sign(newHandler(CoinTicker.VERGE, fixture), fixture.unsignedWireBytes);
 
             String wireHex = envelope(response).getAsJsonObject("result").get("hex").getAsString();
-            assertEquals(INCOMING_NTIME, TxTimeField.parentNTime(bytes(wireHex)),
+            assertEquals(
+                    INCOMING_NTIME,
+                    TxTimeField.parentNTime(bytes(wireHex)),
                     "wall-clock time must not be injected while signing");
             assertSignatureCovers(CoinTicker.VERGE, fixture, wireHex, INCOMING_NTIME);
         }
@@ -299,8 +330,8 @@ class HTTPServerHandlerSignTest {
                 .thenReturn(null);
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
-            FullHttpResponse response = sign(newHandler(CoinTicker.VERGE, fixture),
-                    fixture.unsignedWireBytes);
+            FullHttpResponse response =
+                    sign(newHandler(CoinTicker.VERGE, fixture), fixture.unsignedWireBytes);
 
             JsonObject envelope = envelope(response);
             assertTrue(envelope.get("result").isJsonNull(), "no hex may be returned");
@@ -314,8 +345,8 @@ class HTTPServerHandlerSignTest {
         Fixture fixture = new Fixture(CoinTicker.PKOIN, true, 2, INCOMING_NTIME);
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
-            FullHttpResponse response = sign(newHandler(CoinTicker.PKOIN, fixture),
-                    fixture.unsignedWireBytes);
+            FullHttpResponse response =
+                    sign(newHandler(CoinTicker.PKOIN, fixture), fixture.unsignedWireBytes);
 
             JsonObject result = envelope(response).getAsJsonObject("result");
             String wireHex = result.get("hex").getAsString();
@@ -332,12 +363,12 @@ class HTTPServerHandlerSignTest {
         Fixture fixture = new Fixture(CoinTicker.LITECOIN, false, 2, INCOMING_NTIME);
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
-            FullHttpResponse response = sign(newHandler(CoinTicker.LITECOIN, fixture),
-                    fixture.unsignedWireBytes);
+            FullHttpResponse response =
+                    sign(newHandler(CoinTicker.LITECOIN, fixture), fixture.unsignedWireBytes);
 
             JsonObject result = envelope(response).getAsJsonObject("result");
-            Transaction signed = parseWire(CoinTicker.LITECOIN, fixture.params,
-                    result.get("hex").getAsString());
+            Transaction signed =
+                    parseWire(CoinTicker.LITECOIN, fixture.params, result.get("hex").getAsString());
             assertEquals(2, signed.getVersion());
             verify(httpClient, never()).getRawTransaction(any(), anyString(), anyBoolean());
         }
@@ -366,13 +397,15 @@ class HTTPServerHandlerSignTest {
         params.add(outputs);
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
-            FullHttpResponse response = call(newHandler(CoinTicker.PKOIN, fixture),
-                    "createrawtransaction", params);
+            FullHttpResponse response =
+                    call(newHandler(CoinTicker.PKOIN, fixture), "createrawtransaction", params);
 
             String hex = envelope(response).get("result").getAsString();
-            Transaction created = HTTPServerHandler.parseForCoin(CoinTicker.PKOIN,
-                    fixture.params, bytes(hex));
-            assertEquals(2, created.getVersion(),
+            Transaction created =
+                    HTTPServerHandler.parseForCoin(CoinTicker.PKOIN, fixture.params, bytes(hex));
+            assertEquals(
+                    2,
+                    created.getVersion(),
                     "the transaction version must come from BCF, not bitcoinj's default");
         }
     }
@@ -383,10 +416,12 @@ class HTTPServerHandlerSignTest {
         body.add("params", params);
 
         byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-        FullHttpRequest request = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.wrappedBuffer(bytes));
-        String credentials = Base64.getEncoder().encodeToString(
-                (USER + ":" + PASS).getBytes(StandardCharsets.UTF_8));
+        FullHttpRequest request =
+                new DefaultFullHttpRequest(
+                        HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.wrappedBuffer(bytes));
+        String credentials =
+                Base64.getEncoder()
+                        .encodeToString((USER + ":" + PASS).getBytes(StandardCharsets.UTF_8));
         request.headers().set(HttpHeaderNames.AUTHORIZATION, "Basic " + credentials);
         request.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, bytes.length);
 
@@ -404,18 +439,19 @@ class HTTPServerHandlerSignTest {
     @DisplayName("locktime survives signing")
     void testLockTimeSurvivesSigning() throws Exception {
         Fixture fixture = new Fixture(CoinTicker.LITECOIN, false, 2, INCOMING_NTIME);
-        Transaction unsigned = HTTPServerHandler.parseForCoin(CoinTicker.LITECOIN,
-                fixture.params, fixture.unsignedWireBytes);
+        Transaction unsigned =
+                HTTPServerHandler.parseForCoin(
+                        CoinTicker.LITECOIN, fixture.params, fixture.unsignedWireBytes);
         unsigned.setLockTime(123_456L);
         unsigned.setVersion(2);
 
         try (MockedStatic<CoinInstance> ignored = staticCoinInstance()) {
-            FullHttpResponse response = sign(newHandler(CoinTicker.LITECOIN, fixture),
-                    unsigned.bitcoinSerialize());
+            FullHttpResponse response =
+                    sign(newHandler(CoinTicker.LITECOIN, fixture), unsigned.bitcoinSerialize());
 
             JsonObject result = envelope(response).getAsJsonObject("result");
-            Transaction signed = parseWire(CoinTicker.LITECOIN, fixture.params,
-                    result.get("hex").getAsString());
+            Transaction signed =
+                    parseWire(CoinTicker.LITECOIN, fixture.params, result.get("hex").getAsString());
             assertEquals(123_456L, signed.getLockTime());
         }
     }

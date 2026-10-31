@@ -2,29 +2,34 @@ package io.xlite.daemon.app.net.xrouter;
 
 import com.google.common.base.Preconditions;
 import com.subgraph.orchid.encoders.Hex;
+
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetParameters;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
+
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.Utils;
 
-import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 public class XRouterPacketManager {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private static final int XROUTER_PACKET_VERSION = 0xff000023;
 
     private final XRouterMessageSerializer xRouterMessageSerializer;
     private final BlocknetParameters blocknetNetworkParameters;
 
-    public XRouterPacketManager(XRouterMessageSerializer xRouterMessageSerializer, BlocknetParameters blocknetNetworkParameters) {
+    public XRouterPacketManager(
+            XRouterMessageSerializer xRouterMessageSerializer,
+            BlocknetParameters blocknetNetworkParameters) {
         this.xRouterMessageSerializer = xRouterMessageSerializer;
         this.blocknetNetworkParameters = blocknetNetworkParameters;
     }
@@ -43,20 +48,28 @@ public class XRouterPacketManager {
         byte[] s = rawSignature.s.toByteArray();
 
         if (r.length > 32) {
-            LOGGER.finer("[xrouter] WARNING: Signature R is greater than 32 bytes! Trimming from the beginning. Size: " + r.length);
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature R is greater than 32 bytes! Trimming from the beginning. Size: "
+                            + r.length);
             LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
         } else if (r.length < 32) {
-            LOGGER.finer("[xrouter] WARNING: Signature R is less than 32 bytes! Prepending null bytes to the beginning. Size: " + s.length);
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature R is less than 32 bytes! Prepending null bytes to the beginning. Size: "
+                            + s.length);
             LOGGER.finer("[xrouter] WARNING: Signature R: " + new String(Hex.encode(r)));
 
             r = prependNullTo32(r);
         }
 
         if (s.length > 32) {
-            LOGGER.finer("[xrouter] WARNING: Signature S is greater than 32 bytes! Trimming from the beginning. Size: " + s.length);
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature S is greater than 32 bytes! Trimming from the beginning. Size: "
+                            + s.length);
             LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
         } else if (s.length < 32) {
-            LOGGER.finer("[xrouter] WARNING: Signature S is less than 32 bytes! Prepending null bytes. Size: " + s.length);
+            LOGGER.finer(
+                    "[xrouter] WARNING: Signature S is less than 32 bytes! Prepending null bytes. Size: "
+                            + s.length);
             LOGGER.finer("[xrouter] WARNING: Signature S: " + new String(Hex.encode(s)));
 
             s = prependNullTo32(s);
@@ -67,23 +80,36 @@ public class XRouterPacketManager {
         System.arraycopy(r, r.length - 32, signature, 0, 32);
         System.arraycopy(s, s.length - 32, signature, 32, 32);
 
-        LOGGER.finer("[xrouter] Signature: " + new String(Hex.encode(signature)) + ", byte length " + signature.length);
+        LOGGER.finer(
+                "[xrouter] Signature: "
+                        + new String(Hex.encode(signature))
+                        + ", byte length "
+                        + signature.length);
 
         return signature;
     }
 
     private byte[] prependNullTo32(byte[] toPrependTo) {
-        Preconditions.checkState(toPrependTo.length < 32, "This array is too large (32 bytes or more)");
+        Preconditions.checkState(
+                toPrependTo.length < 32, "This array is too large (32 bytes or more)");
 
         byte[] processed = new byte[32];
 
-        System.arraycopy(new byte[32 - toPrependTo.length], 0, processed, 0, 32 - toPrependTo.length);
+        System.arraycopy(
+                new byte[32 - toPrependTo.length], 0, processed, 0, 32 - toPrependTo.length);
         System.arraycopy(toPrependTo, 0, processed, 32 - toPrependTo.length, toPrependTo.length);
 
         return processed;
     }
 
-    private XRouterMessage getPacket(BlocknetPeer blocknetPeer, int size, int commandId, String uuid, ECKey ecPublicKey, ECKey ecPrivateKey, HashMap<String, Object> body) {
+    private XRouterMessage getPacket(
+            BlocknetPeer blocknetPeer,
+            int size,
+            int commandId,
+            String uuid,
+            ECKey ecPublicKey,
+            ECKey ecPrivateKey,
+            HashMap<String, Object> body) {
         Preconditions.checkNotNull(xRouterMessageSerializer);
         Preconditions.checkNotNull(blocknetNetworkParameters);
 
@@ -96,13 +122,13 @@ public class XRouterPacketManager {
         if (extSize < 253) {
             xRouterHeaderBytes = new byte[158];
             compactSize = (byte) extSize;
-            //LOGGER.finer("Compact size = " + compactSize);
+            // LOGGER.finer("Compact size = " + compactSize);
             xRouterHeaderBytes[0] = compactSize;
             compactSizeBytes = 1;
         } else if (extSize <= 65535) {
             xRouterHeaderBytes = new byte[160];
             compactSize = (byte) 253;
-            //LOGGER.finer("Compact size = " + compactSize + ", extSize = " + extSize);
+            // LOGGER.finer("Compact size = " + compactSize + ", extSize = " + extSize);
             xRouterHeaderBytes[0] = compactSize;
             xRouterHeaderBytes[1] = (byte) (0xFF & (extSize));
             xRouterHeaderBytes[2] = (byte) (0xFF & (extSize >> 8));
@@ -110,25 +136,26 @@ public class XRouterPacketManager {
         } else {
             xRouterHeaderBytes = new byte[162];
             compactSize = (byte) 254;
-            //LOGGER.finer("Compact size = " + compactSize + ", extSize = " + extSize);
+            // LOGGER.finer("Compact size = " + compactSize + ", extSize = " + extSize);
             xRouterHeaderBytes[0] = compactSize;
             Utils.uint32ToByteArrayLE(extSize, xRouterHeaderBytes, 1);
             compactSizeBytes = 5;
         }
 
         int cursor = compactSizeBytes;
-        //int cursor = 0;
+        // int cursor = 0;
 
         Utils.uint32ToByteArrayLE(XROUTER_PACKET_VERSION, xRouterHeaderBytes, cursor);
         cursor += 4;
         Utils.uint32ToByteArrayLE(commandId, xRouterHeaderBytes, cursor);
         cursor += 4;
-        Utils.uint32ToByteArrayLE(Math.round(System.currentTimeMillis() / 1000), xRouterHeaderBytes, cursor);
+        Utils.uint32ToByteArrayLE(
+                Math.round(System.currentTimeMillis() / 1000), xRouterHeaderBytes, cursor);
         cursor += 4;
         Utils.uint32ToByteArrayLE(size, xRouterHeaderBytes, cursor);
         cursor += 4;
 
-        //fill in reserved header fields with zeros
+        // fill in reserved header fields with zeros
         System.arraycopy(new byte[8], 0, xRouterHeaderBytes, cursor, 8);
         cursor += 8;
 
@@ -149,8 +176,10 @@ public class XRouterPacketManager {
         LOGGER.finer("[xrouter] Serialized XRouter header. Cursor is at " + cursor);
 
         LOGGER.finer("[xrouter] Serializing XRouter message (phase 1).");
-        XRouterPacketHeader xRouterHeader = new XRouterPacketHeader(ByteBuffer.wrap(xRouterHeaderBytes));
-        XRouterMessage message = new XRouterMessage(blocknetPeer, blocknetNetworkParameters, xRouterHeader, body);
+        XRouterPacketHeader xRouterHeader =
+                new XRouterPacketHeader(ByteBuffer.wrap(xRouterHeaderBytes));
+        XRouterMessage message =
+                new XRouterMessage(blocknetPeer, blocknetNetworkParameters, xRouterHeader, body);
 
         byte[] rawPktUnsigned = message.bitcoinSerialize();
 
@@ -164,18 +193,23 @@ public class XRouterPacketManager {
 
         LOGGER.finer("[xrouter] Serializing XRouter message (phase 2).");
         XRouterPacketHeader xRouterHeaderSigned = new XRouterPacketHeader(xRouterHeaderBufSigned);
-        return new XRouterMessage(blocknetPeer, blocknetNetworkParameters, xRouterHeaderSigned, body);
+        return new XRouterMessage(
+                blocknetPeer, blocknetNetworkParameters, xRouterHeaderSigned, body);
     }
 
     private HashMap<String, Object> getBody(@Nullable String paymentTx) {
         HashMap<String, Object> body = new HashMap<>();
-        if (paymentTx != null)
-            body.put("paymentTx", paymentTx);
+        if (paymentTx != null) body.put("paymentTx", paymentTx);
 
         return body;
     }
 
-    public XRouterMessage getXrGetBlockCount(BlocknetPeer blocknetPeer, String uuid, String currency, ECKey ecPrivateKey, ECKey ecPublicKey) {
+    public XRouterMessage getXrGetBlockCount(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String currency,
+            ECKey ecPrivateKey,
+            ECKey ecPublicKey) {
         String paymentTx = XRouterFeeUtils.getXRouterFeeTx(blocknetPeer, "xrGetBlockCount");
 
         HashMap<String, Object> body = getBody(paymentTx);
@@ -183,10 +217,23 @@ public class XRouterPacketManager {
 
         int size = currency.length() + 1 + paymentTx.length() + 1 + 4;
 
-        return getPacket(blocknetPeer, size, XRouterCommandUtils.commandStringToInt("xrGetBlockCount"), uuid, ecPublicKey, ecPrivateKey, body);
+        return getPacket(
+                blocknetPeer,
+                size,
+                XRouterCommandUtils.commandStringToInt("xrGetBlockCount"),
+                uuid,
+                ecPublicKey,
+                ecPrivateKey,
+                body);
     }
 
-    public XRouterMessage getXrService(BlocknetPeer blocknetPeer, String uuid, String command, ArrayList params, ECKey ecPrivateKey, ECKey ecPublicKey) {
+    public XRouterMessage getXrService(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String command,
+            ArrayList params,
+            ECKey ecPrivateKey,
+            ECKey ecPublicKey) {
         String paymentTx = XRouterFeeUtils.getXRouterFeeTx(blocknetPeer, "xrService");
 
         HashMap<String, Object> body = getBody(paymentTx);
@@ -196,57 +243,124 @@ public class XRouterPacketManager {
         int size = command.length() + 1 + paymentTx.length() + 1 + 4;
 
         for (Object param : params) {
-            if (param instanceof Boolean)
-                size += 4;else if (param instanceof String)
-                size += ((String) param).length() + 1;else if (param instanceof Integer)
-                size += 4;
+            if (param instanceof Boolean) size += 4;
+            else if (param instanceof String) size += ((String) param).length() + 1;
+            else if (param instanceof Integer) size += 4;
             else
-                throw new IllegalArgumentException("Argument of unsupported class: " + param.getClass().getSimpleName());
+                throw new IllegalArgumentException(
+                        "Argument of unsupported class: " + param.getClass().getSimpleName());
         }
 
-        return getPacket(blocknetPeer, size, XRouterCommandUtils.commandStringToInt("xrService"), uuid, ecPublicKey, ecPrivateKey, body);
+        return getPacket(
+                blocknetPeer,
+                size,
+                XRouterCommandUtils.commandStringToInt("xrService"),
+                uuid,
+                ecPublicKey,
+                ecPrivateKey,
+                body);
     }
 
-    public XRouterMessage getXrGetConfig(BlocknetPeer blocknetPeer, String uuid, String address, ECKey ecPrivateKey, ECKey ecPublicKey) {
+    public XRouterMessage getXrGetConfig(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String address,
+            ECKey ecPrivateKey,
+            ECKey ecPublicKey) {
         HashMap<String, Object> body = getBody(null);
         body.put("addr", address);
 
         int size = address.length() + 1;
 
-        return getPacket(blocknetPeer, size, XRouterCommandUtils.commandStringToInt("xrGetConfig"), uuid, ecPublicKey, ecPrivateKey, body);
+        return getPacket(
+                blocknetPeer,
+                size,
+                XRouterCommandUtils.commandStringToInt("xrGetConfig"),
+                uuid,
+                ecPublicKey,
+                ecPrivateKey,
+                body);
     }
 
-    public XRouterMessage getXrSendTransaction(BlocknetPeer blocknetPeer, String uuid, String feePayment, String currency, String transaction, ECKey ecPrivateKey, ECKey ecPublicKey) {
+    public XRouterMessage getXrSendTransaction(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String feePayment,
+            String currency,
+            String transaction,
+            ECKey ecPrivateKey,
+            ECKey ecPublicKey) {
         HashMap<String, Object> body = getBody(feePayment);
         body.put("currency", currency);
         body.put("transaction", transaction);
 
         int size = feePayment.length() + 1 + currency.length() + 1 + 4 + transaction.length() + 1;
 
-        return getPacket(blocknetPeer, size, XRouterCommandUtils.commandStringToInt("xrSendTransaction"), uuid, ecPublicKey, ecPrivateKey, body);
+        return getPacket(
+                blocknetPeer,
+                size,
+                XRouterCommandUtils.commandStringToInt("xrSendTransaction"),
+                uuid,
+                ecPublicKey,
+                ecPrivateKey,
+                body);
     }
 
-    public XRouterMessage getXrGetBlockHash(BlocknetPeer blocknetPeer, String uuid, String feePayment, String currency, String blockIndex, ECKey ecPrivateKey, ECKey ecPublicKey) {
+    public XRouterMessage getXrGetBlockHash(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String feePayment,
+            String currency,
+            String blockIndex,
+            ECKey ecPrivateKey,
+            ECKey ecPublicKey) {
         HashMap<String, Object> body = getBody(feePayment);
         body.put("currency", currency);
         body.put("blockId", blockIndex);
 
         int size = feePayment.length() + 1 + currency.length() + 1 + 4 + blockIndex.length() + 1;
 
-        return getPacket(blocknetPeer, size, XRouterCommandUtils.commandStringToInt("xrGetBlockHash"), uuid, ecPublicKey, ecPrivateKey, body);
+        return getPacket(
+                blocknetPeer,
+                size,
+                XRouterCommandUtils.commandStringToInt("xrGetBlockHash"),
+                uuid,
+                ecPublicKey,
+                ecPrivateKey,
+                body);
     }
 
-    public XRouterMessage getXrGetBlock(BlocknetPeer blocknetPeer, String uuid, String feePayment, String currency, String blockHash, ECKey ecPrivateKey, ECKey ecPublicKey) {
+    public XRouterMessage getXrGetBlock(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String feePayment,
+            String currency,
+            String blockHash,
+            ECKey ecPrivateKey,
+            ECKey ecPublicKey) {
         HashMap<String, Object> body = getBody(feePayment);
         body.put("currency", currency);
         body.put("blockHash", blockHash);
 
         int size = feePayment.length() + 1 + currency.length() + 1 + blockHash.length() + 1 + 4;
 
-        return getPacket(blocknetPeer, size, XRouterCommandUtils.commandStringToInt("xrGetBlock"), uuid, ecPublicKey, ecPrivateKey, body);
+        return getPacket(
+                blocknetPeer,
+                size,
+                XRouterCommandUtils.commandStringToInt("xrGetBlock"),
+                uuid,
+                ecPublicKey,
+                ecPrivateKey,
+                body);
     }
 
-    public XRouterMessage getXrGetTransaction(BlocknetPeer blocknetPeer, String uuid, String currency, String txid, ECKey ecPrivateKey, ECKey ecPublicKey) {
+    public XRouterMessage getXrGetTransaction(
+            BlocknetPeer blocknetPeer,
+            String uuid,
+            String currency,
+            String txid,
+            ECKey ecPrivateKey,
+            ECKey ecPublicKey) {
         String paymentTx = XRouterFeeUtils.getXRouterFeeTx(blocknetPeer, "xrGetBlockCount");
 
         HashMap<String, Object> body = getBody(paymentTx);
@@ -255,6 +369,13 @@ public class XRouterPacketManager {
 
         int size = paymentTx.length() + 1 + currency.length() + 1 + txid.length() + 1 + 4;
 
-        return getPacket(blocknetPeer, size, XRouterCommandUtils.commandStringToInt("xrGetTransaction"), uuid, ecPublicKey, ecPrivateKey, body);
+        return getPacket(
+                blocknetPeer,
+                size,
+                XRouterCommandUtils.commandStringToInt("xrGetTransaction"),
+                uuid,
+                ecPublicKey,
+                ecPrivateKey,
+                body);
     }
 }

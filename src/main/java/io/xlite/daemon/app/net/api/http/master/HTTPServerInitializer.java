@@ -1,6 +1,5 @@
 package io.xlite.daemon.app.net.api.http.master;
 
-import io.xlite.daemon.app.net.api.http.server.ExceptionHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -9,10 +8,10 @@ import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import io.xlite.daemon.app.net.api.http.server.ExceptionHandler;
 
 public class HTTPServerInitializer extends ChannelInitializer<SocketChannel> {
-    public HTTPServerInitializer() {
-    }
+    public HTTPServerInitializer() {}
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -26,5 +25,4 @@ public class HTTPServerInitializer extends ChannelInitializer<SocketChannel> {
         pipeline.addLast(new HTTPServerHandler());
         pipeline.addLast(new ExceptionHandler());
     }
-
 }

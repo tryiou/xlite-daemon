@@ -38,41 +38,45 @@ public class ArgMenu {
 
         try {
             if (password == null) {
-                System.out.println("Unrecognized arguments. Use --new-wallet <password> or --decrypt-wallet <password>.");
+                System.out.println(
+                        "Unrecognized arguments. Use --new-wallet <password> or --decrypt-wallet <password>.");
                 return;
             }
             switch (selection) {
-                case 1: {
-                    if (KeyHandler.existsBaseECKeyFromLocal()) {
-                        System.out.println("Key already exists");
-                        return;
+                case 1:
+                    {
+                        if (KeyHandler.existsBaseECKeyFromLocal()) {
+                            System.out.println("Key already exists");
+                            return;
+                        }
+
+                        int strength = KeyHandler.calculatePasswordStrength(password);
+
+                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                            System.out.println("Bad password.");
+                            return;
+                        }
+
+                        completeLogin(password, null);
+                        break;
                     }
+                case 2:
+                    {
+                        int strength = KeyHandler.calculatePasswordStrength(password);
 
-                    int strength = KeyHandler.calculatePasswordStrength(password);
+                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                            System.out.println("Bad password.");
+                            return;
+                        }
 
-                    if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                        System.out.println("Bad password.");
-                        return;
+                        completeLogin(password, null);
+                        break;
                     }
-
-                    completeLogin(password, null);
-                    break;
-                }
-                case 2: {
-                    int strength = KeyHandler.calculatePasswordStrength(password);
-
-                    if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                        System.out.println("Bad password.");
-                        return;
+                case 3:
+                    {
+                        System.out.println("Exiting...");
+                        System.exit(0);
                     }
-
-                    completeLogin(password, null);
-                    break;
-                }
-                case 3: {
-                    System.out.println("Exiting...");
-                    System.exit(0);
-                }
                     break;
                 default:
                     throw new IllegalStateException("Unexpected value: " + selection);
@@ -83,18 +87,28 @@ public class ArgMenu {
     }
 
     private void completeLogin(char[] password, String userMnemonic) {
-        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, userMnemonic, false);
+        CoinInstance.CoinError coinError =
+                CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, userMnemonic, false);
         if (coinError != null) {
-            System.out.println("[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage());
+            System.out.println(
+                    "[master] Error("
+                            + coinError.getCode().name()
+                            + "): "
+                            + coinError.getMessage());
             System.exit(0);
         }
 
         for (CoinTicker cointicker : CoinTicker.coins()) {
-            if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BITCOIN)
-                continue;
+            if (cointicker == CoinTicker.BLOCKNET || cointicker == CoinTicker.BITCOIN) continue;
             coinError = CoinInstance.getInstance(cointicker).init(password, userMnemonic, false);
             if (coinError != null)
-                System.out.println("[" + cointicker.name() + "] Error(" + coinError.getCode().name() + "): " + coinError.getMessage());
+                System.out.println(
+                        "["
+                                + cointicker.name()
+                                + "] Error("
+                                + coinError.getCode().name()
+                                + "): "
+                                + coinError.getMessage());
         }
     }
 }

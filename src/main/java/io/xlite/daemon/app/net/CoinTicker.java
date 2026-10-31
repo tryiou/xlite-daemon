@@ -17,29 +17,27 @@ public enum CoinTicker {
     RAVENCOIN,
     UNOBTANIUM,
     PKOIN,
-    VERGE
-    ;
+    VERGE;
 
     /**
-    * List of supported coins.
-    * @return Supported coins
-    */
+     * List of supported coins.
+     *
+     * @return Supported coins
+     */
     public static List<CoinTicker> coins() {
         return Arrays.asList(
                 BLOCKNET,
                 BITCOIN,
-//            BITCOIN_CASH, - not support on backend
+                //            BITCOIN_CASH, - not support on backend
                 LITECOIN,
                 DASHCOIN,
                 DIGIBYTE,
                 DOGECOIN,
-
                 SYSCOIN,
                 PIVX,
                 UNOBTANIUM,
                 PKOIN,
                 RAVENCOIN,
-                VERGE
-        );
+                VERGE);
     }
 }

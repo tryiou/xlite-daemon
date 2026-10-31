@@ -1,13 +1,15 @@
 package io.xlite.daemon.app.net.api.http.client;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.xlite.daemon.app.net.CoinTicker;
-import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import io.xlite.daemon.app.net.CoinTicker;
+
+import org.junit.jupiter.api.Test;
 
 public class EXRResponseNormalizeTest {
 
@@ -22,7 +24,8 @@ public class EXRResponseNormalizeTest {
 
     @Test
     public void testNormalize_BareUtxosObjectPassthrough() {
-        String body = "{\"utxos\":[{\"txhash\":\"ab\",\"vout\":1,\"value\":1.5,\"address\":\"X\",\"block_number\":100}]}";
+        String body =
+                "{\"utxos\":[{\"txhash\":\"ab\",\"vout\":1,\"value\":1.5,\"address\":\"X\",\"block_number\":100}]}";
         JsonElement parsed = JsonParser.parseString(body);
         assertEquals(body, HTTPClient.normalizeEXRResponse(parsed));
     }
@@ -93,15 +96,18 @@ public class EXRResponseNormalizeTest {
 
     @Test
     public void testParseEnvelope_ObjectResultPreserved() {
-        JsonObject env = HTTPClient.parseEnvelope("{\"result\":{\"hex\":\"aa\"},\"error\":null}", "op");
+        JsonObject env =
+                HTTPClient.parseEnvelope("{\"result\":{\"hex\":\"aa\"},\"error\":null}", "op");
         assertNotNull(env);
         assertEquals("aa", env.getAsJsonObject("result").get("hex").getAsString());
     }
 
     @Test
     public void testParseEnvelope_ErrorYieldsNull() {
-        assertNull(HTTPClient.parseEnvelope(
-                "{\"result\":null,\"error\":{\"code\":-25,\"message\":\"missing inputs\"}}", "op"));
+        assertNull(
+                HTTPClient.parseEnvelope(
+                        "{\"result\":null,\"error\":{\"code\":-25,\"message\":\"missing inputs\"}}",
+                        "op"));
     }
 
     @Test
@@ -173,8 +179,9 @@ public class EXRResponseNormalizeTest {
 
     @Test
     public void testSendRawTransaction_ErrorEnvelopePassedThroughIntact() {
-        HTTPClient client = new CannedClient(
-                "{\"result\":null,\"error\":{\"code\":-25,\"message\":\"missing inputs\"}}");
+        HTTPClient client =
+                new CannedClient(
+                        "{\"result\":null,\"error\":{\"code\":-25,\"message\":\"missing inputs\"}}");
         JsonObject res = client.sendRawTransaction(CoinTicker.BLOCKNET, "deadbeef");
         assertNotNull(res);
         assertTrue(res.has("error") && !res.get("error").isJsonNull());

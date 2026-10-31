@@ -9,20 +9,19 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Ports a stepping listener must not take: the master listener's port and
- * every other coin's daemon and derived listener ports.
+ * Ports a stepping listener must not take: the master listener's port and every other coin's daemon
+ * and derived listener ports.
  *
- * <p>The master port is passed in rather than read here: it is the operator's
- * configured value, not a constant, and this class stays free of file access.
- * </p>
+ * <p>The master port is passed in rather than read here: it is the operator's configured value, not
+ * a constant, and this class stays free of file access.
  */
 public final class RpcPortClaims {
 
-    private RpcPortClaims() {
-    }
+    private RpcPortClaims() {}
 
     /**
      * Ports claimed by everything except {@code ticker}.
+     *
      * @param ticker the asking coin; its own ports are not claimed
      * @param masterPort the master listener's port, never handed to a coin
      */

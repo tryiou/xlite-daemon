@@ -1,8 +1,11 @@
 package io.xlite.daemon.app.net.api.http.server;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.util.TxTimeField;
+
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -16,19 +19,15 @@ import org.junit.jupiter.api.Test;
 
 import java.security.MessageDigest;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * A decoded transaction must be reported under the identifier the network gave
- * it.
+ * A decoded transaction must be reported under the identifier the network gave it.
  *
- * <p>For a chain whose wire layout carries a timestamp, the bytes on the wire
- * are the hashed preimage, so the identifier is the hash of exactly those
- * bytes. A parser that hands the transaction to bitcoinj has to strip that
- * field to read the rest correctly, and bitcoinj then re-serializes without it
- * — so the hash it computes is over a different message than the one the chain
- * hashed. The decoded fields come out right, which is what makes this easy to
- * miss: only the identifier is wrong.
+ * <p>For a chain whose wire layout carries a timestamp, the bytes on the wire are the hashed
+ * preimage, so the identifier is the hash of exactly those bytes. A parser that hands the
+ * transaction to bitcoinj has to strip that field to read the rest correctly, and bitcoinj then
+ * re-serializes without it — so the hash it computes is over a different message than the one the
+ * chain hashed. The decoded fields come out right, which is what makes this easy to miss: only the
+ * identifier is wrong.
  */
 class DecodeTransactionTxidTest {
 
@@ -49,8 +48,8 @@ class DecodeTransactionTxidTest {
         io.xlite.daemon.app.coinconfig.CoinConfigRegistry.resetForTest();
     }
 
-    private static CoinConfig config(String ticker, String name, int addr, int p2sh, int dpk,
-                                     boolean timeField) {
+    private static CoinConfig config(
+            String ticker, String name, int addr, int p2sh, int dpk, boolean timeField) {
         java.util.Map<String, String> e = new java.util.LinkedHashMap<>();
         e.put("AddressPrefix", Integer.toString(addr));
         e.put("ScriptPrefix", Integer.toString(p2sh));
@@ -67,12 +66,20 @@ class DecodeTransactionTxidTest {
 
     private static byte[] standardTransaction(NetworkParameters params, byte[] hash160) {
         Transaction tx = new Transaction(params);
-        TransactionInput in = new TransactionInput(params, null,
-                new byte[0], new TransactionOutPoint(params, 0L, Sha256Hash.ZERO_HASH),
-                Coin.valueOf(150_000L));
+        TransactionInput in =
+                new TransactionInput(
+                        params,
+                        null,
+                        new byte[0],
+                        new TransactionOutPoint(params, 0L, Sha256Hash.ZERO_HASH),
+                        Coin.valueOf(150_000L));
         tx.addInput(in);
-        tx.addOutput(new TransactionOutput(params, null, Coin.valueOf(140_000L),
-                LegacyAddress.fromPubKeyHash(params, hash160)));
+        tx.addOutput(
+                new TransactionOutput(
+                        params,
+                        null,
+                        Coin.valueOf(140_000L),
+                        LegacyAddress.fromPubKeyHash(params, hash160)));
         return tx.bitcoinSerialize();
     }
 
@@ -119,10 +126,11 @@ class DecodeTransactionTxidTest {
         // What a stripped-and-rehashed parse produces: different, and wrong.
         Transaction parsed = new Transaction(params, TxTimeField.stripNTime(wire));
         String bitcoinjTxid = parsed.getHashAsString();
-        assertNotEquals(chainTxid, bitcoinjTxid,
-                "the two must differ for this test to be meaningful");
+        assertNotEquals(
+                chainTxid, bitcoinjTxid, "the two must differ for this test to be meaningful");
 
-        assertEquals(chainTxid,
+        assertEquals(
+                chainTxid,
                 HTTPServerHandler.txidForDecoded(CoinTicker.VERGE, wire, parsed),
                 "a time-field coin must be reported under the chain's identifier");
     }
@@ -135,7 +143,8 @@ class DecodeTransactionTxidTest {
         byte[] wire = standardTransaction(params, hash160);
         Transaction parsed = new Transaction(params, wire);
 
-        assertEquals(parsed.getHashAsString(),
+        assertEquals(
+                parsed.getHashAsString(),
                 HTTPServerHandler.txidForDecoded(CoinTicker.LITECOIN, wire, parsed),
                 "a coin with no time field must keep the bitcoinj identifier");
     }
@@ -154,11 +163,13 @@ class DecodeTransactionTxidTest {
 
         // Only the tickers the fixture configures, since deciding whether the
         // field applies is itself a configuration lookup.
-        for (CoinTicker t : new CoinTicker[]{CoinTicker.LITECOIN, CoinTicker.VERGE}) {
+        for (CoinTicker t : new CoinTicker[] {CoinTicker.LITECOIN, CoinTicker.VERGE}) {
             if (!TxTimeField.appliesTo(t)) {
                 continue;
             }
-            assertEquals(expected, HTTPServerHandler.txidForDecoded(t, wire, parsed),
+            assertEquals(
+                    expected,
+                    HTTPServerHandler.txidForDecoded(t, wire, parsed),
                     t + " declares a time field and must be reported over the wire bytes");
         }
     }

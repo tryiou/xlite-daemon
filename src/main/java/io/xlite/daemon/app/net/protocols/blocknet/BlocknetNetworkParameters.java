@@ -1,7 +1,9 @@
 package io.xlite.daemon.app.net.protocols.blocknet;
 
 import com.subgraph.orchid.encoders.Hex;
+
 import io.xlite.daemon.app.net.xrouter.XRouterMessageSerializer;
+
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
@@ -12,63 +14,52 @@ import java.math.BigInteger;
 /**
  * The XRouter-over-p2p parameters for Blocknet.
  *
- * <p>This is NOT a second copy of the coin's network parameters. Blocknet's
- * prefixes, dust floor, supply ceiling and monetary format come from
- * {@link io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters}, which
- * is the single place the coin's configuration is read and converted. The
- * supply figure, dust floor, network id and protocol version are consensus-era
- * constants the configuration repository does not carry: the compiled
- * supplement owns them, and this class reads that one table. No getter here
- * recomputes a value another class also computes — the prefixes, dust floor,
- * supply ceiling and monetary format are all delegated — so a second copy of a
- * coin's value cannot drift from the first.
+ * <p>This is NOT a second copy of the coin's network parameters. Blocknet's prefixes, dust floor,
+ * supply ceiling and monetary format come from {@link
+ * io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters}, which is the single place the
+ * coin's configuration is read and converted. The supply figure, dust floor, network id and
+ * protocol version are consensus-era constants the configuration repository does not carry: the
+ * compiled supplement owns them, and this class reads that one table. No getter here recomputes a
+ * value another class also computes — the prefixes, dust floor, supply ceiling and monetary format
+ * are all delegated — so a second copy of a coin's value cannot drift from the first.
  *
- * <p>What is genuinely here, and not expressible in a configuration file, is
- * the p2p surface: DNS seeds, the p2p port, packet magic, the genesis hash and
- * the message serializers.
+ * <p>What is genuinely here, and not expressible in a configuration file, is the p2p surface: DNS
+ * seeds, the p2p port, packet magic, the genesis hash and the message serializers.
  *
- * <p>This object no longer carries the coin's fee rate or minimum fee. It used
- * to implement the fee accessor interface with its own copies of them, and that
- * is how those copies drifted from what the daemon actually charged. The fees
- * now live only on the config-driven parameter set the money and address paths
- * use, so asking this object for a fee is no longer possible by design: a fee
+ * <p>This object no longer carries the coin's fee rate or minimum fee. It used to implement the fee
+ * accessor interface with its own copies of them, and that is how those copies drifted from what
+ * the daemon actually charged. The fees now live only on the config-driven parameter set the money
+ * and address paths use, so asking this object for a fee is no longer possible by design: a fee
  * read here would be a read of a second, unowned number.
  */
 public class BlocknetNetworkParameters extends BlocknetParameters {
 
     /**
-     * Resolved on first use and cached. Building it validates the whole
-     * configuration, and the getters below read more than one header per
-     * operation, so rebuilding per call would revalidate the configuration on
-     * every use.
+     * Resolved on first use and cached. Building it validates the whole configuration, and the
+     * getters below read more than one header per operation, so rebuilding per call would
+     * revalidate the configuration on every use.
      *
-     * <p>This object is a per-coin adapter, so the coin's configuration must
-     * already be loaded when it is constructed. That is not only for the
-     * address prefixes: the base class asks for the supply ceiling while it is
-     * still running its own constructor, so the very first thing this class is
-     * asked for may be a delegating getter. With no configuration loaded that
-     * call throws, which is the honest outcome for a coin that was never
-     * configured.
+     * <p>This object is a per-coin adapter, so the coin's configuration must already be loaded when
+     * it is constructed. That is not only for the address prefixes: the base class asks for the
+     * supply ceiling while it is still running its own constructor, so the very first thing this
+     * class is asked for may be a delegating getter. With no configuration loaded that call throws,
+     * which is the honest outcome for a coin that was never configured.
      *
-     * <p>The cache lives as long as this object, not as long as the process: the
-     * coin builds a new instance on every init, so a registry reloaded between
-     * two inits is picked up by the next one. What is not picked up is a reload
-     * that happens after a given instance has already resolved — that instance
-     * keeps serving what it resolved. The field is left uninitialised on
-     * purpose: the cache is populated during the superclass call described
-     * above, and an explicit {@code = null} initialiser would run afterwards and
-     * throw it away, so the whole configuration would be revalidated on every
-     * call instead of once.
+     * <p>The cache lives as long as this object, not as long as the process: the coin builds a new
+     * instance on every init, so a registry reloaded between two inits is picked up by the next
+     * one. What is not picked up is a reload that happens after a given instance has already
+     * resolved — that instance keeps serving what it resolved. The field is left uninitialised on
+     * purpose: the cache is populated during the superclass call described above, and an explicit
+     * {@code = null} initialiser would run afterwards and throw it away, so the whole configuration
+     * would be revalidated on every call instead of once.
      *
-     * <p>That makes the requirement wider than construction. Every delegating
-     * getter here — and every bitcoinj operation that reaches one, address
-     * derivation and serializer use among them — throws
-     * {@link IllegalStateException} if the coin's configuration was never
-     * loaded, not just the constructor. For a coin that was never configured
-     * that is the intended failure, but a caller that reaches one of these
-     * getters without a loaded configuration is a bug in that caller, not a
-     * coin that can be started on guesswork. is a bug in that caller, not a
-     * coin that can be started on guesswork.
+     * <p>That makes the requirement wider than construction. Every delegating getter here — and
+     * every bitcoinj operation that reaches one, address derivation and serializer use among them —
+     * throws {@link IllegalStateException} if the coin's configuration was never loaded, not just
+     * the constructor. For a coin that was never configured that is the intended failure, but a
+     * caller that reaches one of these getters without a loaded configuration is a bug in that
+     * caller, not a coin that can be started on guesswork. is a bug in that caller, not a coin that
+     * can be started on guesswork.
      */
     private io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters coin;
 
@@ -87,8 +78,8 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 
     /** The coin's ticker, resolved the same way every other lookup resolves it. */
     private static String ticker() {
-        return io.xlite.daemon.app.net.CoinTickerUtils
-                .tickerToString(io.xlite.daemon.app.net.CoinTicker.BLOCKNET);
+        return io.xlite.daemon.app.net.CoinTickerUtils.tickerToString(
+                io.xlite.daemon.app.net.CoinTicker.BLOCKNET);
     }
 
     private static io.xlite.daemon.app.coinconfig.CompiledCoinSupplement.Supplement supplement() {
@@ -140,16 +131,16 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
     }
 
     /**
-     * The address prefixes come from the coin's configuration file, not from
-     * here. Asking this object for them means asking the XRouter p2p surface
-     * for the coin's address format, which is why it needs the configuration to
-     * be loaded: encoding a Blocknet address is the coin's business, and the
-     * coin's parameters are the right object to do it with.
+     * The address prefixes come from the coin's configuration file, not from here. Asking this
+     * object for them means asking the XRouter p2p surface for the coin's address format, which is
+     * why it needs the configuration to be loaded: encoding a Blocknet address is the coin's
+     * business, and the coin's parameters are the right object to do it with.
      */
     private synchronized io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters coin() {
         if (coin == null) {
-            coin = io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters
-                    .from(io.xlite.daemon.app.coinconfig.CoinConfigRegistry.get(ticker()));
+            coin =
+                    io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters.from(
+                            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.get(ticker()));
         }
         return coin;
     }
@@ -174,10 +165,9 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
     // ---------------------------------------------------------------------
 
     @Override
-    public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore) throws VerificationException, BlockStoreException {
-
-    }
-
+    public void checkDifficultyTransitions(
+            StoredBlock storedPrev, Block next, BlockStore blockStore)
+            throws VerificationException, BlockStoreException {}
 
     @Override
     public Sha256Hash getGenesisBlockHash() {
@@ -211,7 +201,8 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 
     @Override
     public byte[] getAlertSigningKey() {
-        return Hex.decode("0415758705177c87c35dadf7ebf66e93ecc2710253bbac955e695664011fa39ff29a84fa21ae9e203a43debb487170c143ab6eaffe4fa3b12e162d8a6d4da87395");
+        return Hex.decode(
+                "0415758705177c87c35dadf7ebf66e93ecc2710253bbac955e695664011fa39ff29a84fa21ae9e203a43debb487170c143ab6eaffe4fa3b12e162d8a6d4da87395");
     }
 
     @Override
@@ -245,8 +236,7 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
 
         String[] dnsSeeds = new String[nodeCount];
 
-        for (int i = 0; i < nodeCount; i++)
-            dnsSeeds[i] = "node-" + i + ".cloudchainsinc.com";
+        for (int i = 0; i < nodeCount; i++) dnsSeeds[i] = "node-" + i + ".cloudchainsinc.com";
 
         return dnsSeeds;
     }
@@ -270,5 +260,4 @@ public class BlocknetNetworkParameters extends BlocknetParameters {
     public XRouterMessageSerializer getXRouterMessageSerializer(boolean parseRetain) {
         return new XRouterMessageSerializer(parseRetain, this);
     }
-
 }

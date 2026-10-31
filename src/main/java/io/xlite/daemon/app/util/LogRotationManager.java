@@ -16,30 +16,28 @@ import java.util.logging.Logger;
 
 /**
  * Manages log file rotation and cleanup to prevent disk space issues.
- * 
- * Features:
- * - Configurable log retention period (default: 7 days)
- * - Automatic cleanup of old log files during startup
- * - Support for both .log and .log.1 files (rotated by FileHandler)
- * - Graceful handling of missing directories and files
- * - Detailed logging of cleanup operations
- * 
- * Log file naming pattern: error-YYYY-MM-DD.log[.1]
- * Example: error-2025-12-12.log, error-2025-12-12.log.1
+ *
+ * <p>Features: - Configurable log retention period (default: 7 days) - Automatic cleanup of old log
+ * files during startup - Support for both .log and .log.1 files (rotated by FileHandler) - Graceful
+ * handling of missing directories and files - Detailed logging of cleanup operations
+ *
+ * <p>Log file naming pattern: error-YYYY-MM-DD.log[.1] Example: error-2025-12-12.log,
+ * error-2025-12-12.log.1
  */
 public class LogRotationManager {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private static final String LOG_PREFIX = "error-";
     private static final String LOG_SUFFIX = ".log";
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final Path logDirectory;
     private final int retentionDays;
 
     /**
      * Creates a new LogRotationManager.
-     * 
+     *
      * @param logDirectoryPath Path to the directory containing log files
      * @param retentionDays Number of days to keep log files (default: 7)
      */
@@ -50,7 +48,7 @@ public class LogRotationManager {
 
     /**
      * Creates a LogRotationManager with default 7-day retention.
-     * 
+     *
      * @param logDirectoryPath Path to the directory containing log files
      */
     public LogRotationManager(String logDirectoryPath) {
@@ -59,7 +57,7 @@ public class LogRotationManager {
 
     /**
      * Performs log rotation cleanup by removing files older than the retention period.
-     * 
+     *
      * @return true if cleanup completed successfully, false otherwise
      */
     public boolean rotateLogs() {
@@ -71,11 +69,15 @@ public class LogRotationManager {
             List<File> oldLogFiles = findOldLogFiles();
 
             if (oldLogFiles.isEmpty()) {
-                LOGGER.info("[log-rotation] No old log files found. Current retention: " + retentionDays + " days");
+                LOGGER.info(
+                        "[log-rotation] No old log files found. Current retention: "
+                                + retentionDays
+                                + " days");
                 return true;
             }
 
-            LOGGER.info("[log-rotation] Found " + oldLogFiles.size() + " old log files to clean up");
+            LOGGER.info(
+                    "[log-rotation] Found " + oldLogFiles.size() + " old log files to clean up");
 
             long totalSize = 0;
             int deletedCount = 0;
@@ -86,16 +88,29 @@ public class LogRotationManager {
                     if (file.delete()) {
                         totalSize += fileSize;
                         deletedCount++;
-                        LOGGER.fine("[log-rotation] Deleted: " + file.getName() + " (" + fileSize + " bytes)");
+                        LOGGER.fine(
+                                "[log-rotation] Deleted: "
+                                        + file.getName()
+                                        + " ("
+                                        + fileSize
+                                        + " bytes)");
                     } else {
                         LOGGER.warning("[log-rotation] Failed to delete: " + file.getName());
                     }
                 } catch (SecurityException e) {
-                    LOGGER.severe("[log-rotation] Security exception deleting file: " + file.getName());
+                    LOGGER.severe(
+                            "[log-rotation] Security exception deleting file: " + file.getName());
                 }
             }
 
-            LOGGER.info("[log-rotation] Cleanup completed: " + deletedCount + "/" + oldLogFiles.size() + " files deleted, " + totalSize + " bytes freed");
+            LOGGER.info(
+                    "[log-rotation] Cleanup completed: "
+                            + deletedCount
+                            + "/"
+                            + oldLogFiles.size()
+                            + " files deleted, "
+                            + totalSize
+                            + " bytes freed");
 
             return true;
 
@@ -107,7 +122,7 @@ public class LogRotationManager {
 
     /**
      * Lists all log files in the directory with their details.
-     * 
+     *
      * @return List of log file details
      */
     public List<LogFileInfo> listLogFiles() {
@@ -123,11 +138,9 @@ public class LogRotationManager {
                     .sorted(Comparator.comparing(Path::getFileName))
                     .forEach(path -> {
                         File file = path.toFile();
-                        files.add(new LogFileInfo(
-                                file.getName(),
-                                file.length(),
-                                file.lastModified()
-                        ));
+                        files.add(
+                                new LogFileInfo(
+                                        file.getName(), file.length(), file.lastModified()));
                     });
 
         } catch (IOException e) {
@@ -139,7 +152,7 @@ public class LogRotationManager {
 
     /**
      * Gets the current retention period in days.
-     * 
+     *
      * @return Number of days logs are retained
      */
     public int getRetentionDays() {
@@ -148,29 +161,28 @@ public class LogRotationManager {
 
     /**
      * Checks if a file is a log file based on naming pattern.
-     * 
+     *
      * @param file File to check
      * @return true if it's a log file, false otherwise
      */
     private boolean isLogFile(File file) {
         String name = file.getName();
-        return name.startsWith(LOG_PREFIX) &&
-                name.endsWith(LOG_SUFFIX) &&
-                extractDateFromFileName(name) != null;
+        return name.startsWith(LOG_PREFIX)
+                && name.endsWith(LOG_SUFFIX)
+                && extractDateFromFileName(name) != null;
     }
 
     /**
      * Extracts date from log file name.
-     * 
+     *
      * @param fileName Name of the log file
      * @return LocalDate if valid, null otherwise
      */
     private LocalDate extractDateFromFileName(String fileName) {
         try {
             // Remove prefix and suffix to get date part
-            String datePart = fileName
-                    .replaceFirst("^" + LOG_PREFIX, "")
-                    .replaceFirst("\\.log.*$", "");
+            String datePart =
+                    fileName.replaceFirst("^" + LOG_PREFIX, "").replaceFirst("\\.log.*$", "");
 
             return LocalDate.parse(datePart, DATE_FORMATTER);
         } catch (DateTimeParseException e) {
@@ -181,7 +193,7 @@ public class LogRotationManager {
 
     /**
      * Finds all log files older than the retention period.
-     * 
+     *
      * @return List of old log files
      */
     private List<File> findOldLogFiles() {
@@ -213,7 +225,7 @@ public class LogRotationManager {
 
     /**
      * Ensures the log directory exists, creating it if necessary.
-     * 
+     *
      * @return true if directory exists or was created successfully
      */
     private boolean ensureLogDirectoryExists() {
@@ -229,9 +241,7 @@ public class LogRotationManager {
         }
     }
 
-    /**
-     * Immutable class representing log file information.
-     */
+    /** Immutable class representing log file information. */
     public static class LogFileInfo {
         private final String name;
         private final long size;
@@ -257,7 +267,9 @@ public class LogRotationManager {
 
         @Override
         public String toString() {
-            return String.format("LogFileInfo{name='%s', size=%d bytes, lastModified=%d}", name, size, lastModified);
+            return String.format(
+                    "LogFileInfo{name='%s', size=%d bytes, lastModified=%d}",
+                    name, size, lastModified);
         }
     }
 }

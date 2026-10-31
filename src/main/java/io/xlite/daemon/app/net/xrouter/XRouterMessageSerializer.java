@@ -2,9 +2,11 @@ package io.xlite.daemon.app.net.xrouter;
 
 import com.google.common.base.Preconditions;
 import com.subgraph.orchid.encoders.Hex;
+
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPacketHeader;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetParameters;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetUtils;
+
 import org.bitcoinj.core.*;
 
 import java.io.IOException;
@@ -15,8 +17,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class XRouterMessageSerializer extends MessageSerializer {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private boolean parseRetain;
     private BlocknetParameters params;
@@ -27,7 +29,8 @@ public class XRouterMessageSerializer extends MessageSerializer {
     }
 
     @Override
-    public XRouterMessage deserialize(ByteBuffer in) throws ProtocolException, UnsupportedOperationException {
+    public XRouterMessage deserialize(ByteBuffer in)
+            throws ProtocolException, UnsupportedOperationException {
         seekPastMagicBytes(in);
         BlocknetPacketHeader header = deserializeHeader(in);
 
@@ -35,12 +38,15 @@ public class XRouterMessageSerializer extends MessageSerializer {
     }
 
     @Override
-    public BlocknetPacketHeader deserializeHeader(ByteBuffer in) throws ProtocolException, UnsupportedOperationException {
+    public BlocknetPacketHeader deserializeHeader(ByteBuffer in)
+            throws ProtocolException, UnsupportedOperationException {
         return new BlocknetPacketHeader(in);
     }
 
     @Override
-    public XRouterMessage deserializePayload(BitcoinSerializer.BitcoinPacketHeader header, ByteBuffer in) throws ProtocolException, BufferUnderflowException, UnsupportedOperationException {
+    public XRouterMessage deserializePayload(
+            BitcoinSerializer.BitcoinPacketHeader header, ByteBuffer in)
+            throws ProtocolException, BufferUnderflowException, UnsupportedOperationException {
         BlocknetPacketHeader blocknetPacketHeader = (BlocknetPacketHeader) header;
 
         byte[] payloadBytes = new byte[blocknetPacketHeader.getLength()];
@@ -64,43 +70,59 @@ public class XRouterMessageSerializer extends MessageSerializer {
     }
 
     @Override
-    public AddressMessage makeAddressMessage(byte[] payloadBytes, int length) throws ProtocolException, UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer does not support address message construction.");
+    public AddressMessage makeAddressMessage(byte[] payloadBytes, int length)
+            throws ProtocolException, UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer does not support address message construction.");
     }
 
     @Override
-    public Message makeAlertMessage(byte[] payloadBytes) throws ProtocolException, UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer does not support alert message construction.");
+    public Message makeAlertMessage(byte[] payloadBytes)
+            throws ProtocolException, UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer does not support alert message construction.");
     }
 
     @Override
-    public Block makeBlock(byte[] payloadBytes, int offset, int length) throws ProtocolException, UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer does not support block construction.");
+    public Block makeBlock(byte[] payloadBytes, int offset, int length)
+            throws ProtocolException, UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer does not support block construction.");
     }
 
     @Override
-    public Message makeBloomFilter(byte[] payloadBytes) throws ProtocolException, UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer does not support bloom filter construction.");
+    public Message makeBloomFilter(byte[] payloadBytes)
+            throws ProtocolException, UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer does not support bloom filter construction.");
     }
 
     @Override
-    public FilteredBlock makeFilteredBlock(byte[] payloadBytes) throws ProtocolException, UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer does not support block construction.");
+    public FilteredBlock makeFilteredBlock(byte[] payloadBytes)
+            throws ProtocolException, UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer does not support block construction.");
     }
 
     @Override
-    public InventoryMessage makeInventoryMessage(byte[] payloadBytes, int length) throws ProtocolException, UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer does not support inventory message construction.");
+    public InventoryMessage makeInventoryMessage(byte[] payloadBytes, int length)
+            throws ProtocolException, UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer does not support inventory message construction.");
     }
 
     @Override
-    public Transaction makeTransaction(byte[] payloadBytes, int offset, int length, byte[] hash) throws ProtocolException, UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer does not support transaction construction");
+    public Transaction makeTransaction(byte[] payloadBytes, int offset, int length, byte[] hash)
+            throws ProtocolException, UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer does not support transaction construction");
     }
 
     @Override
-    public void serialize(String name, byte[] message, OutputStream out) throws UnsupportedOperationException {
-        throw new UnsupportedOperationException("This serializer currently does not support name/message serialization.");
+    public void serialize(String name, byte[] message, OutputStream out)
+            throws UnsupportedOperationException {
+        throw new UnsupportedOperationException(
+                "This serializer currently does not support name/message serialization.");
     }
 
     private void serialize(byte[] data, OutputStream out) throws IOException {
@@ -109,18 +131,24 @@ public class XRouterMessageSerializer extends MessageSerializer {
         out.write(header);
         out.write(data);
 
-        LOGGER.finer("[blocknet-serializer] Serialized xrouter message. Bytes: " + new String(Hex.encode(header)) + new String(Hex.encode(data)));
+        LOGGER.finer(
+                "[blocknet-serializer] Serialized xrouter message. Bytes: "
+                        + new String(Hex.encode(header))
+                        + new String(Hex.encode(data)));
     }
 
     /**
      * Serialize XRouter packet header and body
+     *
      * @param message XRouterMessage The XRouter message to serialize
-     * @param out OutputStream The output stream to which to write the serialized XRouter message bytes
+     * @param out OutputStream The output stream to which to write the serialized XRouter message
+     *     bytes
      * @throws IOException If writing fails or another I/O related error occurs
      */
     @Override
     public void serialize(Message message, OutputStream out) throws IOException {
-        Preconditions.checkArgument(message instanceof XRouterMessage, "This message is not an XRouter message.");
+        Preconditions.checkArgument(
+                message instanceof XRouterMessage, "This message is not an XRouter message.");
 
         XRouterMessage xRouterMessage = (XRouterMessage) message;
         serialize(xRouterMessage.bitcoinSerialize(), out);

@@ -6,13 +6,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.subgraph.orchid.encoders.Base64;
-import io.xlite.daemon.app.Version;
-import io.xlite.daemon.app.coinconfig.CoinConfig;
-import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
-import io.xlite.daemon.app.net.CoinInstance;
-import io.xlite.daemon.app.net.CoinTicker;
-import io.xlite.daemon.app.net.CoinTickerUtils;
-import io.xlite.daemon.app.util.ConfigHelper;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -20,6 +14,13 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
+import io.xlite.daemon.app.Version;
+import io.xlite.daemon.app.coinconfig.CoinConfig;
+import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
+import io.xlite.daemon.app.net.CoinInstance;
+import io.xlite.daemon.app.net.CoinTicker;
+import io.xlite.daemon.app.net.CoinTickerUtils;
+import io.xlite.daemon.app.util.ConfigHelper;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -28,8 +29,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private ConfigHelper configHelper;
 
@@ -62,7 +63,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         LOGGER.warning("[http-master] Exception caught on channel: " + cause.getMessage());
 
-        FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
+        FullHttpResponse httpResponse =
+                new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
         writeResponse(ctx, httpResponse, null);
         ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
         ctx.close();
@@ -104,7 +106,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         headerUser = values[0];
                         headerPass = values[1];
 
-                        if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
+                        if (headerUser.equals(configHelper.getRpcUsername())
+                                && headerPass.equals(configHelper.getRpcPassword())) {
                             successfulAuth = true;
                             LOGGER.finer("[http-server-handler] Successful Auth");
                         }
@@ -115,7 +118,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if (!request.uri().equals("/")) {
                 JsonObject onlyServerRootJSON = new JsonObject();
                 onlyServerRootJSON.addProperty("code", -1002);
-                onlyServerRootJSON.addProperty("message", "Only the server root ('/') is being served.");
+                onlyServerRootJSON.addProperty(
+                        "message", "Only the server root ('/') is being served.");
 
                 response.add("error", onlyServerRootJSON);
                 response.add("result", JsonNull.INSTANCE);
@@ -146,7 +150,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         if (status != HttpResponseStatus.OK) {
             ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
-            FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
+            FullHttpResponse httpResponse =
+                    new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
 
             writeResponse(ctx, httpResponse, request);
             ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
@@ -176,7 +181,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 response.add("error", errorParsingJSON);
                 response.add("result", JsonNull.INSTANCE);
                 if (e instanceof IllegalArgumentException) {
-                    LOGGER.finer("[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
+                    LOGGER.finer(
+                            "[http-server-handler] WARNING: Client sent valid JSON, but did not specify method and/or parameters!");
                 } else {
                     LOGGER.finer("[http-server-handler] WARNING: Client sent invalid JSON!");
                 }
@@ -193,16 +199,21 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 // passwords; never log them verbatim. Ping is high-frequency liveness.
                 String methodLower = method == null ? null : method.toLowerCase(Locale.ROOT);
                 if ("ping".equals(methodLower)) {
-                    LOGGER.finer("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
+                    LOGGER.finer(
+                            "[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
                 } else {
-                    LOGGER.info("[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
+                    LOGGER.info(
+                            "[http-server-handler] RPC CALL: " + method + " PARAMS: <redacted>");
                 }
 
                 response = getResponse(method, params);
                 LOGGER.finer(response.toString());
             } else {
-                ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
-                FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
+                ByteBuf responseContent =
+                        Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
+                FullHttpResponse httpResponse =
+                        new DefaultFullHttpResponse(
+                                request.protocolVersion(), status, responseContent);
 
                 writeResponse(ctx, httpResponse, request);
                 ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
@@ -210,9 +221,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             }
 
             if (request instanceof LastHttpContent) {
-                ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
+                ByteBuf responseContent =
+                        Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
 
-                FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
+                FullHttpResponse httpResponse =
+                        new DefaultFullHttpResponse(
+                                request.protocolVersion(), status, responseContent);
 
                 if (!writeResponse(ctx, httpResponse, request)) {
                     ctx.write(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
@@ -227,163 +241,196 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         String normalizedMethod = method == null ? "" : method.toLowerCase(Locale.ROOT);
         switch (normalizedMethod) {
-            case "reloadconfig": {
-                if (params.size() != 1) {
-                    response.add("result", JsonNull.INSTANCE);
-                    JsonObject errorJSON = new JsonObject();
-                    errorJSON.addProperty("code", -1);
-                    errorJSON.addProperty("message", "Usage: reloadconfig <token>\n\ntoken (string, required)");
+            case "reloadconfig":
+                {
+                    if (params.size() != 1) {
+                        response.add("result", JsonNull.INSTANCE);
+                        JsonObject errorJSON = new JsonObject();
+                        errorJSON.addProperty("code", -1);
+                        errorJSON.addProperty(
+                                "message",
+                                "Usage: reloadconfig <token>\n\ntoken (string, required)");
 
-                    response.add("error", errorJSON);
-                    break;
-                }
-
-                CoinTicker ticker = CoinTickerUtils.stringToTicker(params.get(0).getAsString());
-                if (ticker == null) {
-                    JsonObject errorJSON = new JsonObject();
-                    errorJSON.addProperty("code", -1);
-                    errorJSON.addProperty("message", "Unknown ticker: " + params.get(0).getAsString());
-                    response.add("error", errorJSON);
-                    break;
-                }
-
-                CoinInstance instance = CoinInstance.getInstance(ticker);
-                if (instance == null) {
-                    JsonObject errorJSON = new JsonObject();
-                    errorJSON.addProperty("code", -1);
-                    errorJSON.addProperty("message", "Coin instance not found for ticker: " + CoinTickerUtils.tickerToString(ticker));
-                    response.add("error", errorJSON);
-                    break;
-                }
-
-                Thread t = new Thread(() -> {
-                    try {
-                        Thread.sleep(500);
-                        instance.reloadConfig();
-                    } catch (InterruptedException e) {
-                        LOGGER.warning("[http-master] Interrupted during reloadconfig for " + ticker + ", " + e.getMessage());
+                        response.add("error", errorJSON);
+                        break;
                     }
-                });
-                t.setDaemon(true);
-                t.start();
 
-                response.addProperty("result", true);
-                response.add("error", JsonNull.INSTANCE);
-                break;
-            }
-            case "version": {
-                response.addProperty("result", Version.CLIENT_VERSION);
-                response.add("error", JsonNull.INSTANCE);
-                break;
-            }
-//			case "reloadconfigs": {
-//				boolean success = true;
-//				for (CoinInstance instance : CoinInstance.getCoinInstances()) {
-//					if (!CoinTickerUtils.isActiveTicker(instance.getTicker()))
-//						continue;
-//
-//					try {
-//						LOGGER.info(instance.getTicker().toString());
-//						instance.reloadConfig();
-//					} catch (Exception e) {
-//						success = false;
-//						e.printStackTrace();
-//					}
-//				}
-//
-//				response.addProperty("result", success);
-//				response.add("error", JsonNull.INSTANCE);
-//				break;
-//			}
-            case "ping": {
-                response.addProperty("result", 1);
-                response.add("error", JsonNull.INSTANCE);
-                break;
-            }
-            case "help": {
-                String helpString = "Master JSON-RPC server\n"
-                        + "This JSON-RPC server is served by " + CoinInstance.getVersionString() + "\n"
-                        + "\n"
-                        + "help - Display the help\n"
-                        + "\n=====RPC Master=====\n"
-                        + "ping - Lightweight liveness probe (result 1)\n"
-                        + "stop - Shutdown the server\n"
-                        + "reloadconfig <token> - Reload configuration for specified token\n"
-                        + "getCoins - List coin configurations (alias listCoins)\n"
-                        + "version - Get version\n";
-//						+ "reloadconfigs - Reload all configuration files\n";
+                    CoinTicker ticker = CoinTickerUtils.stringToTicker(params.get(0).getAsString());
+                    if (ticker == null) {
+                        JsonObject errorJSON = new JsonObject();
+                        errorJSON.addProperty("code", -1);
+                        errorJSON.addProperty(
+                                "message", "Unknown ticker: " + params.get(0).getAsString());
+                        response.add("error", errorJSON);
+                        break;
+                    }
 
-                response.addProperty("result", helpString);
-                response.add("error", JsonNull.INSTANCE);
-                break;
-            }
-            case "stop": {
-                shutdownRequested = true;
-                response.addProperty("result", "shutting down...");
-                response.add("error", JsonNull.INSTANCE);
-                break;
-            }
-            case "getcoins":
-            case "listcoins": {
-                if (params == null || params.size() != 0) {
-                    JsonObject err = new JsonObject();
-                    err.addProperty("code", -1);
-                    err.addProperty("message", "Usage: getCoins");
-                    response.add("error", err);
-                    response.add("result", JsonNull.INSTANCE);
-                    break;
-                }
-                // Atomic snapshot — avoids isLoaded()/list() TOCTOU; empty check is the gate.
-                java.util.Map<String, CoinConfig> snap = CoinConfigRegistry.list();
-                if (snap.isEmpty()) {
-                    JsonObject err = new JsonObject();
-                    err.addProperty("code", -1);
-                    err.addProperty("message", "Coin configs not loaded");
-                    response.add("error", err);
-                    response.add("result", JsonNull.INSTANCE);
-                    break;
-                }
-                // Single DTO source — delegate to CoinConfig.toDtoMap() (authenticated via channelRead0)
-                try {
-                    JsonArray arr = new JsonArray();
-                    snap.values().stream()
-                            .sorted(java.util.Comparator.comparing(CoinConfig::getTicker))
-                            .forEach(cfg -> {
-                                java.util.Map<String, Object> dto = cfg.toDtoMap();
-                                JsonObject o = new JsonObject();
-                                o.addProperty("ticker", (String) dto.get("ticker"));
-                                o.addProperty("blockchain", (String) dto.get("blockchain"));
-                                o.addProperty("verId", (String) dto.get("verId"));
-                                o.addProperty("addressPrefix", ((Number) dto.get("addressPrefix")).intValue());
-                                o.addProperty("scriptPrefix", ((Number) dto.get("scriptPrefix")).intValue());
-                                o.addProperty("secretPrefix", ((Number) dto.get("secretPrefix")).intValue());
-                                o.addProperty("coin", ((Number) dto.get("coin")).longValue());
-                                o.addProperty("feePerByte", ((Number) dto.get("feePerByte")).longValue());
-                                o.addProperty("minTxFee", ((Number) dto.get("minTxFee")).longValue());
-                                o.addProperty("port", ((Number) dto.get("port")).intValue());
-                                o.addProperty("dustAmount", ((Number) dto.get("dustAmount")).longValue());
-                                arr.add(o);
+                    CoinInstance instance = CoinInstance.getInstance(ticker);
+                    if (instance == null) {
+                        JsonObject errorJSON = new JsonObject();
+                        errorJSON.addProperty("code", -1);
+                        errorJSON.addProperty(
+                                "message",
+                                "Coin instance not found for ticker: "
+                                        + CoinTickerUtils.tickerToString(ticker));
+                        response.add("error", errorJSON);
+                        break;
+                    }
+
+                    Thread t =
+                            new Thread(() -> {
+                                try {
+                                    Thread.sleep(500);
+                                    instance.reloadConfig();
+                                } catch (InterruptedException e) {
+                                    LOGGER.warning(
+                                            "[http-master] Interrupted during reloadconfig for "
+                                                    + ticker
+                                                    + ", "
+                                                    + e.getMessage());
+                                }
                             });
-                    response.add("result", arr);
+                    t.setDaemon(true);
+                    t.start();
+
+                    response.addProperty("result", true);
                     response.add("error", JsonNull.INSTANCE);
-                } catch (IllegalStateException e) {
-                    LOGGER.warning("[http-master] getCoins DTO error: " + e.getMessage());
-                    JsonObject err = new JsonObject();
-                    err.addProperty("code", -1);
-                    err.addProperty("message", e.getMessage());
-                    response.add("error", err);
-                    response.add("result", JsonNull.INSTANCE);
+                    break;
                 }
-                break;
-            }
-            default: {
-                JsonObject methodNotFound = new JsonObject();
-                methodNotFound.addProperty("code", -32601);
-                methodNotFound.addProperty("message", "Method not found.");
-                response.add("error", methodNotFound);
-                response.add("result", JsonNull.INSTANCE);
-                break;
-            }
+            case "version":
+                {
+                    response.addProperty("result", Version.CLIENT_VERSION);
+                    response.add("error", JsonNull.INSTANCE);
+                    break;
+                }
+            //			case "reloadconfigs": {
+            //				boolean success = true;
+            //				for (CoinInstance instance : CoinInstance.getCoinInstances()) {
+            //					if (!CoinTickerUtils.isActiveTicker(instance.getTicker()))
+            //						continue;
+            //
+            //					try {
+            //						LOGGER.info(instance.getTicker().toString());
+            //						instance.reloadConfig();
+            //					} catch (Exception e) {
+            //						success = false;
+            //						e.printStackTrace();
+            //					}
+            //				}
+            //
+            //				response.addProperty("result", success);
+            //				response.add("error", JsonNull.INSTANCE);
+            //				break;
+            //			}
+            case "ping":
+                {
+                    response.addProperty("result", 1);
+                    response.add("error", JsonNull.INSTANCE);
+                    break;
+                }
+            case "help":
+                {
+                    String helpString =
+                            "Master JSON-RPC server\n"
+                                    + "This JSON-RPC server is served by "
+                                    + CoinInstance.getVersionString()
+                                    + "\n"
+                                    + "\n"
+                                    + "help - Display the help\n"
+                                    + "\n=====RPC Master=====\n"
+                                    + "ping - Lightweight liveness probe (result 1)\n"
+                                    + "stop - Shutdown the server\n"
+                                    + "reloadconfig <token> - Reload configuration for specified token\n"
+                                    + "getCoins - List coin configurations (alias listCoins)\n"
+                                    + "version - Get version\n";
+                    //						+ "reloadconfigs - Reload all configuration files\n";
+
+                    response.addProperty("result", helpString);
+                    response.add("error", JsonNull.INSTANCE);
+                    break;
+                }
+            case "stop":
+                {
+                    shutdownRequested = true;
+                    response.addProperty("result", "shutting down...");
+                    response.add("error", JsonNull.INSTANCE);
+                    break;
+                }
+            case "getcoins":
+            case "listcoins":
+                {
+                    if (params == null || params.size() != 0) {
+                        JsonObject err = new JsonObject();
+                        err.addProperty("code", -1);
+                        err.addProperty("message", "Usage: getCoins");
+                        response.add("error", err);
+                        response.add("result", JsonNull.INSTANCE);
+                        break;
+                    }
+                    // Atomic snapshot — avoids isLoaded()/list() TOCTOU; empty check is the gate.
+                    java.util.Map<String, CoinConfig> snap = CoinConfigRegistry.list();
+                    if (snap.isEmpty()) {
+                        JsonObject err = new JsonObject();
+                        err.addProperty("code", -1);
+                        err.addProperty("message", "Coin configs not loaded");
+                        response.add("error", err);
+                        response.add("result", JsonNull.INSTANCE);
+                        break;
+                    }
+                    // Single DTO source — delegate to CoinConfig.toDtoMap() (authenticated via
+                    // channelRead0)
+                    try {
+                        JsonArray arr = new JsonArray();
+                        snap.values().stream()
+                                .sorted(java.util.Comparator.comparing(CoinConfig::getTicker))
+                                .forEach(cfg -> {
+                                    java.util.Map<String, Object> dto = cfg.toDtoMap();
+                                    JsonObject o = new JsonObject();
+                                    o.addProperty("ticker", (String) dto.get("ticker"));
+                                    o.addProperty("blockchain", (String) dto.get("blockchain"));
+                                    o.addProperty("verId", (String) dto.get("verId"));
+                                    o.addProperty(
+                                            "addressPrefix",
+                                            ((Number) dto.get("addressPrefix")).intValue());
+                                    o.addProperty(
+                                            "scriptPrefix",
+                                            ((Number) dto.get("scriptPrefix")).intValue());
+                                    o.addProperty(
+                                            "secretPrefix",
+                                            ((Number) dto.get("secretPrefix")).intValue());
+                                    o.addProperty("coin", ((Number) dto.get("coin")).longValue());
+                                    o.addProperty(
+                                            "feePerByte",
+                                            ((Number) dto.get("feePerByte")).longValue());
+                                    o.addProperty(
+                                            "minTxFee", ((Number) dto.get("minTxFee")).longValue());
+                                    o.addProperty("port", ((Number) dto.get("port")).intValue());
+                                    o.addProperty(
+                                            "dustAmount",
+                                            ((Number) dto.get("dustAmount")).longValue());
+                                    arr.add(o);
+                                });
+                        response.add("result", arr);
+                        response.add("error", JsonNull.INSTANCE);
+                    } catch (IllegalStateException e) {
+                        LOGGER.warning("[http-master] getCoins DTO error: " + e.getMessage());
+                        JsonObject err = new JsonObject();
+                        err.addProperty("code", -1);
+                        err.addProperty("message", e.getMessage());
+                        response.add("error", err);
+                        response.add("result", JsonNull.INSTANCE);
+                    }
+                    break;
+                }
+            default:
+                {
+                    JsonObject methodNotFound = new JsonObject();
+                    methodNotFound.addProperty("code", -32601);
+                    methodNotFound.addProperty("message", "Method not found.");
+                    response.add("error", methodNotFound);
+                    response.add("result", JsonNull.INSTANCE);
+                    break;
+                }
         }
 
         if (shutdownRequested) {
@@ -394,25 +441,30 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         return response;
     }
 
-    private boolean writeResponse(ChannelHandlerContext ctx, FullHttpResponse httpResponse, FullHttpRequest request) {
+    private boolean writeResponse(
+            ChannelHandlerContext ctx, FullHttpResponse httpResponse, FullHttpRequest request) {
         boolean keepAlive = false;
-        if (request != null)
-            keepAlive = HttpUtil.isKeepAlive(request);
+        if (request != null) keepAlive = HttpUtil.isKeepAlive(request);
 
         httpResponse.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json");
-        httpResponse.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, httpResponse.content().readableBytes());
+        httpResponse
+                .headers()
+                .setInt(HttpHeaderNames.CONTENT_LENGTH, httpResponse.content().readableBytes());
         httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
         httpResponse.headers().set(HttpHeaderNames.SERVER, CoinInstance.getVersionString());
 
         LOGGER.finer("[http-server-handler] Writing response to channel. Keep alive? " + keepAlive);
-        LOGGER.finer("[http-server-handler] Response content: " + httpResponse.content().toString(CharsetUtil.UTF_8));
+        LOGGER.finer(
+                "[http-server-handler] Response content: "
+                        + httpResponse.content().toString(CharsetUtil.UTF_8));
         ctx.write(httpResponse);
 
         return keepAlive;
     }
 
     private static void send100Continue(ChannelHandlerContext ctx) {
-        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE);
+        FullHttpResponse response =
+                new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE);
         ctx.write(response);
     }
 }

@@ -1,19 +1,18 @@
 package io.xlite.daemon.app.util;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Shared whole-coin to base-unit conversion must round to nearest, never truncate.
  *
- * <p>Binary doubles cannot exactly represent most decimal fractions. A value
- * like 0.00050001 (50001 sats) is stored as slightly less, so {@code (long)}
- * truncation yields 50000 — a 1-satoshi shortfall that invalidated BIP137
- * ownership proofs on takes (servicenode {@code crNoMoney} rejects). Every
- * whole-coin to base-unit site (ingest, send, fees, display) must go through
- * {@link Sats#fromWholeCoins} with the coin's own BCF COIN factor.
+ * <p>Binary doubles cannot exactly represent most decimal fractions. A value like 0.00050001 (50001
+ * sats) is stored as slightly less, so {@code (long)} truncation yields 50000 — a 1-satoshi
+ * shortfall that invalidated BIP137 ownership proofs on takes (servicenode {@code crNoMoney}
+ * rejects). Every whole-coin to base-unit site (ingest, send, fees, display) must go through {@link
+ * Sats#fromWholeCoins} with the coin's own BCF COIN factor.
  */
 class SatsTest {
 

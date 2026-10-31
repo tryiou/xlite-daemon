@@ -1,5 +1,7 @@
 package io.xlite.daemon.app.coinconfig;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,12 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Offline-fallback tests for {@link CoinConfigRegistry#loadWithFallback}.
- * Upstream failure is simulated with a closed localhost port (fast
- * refusal, no network dependency).
+ * Offline-fallback tests for {@link CoinConfigRegistry#loadWithFallback}. Upstream failure is
+ * simulated with a closed localhost port (fast refusal, no network dependency).
  */
 class CoinConfigRegistryFallbackTest {
 
@@ -59,15 +58,18 @@ class CoinConfigRegistryFallbackTest {
     @Test
     void testColdCachePropagatesOriginalFailure(@TempDir Path root) {
         CoinConfigCache cache = CoinConfigCache.forSource(root, DEAD_UPSTREAM);
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> CoinConfigRegistry.loadWithFallback(DEAD_UPSTREAM, cache));
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> CoinConfigRegistry.loadWithFallback(DEAD_UPSTREAM, cache));
         assertTrue(e.getMessage().contains("Cannot fetch"), e.getMessage());
         assertTrue(CoinConfigRegistry.list().isEmpty());
     }
 
     @Test
     void testNullCachePropagatesFailure(@TempDir Path root) {
-        assertThrows(IllegalStateException.class,
+        assertThrows(
+                IllegalStateException.class,
                 () -> CoinConfigRegistry.loadWithFallback(DEAD_UPSTREAM, null));
     }
 

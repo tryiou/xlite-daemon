@@ -24,17 +24,18 @@ public class BlocknetPacketHeader extends BitcoinSerializer.BitcoinPacketHeader 
 
         int cursor = 0;
 
-        for (; header[cursor] != 0x00 && cursor < 12; cursor++);
+        for (; header[cursor] != 0x00 && cursor < 12; cursor++)
+            ;
 
         byte[] commandBytes = new byte[cursor];
         System.arraycopy(header, 0, commandBytes, 0, cursor);
         cursor = 12;
 
         command = new String(commandBytes).trim();
-//		LOGGER.finer("[blocknet-header] Retrieved command: " + command);
+        //		LOGGER.finer("[blocknet-header] Retrieved command: " + command);
 
         length = (int) Utils.readUint32(header, cursor);
-//		LOGGER.finer("[blocknet-header] Retrieved length: " + length);
+        //		LOGGER.finer("[blocknet-header] Retrieved length: " + length);
         cursor += 4;
 
         if (length > Message.MAX_SIZE || length < 0) {
@@ -43,7 +44,8 @@ public class BlocknetPacketHeader extends BitcoinSerializer.BitcoinPacketHeader 
 
         checksum = new byte[4];
         System.arraycopy(header, cursor, checksum, 0, 4);
-//		LOGGER.finer("[blocknet-header] Retrieved checksum: " + new String(Hex.encode(checksum)));
+        //		LOGGER.finer("[blocknet-header] Retrieved checksum: " + new
+        // String(Hex.encode(checksum)));
     }
 
     public String getCommand() {

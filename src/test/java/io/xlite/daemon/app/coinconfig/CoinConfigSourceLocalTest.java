@@ -1,5 +1,7 @@
 package io.xlite.daemon.app.coinconfig;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -9,12 +11,10 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Validates CoinConfigSource logic with simple synthetic sets — no committed
- * fixture, no ../ sibling. The gate is unit-tested against synthetic configurations; real production
- * bcf is not read by any test in this repository.
+ * Validates CoinConfigSource logic with simple synthetic sets — no committed fixture, no ../
+ * sibling. The gate is unit-tested against synthetic configurations; real production bcf is not
+ * read by any test in this repository.
  */
 class CoinConfigSourceLocalTest {
 
@@ -57,12 +57,15 @@ class CoinConfigSourceLocalTest {
     @Test
     void testLoadsSyntheticManifest(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
-        Files.writeString(dir.resolve("manifest-latest.json"),
+        Files.writeString(
+                dir.resolve("manifest-latest.json"),
                 "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\",\"xbridge_conf\":\"ltc.conf\"},"
                         + "{\"blockchain\":\"Blocknet\",\"ticker\":\"BLOCK\",\"xbridge_conf\":\"block.conf\"}]");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("ltc.conf"),
+        Files.writeString(
+                dir.resolve("xbridge-confs").resolve("ltc.conf"),
                 "[LTC]\nTitle=Litecoin\nAddressPrefix=48\nScriptPrefix=50\nSecretPrefix=176\nCOIN=100000000\nFeePerByte=10\nMinTxFee=5000\nPort=9332\nDustAmount=0\nTxVersion=1\n");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("block.conf"),
+        Files.writeString(
+                dir.resolve("xbridge-confs").resolve("block.conf"),
                 "[BLOCK]\nTitle=Blocknet\nAddressPrefix=26\nScriptPrefix=28\nSecretPrefix=154\nCOIN=100000000\nFeePerByte=20\nMinTxFee=10000\nPort=41414\nTxVersion=1\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
         assertEquals(2, all.size());
@@ -73,8 +76,9 @@ class CoinConfigSourceLocalTest {
 
     @Test
     void testMissingSourceFailsHard() {
-        CoinConfigSource bad = new CoinConfigSource(
-                Paths.get("..", "no-such-bcf-dir").toAbsolutePath().normalize().toString());
+        CoinConfigSource bad =
+                new CoinConfigSource(
+                        Paths.get("..", "no-such-bcf-dir").toAbsolutePath().normalize().toString());
         IllegalStateException e = assertThrows(IllegalStateException.class, bad::loadAll);
         assertTrue(e.getMessage().contains("Cannot read"));
     }
@@ -82,20 +86,24 @@ class CoinConfigSourceLocalTest {
     @Test
     void testManifestEntryWithoutSectionFailsHard(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
-        Files.writeString(dir.resolve("manifest-latest.json"),
+        Files.writeString(
+                dir.resolve("manifest-latest.json"),
                 "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\","
                         + "\"xbridge_conf\":\"ltc--v1.conf\"}]");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("ltc--v1.conf"),
-                "[OTHER]\nAddressPrefix=1\n");
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfigSource(dir.toString()).loadAll());
+        Files.writeString(
+                dir.resolve("xbridge-confs").resolve("ltc--v1.conf"), "[OTHER]\nAddressPrefix=1\n");
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfigSource(dir.toString()).loadAll());
         assertTrue(e.getMessage().contains("has no [LTC] section"), e.getMessage());
     }
 
     @Test
     void testDuplicateManifestTickerKeepsLast(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
-        Files.writeString(dir.resolve("manifest-latest.json"),
+        Files.writeString(
+                dir.resolve("manifest-latest.json"),
                 "[{\"blockchain\":\"A\",\"ticker\":\"LTC\",\"xbridge_conf\":\"a.conf\"},"
                         + "{\"blockchain\":\"B\",\"ticker\":\"LTC\",\"xbridge_conf\":\"b.conf\"}]");
         Files.writeString(dir.resolve("xbridge-confs").resolve("a.conf"), "[LTC]\nK=V1\n");
@@ -109,8 +117,10 @@ class CoinConfigSourceLocalTest {
     @Test
     void testBadRootShapeFailsHardWithManifestContext(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("manifest-latest.json"), "{}");
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfigSource(dir.toString()).loadAll());
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfigSource(dir.toString()).loadAll());
         assertTrue(e.getMessage().startsWith("manifest:"), e.getMessage());
         assertTrue(e.getMessage().contains("contracts"), e.getMessage());
     }
@@ -118,10 +128,12 @@ class CoinConfigSourceLocalTest {
     @Test
     void testContractsWrappedManifestAlsoAccepted(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("xbridge-confs"));
-        Files.writeString(dir.resolve("manifest-latest.json"),
+        Files.writeString(
+                dir.resolve("manifest-latest.json"),
                 "{\"contracts\":[{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\","
                         + "\"xbridge_conf\":\"doge.conf\"}]}");
-        Files.writeString(dir.resolve("xbridge-confs").resolve("doge.conf"),
+        Files.writeString(
+                dir.resolve("xbridge-confs").resolve("doge.conf"),
                 "[DOGE]\nAddressPrefix=30\nFeePerByte=1\nMinTxFee=2\nCOIN=3\nPort=4\nScriptPrefix=22\nSecretPrefix=158\nTxVersion=1\n");
         Map<String, CoinConfig> all = new CoinConfigSource(dir.toString()).loadAll();
         assertEquals(30, all.get("DOGE").addressPrefix());

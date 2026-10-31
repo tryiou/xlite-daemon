@@ -1,22 +1,21 @@
 package io.xlite.daemon.app.net.api.http.client;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.util.UTXO;
-import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Test;
 
 /**
  * Whole-coin to satoshi conversion must round to nearest, never truncate.
  *
- * <p>A live DASH UTXO worth 0.00050001 (50001 sats) was ingested as 50000
- * sats because {@code (long) Math.floor(value * 1e8)} truncates the binary
- * floating-point representation error. The one-satoshi shortfall then
- * invalidated the BIP137 ownership proof on takes (the hub re-verifies
- * against chain truth), producing servicenode {@code crNoMoney} rejects
- * for fully-funded wallets.
+ * <p>A live DASH UTXO worth 0.00050001 (50001 sats) was ingested as 50000 sats because {@code
+ * (long) Math.floor(value * 1e8)} truncates the binary floating-point representation error. The
+ * one-satoshi shortfall then invalidated the BIP137 ownership proof on takes (the hub re-verifies
+ * against chain truth), producing servicenode {@code crNoMoney} rejects for fully-funded wallets.
  */
 class SatsConversionTest {
     // The ingest path that replaced the deleted per-site conversion. The factor
@@ -26,9 +25,8 @@ class SatsConversionTest {
     private static final CoinTicker TICKER_6DP = CoinTicker.VERGE;
 
     /**
-     * The conversion resolves the factor from the coin's configuration, so the
-     * registry has to carry both coins under test. Loaded here and dropped
-     * afterwards because it is process-global.
+     * The conversion resolves the factor from the coin's configuration, so the registry has to
+     * carry both coins under test. Loaded here and dropped afterwards because it is process-global.
      */
     @org.junit.jupiter.api.BeforeAll
     static void loadRegistry() {
@@ -44,8 +42,8 @@ class SatsConversionTest {
         CoinConfigRegistry.resetForTest();
     }
 
-    private static CoinConfig config(String ticker, String name, int addr, int p2sh, int dpk,
-                                     long coinFactor) {
+    private static CoinConfig config(
+            String ticker, String name, int addr, int p2sh, int dpk, long coinFactor) {
         java.util.Map<String, String> e = new java.util.LinkedHashMap<>();
         e.put("AddressPrefix", Integer.toString(addr));
         e.put("ScriptPrefix", Integer.toString(p2sh));
@@ -98,7 +96,7 @@ class SatsConversionTest {
 
     @Test
     void testSixDecimalMaxSupplyNoOverflow() {
-        assertEquals(16_555_000_000_000_000L,
-                UTXO.baseUnitsForTicker(TICKER_6DP, 16_555_000_000.0));
+        assertEquals(
+                16_555_000_000_000_000L, UTXO.baseUnitsForTicker(TICKER_6DP, 16_555_000_000.0));
     }
 }

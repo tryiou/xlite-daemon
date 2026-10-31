@@ -1,8 +1,12 @@
 package io.xlite.daemon.app.util;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinTicker;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,16 +15,12 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-
 /**
- * The divisor is read at several call sites, and a wrong divisor there does not
- * throw -- it silently reports an amount 100x off, which is the failure this
- * whole change exists to prevent. Each case below supplies a coin whose COIN
- * factor is not 1e8 and pins the value that reaches the call site, so a
- * regression to a hardcoded 1e8 is caught where it happens rather than on a
- * live chain.
+ * The divisor is read at several call sites, and a wrong divisor there does not throw -- it
+ * silently reports an amount 100x off, which is the failure this whole change exists to prevent.
+ * Each case below supplies a coin whose COIN factor is not 1e8 and pins the value that reaches the
+ * call site, so a regression to a hardcoded 1e8 is caught where it happens rather than on a live
+ * chain.
  */
 class SatsDivisorCallSiteTest {
 
@@ -32,10 +32,11 @@ class SatsDivisorCallSiteTest {
 
     @BeforeEach
     void useSixDecimalCoin() {
-        CoinConfigRegistry.loadForTest(Map.of(
-                "PIVX", config("PIVX", "PIVX", 30, 13, 212, SIX_DECIMAL),
-                "BLOCK", config("BLOCK", "Blocknet", 26, 28, 154, EIGHT_DECIMAL),
-                "BTC", config("BTC", "Bitcoin", 0, 5, 128, EIGHT_DECIMAL)));
+        CoinConfigRegistry.loadForTest(
+                Map.of(
+                        "PIVX", config("PIVX", "PIVX", 30, 13, 212, SIX_DECIMAL),
+                        "BLOCK", config("BLOCK", "Blocknet", 26, 28, 154, EIGHT_DECIMAL),
+                        "BTC", config("BTC", "Bitcoin", 0, 5, 128, EIGHT_DECIMAL)));
     }
 
     @AfterEach
@@ -43,8 +44,13 @@ class SatsDivisorCallSiteTest {
         CoinConfigRegistry.resetForTest();
     }
 
-    private static CoinConfig config(String ticker, String blockchain,
-            int addrPrefix, int scriptPrefix, int secretPrefix, long coin) {
+    private static CoinConfig config(
+            String ticker,
+            String blockchain,
+            int addrPrefix,
+            int scriptPrefix,
+            int secretPrefix,
+            long coin) {
         Map<String, String> e = new LinkedHashMap<>();
         e.put("AddressPrefix", Integer.toString(addrPrefix));
         e.put("ScriptPrefix", Integer.toString(scriptPrefix));
@@ -66,8 +72,7 @@ class SatsDivisorCallSiteTest {
         assertEquals(0.1, six.getAmount(), 1e-9);
 
         UTXO eight = new UTXO(CoinTicker.BLOCKNET, ADDR, TXID, 0, 100, 100_000L);
-        assertEquals(0.001, eight.getAmount(), 1e-12,
-                "an 8-decimal coin keeps the 1e8 divisor");
+        assertEquals(0.001, eight.getAmount(), 1e-12, "an 8-decimal coin keeps the 1e8 divisor");
     }
 
     @Test
@@ -75,14 +80,18 @@ class SatsDivisorCallSiteTest {
     void testAddressBalanceUsesOwnFactorExactlyOnce() {
         // The divisor is taken from the first row's coin, so the rows must
         // belong to the coin whose factor is under test.
-        org.bitcoinj.core.LegacyAddress address = org.bitcoinj.core.LegacyAddress.fromBase58(
-                io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters
-                        .from(io.xlite.daemon.app.coinconfig.CoinConfigRegistry.get("PIVX")),
-                ADDR);
+        org.bitcoinj.core.LegacyAddress address =
+                org.bitcoinj.core.LegacyAddress.fromBase58(
+                        io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters.from(
+                                io.xlite.daemon.app.coinconfig.CoinConfigRegistry.get("PIVX")),
+                        ADDR);
         AddressBalance balance = new AddressBalance(address, null);
         balance.addUtxo(new UTXO(CoinTicker.PIVX, ADDR, TXID, 0, 100, 100_000L));
         balance.calculateBalance();
-        assertEquals(0.1, balance.getBalanceProp(), 1e-9,
+        assertEquals(
+                0.1,
+                balance.getBalanceProp(),
+                1e-9,
                 "100000 base units of a 6-decimal coin is 0.1");
     }
 
@@ -98,7 +107,8 @@ class SatsDivisorCallSiteTest {
     void testToWholeCoinsUsesOwnFactor() {
         assertEquals(0.1, Sats.toWholeCoins(100_000L, SIX_DECIMAL), 1e-12);
         assertEquals(0.001, Sats.toWholeCoins(100_000L, EIGHT_DECIMAL), 1e-15);
-        assertNotEquals(Sats.toWholeCoins(100_000L, SIX_DECIMAL),
+        assertNotEquals(
+                Sats.toWholeCoins(100_000L, SIX_DECIMAL),
                 Sats.toWholeCoins(100_000L, EIGHT_DECIMAL),
                 "the two factors must not be interchangeable");
     }
@@ -127,7 +137,8 @@ class SatsDivisorCallSiteTest {
         // BtcFormat.COIN_SCALE rendered 100000 base units as "0.00".
         assertEquals("0.1", CloudTransaction.formatForTicker(100_000L, "PIVX"));
         assertEquals("0.001", CloudTransaction.formatForTicker(100_000L, "BTC"));
-        assertNotEquals(CloudTransaction.formatForTicker(100_000L, "PIVX"),
+        assertNotEquals(
+                CloudTransaction.formatForTicker(100_000L, "PIVX"),
                 CloudTransaction.formatForTicker(100_000L, "BTC"),
                 "the factor must come from the ticker, not a constant");
     }
@@ -137,11 +148,16 @@ class SatsDivisorCallSiteTest {
     void testUtxoIngestChokePoint() {
         // Three sites used to do this inline, once per row, each resolving the
         // divisor itself. They now share one audited conversion.
-        assertEquals(100_000L, UTXO.baseUnitsForTicker(CoinTicker.PIVX, 0.1),
+        assertEquals(
+                100_000L,
+                UTXO.baseUnitsForTicker(CoinTicker.PIVX, 0.1),
                 "0.1 of a 6-decimal coin is 100000 base units");
-        assertEquals(100_000L, UTXO.baseUnitsForTicker(CoinTicker.BITCOIN, 0.001),
+        assertEquals(
+                100_000L,
+                UTXO.baseUnitsForTicker(CoinTicker.BITCOIN, 0.001),
                 "0.001 of an 8-decimal coin is the same base units, by coincidence");
-        assertNotEquals(UTXO.baseUnitsForTicker(CoinTicker.PIVX, 1.0),
+        assertNotEquals(
+                UTXO.baseUnitsForTicker(CoinTicker.PIVX, 1.0),
                 UTXO.baseUnitsForTicker(CoinTicker.BITCOIN, 1.0),
                 "one whole coin must be the coin's own factor, never a constant");
     }

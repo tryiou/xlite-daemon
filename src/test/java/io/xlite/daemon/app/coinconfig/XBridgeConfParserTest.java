@@ -1,10 +1,10 @@
 package io.xlite.daemon.app.coinconfig;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class XBridgeConfParserTest {
 
@@ -41,22 +41,28 @@ class XBridgeConfParserTest {
 
     @Test
     void testMalformedLineOutsideSectionThrows() {
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> XBridgeConfParser.parse("Orphan=1\n[A]\nK=V\n"));
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> XBridgeConfParser.parse("Orphan=1\n[A]\nK=V\n"));
         assertTrue(e.getMessage().contains("outside any section"));
     }
 
     @Test
     void testMalformedLineInsideSectionThrows() {
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> XBridgeConfParser.parse("[A]\nJustAK\nK=V\n"));
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> XBridgeConfParser.parse("[A]\nJustAK\nK=V\n"));
         assertTrue(e.getMessage().contains("in [A]"));
     }
 
     @Test
     void testNestedBracketHeaderThrows() {
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> XBridgeConfParser.parse("[A][B]\nK=V\n"));
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> XBridgeConfParser.parse("[A][B]\nK=V\n"));
         assertTrue(e.getMessage().contains("Malformed section header"), e.getMessage());
     }
 
@@ -76,7 +82,8 @@ class XBridgeConfParserTest {
 
     @Test
     void testUtf8BomStrippedBeforeFirstSection() {
-        Map<String, Map<String, String>> all = XBridgeConfParser.parse("\uFEFF[LTC]\nAddressPrefix=48\n");
+        Map<String, Map<String, String>> all =
+                XBridgeConfParser.parse("\uFEFF[LTC]\nAddressPrefix=48\n");
         assertEquals("48", all.get("LTC").get("AddressPrefix"));
     }
 

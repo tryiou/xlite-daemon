@@ -1,10 +1,13 @@
 package io.xlite.daemon.app.net.api.http.client;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.UTXO;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,18 +20,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
  * Eviction of backend-omitted addresses from the UTXO view.
  *
- * A successful getutxos response that omits a tracked address (or flags it
- * in the backend "errors" array) means the backend holds no unspent outputs
- * for it. Stored rows for such addresses must be dropped: otherwise a stale
- * view re-serves dead outputs with live-looking confirmations indefinitely
- * (live 2026-09-24: hub rejects on just-spent fee/funding inputs the wallet
- * kept listing). Whole-batch failures (null / unparseable) must keep old
- * rows (an outage must never wipe the wallet).
+ * <p>A successful getutxos response that omits a tracked address (or flags it in the backend
+ * "errors" array) means the backend holds no unspent outputs for it. Stored rows for such addresses
+ * must be dropped: otherwise a stale view re-serves dead outputs with live-looking confirmations
+ * indefinitely (live 2026-09-24: hub rejects on just-spent fee/funding inputs the wallet kept
+ * listing). Whole-batch failures (null / unparseable) must keep old rows (an outage must never wipe
+ * the wallet).
  */
 public class HTTPClientUtxoEvictionTest {
 
@@ -37,8 +37,7 @@ public class HTTPClientUtxoEvictionTest {
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
     private static final String PASSWORD = "eviction-test-password";
 
-    @TempDir
-    Path tempDir;
+    @TempDir Path tempDir;
 
     private CoinInstance coin;
     private String addrA;
@@ -75,7 +74,10 @@ public class HTTPClientUtxoEvictionTest {
         block.put("DustAmount", "0");
         block.put("TxVersion", "1");
         block.put("Title", "Blocknet");
-        cfgs.put("BLOCK", new io.xlite.daemon.app.coinconfig.CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", block));
+        cfgs.put(
+                "BLOCK",
+                new io.xlite.daemon.app.coinconfig.CoinConfig(
+                        "BLOCK", "Blocknet", "blocknet--v4.2.0", block));
         if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {
             io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadForTest(cfgs);
         }
@@ -117,8 +119,13 @@ public class HTTPClientUtxoEvictionTest {
     }
 
     private static String utxoRow(String address, String txid, int vout) {
-        return "{\"address\":\"" + address + "\",\"txhash\":\"" + txid
-                + "\",\"vout\":" + vout + ",\"block_number\":100,\"value\":0.01000599}";
+        return "{\"address\":\""
+                + address
+                + "\",\"txhash\":\""
+                + txid
+                + "\",\"vout\":"
+                + vout
+                + ",\"block_number\":100,\"value\":0.01000599}";
     }
 
     private static List<String> txidsOf(CoinInstance c, String addr) {
@@ -135,7 +142,8 @@ public class HTTPClientUtxoEvictionTest {
     @Test
     void testOmittedAddressRowsEvictedOnNextSuccessfulFetch() {
         CannedClient client = new CannedClient();
-        client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
+        client.canned =
+                "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
         assertEquals(List.of(TX_B), txidsOf(coin, addrB));
@@ -146,7 +154,8 @@ public class HTTPClientUtxoEvictionTest {
         client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "]}";
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
-        assertTrue(txidsOf(coin, addrB).isEmpty(),
+        assertTrue(
+                txidsOf(coin, addrB).isEmpty(),
                 "backend-omitted address kept stale rows: " + txidsOf(coin, addrB));
         // Eviction must also drop the cached balance: without a recalculation
         // the address keeps reporting its old getbalance after its rows go.
@@ -157,12 +166,20 @@ public class HTTPClientUtxoEvictionTest {
     @Test
     void testBackendErrorArrayEvictsFlaggedAddress() {
         CannedClient client = new CannedClient();
-        client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
+        client.canned =
+                "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
 
         // Both present but backend flags addrB failed: addrB rows must go.
-        client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "],"
-                + "\"errors\":[{\"address\":\"" + addrB + "\",\"message\":\"boom\"}]}";
+        client.canned =
+                "{\"utxos\":["
+                        + utxoRow(addrA, TX_A, 0)
+                        + ","
+                        + utxoRow(addrB, TX_B, 0)
+                        + "],"
+                        + "\"errors\":[{\"address\":\""
+                        + addrB
+                        + "\",\"message\":\"boom\"}]}";
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
         assertTrue(txidsOf(coin, addrB).isEmpty());
@@ -177,7 +194,8 @@ public class HTTPClientUtxoEvictionTest {
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
 
         // Backend outage envelope (no "utxos" key): outage must never wipe.
-        client.canned = "{\"result\":null,\"error\":{\"code\":-32000,\"message\":\"All addresses failed\"}}";
+        client.canned =
+                "{\"result\":null,\"error\":{\"code\":-32000,\"message\":\"All addresses failed\"}}";
         assertNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
     }
@@ -185,7 +203,8 @@ public class HTTPClientUtxoEvictionTest {
     @Test
     void testSpentMarkedRowsSurviveEviction() {
         CannedClient client = new CannedClient();
-        client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
+        client.canned =
+                "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         // Wallet-originated spend marker must survive address eviction.
         for (UTXO u : coin.getAddressBalance(addrB).getUtxos()) {

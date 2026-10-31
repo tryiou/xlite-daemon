@@ -10,17 +10,15 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 /**
- * Process-wide holder for the loaded {@link CoinConfig} map. Initialized once
- * at startup from the resolved blockchain-configuration-files source; tests
- * may reload with a different source between cases.
+ * Process-wide holder for the loaded {@link CoinConfig} map. Initialized once at startup from the
+ * resolved blockchain-configuration-files source; tests may reload with a different source between
+ * cases.
  *
- * <p>This is the single source of per-coin configuration: an address's
- * prefixes and a coin's fee rate and minimum fee all come from here, from the
- * configuration repository, dust floor included. The values that repository
- * does not carry — the supply ceiling, protocol version, network id and
- * payment protocol id — live in
- * {@link CompiledCoinSupplement}. A coin missing from here fails loudly rather
- * than falling back to constants.</p>
+ * <p>This is the single source of per-coin configuration: an address's prefixes and a coin's fee
+ * rate and minimum fee all come from here, from the configuration repository, dust floor included.
+ * The values that repository does not carry — the supply ceiling, protocol version, network id and
+ * payment protocol id — live in {@link CompiledCoinSupplement}. A coin missing from here fails
+ * loudly rather than falling back to constants.
  */
 public final class CoinConfigRegistry {
 
@@ -30,25 +28,22 @@ public final class CoinConfigRegistry {
     private static volatile Map<String, CoinConfig> loaded = null;
     private static volatile String loadedSource = null;
 
-    private CoinConfigRegistry() {
-    }
+    private CoinConfigRegistry() {}
 
     /**
-     * Load (or reload) all configs from the given source. On success the map
-     * replaces any prior load — startup calls once; tests may call repeatedly.
-     * Gate-rejected entries are logged and omitted from the map when the user
-     * chose warn-and-continue semantics; the registry retains every valid
-     * ticker.
+     * Load (or reload) all configs from the given source. On success the map replaces any prior
+     * load — startup calls once; tests may call repeatedly. Gate-rejected entries are logged and
+     * omitted from the map when the user chose warn-and-continue semantics; the registry retains
+     * every valid ticker.
      */
     public static synchronized void load(String source) {
         load(source, null);
     }
 
     /**
-     * Load with offline fallback: when the upstream load fails and the cache
-     * holds a manifest, serve the stale cache instead of starting coin-less.
-     * Cold cache (or a cache that itself fails to load) propagates the
-     * original failure — first-ever boot with no network still fails
+     * Load with offline fallback: when the upstream load fails and the cache holds a manifest,
+     * serve the stale cache instead of starting coin-less. Cold cache (or a cache that itself fails
+     * to load) propagates the original failure — first-ever boot with no network still fails
      * honestly. Staleness is always logged loudly.
      */
     public static synchronized void loadWithFallback(String source, CoinConfigCache cache) {
@@ -56,33 +51,39 @@ public final class CoinConfigRegistry {
             load(source, cache);
             return;
         } catch (RuntimeException first) {
-            if (cache == null)
-                throw first;
+            if (cache == null) throw first;
             String warmed = cache.dir().toString();
-            if (!Files.isRegularFile(cache.dir().resolve("manifest-latest.json")))
-                throw first;
+            if (!Files.isRegularFile(cache.dir().resolve("manifest-latest.json"))) throw first;
             try {
                 load(warmed);
             } catch (RuntimeException fallbackFailure) {
-                throw new IllegalStateException("upstream (" + first.getMessage()
-                        + "); cache fallback also failed: " + fallbackFailure.getMessage(), first);
+                throw new IllegalStateException(
+                        "upstream ("
+                                + first.getMessage()
+                                + "); cache fallback also failed: "
+                                + fallbackFailure.getMessage(),
+                        first);
             }
-            LOGGER.log(Level.WARNING,
-                    "[coinconfig] upstream unreachable (" + first.getMessage()
-                            + ") — serving STALE cached configs from " + warmed
-                            + " (" + cacheAge(cache) + ")");
+            LOGGER.log(
+                    Level.WARNING,
+                    "[coinconfig] upstream unreachable ("
+                            + first.getMessage()
+                            + ") — serving STALE cached configs from "
+                            + warmed
+                            + " ("
+                            + cacheAge(cache)
+                            + ")");
         }
     }
 
     /**
-     * Load with an optional write-through cache (remote sources). A null
-     * cache behaves exactly like {@link #load(String)}.
+     * Load with an optional write-through cache (remote sources). A null cache behaves exactly like
+     * {@link #load(String)}.
      */
     public static synchronized void load(String source, CoinConfigCache cache) {
         String resolved = source.replaceAll("/+$", "");
         CoinConfigSource src = new CoinConfigSource(resolved);
-        if (cache != null)
-            src.setCache(cache);
+        if (cache != null) src.setCache(cache);
         Map<String, CoinConfig> all = src.loadAll();
         LinkedHashMap<String, CoinConfig> filtered = new LinkedHashMap<>();
         int rejected = 0;
@@ -91,15 +92,20 @@ public final class CoinConfigRegistry {
                 CoinConfigGate.validate(e.getValue());
                 filtered.put(e.getKey(), e.getValue());
             } catch (IllegalStateException ex) {
-                LOGGER.log(Level.WARNING,
+                LOGGER.log(
+                        Level.WARNING,
                         "[coinconfig] rejected [" + e.getKey() + "]: " + ex.getMessage());
                 rejected++;
             }
         }
         if (rejected > 0) {
-            LOGGER.log(Level.WARNING,
-                    "[coinconfig] " + rejected + " ticker(s) rejected by gate; continuing with "
-                            + filtered.size() + " valid");
+            LOGGER.log(
+                    Level.WARNING,
+                    "[coinconfig] "
+                            + rejected
+                            + " ticker(s) rejected by gate; continuing with "
+                            + filtered.size()
+                            + " valid");
         }
         loaded = Collections.unmodifiableMap(filtered);
         loadedSource = resolved;
@@ -110,10 +116,8 @@ public final class CoinConfigRegistry {
         try {
             FileTime mtime = Files.getLastModifiedTime(cache.dir().resolve("manifest-latest.json"));
             long hours = (System.currentTimeMillis() - mtime.toMillis()) / 3_600_000L;
-            if (hours < 1)
-                return "under an hour old";
-            if (hours < 48)
-                return hours + "h old";
+            if (hours < 1) return "under an hour old";
+            if (hours < 48) return hours + "h old";
             return (hours / 24) + "d old";
         } catch (Exception e) {
             return "age unknown";
@@ -131,8 +135,7 @@ public final class CoinConfigRegistry {
     /** Snapshot of loaded configs. Empty when not loaded. Defensive copy under lock. */
     public static synchronized Map<String, CoinConfig> list() {
         Map<String, CoinConfig> m = loaded;
-        if (m == null)
-            return Collections.emptyMap();
+        if (m == null) return Collections.emptyMap();
         return Collections.unmodifiableMap(new LinkedHashMap<>(m));
     }
 
@@ -146,10 +149,9 @@ public final class CoinConfigRegistry {
      *
      * @param ticker the coin's manifest ticker
      * @return its configuration
-     * @throws IllegalStateException if no configuration was loaded at all, or
-     *         if the loaded set does not carry this coin. Fails loudly rather
-     *         than substituting constants, so a missing coin is visible instead
-     *         of being priced from stale in-code values.
+     * @throws IllegalStateException if no configuration was loaded at all, or if the loaded set
+     *     does not carry this coin. Fails loudly rather than substituting constants, so a missing
+     *     coin is visible instead of being priced from stale in-code values.
      */
     public static CoinConfig get(String ticker) {
         Map<String, CoinConfig> m = loaded;

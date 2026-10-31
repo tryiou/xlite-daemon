@@ -1,8 +1,17 @@
 package io.xlite.daemon.app.net.api;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.Future;
 import io.xlite.daemon.app.net.CoinInstance;
+
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -12,22 +21,12 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-
 /**
- * Pins the shared-worker-group contract: every listener borrows one group,
- * retiring a listener closes only its own channel, and the group is released
- * exactly once by application shutdown.
+ * Pins the shared-worker-group contract: every listener borrows one group, retiring a listener
+ * closes only its own channel, and the group is released exactly once by application shutdown.
  *
- * <p>This is the thread-budget property: a per-listener group cost five
- * threads per coin (60 for twelve coins, 205 for the full set), while one
- * shared group is bounded by the host's core count.</p>
+ * <p>This is the thread-budget property: a per-listener group cost five threads per coin (60 for
+ * twelve coins, 205 for the full set), while one shared group is bounded by the host's core count.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class NettyEventLoopsTest {
@@ -71,7 +70,8 @@ public class NettyEventLoopsTest {
 
             assertFalse(retiring.isAlive());
             assertTrue(sibling.isAlive());
-            assertFalse(group.isShuttingDown(),
+            assertFalse(
+                    group.isShuttingDown(),
                     "retiring one listener must not retire the shared group");
             // The sibling must still accept connections on its own socket.
             try (Socket probe = new Socket()) {
@@ -93,7 +93,9 @@ public class NettyEventLoopsTest {
         for (Object ignored : group) {
             children++;
         }
-        assertEquals(NettyEventLoops.workerThreads(), children,
+        assertEquals(
+                NettyEventLoops.workerThreads(),
+                children,
                 "the pool must be sized from the host, not the coin count");
 
         JSONRPCServer[] servers = new JSONRPCServer[4];
@@ -108,8 +110,7 @@ public class NettyEventLoopsTest {
             for (Object ignored : group) {
                 afterStart++;
             }
-            assertEquals(children, afterStart,
-                    "adding listeners must not grow the shared pool");
+            assertEquals(children, afterStart, "adding listeners must not grow the shared pool");
         } finally {
             for (JSONRPCServer s : servers) {
                 if (s != null) {

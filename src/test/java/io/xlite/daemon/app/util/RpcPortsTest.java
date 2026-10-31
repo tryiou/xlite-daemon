@@ -1,24 +1,23 @@
 package io.xlite.daemon.app.util;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Pins the listener-port rule: a port derived from the configuration
- * repository, offset so a core wallet cannot collide, and a short candidate
- * window for when the host already holds it.
+ * Pins the listener-port rule: a port derived from the configuration repository, offset so a core
+ * wallet cannot collide, and a short candidate window for when the host already holds it.
  */
 class RpcPortsTest {
 
     @Test
     void testXlitePort_OffsetsAboveTheCoinDaemonsOwnPort() {
         assertEquals(41417, RpcPorts.xlitePort(41414)); // BLOCK
-        assertEquals(8335, RpcPorts.xlitePort(8332));   // BTC
-        assertEquals(10001, RpcPorts.xlitePort(9998));  // DASH
+        assertEquals(8335, RpcPorts.xlitePort(8332)); // BTC
+        assertEquals(10001, RpcPorts.xlitePort(9998)); // DASH
         assertEquals(51577, RpcPorts.xlitePort(51574)); // PIVX
         assertEquals(37074, RpcPorts.xlitePort(37071)); // PKOIN
     }
@@ -55,7 +54,7 @@ class RpcPortsTest {
     void testCandidates_ZeroWindowYieldsOnlyTheConfiguredPort() {
         // A port read from a config file is the operator's choice: the
         // listener may retry it, but must never move to a neighbour.
-        assertArrayEquals(new int[]{41417}, RpcPorts.candidates(41417, 0));
+        assertArrayEquals(new int[] {41417}, RpcPorts.candidates(41417, 0));
     }
 
     @Test

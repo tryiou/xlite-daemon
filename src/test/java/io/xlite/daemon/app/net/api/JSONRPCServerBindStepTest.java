@@ -1,6 +1,10 @@
 package io.xlite.daemon.app.net.api;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+
 import io.xlite.daemon.app.net.CoinInstance;
+
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
@@ -8,13 +12,9 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-
 /**
- * Pins bind-time port stepping: a port held by another process is skipped, the
- * listener takes the first candidate it can bind, and a single-candidate
- * listener never moves.
+ * Pins bind-time port stepping: a port held by another process is skipped, the listener takes the
+ * first candidate it can bind, and a single-candidate listener never moves.
  */
 public class JSONRPCServerBindStepTest {
 
@@ -52,8 +52,8 @@ public class JSONRPCServerBindStepTest {
     @Test
     public void testSingleCandidateNeverMoves() throws Exception {
         int held = freePort();
-        JSONRPCServer server = new JSONRPCServer(mock(CoinInstance.class), held, "127.0.0.1",
-                new int[]{held});
+        JSONRPCServer server =
+                new JSONRPCServer(mock(CoinInstance.class), held, "127.0.0.1", new int[] {held});
         try (ServerSocket ignored = hold(held)) {
             server.start();
             assertFalse(server.awaitBound(2000), "a single candidate must not be replaced");
@@ -69,17 +69,26 @@ public class JSONRPCServerBindStepTest {
         int held = freePort();
         // Hold the base port plus the whole two-port window.
         try (ServerSocket first = hold(held);
-             ServerSocket second = hold(held + 1);
-             ServerSocket third = hold(held + 2)) {
-            JSONRPCServer server = new JSONRPCServer(mock(CoinInstance.class), held, "127.0.0.1",
-                    new int[]{held, held + 1, held + 2});
+                ServerSocket second = hold(held + 1);
+                ServerSocket third = hold(held + 2)) {
+            JSONRPCServer server =
+                    new JSONRPCServer(
+                            mock(CoinInstance.class),
+                            held,
+                            "127.0.0.1",
+                            new int[] {held, held + 1, held + 2});
             try {
                 server.start();
                 assertFalse(server.awaitBound(3000), "no candidate was free");
                 String state = server.lifecycleState();
-                assertTrue(state.contains("bindFailed=true"), "state must record the failure: " + state);
-                assertTrue(state.contains("channel=null"), "no channel may be left behind: " + state);
-                assertFalse(state.contains("bound=true"), "a failed listener must not claim to be bound: " + state);
+                assertTrue(
+                        state.contains("bindFailed=true"),
+                        "state must record the failure: " + state);
+                assertTrue(
+                        state.contains("channel=null"), "no channel may be left behind: " + state);
+                assertFalse(
+                        state.contains("bound=true"),
+                        "a failed listener must not claim to be bound: " + state);
             } finally {
                 server.deinit();
                 server.join(5000);

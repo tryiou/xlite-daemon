@@ -1,11 +1,14 @@
 package io.xlite.daemon.app.net.api.http.server;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.TxTimeField;
+
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -22,21 +25,18 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
  * The send path's wire-layout guard, pinned directly.
  *
- * <p>This is the one check that decides whether hex a caller supplied is in the
- * chain's layout at all. On a time-field chain a standard-layout transaction
- * does not merely decode to different numbers: four bytes stripped at the wrong
- * offset shift the input count, so the parse either fails outright or yields a
- * transaction whose input count contradicts the bytes it was handed. The second
- * case is the dangerous one, and only re-serializing and comparing catches it.
+ * <p>This is the one check that decides whether hex a caller supplied is in the chain's layout at
+ * all. On a time-field chain a standard-layout transaction does not merely decode to different
+ * numbers: four bytes stripped at the wrong offset shift the input count, so the parse either fails
+ * outright or yields a transaction whose input count contradicts the bytes it was handed. The
+ * second case is the dangerous one, and only re-serializing and comparing catches it.
  *
- * <p>Nothing else in the suite reaches this method, so while it was private the
- * guard was unproven. The sighash tests show the signer is self-consistent; they
- * say nothing about whether the bytes handed to it are bytes the chain accepts.
+ * <p>Nothing else in the suite reaches this method, so while it was private the guard was unproven.
+ * The sighash tests show the signer is self-consistent; they say nothing about whether the bytes
+ * handed to it are bytes the chain accepts.
  */
 class HTTPServerHandlerWireLayoutTest {
 
@@ -56,8 +56,8 @@ class HTTPServerHandlerWireLayoutTest {
         CoinConfigRegistry.resetForTest();
     }
 
-    private static CoinConfig config(String ticker, String name, int addr, int p2sh, int dpk,
-                                     boolean timeField) {
+    private static CoinConfig config(
+            String ticker, String name, int addr, int p2sh, int dpk, boolean timeField) {
         Map<String, String> e = new LinkedHashMap<>();
         e.put("AddressPrefix", Integer.toString(addr));
         e.put("ScriptPrefix", Integer.toString(p2sh));
@@ -83,10 +83,19 @@ class HTTPServerHandlerWireLayoutTest {
             hash160[i] = (byte) (i * 7 + 3);
         }
         Transaction tx = new Transaction(params);
-        tx.addInput(new TransactionInput(params, null, new byte[0],
-                new TransactionOutPoint(params, 0L, Sha256Hash.ZERO_HASH), Coin.valueOf(150_000L)));
-        tx.addOutput(new TransactionOutput(params, null, Coin.valueOf(140_000L),
-                LegacyAddress.fromPubKeyHash(params, hash160)));
+        tx.addInput(
+                new TransactionInput(
+                        params,
+                        null,
+                        new byte[0],
+                        new TransactionOutPoint(params, 0L, Sha256Hash.ZERO_HASH),
+                        Coin.valueOf(150_000L)));
+        tx.addOutput(
+                new TransactionOutput(
+                        params,
+                        null,
+                        Coin.valueOf(140_000L),
+                        LegacyAddress.fromPubKeyHash(params, hash160)));
         return tx.bitcoinSerialize();
     }
 
@@ -98,7 +107,9 @@ class HTTPServerHandlerWireLayoutTest {
 
         Transaction parsed = HTTPServerHandler.parseForCoin(CoinTicker.VERGE, ltc, timeField);
         assertNotNull(parsed, "a transaction in the right layout must parse");
-        assertArrayEquals(timeField, TxTimeField.insertNTime(parsed.bitcoinSerialize(), NTIME),
+        assertArrayEquals(
+                timeField,
+                TxTimeField.insertNTime(parsed.bitcoinSerialize(), NTIME),
                 "re-inserting nTime must reproduce the bytes supplied");
     }
 
@@ -111,10 +122,13 @@ class HTTPServerHandlerWireLayoutTest {
         // The failure the guard exists for: these bytes are a valid transaction,
         // they simply carry no nTime, so nothing about the call looks wrong until
         // the fields are read back at the wrong offsets.
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> HTTPServerHandler.parseForCoin(CoinTicker.VERGE, ltc, standard),
-                "a standard-layout transaction must be refused where nTime is required");
-        assertTrue(e.getMessage().contains("wire layout"),
+        IllegalArgumentException e =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> HTTPServerHandler.parseForCoin(CoinTicker.VERGE, ltc, standard),
+                        "a standard-layout transaction must be refused where nTime is required");
+        assertTrue(
+                e.getMessage().contains("wire layout"),
                 "the failure must name the layout mismatch, got: " + e.getMessage());
     }
 
@@ -124,8 +138,8 @@ class HTTPServerHandlerWireLayoutTest {
         // Otherwise every ordinary transaction on the other coins would become
         // unparseable, and the guard would be worse than nothing.
         NetworkParameters ltc = litecoin();
-        assertNotNull(HTTPServerHandler.parseForCoin(CoinTicker.LITECOIN, ltc,
-                        standardTransaction(ltc)),
+        assertNotNull(
+                HTTPServerHandler.parseForCoin(CoinTicker.LITECOIN, ltc, standardTransaction(ltc)),
                 "a standard transaction on a standard chain must parse");
     }
 
@@ -137,13 +151,15 @@ class HTTPServerHandlerWireLayoutTest {
         // either reject valid Verge transactions or accept invalid ones.
         NetworkParameters ltc = litecoin();
         byte[] standard = standardTransaction(ltc);
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> HTTPServerHandler.parseForCoin(CoinTicker.VERGE, ltc, standard),
                 "Verge carries nTime, so standard bytes are wrong for it");
         assertDoesNotThrow(
                 () -> HTTPServerHandler.parseForCoin(CoinTicker.LITECOIN, ltc, standard),
                 "Litecoin carries none, so the same bytes are right for it");
-        assertTrue(CoinTickerUtils.tickerToString(CoinTicker.VERGE).equals("XVG"),
+        assertTrue(
+                CoinTickerUtils.tickerToString(CoinTicker.VERGE).equals("XVG"),
                 "this test's fixture is keyed by the manifest ticker, not the enum name");
     }
 
@@ -162,9 +178,13 @@ class HTTPServerHandlerWireLayoutTest {
         String hex = HTTPServerHandler.serializeForBroadcast(CoinTicker.VERGE, signed, NTIME);
         byte[] wire = hexToBytes(hex);
 
-        assertEquals(NTIME, TxTimeField.parentNTime(wire),
+        assertEquals(
+                NTIME,
+                TxTimeField.parentNTime(wire),
                 "the wire bytes must carry the nTime that was signed");
-        assertArrayEquals(TxTimeField.insertNTime(standard, NTIME), wire,
+        assertArrayEquals(
+                TxTimeField.insertNTime(standard, NTIME),
+                wire,
                 "the wire bytes must be exactly the signed transaction with that nTime");
     }
 
@@ -177,10 +197,15 @@ class HTTPServerHandlerWireLayoutTest {
         NetworkParameters ltc = litecoin();
         Transaction signed = new Transaction(ltc, standardTransaction(ltc));
 
-        RuntimeException e = assertThrows(RuntimeException.class,
-                () -> HTTPServerHandler.serializeForBroadcast(CoinTicker.VERGE, signed, -1L),
-                "an absent nTime must not be broadcast");
-        assertTrue(e.getMessage().contains("nTime"),
+        RuntimeException e =
+                assertThrows(
+                        RuntimeException.class,
+                        () ->
+                                HTTPServerHandler.serializeForBroadcast(
+                                        CoinTicker.VERGE, signed, -1L),
+                        "an absent nTime must not be broadcast");
+        assertTrue(
+                e.getMessage().contains("nTime"),
                 "the failure must name what was missing, got: " + e.getMessage());
     }
 
@@ -191,9 +216,10 @@ class HTTPServerHandlerWireLayoutTest {
         byte[] standard = standardTransaction(ltc);
         Transaction signed = new Transaction(ltc, standard);
 
-        assertArrayEquals(standard,
-                hexToBytes(HTTPServerHandler.serializeForBroadcast(
-                        CoinTicker.LITECOIN, signed, -1L)),
+        assertArrayEquals(
+                standard,
+                hexToBytes(
+                        HTTPServerHandler.serializeForBroadcast(CoinTicker.LITECOIN, signed, -1L)),
                 "a coin without the field must broadcast the plain serialization");
     }
 

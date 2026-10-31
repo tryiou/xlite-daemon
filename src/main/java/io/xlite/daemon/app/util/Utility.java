@@ -7,8 +7,7 @@ import org.bitcoinj.core.SegwitAddress;
 
 public class Utility {
     public static boolean isValidAddress(NetworkParameters params, String address) {
-        if (address == null || address.isEmpty())
-            return false;
+        if (address == null || address.isEmpty()) return false;
 
         try {
             LegacyAddress.fromBase58(params, address);

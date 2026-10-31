@@ -1,5 +1,7 @@
 package io.xlite.daemon.app.coinconfig;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -7,11 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-/**
- * Byte-level tests for {@link CoinConfigCache} — no network, no parsing.
- */
+/** Byte-level tests for {@link CoinConfigCache} — no network, no parsing. */
 class CoinConfigCacheTest {
 
     @Test
@@ -21,9 +19,14 @@ class CoinConfigCacheTest {
         assertTrue(cache.cachedConf("ltc.conf").isEmpty());
         cache.storeManifest("[{\"ticker\":\"LTC\"}]");
         cache.storeConf("ltc.conf", "[LTC]\nTitle=Litecoin\n");
-        assertEquals("[{\"ticker\":\"LTC\"}]", cache.cachedManifest().orElseThrow(AssertionError::new));
-        assertEquals("[LTC]\nTitle=Litecoin\n", cache.cachedConf("ltc.conf").orElseThrow(AssertionError::new));
-        assertEquals("manifest-latest.json", cache.dir().resolve("manifest-latest.json").getFileName().toString());
+        assertEquals(
+                "[{\"ticker\":\"LTC\"}]", cache.cachedManifest().orElseThrow(AssertionError::new));
+        assertEquals(
+                "[LTC]\nTitle=Litecoin\n",
+                cache.cachedConf("ltc.conf").orElseThrow(AssertionError::new));
+        assertEquals(
+                "manifest-latest.json",
+                cache.dir().resolve("manifest-latest.json").getFileName().toString());
     }
 
     @Test

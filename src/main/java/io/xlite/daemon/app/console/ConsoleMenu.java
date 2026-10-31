@@ -26,8 +26,8 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class ConsoleMenu {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private String[] arguments;
     private BackgroundTimerThread backgroundTimerThread = null;
 
@@ -39,17 +39,27 @@ public class ConsoleMenu {
     }
 
     public void logBadPassword(String msg) {
-        if (msg == null || msg.isEmpty())
-            msg = "Bad password";
-        LOGGER.info("[master] Error(" + CoinInstance.CoinError.CoinErrorCode.BADPASSWORD.name() + "): " + msg);
+        if (msg == null || msg.isEmpty()) msg = "Bad password";
+        LOGGER.info(
+                "[master] Error("
+                        + CoinInstance.CoinError.CoinErrorCode.BADPASSWORD.name()
+                        + "): "
+                        + msg);
     }
 
     public void logBadMnemonic() {
-        LOGGER.info("[master] Error(" + CoinInstance.CoinError.CoinErrorCode.BADMNEMONIC.name() + "): Bad mnemonic");
+        LOGGER.info(
+                "[master] Error("
+                        + CoinInstance.CoinError.CoinErrorCode.BADMNEMONIC.name()
+                        + "): Bad mnemonic");
     }
 
     public void logBadChangePass(String msg) {
-        LOGGER.info("[master] Error(" + CoinInstance.CoinError.CoinErrorCode.CHANGEPASSWORDFAILED.name() + "): " + msg);
+        LOGGER.info(
+                "[master] Error("
+                        + CoinInstance.CoinError.CoinErrorCode.CHANGEPASSWORDFAILED.name()
+                        + "): "
+                        + msg);
     }
 
     public void init() {
@@ -70,204 +80,243 @@ public class ConsoleMenu {
                         autoGenerateRPCConfig();
                         System.exit(0);
                         break; // unreachable: System.exit never returns, but the
-                               // compiler cannot prove it; without this the new
-                               // -Xlint:fallthrough flags a false positive here.
-                    case "--development-endpoint": {
-                        if (i + 1 < arguments.length) {
-                            String customEndpoint = arguments[i + 1];
-                            if (customEndpoint.startsWith("--")) {
-                                LOGGER.warning("Invalid endpoint: " + customEndpoint);
-                                break;
-                            }
-                            App.BASE_URL = customEndpoint;
-                            i++;
-                        } else {
-                            String envEndpoint = App.getEnv("BASE_URL");
-                            if (envEndpoint != null && !envEndpoint.isEmpty()) {
-                                App.BASE_URL = envEndpoint;
+                    // compiler cannot prove it; without this the new
+                    // -Xlint:fallthrough flags a false positive here.
+                    case "--development-endpoint":
+                        {
+                            if (i + 1 < arguments.length) {
+                                String customEndpoint = arguments[i + 1];
+                                if (customEndpoint.startsWith("--")) {
+                                    LOGGER.warning("Invalid endpoint: " + customEndpoint);
+                                    break;
+                                }
+                                App.BASE_URL = customEndpoint;
+                                i++;
                             } else {
-                                LOGGER.warning("Missing custom endpoint after '--development-endpoint'");
+                                String envEndpoint = App.getEnv("BASE_URL");
+                                if (envEndpoint != null && !envEndpoint.isEmpty()) {
+                                    App.BASE_URL = envEndpoint;
+                                } else {
+                                    LOGGER.warning(
+                                            "Missing custom endpoint after '--development-endpoint'");
+                                }
                             }
+                            break;
                         }
-                        break;
-                    }
-                    case "--exr-endpoint": {
-                        if (i + 1 < arguments.length) {
-                            String exrEndpoint = arguments[i + 1];
-                            if (exrEndpoint.startsWith("--")) {
-                                LOGGER.warning("Invalid endpoint: " + exrEndpoint);
-                                break;
-                            }
-                            App.EXR_ENDPOINT = exrEndpoint;
-                            App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
-                            LOGGER.info("[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
-                            spawnExrCapabilityProbe();
-                            i++;
-                        } else {
-                            String envExrEndpoint = App.getEnv("EXR_ENDPOINT");
-                            if (envExrEndpoint != null && !envExrEndpoint.isEmpty()) {
-                                App.EXR_ENDPOINT = envExrEndpoint;
+                    case "--exr-endpoint":
+                        {
+                            if (i + 1 < arguments.length) {
+                                String exrEndpoint = arguments[i + 1];
+                                if (exrEndpoint.startsWith("--")) {
+                                    LOGGER.warning("Invalid endpoint: " + exrEndpoint);
+                                    break;
+                                }
+                                App.EXR_ENDPOINT = exrEndpoint;
                                 App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
-                                LOGGER.info("[console] EXR mode enabled with " + App.exrServerPool.getServerCount() + " servers: " + App.EXR_ENDPOINT);
+                                LOGGER.info(
+                                        "[console] EXR mode enabled with "
+                                                + App.exrServerPool.getServerCount()
+                                                + " servers: "
+                                                + App.EXR_ENDPOINT);
                                 spawnExrCapabilityProbe();
+                                i++;
                             } else {
-                                LOGGER.warning("Missing EXR endpoint after '--exr-endpoint'");
+                                String envExrEndpoint = App.getEnv("EXR_ENDPOINT");
+                                if (envExrEndpoint != null && !envExrEndpoint.isEmpty()) {
+                                    App.EXR_ENDPOINT = envExrEndpoint;
+                                    App.exrServerPool = new EXRServerPool(App.EXR_ENDPOINT);
+                                    LOGGER.info(
+                                            "[console] EXR mode enabled with "
+                                                    + App.exrServerPool.getServerCount()
+                                                    + " servers: "
+                                                    + App.EXR_ENDPOINT);
+                                    spawnExrCapabilityProbe();
+                                } else {
+                                    LOGGER.warning("Missing EXR endpoint after '--exr-endpoint'");
+                                }
                             }
+                            break;
                         }
-                        break;
-                    }
-                    case "--blockchain-configuration-files": {
-                        // Flag already handled in App.initCoinConfigs(); just consume the value here
-                        // to avoid falling through to the interactive menu.
-                        if (i + 1 < arguments.length && !arguments[i + 1].startsWith("--")) {
-                            i++;
-                        } else {
-                            String envVal = App.getEnv("BLOCKCHAIN_CONFIGURATION_FILES");
-                            if (envVal == null || envVal.isEmpty()) {
-                                LOGGER.warning("Missing value after '--blockchain-configuration-files'");
+                    case "--blockchain-configuration-files":
+                        {
+                            // Flag already handled in App.initCoinConfigs(); just consume the value
+                            // here
+                            // to avoid falling through to the interactive menu.
+                            if (i + 1 < arguments.length && !arguments[i + 1].startsWith("--")) {
+                                i++;
+                            } else {
+                                String envVal = App.getEnv("BLOCKCHAIN_CONFIGURATION_FILES");
+                                if (envVal == null || envVal.isEmpty()) {
+                                    LOGGER.warning(
+                                            "Missing value after '--blockchain-configuration-files'");
+                                }
                             }
+                            break;
                         }
-                        break;
-                    }
                     case "--version":
                         LOGGER.info(Version.CLIENT_VERSION);
                         System.exit(0);
                         break;
-                    case "--createdefaultwallet": {
-                        if (KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.info("Wallet already exists");
-                            System.exit(0);
-                        }
-
-                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        try {
-                            int strength = KeyHandler.calculatePasswordStrength(password);
-                            if (strength < 9) {
-                                logBadPassword(null);
-                                System.exit(1);
+                    case "--createdefaultwallet":
+                        {
+                            if (KeyHandler.existsBaseECKeyFromLocal()) {
+                                LOGGER.info("Wallet already exists");
+                                System.exit(0);
                             }
 
-                            List<String> mnemonic = KeyHandler.getBaseSeed(password);
-                            if (mnemonic == null) {
-                                logBadPassword(null);
-                                System.exit(1);
-                            }
-                        } finally {
-                            Arrays.fill(password, '\0');
-                        }
+                            char[] password =
+                                    readPasswordChars(
+                                            input, arguments, i + 1, "", "WALLET_PASSWORD");
+                            try {
+                                int strength = KeyHandler.calculatePasswordStrength(password);
+                                if (strength < 9) {
+                                    logBadPassword(null);
+                                    System.exit(1);
+                                }
 
-                        System.exit(0);
-                    }
-                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
-                    case "--createwalletmnemonic": {
-                        if (KeyHandler.existsBaseECKeyFromLocal()) {
-                            LOGGER.info("Wallet already exists");
-                            System.exit(0);
-                        }
-
-                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        String mnemonic = readPassword(input, arguments, i + 2, "Mnemonic:\n", "WALLET_MNEMONIC").trim();
-                        try {
-                            int strength = KeyHandler.calculatePasswordStrength(password);
-                            if (strength < 9) {
-                                logBadPassword(null);
-                                System.exit(1);
-                            }
-                            if (mnemonic.isEmpty()) {
-                                logBadMnemonic();
-                                System.exit(1);
-                            }
-
-                            if (!KeyHandler.importFromMnemonic(Arrays.asList(mnemonic.split(" ")), password)) {
-                                logBadMnemonic();
-                                System.exit(1);
-                            }
-                        } finally {
-                            Arrays.fill(password, '\0');
-                        }
-
-                        System.exit(0);
-                    }
-                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
-                    case "--password": {
-                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        try {
-                            int strength = KeyHandler.calculatePasswordStrength(password);
-
-                            if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                                LOGGER.info("Bad password.");
-                                System.exit(1);
-                            }
-
-                            completeLogin(password, null, false);
-                        } finally {
-                            Arrays.fill(password, '\0');
-                        }
-
-                        return;
-                    }
-                    case "--getmnemonic": {
-                        char[] password = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        try {
-                            if (!KeyHandler.existsBaseECKeyFromLocal()) {
-                                LOGGER.info("No wallet found.");
-                                System.exit(1);
-                            }
-
-                            String mnemonic = CoinInstance.getMnemonicForPw(password);
-                            if (mnemonic == null || mnemonic.isEmpty()) {
-                                // Wrong password (or unusable wallet) must not
-                                // masquerade as success with an empty phrase.
-                                // Wipe BEFORE exiting — System.exit does not
-                                // unwind, so a finally block would be skipped.
-                                LOGGER.severe("Error(BADPASSWORD): could not retrieve mnemonic for the supplied password");
+                                List<String> mnemonic = KeyHandler.getBaseSeed(password);
+                                if (mnemonic == null) {
+                                    logBadPassword(null);
+                                    System.exit(1);
+                                }
+                            } finally {
                                 Arrays.fill(password, '\0');
-                                System.exit(4);
                             }
-                            System.out.println(mnemonic);
-                        } finally {
-                            Arrays.fill(password, '\0');
-                        }
-                        System.exit(0);
-                    }
-                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
-                    case "--changepassword": {
-                        if (!KeyHandler.existsBaseECKeyFromLocal()) {
-                            logBadChangePass("Wallet not found");
-                            System.exit(1);
-                        }
 
-                        char[] currentPassword = readPasswordChars(input, arguments, i + 1, "", "WALLET_PASSWORD");
-                        char[] newPassword = readPasswordChars(input, arguments, i + 2, "", null);
-                        try {
-                            if (currentPassword.length == 0 || newPassword.length == 0) {
-                                LOGGER.info("Password cannot be empty");
+                            System.exit(0);
+                        }
+                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                    case "--createwalletmnemonic":
+                        {
+                            if (KeyHandler.existsBaseECKeyFromLocal()) {
+                                LOGGER.info("Wallet already exists");
+                                System.exit(0);
+                            }
+
+                            char[] password =
+                                    readPasswordChars(
+                                            input, arguments, i + 1, "", "WALLET_PASSWORD");
+                            String mnemonic =
+                                    readPassword(
+                                                    input,
+                                                    arguments,
+                                                    i + 2,
+                                                    "Mnemonic:\n",
+                                                    "WALLET_MNEMONIC")
+                                            .trim();
+                            try {
+                                int strength = KeyHandler.calculatePasswordStrength(password);
+                                if (strength < 9) {
+                                    logBadPassword(null);
+                                    System.exit(1);
+                                }
+                                if (mnemonic.isEmpty()) {
+                                    logBadMnemonic();
+                                    System.exit(1);
+                                }
+
+                                if (!KeyHandler.importFromMnemonic(
+                                        Arrays.asList(mnemonic.split(" ")), password)) {
+                                    logBadMnemonic();
+                                    System.exit(1);
+                                }
+                            } finally {
+                                Arrays.fill(password, '\0');
+                            }
+
+                            System.exit(0);
+                        }
+                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                    case "--password":
+                        {
+                            char[] password =
+                                    readPasswordChars(
+                                            input, arguments, i + 1, "", "WALLET_PASSWORD");
+                            try {
+                                int strength = KeyHandler.calculatePasswordStrength(password);
+
+                                if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                                    LOGGER.info("Bad password.");
+                                    System.exit(1);
+                                }
+
+                                completeLogin(password, null, false);
+                            } finally {
+                                Arrays.fill(password, '\0');
+                            }
+
+                            return;
+                        }
+                    case "--getmnemonic":
+                        {
+                            char[] password =
+                                    readPasswordChars(
+                                            input, arguments, i + 1, "", "WALLET_PASSWORD");
+                            try {
+                                if (!KeyHandler.existsBaseECKeyFromLocal()) {
+                                    LOGGER.info("No wallet found.");
+                                    System.exit(1);
+                                }
+
+                                String mnemonic = CoinInstance.getMnemonicForPw(password);
+                                if (mnemonic == null || mnemonic.isEmpty()) {
+                                    // Wrong password (or unusable wallet) must not
+                                    // masquerade as success with an empty phrase.
+                                    // Wipe BEFORE exiting — System.exit does not
+                                    // unwind, so a finally block would be skipped.
+                                    LOGGER.severe(
+                                            "Error(BADPASSWORD): could not retrieve mnemonic for the supplied password");
+                                    Arrays.fill(password, '\0');
+                                    System.exit(4);
+                                }
+                                System.out.println(mnemonic);
+                            } finally {
+                                Arrays.fill(password, '\0');
+                            }
+                            System.exit(0);
+                        }
+                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                    case "--changepassword":
+                        {
+                            if (!KeyHandler.existsBaseECKeyFromLocal()) {
+                                logBadChangePass("Wallet not found");
                                 System.exit(1);
                             }
-                            if (Arrays.equals(currentPassword, newPassword)) {
-                                LOGGER.info("New password must be different from old password");
-                                System.exit(1);
+
+                            char[] currentPassword =
+                                    readPasswordChars(
+                                            input, arguments, i + 1, "", "WALLET_PASSWORD");
+                            char[] newPassword =
+                                    readPasswordChars(input, arguments, i + 2, "", null);
+                            try {
+                                if (currentPassword.length == 0 || newPassword.length == 0) {
+                                    LOGGER.info("Password cannot be empty");
+                                    System.exit(1);
+                                }
+                                if (Arrays.equals(currentPassword, newPassword)) {
+                                    LOGGER.info("New password must be different from old password");
+                                    System.exit(1);
+                                }
+
+                                int strength = KeyHandler.calculatePasswordStrength(newPassword);
+                                if (strength < 9) {
+                                    LOGGER.info(
+                                            "Unable to change the password: New password is not strong enough");
+                                    System.exit(1);
+                                }
+
+                                CoinInstance.CoinError err =
+                                        CoinInstance.changePassword(currentPassword, newPassword);
+                                if (err != null) logBadChangePass(err.getMessage());
+                                else LOGGER.info("Wallet password changed successfully");
+                            } finally {
+                                Arrays.fill(currentPassword, '\0');
+                                Arrays.fill(newPassword, '\0');
                             }
 
-                            int strength = KeyHandler.calculatePasswordStrength(newPassword);
-                            if (strength < 9) {
-                                LOGGER.info("Unable to change the password: New password is not strong enough");
-                                System.exit(1);
-                            }
-
-                            CoinInstance.CoinError err = CoinInstance.changePassword(currentPassword, newPassword);
-                            if (err != null)
-                                logBadChangePass(err.getMessage());
-                            else
-                                LOGGER.info("Wallet password changed successfully");
-                        } finally {
-                            Arrays.fill(currentPassword, '\0');
-                            Arrays.fill(newPassword, '\0');
+                            System.exit(0);
                         }
-
-                        System.exit(0);
-                    }
-                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                        break; // unreachable (System.exit above); silences -Xlint:fallthrough.
                     case "--help":
                         displayHelp();
                         System.exit(0);
@@ -317,87 +366,90 @@ public class ConsoleMenu {
             input.nextLine();
 
             switch (selection) {
-                case 1: {
-                    if (KeyHandler.existsBaseECKeyFromLocal()) {
-                        LOGGER.info("Key already exists");
+                case 1:
+                    {
+                        if (KeyHandler.existsBaseECKeyFromLocal()) {
+                            LOGGER.info("Key already exists");
+                            return;
+                        }
+
+                        Console console = System.console();
+                        char[] password;
+                        if (console != null) {
+                            password = console.readPassword("Enter new password: ");
+                        } else {
+                            LOGGER.info("Enter new password: ");
+                            password = input.next().toCharArray();
+                        }
+                        try {
+                            int strength = KeyHandler.calculatePasswordStrength(password);
+
+                            if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                                LOGGER.info("Bad password.");
+                                return;
+                            }
+                            completeLogin(password, null, false);
+                        } finally {
+                            Arrays.fill(password, '\0');
+                        }
                         return;
                     }
-
-                    Console console = System.console();
-                    char[] password;
-                    if (console != null) {
-                        password = console.readPassword("Enter new password: ");
-                    } else {
-                        LOGGER.info("Enter new password: ");
-                        password = input.next().toCharArray();
-                    }
-                    try {
-                        int strength = KeyHandler.calculatePasswordStrength(password);
-
-                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            LOGGER.info("Bad password.");
-                            return;
+                case 2:
+                    {
+                        LOGGER.info("Enter password: ");
+                        Console console = System.console();
+                        char[] password;
+                        if (console != null) {
+                            password = console.readPassword();
+                        } else {
+                            LOGGER.warning("Console not available, using Scanner fallback");
+                            password = readPasswordChars(input, null, 0, "", null);
                         }
-                        completeLogin(password, null, false);
-                    } finally {
-                        Arrays.fill(password, '\0');
-                    }
-                    return;
-                }
-                case 2: {
-                    LOGGER.info("Enter password: ");
-                    Console console = System.console();
-                    char[] password;
-                    if (console != null) {
-                        password = console.readPassword();
-                    } else {
-                        LOGGER.warning("Console not available, using Scanner fallback");
-                        password = readPasswordChars(input, null, 0, "", null);
-                    }
-                    try {
-                        int strength = KeyHandler.calculatePasswordStrength(password);
+                        try {
+                            int strength = KeyHandler.calculatePasswordStrength(password);
 
-                        if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
-                            LOGGER.info("Bad password.");
-                            return;
+                            if (!KeyHandler.existsBaseECKeyFromLocal() && strength < 9) {
+                                LOGGER.info("Bad password.");
+                                return;
+                            }
+                            completeLogin(password, null, false);
+                        } finally {
+                            Arrays.fill(password, '\0');
                         }
-                        completeLogin(password, null, false);
-                    } finally {
-                        Arrays.fill(password, '\0');
+                        return;
                     }
-                    return;
-                }
-                case 3: {
-                    LOGGER.info("Enter mnemonic: ");
-                    String mnemonicInput = input.nextLine().trim();
+                case 3:
+                    {
+                        LOGGER.info("Enter mnemonic: ");
+                        String mnemonicInput = input.nextLine().trim();
 
-                    char[] mnemonicChars = mnemonicInput.toCharArray();
-                    try {
-                        completeLogin(mnemonicChars, null, true);
-                    } finally {
-                        Arrays.fill(mnemonicChars, '\0');
+                        char[] mnemonicChars = mnemonicInput.toCharArray();
+                        try {
+                            completeLogin(mnemonicChars, null, true);
+                        } finally {
+                            Arrays.fill(mnemonicChars, '\0');
+                        }
+                        return;
                     }
-                    return;
-                }
-                case 4: {
-                    LOGGER.info("Exiting...");
-                    System.exit(0);
-                }
-                break; // unreachable (System.exit above); silences -Xlint:fallthrough.
-                default: {
-                    LOGGER.info("Unknown Option.");
-                }
+                case 4:
+                    {
+                        LOGGER.info("Exiting...");
+                        System.exit(0);
+                    }
+                    break; // unreachable (System.exit above); silences -Xlint:fallthrough.
+                default:
+                    {
+                        LOGGER.info("Unknown Option.");
+                    }
             }
         }
     }
 
     public void deinit() {
-        if (backgroundTimerThread != null)
-            backgroundTimerThread.stop();
+        if (backgroundTimerThread != null) backgroundTimerThread.stop();
         for (CoinTicker cointicker : CoinTicker.coins()) {
             CoinInstance instance = CoinInstance.getInstance(cointicker);
-            if (instance != null)
-                instance.deinit();
+            if (instance != null) instance.deinit();
         }
     }
 
@@ -418,22 +470,30 @@ public class ConsoleMenu {
         // credentials or port change.
         Map<CoinTicker, CoinConfigEnsurer.Outcome> ensureReport =
                 CoinConfigEnsurer.ensureMissing(CoinTicker.coins());
-        long repaired = ensureReport.values().stream()
-                .filter(o -> o == CoinConfigEnsurer.Outcome.CREATED
-                        || o == CoinConfigEnsurer.Outcome.CORRUPT_QUARANTINED).count();
+        long repaired =
+                ensureReport.values().stream()
+                        .filter(o ->
+                                o == CoinConfigEnsurer.Outcome.CREATED
+                                        || o == CoinConfigEnsurer.Outcome.CORRUPT_QUARANTINED)
+                        .count();
         if (repaired > 0) {
-            LOGGER.info("[coin] Coin config self-healing repaired " + repaired + " coin(s): " + ensureReport);
+            LOGGER.info(
+                    "[coin] Coin config self-healing repaired "
+                            + repaired
+                            + " coin(s): "
+                            + ensureReport);
         }
 
-        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, null, isMnemonic);
+        CoinInstance.CoinError coinError =
+                CoinInstance.getInstance(CoinTicker.BLOCKNET).init(password, null, isMnemonic);
         if (coinError != null) {
-            String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
+            String msg =
+                    "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.severe(msg);
             // Auth/init failure must not exit 0 — scripts and the GUI treat
             // exit code 0 as success. Wipe the credential before exiting
             // (System.exit does not unwind caller finally blocks).
-            if (password != null)
-                Arrays.fill(password, '\0');
+            if (password != null) Arrays.fill(password, '\0');
             System.exit(5);
         }
 
@@ -458,16 +518,18 @@ public class ConsoleMenu {
         // daemonized; the coin-init pool is short-lived, daemon-factory,
         // and always drained in its finally. deinit()/stop() releases
         // this anchor on shutdown.
-        Thread timerAnchor = new Thread(backgroundTimerThread,
-                "background-timer-anchor");
+        Thread timerAnchor = new Thread(backgroundTimerThread, "background-timer-anchor");
         timerAnchor.start();
         if (App.exrServerPool != null) {
             App.exrServerPool.probeAllCapabilities();
         }
     }
 
-    private void initializeCoinsConcurrently(List<CoinTicker> coinTickers, char[] password,
-                                             String userMnemonic, boolean isMnemonic) {
+    private void initializeCoinsConcurrently(
+            List<CoinTicker> coinTickers,
+            char[] password,
+            String userMnemonic,
+            boolean isMnemonic) {
         if (coinTickers.isEmpty()) {
             return;
         }
@@ -476,35 +538,62 @@ public class ConsoleMenu {
         // Daemon factory: init tasks are bounded by their futures and the
         // pool is drained in finally — it must never become a second
         // liveness anchor if a task survives shutdownNow's interrupt.
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount, r -> {
-            Thread t = new Thread(r, "coin-init");
-            t.setDaemon(true);
-            return t;
-        });
+        ExecutorService executor =
+                Executors.newFixedThreadPool(
+                        threadCount,
+                        r -> {
+                            Thread t = new Thread(r, "coin-init");
+                            t.setDaemon(true);
+                            return t;
+                        });
 
         try {
-            List<CoinTicker> enabledCoins = coinTickers.stream()
-                    .filter(ticker -> ticker == CoinTicker.BLOCKNET || CoinInstance.getInstance(ticker) != null)
-                    .collect(Collectors.toList());
+            List<CoinTicker> enabledCoins =
+                    coinTickers.stream()
+                            .filter(ticker ->
+                                    ticker == CoinTicker.BLOCKNET
+                                            || CoinInstance.getInstance(ticker) != null)
+                            .collect(Collectors.toList());
 
-            CompletableFuture<?>[] futures = enabledCoins.stream()
-                    .map(coinTicker -> CompletableFuture.runAsync(() -> {
-                        try {
-                            LOGGER.fine("[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
-                            CoinInstance.CoinError coinError = CoinInstance.getInstance(coinTicker)
-                                    .init(password, userMnemonic, isMnemonic);
-                            if (coinError != null) {
-                                LOGGER.warning("[" + coinTicker.name() + "] Error(" +
-                                        coinError.getCode().name() + "): " + coinError.getMessage());
-                            }
-                        } catch (Exception e) {
-                            LOGGER.severe("Failed to initialize " + coinTicker.name() + ", " + e.getMessage());
-                        }
-                    }, executor))
-                    .toArray(CompletableFuture[]::new);
+            CompletableFuture<?>[] futures =
+                    enabledCoins.stream()
+                            .map(coinTicker ->
+                                    CompletableFuture.runAsync(
+                                            () -> {
+                                                try {
+                                                    LOGGER.fine(
+                                                            "[coin] Initializing "
+                                                                    + CoinTickerUtils
+                                                                            .tickerToString(
+                                                                                    coinTicker)
+                                                                    + " concurrently");
+                                                    CoinInstance.CoinError coinError =
+                                                            CoinInstance.getInstance(coinTicker)
+                                                                    .init(
+                                                                            password,
+                                                                            userMnemonic,
+                                                                            isMnemonic);
+                                                    if (coinError != null) {
+                                                        LOGGER.warning(
+                                                                "["
+                                                                        + coinTicker.name()
+                                                                        + "] Error("
+                                                                        + coinError.getCode().name()
+                                                                        + "): "
+                                                                        + coinError.getMessage());
+                                                    }
+                                                } catch (Exception e) {
+                                                    LOGGER.severe(
+                                                            "Failed to initialize "
+                                                                    + coinTicker.name()
+                                                                    + ", "
+                                                                    + e.getMessage());
+                                                }
+                                            },
+                                            executor))
+                            .toArray(CompletableFuture[]::new);
 
             CompletableFuture.allOf(futures).join();
-
 
         } finally {
             executor.shutdown();
@@ -520,25 +609,29 @@ public class ConsoleMenu {
     }
 
     /**
-     * Deferred best-effort capability probe for a freshly configured EXR
-     * pool. Daemon thread: a hung endpoint must never hold the JVM.
+     * Deferred best-effort capability probe for a freshly configured EXR pool. Daemon thread: a
+     * hung endpoint must never hold the JVM.
      */
     private void spawnExrCapabilityProbe() {
-        Thread prober = new Thread(() -> {
-            try {
-                Thread.sleep(1000);
-                App.exrServerPool.probeAllCapabilities();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "EXR-Capability-Prober");
+        Thread prober =
+                new Thread(
+                        () -> {
+                            try {
+                                Thread.sleep(1000);
+                                App.exrServerPool.probeAllCapabilities();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        },
+                        "EXR-Capability-Prober");
         prober.setDaemon(true);
         prober.start();
     }
 
     private void autoGenerateRPCConfig() {
         for (CoinTicker cointicker : CoinTicker.coins()) {
-            ConfigHelper configHelper = new ConfigHelper(CoinTickerUtils.tickerToString(cointicker));
+            ConfigHelper configHelper =
+                    new ConfigHelper(CoinTickerUtils.tickerToString(cointicker));
 
             configHelper.setRpcUsername(generateRandomString(24));
             configHelper.setRpcPassword(generateRandomString(32));
@@ -556,14 +649,13 @@ public class ConsoleMenu {
         return CoinConfigEnsurer.randomToken(length);
     }
 
-    private String readPassword(Scanner input, String[] args, int argPos, String msg, String envVar) {
-        if (msg.isEmpty())
-            msg = "Password:\n";
+    private String readPassword(
+            Scanner input, String[] args, int argPos, String msg, String envVar) {
+        if (msg.isEmpty()) msg = "Password:\n";
         if (args == null || args.length <= argPos || args[argPos].contains("--")) {
             if (envVar != null) {
                 String envVal = App.getEnv(envVar);
-                if (envVal != null && !envVal.isEmpty())
-                    return envVal;
+                if (envVal != null && !envVal.isEmpty()) return envVal;
             }
             System.out.println(msg);
             return input.nextLine();
@@ -572,17 +664,16 @@ public class ConsoleMenu {
     }
 
     /**
-     * Reads the password as a char[] from args, environment variable, or stdin.
-     * Caller MUST zero-fill the returned array after use.
+     * Reads the password as a char[] from args, environment variable, or stdin. Caller MUST
+     * zero-fill the returned array after use.
      */
-    private char[] readPasswordChars(Scanner input, String[] args, int argPos, String msg, String envVar) {
-        if (msg.isEmpty())
-            msg = "Password:\n";
+    private char[] readPasswordChars(
+            Scanner input, String[] args, int argPos, String msg, String envVar) {
+        if (msg.isEmpty()) msg = "Password:\n";
         if (args == null || args.length <= argPos || args[argPos].contains("--")) {
             if (envVar != null) {
                 String envVal = App.getEnv(envVar);
-                if (envVal != null && !envVal.isEmpty())
-                    return envVal.toCharArray();
+                if (envVal != null && !envVal.isEmpty()) return envVal.toCharArray();
             }
             System.out.println(msg);
             return input.nextLine().toCharArray();
@@ -595,23 +686,23 @@ public class ConsoleMenu {
     }
 
     public static String getHelpText() {
-        return "Usage: xlite-daemon [options]\n" +
-                "Options:\n" +
-                "  --enablerpcandconfigure    Enable and configure RPC\n" +
-                "  --development-endpoint     Set a custom development endpoint\n" +
-                "                             Example: --development-endpoint <https://url.endpoint.org/>\n" +
-                "  --exr-endpoint             Set EXR endpoint for EXR server\n" +
-                "                             Example: --exr-endpoint <http://exrproxy1.airdns.org:42114>\n" +
-                "  --blockchain-configuration-files  Set blockchain-configuration-files source\n" +
-                "                             Example: --blockchain-configuration-files <path-or-url>\n" +
-                "  --version                  Display the version\n" +
-                "  --createdefaultwallet     Create a default wallet\n" +
-                "  --createwalletmnemonic    Create a wallet with a mnemonic\n" +
-                "  --password                Set password without prompt\n" +
-                "                           Example: --password <your_password>\n" +
-                "  --getmnemonic             Retrieve mnemonic for a password\n" +
-                "                           Example: --getmnemonic <your_password>\n" +
-                "  --changepassword          Change wallet password\n" +
-                "                           Example: --changepassword <current_password> <new_password>\n";
+        return "Usage: xlite-daemon [options]\n"
+                + "Options:\n"
+                + "  --enablerpcandconfigure    Enable and configure RPC\n"
+                + "  --development-endpoint     Set a custom development endpoint\n"
+                + "                             Example: --development-endpoint <https://url.endpoint.org/>\n"
+                + "  --exr-endpoint             Set EXR endpoint for EXR server\n"
+                + "                             Example: --exr-endpoint <http://exrproxy1.airdns.org:42114>\n"
+                + "  --blockchain-configuration-files  Set blockchain-configuration-files source\n"
+                + "                             Example: --blockchain-configuration-files <path-or-url>\n"
+                + "  --version                  Display the version\n"
+                + "  --createdefaultwallet     Create a default wallet\n"
+                + "  --createwalletmnemonic    Create a wallet with a mnemonic\n"
+                + "  --password                Set password without prompt\n"
+                + "                           Example: --password <your_password>\n"
+                + "  --getmnemonic             Retrieve mnemonic for a password\n"
+                + "                           Example: --getmnemonic <your_password>\n"
+                + "  --changepassword          Change wallet password\n"
+                + "                           Example: --changepassword <current_password> <new_password>\n";
     }
 }

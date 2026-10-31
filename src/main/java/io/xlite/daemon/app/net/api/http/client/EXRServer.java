@@ -2,6 +2,7 @@ package io.xlite.daemon.app.net.api.http.client;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 
@@ -12,8 +13,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class EXRServer {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private final String endpoint;
     private final EXRWrapper wrapper;
     private volatile boolean healthy;
@@ -22,7 +23,8 @@ public class EXRServer {
     private volatile boolean capabilitiesProbed;
     // Use centralized configuration constants
     private static final int HEALTH_CHECK_INTERVAL_MS = HttpClientConfig.HEALTH_CHECK_INTERVAL_MS;
-    private static final int CAPABILITY_PROBE_TIMEOUT_MS = HttpClientConfig.CAPABILITY_PROBE_TIMEOUT_MS;
+    private static final int CAPABILITY_PROBE_TIMEOUT_MS =
+            HttpClientConfig.CAPABILITY_PROBE_TIMEOUT_MS;
 
     public EXRServer(String endpoint) {
         // Store endpoint with trailing slash for consistency
@@ -32,8 +34,10 @@ public class EXRServer {
             this.endpoint = endpoint + "/";
         }
         // EXRWrapper expects endpoint without trailing slash
-        String wrapperEndpoint = this.endpoint.endsWith("/") ?
-                this.endpoint.substring(0, this.endpoint.length() - 1) : this.endpoint;
+        String wrapperEndpoint =
+                this.endpoint.endsWith("/")
+                        ? this.endpoint.substring(0, this.endpoint.length() - 1)
+                        : this.endpoint;
         this.wrapper = new EXRWrapper(wrapperEndpoint);
         this.healthy = true;
         this.lastHealthCheck = 0;
@@ -75,17 +79,32 @@ public class EXRServer {
                             supportedCoins.add(coin);
                         }
                     } catch (Exception e) {
-                        LOGGER.finer("[exr-server] Failed to map coin " + coinName + ", " + e.getMessage());
+                        LOGGER.finer(
+                                "[exr-server] Failed to map coin "
+                                        + coinName
+                                        + ", "
+                                        + e.getMessage());
                     }
                 }
 
                 capabilitiesProbed = true;
-                LOGGER.info("[exr-server] Probed capabilities for " + endpoint + ", supports: " + supportedCoins.size() + " coins: " +
-                        supportedCoins.stream().map(CoinTickerUtils::tickerToString)
-                                .reduce((a, b) -> a + ", " + b).orElse("none"));
+                LOGGER.info(
+                        "[exr-server] Probed capabilities for "
+                                + endpoint
+                                + ", supports: "
+                                + supportedCoins.size()
+                                + " coins: "
+                                + supportedCoins.stream()
+                                        .map(CoinTickerUtils::tickerToString)
+                                        .reduce((a, b) -> a + ", " + b)
+                                        .orElse("none"));
                 return true;
             } catch (Exception e) {
-                LOGGER.warning("[exr-server] Failed to probe capabilities for " + endpoint + ", " + e.getMessage());
+                LOGGER.warning(
+                        "[exr-server] Failed to probe capabilities for "
+                                + endpoint
+                                + ", "
+                                + e.getMessage());
                 return false;
             }
         }
@@ -101,7 +120,8 @@ public class EXRServer {
             healthy = result != null && !result.isJsonNull();
         } catch (Exception e) {
             healthy = false;
-            LOGGER.warning("[exr-server] Health check failed for " + endpoint + ", " + e.getMessage());
+            LOGGER.warning(
+                    "[exr-server] Health check failed for " + endpoint + ", " + e.getMessage());
         }
         lastHealthCheck = now;
         return healthy;

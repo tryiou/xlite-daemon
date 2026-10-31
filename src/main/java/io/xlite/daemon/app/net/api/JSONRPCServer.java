@@ -1,10 +1,5 @@
 package io.xlite.daemon.app.net.api;
 
-import io.xlite.daemon.app.net.CoinInstance;
-import io.xlite.daemon.app.net.CoinTickerUtils;
-import io.xlite.daemon.app.net.api.http.server.HTTPServerInitializer;
-import io.xlite.daemon.app.util.ConfigHelper;
-import io.xlite.daemon.app.util.RpcPorts;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
@@ -12,6 +7,11 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.xlite.daemon.app.net.CoinInstance;
+import io.xlite.daemon.app.net.CoinTickerUtils;
+import io.xlite.daemon.app.net.api.http.server.HTTPServerInitializer;
+import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.RpcPorts;
 
 import java.net.BindException;
 import java.net.InetAddress;
@@ -23,26 +23,29 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class JSONRPCServer extends Thread {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private final CoinInstance coin;
     private final String bindAddress;
+
     /** Ports to try, in order; the first one that binds wins. */
     private final int[] candidates;
+
     private volatile int port;
 
     /**
-     * Retry budget for a single candidate: the kernel can hold a just-closed
-     * socket for up to ~1 s, so retrying the same port is the only recovery.
+     * Retry budget for a single candidate: the kernel can hold a just-closed socket for up to ~1 s,
+     * so retrying the same port is the only recovery.
      */
     private static final int SINGLE_CANDIDATE_PASSES = 20;
+
     /**
-     * Retry budget for a window: stepping to the next candidate is the
-     * recovery, so a second pass only covers a listener that released its
-     * socket between passes.
+     * Retry budget for a window: stepping to the next candidate is the recovery, so a second pass
+     * only covers a listener that released its socket between passes.
      */
     private static final int WINDOW_PASSES = 2;
+
     private static final long PASS_DELAY_MS = 250;
     private volatile boolean stopping = false;
     private volatile boolean bound = false;
@@ -62,9 +65,7 @@ public class JSONRPCServer extends Thread {
         this.coin = coin;
         this.port = port;
         this.bindAddress = bindAddress;
-        this.candidates = candidates.length == 0
-                ? new int[]{port}
-                : candidates.clone();
+        this.candidates = candidates.length == 0 ? new int[] {port} : candidates.clone();
         // Servant thread: never a JVM liveness anchor.
         setDaemon(true);
         setName("rpc-coin-" + CoinTickerUtils.tickerToString(coin.getTicker()));
@@ -83,10 +84,13 @@ public class JSONRPCServer extends Thread {
         // wildcards first, but the bind site enforces it too — no caller
         // path can put a wildcard listener on the wire by omission.
         if (!ConfigHelper.isBindAddressValid(bindAddress)) {
-            LOGGER.severe("[rpc-server] Refusing to bind for "
-                    + CoinTickerUtils.tickerToString(coin.getTicker())
-                    + ": rpcBindAddress '" + bindAddress + "' is not a specific"
-                    + " interface. Set it to 127.0.0.1 or a named local address.");
+            LOGGER.severe(
+                    "[rpc-server] Refusing to bind for "
+                            + CoinTickerUtils.tickerToString(coin.getTicker())
+                            + ": rpcBindAddress '"
+                            + bindAddress
+                            + "' is not a specific"
+                            + " interface. Set it to 127.0.0.1 or a named local address.");
             bindFailed = true;
             return;
         }
@@ -96,9 +100,14 @@ public class JSONRPCServer extends Thread {
         try {
             bindInetAddress = InetAddress.getByName(bindAddress);
         } catch (UnknownHostException e) {
-            LOGGER.severe("[rpc-server] Unresolvable bind address '" + bindAddress
-                    + "' for " + CoinTickerUtils.tickerToString(coin.getTicker())
-                    + " on port " + port + "; refusing to start");
+            LOGGER.severe(
+                    "[rpc-server] Unresolvable bind address '"
+                            + bindAddress
+                            + "' for "
+                            + CoinTickerUtils.tickerToString(coin.getTicker())
+                            + " on port "
+                            + port
+                            + "; refusing to start");
             bindFailed = true;
             return;
         }
@@ -106,7 +115,8 @@ public class JSONRPCServer extends Thread {
         EventLoopGroup workerGroup = NettyEventLoops.shared();
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
-            bootstrap.group(workerGroup)
+            bootstrap
+                    .group(workerGroup)
                     .option(ChannelOption.SO_REUSEADDR, true)
                     .option(ChannelOption.SO_BACKLOG, 128)
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
@@ -126,8 +136,8 @@ public class JSONRPCServer extends Thread {
                     }
                     ChannelFuture bindFuture = null;
                     try {
-                        bindFuture = bootstrap.bind(
-                                new InetSocketAddress(bindInetAddress, candidate));
+                        bindFuture =
+                                bootstrap.bind(new InetSocketAddress(bindInetAddress, candidate));
                         bindFuture.sync();
                         boundChannel = bindFuture.channel();
                         chosenPort = candidate;
@@ -137,8 +147,7 @@ public class JSONRPCServer extends Thread {
                         // channel the bind produced.
                         Thread.currentThread().interrupt();
                         lastBindError = e;
-                        if (bindFuture != null)
-                            bindFuture.channel().close();
+                        if (bindFuture != null) bindFuture.channel().close();
                         break;
                     } catch (Exception e) {
                         lastBindError = e;
@@ -165,27 +174,41 @@ public class JSONRPCServer extends Thread {
                     LOGGER.finer("[rpc-server] bind retries abandoned: stopping");
                     return;
                 }
-                throw lastBindError != null ? lastBindError
+                throw lastBindError != null
+                        ? lastBindError
                         : new IllegalStateException("bind failed without exception");
             }
             channel = boundChannel;
             if (chosenPort != port) {
-                LOGGER.warning("[rpc] " + CoinTickerUtils.tickerToString(coin.getTicker())
-                        + ": port " + port + " unavailable, bound " + chosenPort);
+                LOGGER.warning(
+                        "[rpc] "
+                                + CoinTickerUtils.tickerToString(coin.getTicker())
+                                + ": port "
+                                + port
+                                + " unavailable, bound "
+                                + chosenPort);
             }
             port = chosenPort;
 
             // Emitted only after the bind actually succeeded.
-            LOGGER.info("[rpc] RPC server listening for "
-                    + CoinTickerUtils.tickerToString(coin.getTicker())
-                    + " on port " + port + " at " + channel.localAddress() + ".");
+            LOGGER.info(
+                    "[rpc] RPC server listening for "
+                            + CoinTickerUtils.tickerToString(coin.getTicker())
+                            + " on port "
+                            + port
+                            + " at "
+                            + channel.localAddress()
+                            + ".");
             bound = true;
 
             channel.closeFuture().sync();
         } catch (Exception e) {
             bindFailed = true;
             if (!stopping) {
-                LOGGER.warning("[rpc-server] Error during RPC server operation for " + CoinTickerUtils.tickerToString(coin.getTicker()) + e.getMessage());
+                LOGGER.warning(
+                        "[rpc-server] Error during RPC server operation for "
+                                + CoinTickerUtils.tickerToString(coin.getTicker())
+                                + e.getMessage());
             }
         }
     }
@@ -202,8 +225,9 @@ public class JSONRPCServer extends Thread {
     }
 
     /**
-     * Blocks until the listener has bound successfully, failed outright,
-     * or stop was requested — whichever comes first.
+     * Blocks until the listener has bound successfully, failed outright, or stop was requested —
+     * whichever comes first.
+     *
      * @return true iff the port is bound and accepting.
      */
     public boolean awaitBound(long timeoutMillis) {
@@ -221,8 +245,8 @@ public class JSONRPCServer extends Thread {
     }
 
     /**
-     * Best-effort wait until the previous listener has released its socket,
-     * so an immediate rebind on the same port cannot race the async close.
+     * Best-effort wait until the previous listener has released its socket, so an immediate rebind
+     * on the same port cannot race the async close.
      */
     public void awaitPortRelease(long timeoutMillis) {
         if (channel != null)
@@ -230,19 +254,17 @@ public class JSONRPCServer extends Thread {
     }
 
     /**
-     * Poll ACTUAL kernel bindability of the configured address and port.
-     * Netty's closeFuture can complete while the old LISTEN socket is still
-     * being torn down (observed ~1s lag), so close-completion alone is not a
-     * safe gate for an immediate rebind.
+     * Poll ACTUAL kernel bindability of the configured address and port. Netty's closeFuture can
+     * complete while the old LISTEN socket is still being torn down (observed ~1s lag), so
+     * close-completion alone is not a safe gate for an immediate rebind.
+     *
      * @return true if the address became bindable in time
      */
     public boolean awaitPortBindable(long timeoutMillis) {
         return awaitPortBindable(bindAddress, port, timeoutMillis);
     }
 
-    /**
-     * Static form usable without an instance (also unit-testable).
-     */
+    /** Static form usable without an instance (also unit-testable). */
     static boolean awaitPortBindable(String bindAddress, int port, long timeoutMillis) {
         long deadline = System.currentTimeMillis() + timeoutMillis;
         while (System.currentTimeMillis() < deadline) {
@@ -260,15 +282,14 @@ public class JSONRPCServer extends Thread {
     }
 
     /**
-     * Probe whether a listening socket could be opened on this address and
-     * port right now. Probes the configured address, never the wildcard:
-     * a loopback-held port can still look wildcard-bindable.
+     * Probe whether a listening socket could be opened on this address and port right now. Probes
+     * the configured address, never the wildcard: a loopback-held port can still look
+     * wildcard-bindable.
      */
     static boolean portBindable(String bindAddress, int port) {
         try (ServerSocket probe = new ServerSocket()) {
             probe.setReuseAddress(true);
-            probe.bind(new InetSocketAddress(
-                    InetAddress.getByName(bindAddress), port), 1);
+            probe.bind(new InetSocketAddress(InetAddress.getByName(bindAddress), port), 1);
             return true;
         } catch (Exception e) {
             // probe failed (held, blocked or unresolvable)
@@ -277,20 +298,30 @@ public class JSONRPCServer extends Thread {
     }
 
     /**
-     * One-line lifecycle summary for diagnostics: thread state, bind flags
-     * and the recorded channel's open/done/local-address state.
+     * One-line lifecycle summary for diagnostics: thread state, bind flags and the recorded
+     * channel's open/done/local-address state.
      */
     public String lifecycleState() {
         Channel ch = channel;
-        return "srv=" + System.identityHashCode(this)
-                + " alive=" + isAlive()
-                + " stopping=" + stopping
-                + " bound=" + bound
-                + " bindFailed=" + bindFailed
-                + " channel=" + (ch == null ? "null"
-                : "open=" + ch.isOpen()
-                + " closeDone=" + ch.closeFuture().isDone()
-                + " local=" + ch.localAddress());
+        return "srv="
+                + System.identityHashCode(this)
+                + " alive="
+                + isAlive()
+                + " stopping="
+                + stopping
+                + " bound="
+                + bound
+                + " bindFailed="
+                + bindFailed
+                + " channel="
+                + (ch == null
+                        ? "null"
+                        : "open="
+                                + ch.isOpen()
+                                + " closeDone="
+                                + ch.closeFuture().isDone()
+                                + " local="
+                                + ch.localAddress());
     }
 
     public void deinit() {

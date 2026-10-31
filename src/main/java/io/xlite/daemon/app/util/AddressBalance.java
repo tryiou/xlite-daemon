@@ -2,8 +2,10 @@ package io.xlite.daemon.app.util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
+
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinTickerUtils;
+
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.LegacyAddress;
 
@@ -73,10 +75,8 @@ public class AddressBalance {
         synchronized (this) {
             // Only add UTXO's that do not exist in our wallet
             UTXO bUtxo = getUtxo(utxo.getTxid(), utxo.getVout());
-            if (bUtxo == null)
-                this.utxos.add(utxo);
-            else
-                return false;
+            if (bUtxo == null) this.utxos.add(utxo);
+            else return false;
 
             calculateBalance();
             return true;
@@ -84,7 +84,10 @@ public class AddressBalance {
     }
 
     private UTXO getUtxo(String txid, int vout) {
-        return utxos.stream().filter(o -> o.getTxid().equals(txid) && o.getVout() == vout).findFirst().orElse(null);
+        return utxos.stream()
+                .filter(o -> o.getTxid().equals(txid) && o.getVout() == vout)
+                .findFirst()
+                .orElse(null);
     }
 
     public List<UTXO> getSpentUtxos() {
@@ -125,5 +128,4 @@ public class AddressBalance {
         long coinFactor = CoinConfigRegistry.get(coinTicker).coinFactor();
         setBalanceProp(Sats.toWholeCoins(baseUnits, coinFactor));
     }
-
 }

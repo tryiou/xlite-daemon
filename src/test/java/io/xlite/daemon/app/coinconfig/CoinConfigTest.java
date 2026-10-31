@@ -1,12 +1,12 @@
 package io.xlite.daemon.app.coinconfig;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class CoinConfigTest {
 
@@ -38,18 +38,26 @@ class CoinConfigTest {
 
     @Test
     void testMissingKeyFailsHardWithTickerContext() {
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "Xcoin", "", Map.of("A", "1")).feePerByte());
-        assertTrue(e.getMessage().contains("[X] missing required config key 'FeePerByte'"), e.getMessage());
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "Xcoin", "", Map.of("A", "1")).feePerByte());
+        assertTrue(
+                e.getMessage().contains("[X] missing required config key 'FeePerByte'"),
+                e.getMessage());
     }
 
     @Test
     void testMalformedNumberFailsHardWithContext() {
         Map<String, String> bad = new LinkedHashMap<>();
         bad.put("FeePerByte", "abc");
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "Xcoin", "", bad).feePerByte());
-        assertTrue(e.getMessage().contains("[X] config key 'FeePerByte' is not a number: 'abc'"), e.getMessage());
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "Xcoin", "", bad).feePerByte());
+        assertTrue(
+                e.getMessage().contains("[X] config key 'FeePerByte' is not a number: 'abc'"),
+                e.getMessage());
     }
 
     @Test
@@ -67,8 +75,10 @@ class CoinConfigTest {
 
         Map<String, String> bad = new LinkedHashMap<>();
         bad.put("TxWithTimeField", "yes");
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "X", "", bad).txWithTimeField());
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "X", "", bad).txWithTimeField());
         assertTrue(e.getMessage().contains("'TxWithTimeField' is not true/false"), e.getMessage());
     }
 
@@ -83,15 +93,20 @@ class CoinConfigTest {
         assertEquals(5460L, new CoinConfig("X", "X", "", withDust).dustAmount());
 
         Map<String, String> absent = new LinkedHashMap<>();
-        IllegalStateException missing = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "X", "", absent).dustAmount());
-        assertTrue(missing.getMessage().contains("missing required config key 'DustAmount'"),
+        IllegalStateException missing =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "X", "", absent).dustAmount());
+        assertTrue(
+                missing.getMessage().contains("missing required config key 'DustAmount'"),
                 missing.getMessage());
 
         Map<String, String> badDust = new LinkedHashMap<>();
         badDust.put("DustAmount", "zero");
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "X", "", badDust).dustAmount());
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "X", "", badDust).dustAmount());
         assertTrue(e.getMessage().contains("'DustAmount' is not a number"), e.getMessage());
     }
 
@@ -99,9 +114,13 @@ class CoinConfigTest {
     void testPortOverflowFailsHardWithContext() {
         Map<String, String> bad = new LinkedHashMap<>();
         bad.put("Port", "99999999999");
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "X", "", bad).port());
-        assertTrue(e.getMessage().contains("[X] config key 'Port' exceeds the int range"), e.getMessage());
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "X", "", bad).port());
+        assertTrue(
+                e.getMessage().contains("[X] config key 'Port' exceeds the int range"),
+                e.getMessage());
     }
 
     @Test
@@ -110,22 +129,29 @@ class CoinConfigTest {
         assertEquals(2, sample().txVersion());
 
         Map<String, String> absent = new LinkedHashMap<>();
-        IllegalStateException missing = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "X", "", absent).txVersion());
-        assertTrue(missing.getMessage().contains("missing required config key 'TxVersion'"),
+        IllegalStateException missing =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "X", "", absent).txVersion());
+        assertTrue(
+                missing.getMessage().contains("missing required config key 'TxVersion'"),
                 missing.getMessage());
 
         Map<String, String> bad = new LinkedHashMap<>();
         bad.put("TxVersion", "one");
-        IllegalStateException malformed = assertThrows(IllegalStateException.class,
-                () -> new CoinConfig("X", "X", "", bad).txVersion());
-        assertTrue(malformed.getMessage().contains("'TxVersion' is not a number"),
+        IllegalStateException malformed =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> new CoinConfig("X", "X", "", bad).txVersion());
+        assertTrue(
+                malformed.getMessage().contains("'TxVersion' is not a number"),
                 malformed.getMessage());
     }
 
     @Test
     void testConfEntriesUnmodifiable() {
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> sample().getConfEntries().put("New", "1"));
     }
 
@@ -134,17 +160,25 @@ class CoinConfigTest {
     void testGateRejectsMissingOrNonPositiveTxVersion() {
         Map<String, String> missing = gateValid("LTC", "false");
         missing.remove("TxVersion");
-        IllegalStateException absent = assertThrows(IllegalStateException.class,
-                () -> CoinConfigGate.validate(new CoinConfig("LTC", "Litecoin", "ltc--test", missing)),
-                "TxVersion is a BCF-supplied value, not something the daemon may default");
+        IllegalStateException absent =
+                assertThrows(
+                        IllegalStateException.class,
+                        () ->
+                                CoinConfigGate.validate(
+                                        new CoinConfig("LTC", "Litecoin", "ltc--test", missing)),
+                        "TxVersion is a BCF-supplied value, not something the daemon may default");
         assertTrue(absent.getMessage().contains("TxVersion"), absent.getMessage());
 
-        for (String value : new String[]{"0", "-1", "two"}) {
+        for (String value : new String[] {"0", "-1", "two"}) {
             Map<String, String> bad = gateValid("LTC", "false");
             bad.put("TxVersion", value);
-            IllegalStateException e = assertThrows(IllegalStateException.class,
-                    () -> CoinConfigGate.validate(new CoinConfig("LTC", "Litecoin", "ltc--test", bad)),
-                    "TxVersion=" + value + " must be rejected");
+            IllegalStateException e =
+                    assertThrows(
+                            IllegalStateException.class,
+                            () ->
+                                    CoinConfigGate.validate(
+                                            new CoinConfig("LTC", "Litecoin", "ltc--test", bad)),
+                            "TxVersion=" + value + " must be rejected");
             assertTrue(e.getMessage().contains("TxVersion"), e.getMessage());
         }
     }
@@ -152,11 +186,12 @@ class CoinConfigTest {
     @Test
     @DisplayName("the gate accepts a configured TxVersion, including values above 2")
     void testGateAcceptsConfiguredTxVersion() {
-        for (String value : new String[]{"1", "2", "160"}) {
-            CoinConfig cfg = new CoinConfig("LTC", "Litecoin", "ltc--test",
-                    gateValid("LTC", "false", value));
-            assertDoesNotThrow(() -> CoinConfigGate.validate(cfg),
-                    "TxVersion=" + value + " must be accepted");
+        for (String value : new String[] {"1", "2", "160"}) {
+            CoinConfig cfg =
+                    new CoinConfig(
+                            "LTC", "Litecoin", "ltc--test", gateValid("LTC", "false", value));
+            assertDoesNotThrow(
+                    () -> CoinConfigGate.validate(cfg), "TxVersion=" + value + " must be accepted");
         }
     }
 
@@ -164,7 +199,8 @@ class CoinConfigTest {
         return gateValid(ticker, timeField, "1");
     }
 
-    private static Map<String, String> gateValid(String ticker, String timeField, String txVersion) {
+    private static Map<String, String> gateValid(
+            String ticker, String timeField, String txVersion) {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("AddressPrefix", "30");
         m.put("ScriptPrefix", "63");
@@ -189,9 +225,11 @@ class CoinConfigTest {
         // already built a transaction by the wrong rules.
         CoinConfig bad = new CoinConfig("LTC", "Litecoin", "ltc--test", gateValid("LTC", "yes"));
 
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> CoinConfigGate.validate(bad),
-                "a malformed TxWithTimeField must be rejected at load");
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> CoinConfigGate.validate(bad),
+                        "a malformed TxWithTimeField must be rejected at load");
         assertTrue(e.getMessage().contains("coin config rejected"), e.getMessage());
         assertTrue(e.getMessage().contains("TxWithTimeField"), e.getMessage());
     }
@@ -199,9 +237,11 @@ class CoinConfigTest {
     @Test
     @DisplayName("the gate accepts both spellings of the flag")
     void testGateAcceptsValidTxWithTimeField() {
-        for (String value : new String[]{"true", "false"}) {
-            CoinConfig cfg = new CoinConfig("LTC", "Litecoin", "ltc--test", gateValid("LTC", value));
-            assertDoesNotThrow(() -> CoinConfigGate.validate(cfg),
+        for (String value : new String[] {"true", "false"}) {
+            CoinConfig cfg =
+                    new CoinConfig("LTC", "Litecoin", "ltc--test", gateValid("LTC", value));
+            assertDoesNotThrow(
+                    () -> CoinConfigGate.validate(cfg),
                     "TxWithTimeField=" + value + " must be accepted");
         }
     }

@@ -1,6 +1,7 @@
 package io.xlite.daemon.app.coinconfig;
 
 import io.xlite.daemon.app.net.HasFeeParams;
+
 import org.bitcoinj.core.*;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
@@ -10,28 +11,25 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Network parameters for one coin, driven entirely by its
- * {@link CoinConfig} (blockchain-configuration-files data) plus the small
- * {@link CompiledCoinSupplement} constants bcf does not carry.
+ * Network parameters for one coin, driven entirely by its {@link CoinConfig}
+ * (blockchain-configuration-files data) plus the small {@link CompiledCoinSupplement} constants bcf
+ * does not carry.
  *
- * <p>Replaced the per-coin hardcoded parameter classes, which have since been
- * deleted; their values are now split between the configuration repository and
- * {@link CompiledCoinSupplement}. Where a loaded config differs from what
- * those classes hardcoded, the config wins (e.g. DGB ScriptPrefix 63, RVN
- * FeePerByte 3000).</p>
+ * <p>Replaced the per-coin hardcoded parameter classes, which have since been deleted; their values
+ * are now split between the configuration repository and {@link CompiledCoinSupplement}. Where a
+ * loaded config differs from what those classes hardcoded, the config wins (e.g. DGB ScriptPrefix
+ * 63, RVN FeePerByte 3000).
  *
- * <p>Deliberately preserved status quo: the segwit HRP stays unset — bech32
- * address validation keeps failing for these coins (segwit is unsupported);
- * difficulty/interval/subsidy overrides remain inert stubs (no BlockChain is
- * ever constructed in this daemon); monetary format and URI scheme are dead
- * stubs returning ticker-derived values; {@code getPort()} is likewise not
- * overridden, so it returns bitcoinj's base default rather than any coin's p2p
- * port. That is not safe by construction — it is safe because of who asks:
- * the local RPC port comes from {@code CoinInstance}, and the one consumer of
- * a coin's params-port ({@code BlocknetPeerGroup}) is handed the separate
- * Blocknet p2p parameter object, not this one. A second caller asking this
- * class for a port would get the base default, so overriding it is a change
- * to make deliberately, with that caller in mind.</p>
+ * <p>Deliberately preserved status quo: the segwit HRP stays unset — bech32 address validation
+ * keeps failing for these coins (segwit is unsupported); difficulty/interval/subsidy overrides
+ * remain inert stubs (no BlockChain is ever constructed in this daemon); monetary format and URI
+ * scheme are dead stubs returning ticker-derived values; {@code getPort()} is likewise not
+ * overridden, so it returns bitcoinj's base default rather than any coin's p2p port. That is not
+ * safe by construction — it is safe because of who asks: the local RPC port comes from {@code
+ * CoinInstance}, and the one consumer of a coin's params-port ({@code BlocknetPeerGroup}) is handed
+ * the separate Blocknet p2p parameter object, not this one. A second caller asking this class for a
+ * port would get the base default, so overriding it is a change to make deliberately, with that
+ * caller in mind.
  */
 public final class ConfigurableNetworkParameters extends NetworkParameters implements HasFeeParams {
 
@@ -40,14 +38,13 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
     private final Coin maxMoney;
     private final Coin minNonDustOutput;
 
-
-
     public static ConfigurableNetworkParameters from(CoinConfig config) {
-        return new ConfigurableNetworkParameters(config,
-                CompiledCoinSupplement.forTicker(config.getTicker()));
+        return new ConfigurableNetworkParameters(
+                config, CompiledCoinSupplement.forTicker(config.getTicker()));
     }
 
-    public ConfigurableNetworkParameters(CoinConfig config, CompiledCoinSupplement.Supplement supplement) {
+    public ConfigurableNetworkParameters(
+            CoinConfig config, CompiledCoinSupplement.Supplement supplement) {
         this.config = Objects.requireNonNull(config, "config");
         this.supplement = Objects.requireNonNull(supplement, "supplement");
         CoinConfigGate.validate(config);
@@ -58,12 +55,15 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
         // and turns into a coin error, so this way it cannot escape as an
         // unchecked arithmetic failure from init().
         try {
-            this.maxMoney = Coin.valueOf(
-                    Math.multiplyExact(supplement.maxMoneyCoins, config.coinFactor()));
+            this.maxMoney =
+                    Coin.valueOf(Math.multiplyExact(supplement.maxMoneyCoins, config.coinFactor()));
         } catch (ArithmeticException e) {
-            throw new IllegalStateException("[" + config.getTicker()
-                    + "] COIN is too large to express the coin's supply in base units: COIN="
-                    + config.coinFactor(), e);
+            throw new IllegalStateException(
+                    "["
+                            + config.getTicker()
+                            + "] COIN is too large to express the coin's supply in base units: COIN="
+                            + config.coinFactor(),
+                    e);
         }
         // The dust floor is the configuration's value and nothing else. It used
         // to come from a per-coin constant compiled into this repository while
@@ -80,9 +80,9 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
     }
 
     /**
-     * True once OUR constructor body has run. The NetworkParameters base
-     * constructor calls several of these getters virtually before that, so
-     * every accessor degrades to a neutral value until then.
+     * True once OUR constructor body has run. The NetworkParameters base constructor calls several
+     * of these getters virtually before that, so every accessor degrades to a neutral value until
+     * then.
      */
     private boolean ready() {
         return config != null && supplement != null;
@@ -94,7 +94,8 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
     }
 
     @Override
-    public void checkDifficultyTransitions(StoredBlock storedPrev, Block next, BlockStore blockStore)
+    public void checkDifficultyTransitions(
+            StoredBlock storedPrev, Block next, BlockStore blockStore)
             throws VerificationException, BlockStoreException {
         // no-op: this daemon never verifies block headers (EXR HTTP client)
     }
@@ -131,7 +132,8 @@ public final class ConfigurableNetworkParameters extends NetworkParameters imple
 
     @Override
     public int getProtocolVersionNum(ProtocolVersion version) {
-        return ready() ? supplement.protocolVersion
+        return ready()
+                ? supplement.protocolVersion
                 : ProtocolVersion.CURRENT.getBitcoinProtocolVersion();
     }
 

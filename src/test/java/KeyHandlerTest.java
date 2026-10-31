@@ -1,13 +1,11 @@
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.xlite.daemon.app.crypto.KeyHandler;
 import io.xlite.daemon.app.util.ConfigHelper;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -17,24 +15,29 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Unit tests for KeyHandler.
  *
  * <p>Key design choices:
+ *
  * <ul>
- *   <li>{@code @TempDir} is declared as a static field so the same directory is
- *       reused across all tests in this class and cleaned up automatically by JUnit 5.
- *   <li>Passphrases are {@code char[]} throughout, matching the production API.
- *       Each test allocates a fresh array and zero-fills it in a {@code finally} block.
- *   <li>The legacy wallet helper uses {@code java.util.Base64} (standard library)
- *       instead of a third-party encoder, removing an accidental cross-library coupling.
+ *   <li>{@code @TempDir} is declared as a static field so the same directory is reused across all
+ *       tests in this class and cleaned up automatically by JUnit 5.
+ *   <li>Passphrases are {@code char[]} throughout, matching the production API. Each test allocates
+ *       a fresh array and zero-fills it in a {@code finally} block.
+ *   <li>The legacy wallet helper uses {@code java.util.Base64} (standard library) instead of a
+ *       third-party encoder, removing an accidental cross-library coupling.
  * </ul>
  *
- * <p><b>Thread safety</b>: {@code ConfigHelper.CONFIG_DIR} is a mutable static field.
- * Do not run these tests with JUnit 5 parallel execution enabled unless you isolate
- * the static state per worker.
+ * <p><b>Thread safety</b>: {@code ConfigHelper.CONFIG_DIR} is a mutable static field. Do not run
+ * these tests with JUnit 5 parallel execution enabled unless you isolate the static state per
+ * worker.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class KeyHandlerTest {
@@ -46,19 +49,17 @@ public class KeyHandlerTest {
     private static final String TEST_PASSPHRASE = "testPassphrase123!";
     private static final String TEST_MNEMONIC =
             "one two three cake neutral benefit quick hip level mother fine burst";
-    private static final List<String> TEST_MNEMONIC_LIST =
-            Arrays.asList(TEST_MNEMONIC.split(" "));
+    private static final List<String> TEST_MNEMONIC_LIST = Arrays.asList(TEST_MNEMONIC.split(" "));
 
     // Expected scores for calculatePasswordStrength — named so assertion failures
     // are self-documenting.
-    private static final int SCORE_TOO_SHORT = 0;   // < 8 chars
-    private static final int SCORE_EIGHT_LOWERCASE_ONLY = 3;   // 1 (len 8-9) + 2 (lower)
-    private static final int SCORE_TEN_LOWER_DIGIT = 6;   // 2 (len 10+) + 2 (lower) + 2 (digit)
-    private static final int SCORE_ALL_CRITERIA = 10;  // 2+2+2+2+2
+    private static final int SCORE_TOO_SHORT = 0; // < 8 chars
+    private static final int SCORE_EIGHT_LOWERCASE_ONLY = 3; // 1 (len 8-9) + 2 (lower)
+    private static final int SCORE_TEN_LOWER_DIGIT = 6; // 2 (len 10+) + 2 (lower) + 2 (digit)
+    private static final int SCORE_ALL_CRITERIA = 10; // 2+2+2+2+2
 
     /** Shared temp directory — JUnit 5 removes it and all contents after the test class. */
-    @TempDir
-    static Path tempDir;
+    @TempDir static Path tempDir;
 
     private File testKeyFile;
     private File testBackupDir;
@@ -85,7 +86,8 @@ public class KeyHandlerTest {
     @Order(2)
     void testPasswordStrengthEightCharLowercaseOnly() {
         // 1 (8-9 chars) + 2 (lowercase) = 3
-        assertEquals(SCORE_EIGHT_LOWERCASE_ONLY,
+        assertEquals(
+                SCORE_EIGHT_LOWERCASE_ONLY,
                 KeyHandler.calculatePasswordStrength("eightchr".toCharArray()));
     }
 
@@ -96,22 +98,23 @@ public class KeyHandlerTest {
         assertEquals(
                 KeyHandler.calculatePasswordStrength("eightchr".toCharArray()),
                 KeyHandler.calculatePasswordStrength("ninechars".toCharArray()),
-                "8-char and 9-char passwords must receive the same length bonus"
-        );
+                "8-char and 9-char passwords must receive the same length bonus");
     }
 
     @Test
     @Order(4)
     void testPasswordStrengthTenPlusWithDigitAndLower() {
         // 2 (10+ chars) + 2 (digit) + 2 (lowercase) = 6
-        assertEquals(SCORE_TEN_LOWER_DIGIT,
+        assertEquals(
+                SCORE_TEN_LOWER_DIGIT,
                 KeyHandler.calculatePasswordStrength("tenchars12".toCharArray()));
     }
 
     @Test
     @Order(5)
     void testPasswordStrengthAllCriteria() {
-        assertEquals(SCORE_ALL_CRITERIA,
+        assertEquals(
+                SCORE_ALL_CRITERIA,
                 KeyHandler.calculatePasswordStrength("StrongPass123!".toCharArray()));
     }
 
@@ -146,8 +149,7 @@ public class KeyHandlerTest {
     void testMnemonicToEntropy() {
         byte[] entropy = KeyHandler.mnemonicToEntropy(TEST_MNEMONIC_LIST);
         assertNotNull(entropy, "Entropy must not be null for a valid mnemonic");
-        assertEquals(16, entropy.length,
-                "A 12-word BIP39 mnemonic yields 16 bytes of entropy");
+        assertEquals(16, entropy.length, "A 12-word BIP39 mnemonic yields 16 bytes of entropy");
     }
 
     // =========================================================================
@@ -178,10 +180,11 @@ public class KeyHandlerTest {
         }
 
         String[] lines = readKeyFileLines();
-        assertEquals(4, lines.length,
+        assertEquals(
+                4,
+                lines.length,
                 "V2 wallet file must have exactly 4 lines: VERSION, salt, IV, ciphertext");
-        assertEquals("VERSION:2", lines[0],
-                "First line must be the version header");
+        assertEquals("VERSION:2", lines[0], "First line must be the version header");
         assertFalse(lines[1].isEmpty(), "Salt line must not be empty");
         assertFalse(lines[2].isEmpty(), "IV line must not be empty");
         assertFalse(lines[3].isEmpty(), "Ciphertext line must not be empty");
@@ -217,16 +220,18 @@ public class KeyHandlerTest {
         char[] wrongPass = "wrongPassword".toCharArray();
         try {
             KeyHandler.importFromMnemonic(TEST_MNEMONIC_LIST, importPass);
-            assertTrue(testKeyFile.exists(),
-                    "Wallet file must exist before testing wrong passphrase");
+            assertTrue(
+                    testKeyFile.exists(), "Wallet file must exist before testing wrong passphrase");
 
             List<String> seed = KeyHandler.getBaseSeed(wrongPass);
             assertNull(seed, "Wrong passphrase must return null");
 
             // Verify the wallet file was not damaged by the failed attempt.
-            assertTrue(testKeyFile.exists(),
-                    "Wallet file must still exist after a failed decryption");
-            assertEquals(4, readKeyFileLines().length,
+            assertTrue(
+                    testKeyFile.exists(), "Wallet file must still exist after a failed decryption");
+            assertEquals(
+                    4,
+                    readKeyFileLines().length,
                     "Wallet file must retain its valid 4-line structure");
         } catch (IOException e) {
             fail("Unexpected IOException reading wallet file: " + e.getMessage());
@@ -255,7 +260,8 @@ public class KeyHandlerTest {
             assertTrue(testBackupDir.exists(), "Backups directory must be created");
             File[] backups = testBackupDir.listFiles();
             assertNotNull(backups);
-            assertTrue(backups.length > 0,
+            assertTrue(
+                    backups.length > 0,
                     "At least one backup file must exist after a second import");
         } finally {
             Arrays.fill(passphrase, '\0');
@@ -295,10 +301,8 @@ public class KeyHandlerTest {
 
         // After migration the key file must be V2 format.
         String[] lines = readKeyFileLines();
-        assertEquals("VERSION:2", lines[0],
-                "Migrated wallet must carry the V2 version header");
-        assertEquals(4, lines.length,
-                "Migrated wallet must have the 4-line V2 structure");
+        assertEquals("VERSION:2", lines[0], "Migrated wallet must carry the V2 version header");
+        assertEquals(4, lines.length, "Migrated wallet must have the 4-line V2 structure");
     }
 
     @Test
@@ -318,10 +322,11 @@ public class KeyHandlerTest {
         // migrateToNewFormat places the legacy backup directly in getLocalDataDirectory(),
         // not in the backups/ subdirectory, so it is easy to locate manually.
         File dataDir = new File(ConfigHelper.getLocalDataDirectory());
-        File[] legacyBackups = dataDir.listFiles(
-                (dir, name) -> name.startsWith("key-backup-legacy-"));
+        File[] legacyBackups =
+                dataDir.listFiles((dir, name) -> name.startsWith("key-backup-legacy-"));
         assertNotNull(legacyBackups);
-        assertTrue(legacyBackups.length > 0,
+        assertTrue(
+                legacyBackups.length > 0,
                 "A timestamped legacy backup must be created during migration");
     }
 
@@ -330,8 +335,8 @@ public class KeyHandlerTest {
     // =========================================================================
 
     /**
-     * Write a valid V1 (AES-ECB / PBKDF2-SHA-1 / 16 384 iterations) wallet file
-     * to the path that KeyHandler will read.
+     * Write a valid V1 (AES-ECB / PBKDF2-SHA-1 / 16 384 iterations) wallet file to the path that
+     * KeyHandler will read.
      *
      * <p>Uses only {@link java.util.Base64} (standard library) — no third-party encoder.
      */
@@ -349,7 +354,7 @@ public class KeyHandlerTest {
             SecretKey key = new SecretKeySpec(tmp.getEncoded(), "AES");
             spec.clearPassword();
 
-            Cipher cipher = Cipher.getInstance("AES");   // defaults to ECB — intentional for V1
+            Cipher cipher = Cipher.getInstance("AES"); // defaults to ECB — intentional for V1
             cipher.init(Cipher.ENCRYPT_MODE, key);
             byte[] encrypted = cipher.doFinal(TEST_MNEMONIC.getBytes(StandardCharsets.UTF_8));
 
@@ -377,8 +382,8 @@ public class KeyHandlerTest {
     }
 
     /**
-     * Replicate the legacy LoginUtils.loginToEntropy() behavior:
-     * SHA-256 hash the input and return the hex digest as a char[].
+     * Replicate the legacy LoginUtils.loginToEntropy() behavior: SHA-256 hash the input and return
+     * the hex digest as a char[].
      */
     private static char[] sha256Hex(String input) {
         try {

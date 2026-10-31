@@ -1,11 +1,16 @@
 package io.xlite.daemon.app.wallet;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import io.xlite.daemon.app.coinconfig.CoinConfig;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.UTXO;
+
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -16,18 +21,13 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * Regression tests for the {@code sendtransaction} "No network found" failure.
  *
- * <p>Live daemon rejected valid external LTC/DASH/PIVX destination addresses
- * because the send path parsed them with {@code LegacyAddress.fromBase58(null, …)},
- * which only resolves networks in bitcoinj's global registry (BTC mainnet +
- * testnet). The vectors below are real mainnet addresses produced by live
- * full-node wallets.
+ * <p>Live daemon rejected valid external LTC/DASH/PIVX destination addresses because the send path
+ * parsed them with {@code LegacyAddress.fromBase58(null, …)}, which only resolves networks in
+ * bitcoinj's global registry (BTC mainnet + testnet). The vectors below are real mainnet addresses
+ * produced by live full-node wallets.
  */
 class WalletHelperSendTest {
 
@@ -39,18 +39,19 @@ class WalletHelperSendTest {
     private static final String XVG_P2PKH = "DLp6jdqQjUC3JM5neBNV5UwPzyJFSA4qx3";
 
     /**
-     * Amount math resolves each coin's divisor from its config (BCF COIN),
-     * so the registry must hold the tested tickers. Reset afterwards: the
-     * loaded state is process-global and must not leak into other classes.
+     * Amount math resolves each coin's divisor from its config (BCF COIN), so the registry must
+     * hold the tested tickers. Reset afterwards: the loaded state is process-global and must not
+     * leak into other classes.
      */
     @BeforeAll
     static void loadRegistry() {
-        CoinConfigRegistry.loadForTest(Map.of(
-                "LTC", fixture("LTC", "Litecoin", 48, 50, 176, 100000000L, 9332),
-                "DASH", fixture("DASH", "Dash", 76, 16, 204, 100000000L, 9998),
-                "PIVX", fixture("PIVX", "PIVX", 30, 13, 212, 100000000L, 51474),
-                "BLOCK", fixture("BLOCK", "Blocknet", 26, 28, 154, 100000000L, 41414),
-                "XVG", fixture("XVG", "Verge", 30, 33, 158, 1000000L, 20102)));
+        CoinConfigRegistry.loadForTest(
+                Map.of(
+                        "LTC", fixture("LTC", "Litecoin", 48, 50, 176, 100000000L, 9332),
+                        "DASH", fixture("DASH", "Dash", 76, 16, 204, 100000000L, 9998),
+                        "PIVX", fixture("PIVX", "PIVX", 30, 13, 212, 100000000L, 51474),
+                        "BLOCK", fixture("BLOCK", "Blocknet", 26, 28, 154, 100000000L, 41414),
+                        "XVG", fixture("XVG", "Verge", 30, 33, 158, 1000000L, 20102)));
     }
 
     @AfterAll
@@ -59,18 +60,22 @@ class WalletHelperSendTest {
     }
 
     /**
-     * The coin's parameters as the daemon builds them: from its configuration.
-     * The per-coin hardcoded parameter classes these tests used to instantiate
-     * are gone, and the address vectors below are only meaningful against the
-     * prefixes the coin actually ships.
+     * The coin's parameters as the daemon builds them: from its configuration. The per-coin
+     * hardcoded parameter classes these tests used to instantiate are gone, and the address vectors
+     * below are only meaningful against the prefixes the coin actually ships.
      */
     private static NetworkParameters paramsFor(String ticker) {
         return ConfigurableNetworkParameters.from(CoinConfigRegistry.get(ticker));
     }
 
-    private static CoinConfig fixture(String ticker, String blockchain,
-            int addrPrefix, int scriptPrefix, int secretPrefix,
-            long coin, int port) {
+    private static CoinConfig fixture(
+            String ticker,
+            String blockchain,
+            int addrPrefix,
+            int scriptPrefix,
+            int secretPrefix,
+            long coin,
+            int port) {
         Map<String, String> entries = new LinkedHashMap<>();
         entries.put("AddressPrefix", Integer.toString(addrPrefix));
         entries.put("ScriptPrefix", Integer.toString(scriptPrefix));
@@ -86,27 +91,25 @@ class WalletHelperSendTest {
     }
 
     /**
-     * A coin whose COIN factor is not 1e8, supplied through the same config
-     * path production uses. Every other fixture in this class is 8-decimal,
-     * where a hardcoded 1e8 divisor happens to give the right answer, so this
-     * lookup cannot resolve non-BTC version bytes. Documents why the old
+     * A coin whose COIN factor is not 1e8, supplied through the same config path production uses.
+     * Every other fixture in this class is 8-decimal, where a hardcoded 1e8 divisor happens to give
+     * the right answer, so this lookup cannot resolve non-BTC version bytes. Documents why the old
      * call was wrong; passes independently of the fix.
      */
     @Test
     void testNullParamsLookupRejectsAltcoinAddresses() {
-        assertThrows(AddressFormatException.class,
-                () -> LegacyAddress.fromBase58(null, LTC_P2PKH));
-        assertThrows(AddressFormatException.class,
-                () -> LegacyAddress.fromBase58(null, DASH_P2PKH));
-        assertThrows(AddressFormatException.class,
-                () -> LegacyAddress.fromBase58(null, PIVX_P2PKH));
+        assertThrows(AddressFormatException.class, () -> LegacyAddress.fromBase58(null, LTC_P2PKH));
+        assertThrows(
+                AddressFormatException.class, () -> LegacyAddress.fromBase58(null, DASH_P2PKH));
+        assertThrows(
+                AddressFormatException.class, () -> LegacyAddress.fromBase58(null, PIVX_P2PKH));
     }
 
     @Test
     void testCreateTransactionOutput_LitecoinP2PKH() {
         NetworkParameters params = paramsFor("LTC");
-        UTXO out = WalletHelper.createTransactionOutput(
-                CoinTicker.LITECOIN, LTC_P2PKH, 0.005, params);
+        UTXO out =
+                WalletHelper.createTransactionOutput(CoinTicker.LITECOIN, LTC_P2PKH, 0.005, params);
         assertEquals(LTC_P2PKH, out.getAddress());
         assertEquals(500_000L, out.getValue());
     }
@@ -114,8 +117,9 @@ class WalletHelperSendTest {
     @Test
     void testCreateTransactionOutput_DashP2PKH() {
         NetworkParameters params = paramsFor("DASH");
-        UTXO out = WalletHelper.createTransactionOutput(
-                CoinTicker.DASHCOIN, DASH_P2PKH, 0.005, params);
+        UTXO out =
+                WalletHelper.createTransactionOutput(
+                        CoinTicker.DASHCOIN, DASH_P2PKH, 0.005, params);
         assertEquals(DASH_P2PKH, out.getAddress());
         assertEquals(500_000L, out.getValue());
     }
@@ -123,8 +127,7 @@ class WalletHelperSendTest {
     @Test
     void testCreateTransactionOutput_PivxP2PKH() {
         NetworkParameters params = paramsFor("PIVX");
-        UTXO out = WalletHelper.createTransactionOutput(
-                CoinTicker.PIVX, PIVX_P2PKH, 0.2, params);
+        UTXO out = WalletHelper.createTransactionOutput(CoinTicker.PIVX, PIVX_P2PKH, 0.2, params);
         assertEquals(PIVX_P2PKH, out.getAddress());
         assertEquals(20_000_000L, out.getValue());
     }
@@ -140,8 +143,7 @@ class WalletHelperSendTest {
 
     private static void assertP2SHRoundTrip(CoinTicker ticker, NetworkParameters params) {
         byte[] hash = new byte[20];
-        for (int i = 0; i < hash.length; i++)
-            hash[i] = (byte) (i * 7 + 3);
+        for (int i = 0; i < hash.length; i++) hash[i] = (byte) (i * 7 + 3);
         String p2sh = LegacyAddress.fromScriptHash(params, hash).toBase58();
         assertTrue(LegacyAddress.fromBase58(params, p2sh).isP2SHAddress());
         UTXO out = WalletHelper.createTransactionOutput(ticker, p2sh, 0.001, params);
@@ -153,8 +155,7 @@ class WalletHelperSendTest {
     void testCreateTransactionOutput_BlocknetRegression() {
         NetworkParameters params = paramsFor("BLOCK");
         String p2pkh = LegacyAddress.fromPubKeyHash(params, new byte[20]).toBase58();
-        UTXO out = WalletHelper.createTransactionOutput(
-                CoinTicker.BLOCKNET, p2pkh, 0.05, params);
+        UTXO out = WalletHelper.createTransactionOutput(CoinTicker.BLOCKNET, p2pkh, 0.05, params);
         assertEquals(p2pkh, out.getAddress());
         assertEquals(5_000_000L, out.getValue());
     }
@@ -165,8 +166,9 @@ class WalletHelperSendTest {
         // double sits just below 50001 sats, so (long) truncation yields
         // 50000. Must round to nearest like the UTXO ingest path.
         NetworkParameters params = paramsFor("LTC");
-        UTXO out = WalletHelper.createTransactionOutput(
-                CoinTicker.LITECOIN, LTC_P2PKH, 0.00050001, params);
+        UTXO out =
+                WalletHelper.createTransactionOutput(
+                        CoinTicker.LITECOIN, LTC_P2PKH, 0.00050001, params);
         assertEquals(50_001L, out.getValue());
     }
 
@@ -180,8 +182,11 @@ class WalletHelperSendTest {
         CoinConfigRegistry.loadForTest(cfgs);
         try {
             NetworkParameters params = paramsFor("PIVX");
-            UTXO out = WalletHelper.createTransactionOutput(CoinTicker.PIVX, PIVX_P2PKH, 0.1, params);
-            assertEquals(100_000L, out.getValue(),
+            UTXO out =
+                    WalletHelper.createTransactionOutput(CoinTicker.PIVX, PIVX_P2PKH, 0.1, params);
+            assertEquals(
+                    100_000L,
+                    out.getValue(),
                     "0.1 of a 6-decimal coin is 100000 base units, not 10000000");
         } finally {
             loadRegistry();
@@ -192,10 +197,10 @@ class WalletHelperSendTest {
     void testCreateTransactionOutput_SixDecimalCoinUsesOwnFactor() {
         // 0.1 XVG is 100000 base units (COIN=1000000), not 10000000.
         // The pre-fix hardcoded x1e8 would store 10000000 here.
-        NetworkParameters params = ConfigurableNetworkParameters.from(
-                CoinConfigRegistry.get(CoinTickerUtils.tickerToString(CoinTicker.VERGE)));
-        UTXO out = WalletHelper.createTransactionOutput(
-                CoinTicker.VERGE, XVG_P2PKH, 0.1, params);
+        NetworkParameters params =
+                ConfigurableNetworkParameters.from(
+                        CoinConfigRegistry.get(CoinTickerUtils.tickerToString(CoinTicker.VERGE)));
+        UTXO out = WalletHelper.createTransactionOutput(CoinTicker.VERGE, XVG_P2PKH, 0.1, params);
         assertEquals(XVG_P2PKH, out.getAddress());
         assertEquals(100_000L, out.getValue());
     }

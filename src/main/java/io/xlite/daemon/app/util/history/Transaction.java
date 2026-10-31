@@ -1,6 +1,7 @@
 package io.xlite.daemon.app.util.history;
 
 import com.google.gson.annotations.SerializedName;
+
 import io.xlite.daemon.app.net.CoinTicker;
 
 import java.util.List;
@@ -8,12 +9,16 @@ import java.util.List;
 public class Transaction {
     @SerializedName("address")
     private String addressB58;
+
     @SerializedName("txhash")
     private String txid;
+
     @SerializedName("blockhash")
     private String blockhash;
+
     @SerializedName("category")
     private String category;
+
     private double fee;
     protected transient double value;
     private int vout;
@@ -22,7 +27,16 @@ public class Transaction {
     protected transient List<String> from_addresses;
     protected CoinTicker ticker;
 
-    public Transaction(CoinTicker ticker, String addressB58, String txid, String blockhash, int vout, double value, int confirmations, int blocktime, List<String> from_addresses) {
+    public Transaction(
+            CoinTicker ticker,
+            String addressB58,
+            String txid,
+            String blockhash,
+            int vout,
+            double value,
+            int confirmations,
+            int blocktime,
+            List<String> from_addresses) {
         this.addressB58 = addressB58;
         this.txid = txid;
         this.blockhash = blockhash;
@@ -89,10 +103,14 @@ public class Transaction {
     }
 
     public String toString() {
-        return "\n-------------------------\n" +
-                "Address=" + getAddress() +
-                "\nTXHash=" + getTxid() +
-                "\nVout=" + getVout() +
-                "\nValue=" + getValue();
+        return "\n-------------------------\n"
+                + "Address="
+                + getAddress()
+                + "\nTXHash="
+                + getTxid()
+                + "\nVout="
+                + getVout()
+                + "\nValue="
+                + getValue();
     }
 }

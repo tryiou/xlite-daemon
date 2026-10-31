@@ -2,8 +2,10 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.ConfigHelper;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -19,14 +21,14 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Test helper class providing shared utilities for all test files.
- * This avoids code duplication across test files.
+ * Test helper class providing shared utilities for all test files. This avoids code duplication
+ * across test files.
  */
 public class TestHelper {
 
     /**
-     * Per-class config sandbox. Never the working directory: a test that
-     * touches the config layer must not write into the source tree.
+     * Per-class config sandbox. Never the working directory: a test that touches the config layer
+     * must not write into the source tree.
      */
     protected static final Path testSandbox = createSandbox();
 
@@ -50,7 +52,8 @@ public class TestHelper {
     }
 
     private static void loadTestConfig() throws IOException {
-        try (InputStream is = TestHelper.class.getClassLoader().getResourceAsStream("test_config.json")) {
+        try (InputStream is =
+                TestHelper.class.getClassLoader().getResourceAsStream("test_config.json")) {
             if (is == null) {
                 throw new IOException("Could not find test_config.json in classpath");
             }
@@ -66,25 +69,36 @@ public class TestHelper {
     protected static final String PASSWORD = getPassword();
     protected static final String COIN_TICKER = "LITECOIN";
 
-
     /** A coin configuration for tests, with every value supplied explicitly. */
     protected static io.xlite.daemon.app.coinconfig.CoinConfig testCoinConfig(
-            String ticker, String blockchain, int addr, int p2sh, int dpk,
-            int port, long feePerByte, long minTxFee) {
-        return testCoinConfig(ticker, blockchain, addr, p2sh, dpk, port,
-                feePerByte, minTxFee, 100_000_000L);
+            String ticker,
+            String blockchain,
+            int addr,
+            int p2sh,
+            int dpk,
+            int port,
+            long feePerByte,
+            long minTxFee) {
+        return testCoinConfig(
+                ticker, blockchain, addr, p2sh, dpk, port, feePerByte, minTxFee, 100_000_000L);
     }
 
     /**
-     * The coin factor is a parameter because a fixture that only ever uses
-     * 1e8 cannot detect a divisor that is hardcoded to 1e8: every such
-     * calculation would agree with itself. Currencies with fewer than eight
-     * decimals are real here, so a test that wants to catch that has to be
+     * The coin factor is a parameter because a fixture that only ever uses 1e8 cannot detect a
+     * divisor that is hardcoded to 1e8: every such calculation would agree with itself. Currencies
+     * with fewer than eight decimals are real here, so a test that wants to catch that has to be
      * able to ask for one.
      */
     protected static io.xlite.daemon.app.coinconfig.CoinConfig testCoinConfig(
-            String ticker, String blockchain, int addr, int p2sh, int dpk,
-            int port, long feePerByte, long minTxFee, long coinFactor) {
+            String ticker,
+            String blockchain,
+            int addr,
+            int p2sh,
+            int dpk,
+            int port,
+            long feePerByte,
+            long minTxFee,
+            long coinFactor) {
         java.util.Map<String, String> e = new java.util.LinkedHashMap<>();
         e.put("AddressPrefix", Integer.toString(addr));
         e.put("ScriptPrefix", Integer.toString(p2sh));
@@ -105,7 +119,10 @@ public class TestHelper {
     }
 
     protected static int getAddressCountInitial() {
-        return testConfig.getAsJsonObject("test_parameters").get("address_count_initial").getAsInt();
+        return testConfig
+                .getAsJsonObject("test_parameters")
+                .get("address_count_initial")
+                .getAsInt();
     }
 
     protected static String getPassword() {
@@ -117,30 +134,33 @@ public class TestHelper {
     }
 
     protected static ArrayList<String> getExpectedAddresses() {
-        List<String> list = GSON.fromJson(testConfig.get("expected_addresses"), new TypeToken<List<String>>(){
-        }.getType());
+        List<String> list =
+                GSON.fromJson(
+                        testConfig.get("expected_addresses"),
+                        new TypeToken<List<String>>() {}.getType());
         return new ArrayList<>(list);
     }
 
     /**
-     * Common setup method for all test files.
-     * Disables address discovery during tests to prevent interference.
+     * Common setup method for all test files. Disables address discovery during tests to prevent
+     * interference.
      *
-     * <p>Every test gets a private sandbox: {@code CONFIG_DIR} used to be the
-     * working directory, so a test that touched the config layer wrote
-     * {@code xlite-daemon/} and {@code .migration.lock} into the source tree
-     * (and could delete a sibling checkout's data). A per-class temp dir is
+     * <p>Every test gets a private sandbox: {@code CONFIG_DIR} used to be the working directory, so
+     * a test that touched the config layer wrote {@code xlite-daemon/} and {@code .migration.lock}
+     * into the source tree (and could delete a sibling checkout's data). A per-class temp dir is
      * deleted by JUnit, so nothing escapes.
      */
     @BeforeEach
     public void commonSetup() {
         ConfigHelper.CONFIG_DIR = testSandbox.toString();
         clean();
-        // Disable address discovery during tests to prevent interference with deterministic address generation
+        // Disable address discovery during tests to prevent interference with deterministic address
+        // generation
         CoinInstance.setAddressDiscoveryEnabled(false);
         // Ensure coin configs are available — simple in-memory set, no filesystem
         if (!io.xlite.daemon.app.coinconfig.CoinConfigRegistry.isLoaded()) {
-            java.util.Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs = new java.util.LinkedHashMap<>();
+            java.util.Map<String, io.xlite.daemon.app.coinconfig.CoinConfig> cfgs =
+                    new java.util.LinkedHashMap<>();
             // The prefixes and ports are the coins' real published values,
             // because address derivation depends on them. The fees are chosen
             // by the test and are not claims about current configuration, which
@@ -152,10 +172,9 @@ public class TestHelper {
     }
 
     /**
-     * Common cleanup method for all test files. Pins CONFIG_DIR to the
-     * workdir sandbox: without this, cleanup after a test that restored the
-     * default empty CONFIG_DIR would resolve (and delete!) the real home
-     * data directory, depending on JUnit method order.
+     * Common cleanup method for all test files. Pins CONFIG_DIR to the workdir sandbox: without
+     * this, cleanup after a test that restored the default empty CONFIG_DIR would resolve (and
+     * delete!) the real home data directory, depending on JUnit method order.
      */
     @AfterAll
     public static void commonCleanup() {
@@ -164,15 +183,14 @@ public class TestHelper {
         deleteDir(testSandbox.toFile());
     }
 
-    /**
-     * Cleans up test data and resets CoinInstance state.
-     */
+    /** Cleans up test data and resets CoinInstance state. */
     protected static void clean() {
         CoinInstance.getCoinInstances().clear();
         assertTrue(deleteDir(new File(ConfigHelper.getLocalDataDirectory())));
-        String base = ConfigHelper.CONFIG_DIR == null || ConfigHelper.CONFIG_DIR.trim().isEmpty()
-                ? io.xlite.daemon.app.App.getUserConfigDir()
-                : ConfigHelper.CONFIG_DIR;
+        String base =
+                ConfigHelper.CONFIG_DIR == null || ConfigHelper.CONFIG_DIR.trim().isEmpty()
+                        ? io.xlite.daemon.app.App.getUserConfigDir()
+                        : ConfigHelper.CONFIG_DIR;
         File migrationLock = new File(base, ConfigHelper.MIGRATION_LOCK_FILE);
         if (migrationLock.exists()) {
             assertTrue(migrationLock.delete());
@@ -185,18 +203,17 @@ public class TestHelper {
 
     /**
      * Deletes a directory and all its contents recursively.
+     *
      * @param path The directory to delete
      * @return true if deletion was successful
      */
     protected static boolean deleteDir(File path) {
-        if (!path.exists())
-            return true;
+        if (!path.exists()) return true;
         for (File subFile : Objects.requireNonNull(path.listFiles())) {
             if (subFile.isDirectory()) {
                 deleteDir(subFile);
             } else {
-                if (!subFile.delete())
-                    return false;
+                if (!subFile.delete()) return false;
             }
         }
         return path.delete();
@@ -204,6 +221,7 @@ public class TestHelper {
 
     /**
      * Returns true if there's no duplicates in the list.
+     *
      * @param list The list to check for duplicates
      * @return True if no duplicates
      */
@@ -213,8 +231,9 @@ public class TestHelper {
     }
 
     /**
-     * Asserts that a condition is true.
-     * This is a simple assertion method to avoid importing JUnit in the helper.
+     * Asserts that a condition is true. This is a simple assertion method to avoid importing JUnit
+     * in the helper.
+     *
      * @param condition The condition to assert
      * @throws AssertionError if the condition is false
      */

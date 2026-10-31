@@ -1,15 +1,15 @@
 package io.xlite.daemon.app;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import io.xlite.daemon.app.console.ConsoleMenu;
 import io.xlite.daemon.app.net.api.JSONRPCController;
 import io.xlite.daemon.app.net.api.JSONRPCMasterServer;
 import io.xlite.daemon.app.net.api.http.client.EXRServerPool;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
-import io.xlite.daemon.app.util.ConsoleFormatter;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.ConsoleFormatter;
 import io.xlite.daemon.app.util.FileFormatter;
 import io.xlite.daemon.app.util.LogRotationUtil;
-import io.github.cdimascio.dotenv.Dotenv;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,8 +19,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.logging.*;
 
 public class App {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     // DEBUG ENDPOINT
     public static String BASE_URL = "https://xliterevp.mywire.org/";
@@ -52,18 +52,21 @@ public class App {
 
     /**
      * Resolves the platform application-data root shared by the XLite apps.
-     * <p>Precedence: the {@code XLITE_DATA_HOME} environment variable (when
-     * non-blank, normalized to an absolute path) over the per-OS default.
-     * Pure function so the precedence matrix stays unit-testable.</p>
+     *
+     * <p>Precedence: the {@code XLITE_DATA_HOME} environment variable (when non-blank, normalized
+     * to an absolute path) over the per-OS default. Pure function so the precedence matrix stays
+     * unit-testable.
      *
      * @param dataHomeEnv value of {@code XLITE_DATA_HOME} (may be null)
-     * @param osName      value of the {@code os.name} system property
-     * @param userHome    value of the {@code user.home} system property (must be non-blank on mac/Linux)
-     * @param appDataEnv  Windows {@code AppData} environment value (must be non-blank on Windows)
+     * @param osName value of the {@code os.name} system property
+     * @param userHome value of the {@code user.home} system property (must be non-blank on
+     *     mac/Linux)
+     * @param appDataEnv Windows {@code AppData} environment value (must be non-blank on Windows)
      * @return the resolved config-root directory string
      * @throws IllegalStateException when no override is set and the platform default is missing
      */
-    public static String resolveUserConfigDir(String dataHomeEnv, String osName, String userHome, String appDataEnv) {
+    public static String resolveUserConfigDir(
+            String dataHomeEnv, String osName, String userHome, String appDataEnv) {
         if (dataHomeEnv != null && !dataHomeEnv.trim().isEmpty()) {
             return new File(dataHomeEnv.trim()).getAbsoluteFile().getPath();
         }
@@ -94,7 +97,8 @@ public class App {
     }
 
     public static String getUserConfigDir() {
-        return resolveUserConfigDir(getEnv("XLITE_DATA_HOME"),
+        return resolveUserConfigDir(
+                getEnv("XLITE_DATA_HOME"),
                 System.getProperty("os.name"),
                 System.getProperty("user.home"),
                 getEnv("AppData"));
@@ -107,7 +111,8 @@ public class App {
         try {
             return Level.parse(envValue.trim().toUpperCase());
         } catch (Exception e) {
-            LOGGER.warning("[app] Invalid log level '" + envValue + "', using default " + defaultLevel);
+            LOGGER.warning(
+                    "[app] Invalid log level '" + envValue + "', using default " + defaultLevel);
             return defaultLevel;
         }
     }
@@ -118,7 +123,11 @@ public class App {
         if (exrEndpoint != null && !exrEndpoint.isEmpty()) {
             EXR_ENDPOINT = exrEndpoint;
             exrServerPool = new EXRServerPool(EXR_ENDPOINT);
-            LOGGER.info("[app] EXR mode enabled with " + exrServerPool.getServerCount() + " servers: " + EXR_ENDPOINT);
+            LOGGER.info(
+                    "[app] EXR mode enabled with "
+                            + exrServerPool.getServerCount()
+                            + " servers: "
+                            + EXR_ENDPOINT);
         }
     }
 
@@ -130,7 +139,8 @@ public class App {
                     if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
                         flagValue = args[i + 1];
                     } else {
-                        LOGGER.warning("[coinconfig] Missing value after --blockchain-configuration-files");
+                        LOGGER.warning(
+                                "[coinconfig] Missing value after --blockchain-configuration-files");
                     }
                     break;
                 }
@@ -139,35 +149,45 @@ public class App {
         String envValue = getEnv("BLOCKCHAIN_CONFIGURATION_FILES");
         String source;
         try {
-            source = new io.xlite.daemon.app.coinconfig.ConfigSourceResolver(flagValue, envValue).resolve();
+            source =
+                    new io.xlite.daemon.app.coinconfig.ConfigSourceResolver(flagValue, envValue)
+                            .resolve();
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[coinconfig] invalid source, using default: " + e.getMessage());
+            LOGGER.log(
+                    Level.WARNING, "[coinconfig] invalid source, using default: " + e.getMessage());
             source = io.xlite.daemon.app.coinconfig.ConfigSourceResolver.DEFAULT_UPSTREAM;
         }
         BLOCKCHAIN_CONFIGURATION_FILES = source;
         try {
-            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadWithFallback(source, cacheFor(source));
+            io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadWithFallback(
+                    source, cacheFor(source));
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING,
-                    "[coinconfig] failed to load from " + source + ": " + e.getMessage()
+            LOGGER.log(
+                    Level.WARNING,
+                    "[coinconfig] failed to load from "
+                            + source
+                            + ": "
+                            + e.getMessage()
                             + " — continuing with no configs; migrated coins will report UNSUPPORTEDCOIN");
         }
     }
 
     /**
-     * Write-through cache for remote config sources, rooted in the daemon
-     * data dir. Local checkouts bypass the cache; any failure resolving it
-     * degrades to uncached (a null cache loads exactly as before).
+     * Write-through cache for remote config sources, rooted in the daemon data dir. Local checkouts
+     * bypass the cache; any failure resolving it degrades to uncached (a null cache loads exactly
+     * as before).
      */
     private static io.xlite.daemon.app.coinconfig.CoinConfigCache cacheFor(String source) {
         try {
             if (io.xlite.daemon.app.coinconfig.ConfigSourceResolver.isLocalDirectory(source))
                 return null;
-            java.nio.file.Path root = java.nio.file.Paths.get(getUserConfigDir(),
-                    ConfigHelper.DATA_DIR_NAME, "coinconfig-cache");
+            java.nio.file.Path root =
+                    java.nio.file.Paths.get(
+                            getUserConfigDir(), ConfigHelper.DATA_DIR_NAME, "coinconfig-cache");
             return io.xlite.daemon.app.coinconfig.CoinConfigCache.forSource(root, source);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING,
+            LOGGER.log(
+                    Level.WARNING,
                     "[coinconfig] cache unavailable: " + e.getMessage() + " — continuing uncached");
             return null;
         }
@@ -197,12 +217,17 @@ public class App {
             String userHomeDir = getUserConfigDir();
             String logDir = userHomeDir + File.separator + ConfigHelper.DATA_DIR_NAME;
             DateTimeFormatter timeStampPattern = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            Handler fileHandler = new FileHandler(
-                    logDir + File.separator + "error-" + timeStampPattern.format(LocalDateTime.now()) + ".log",
-                    10_000_000,  // max file size 10MB
-                    5,          // 5 rotated files
-                    true         // append to existing
-            );
+            Handler fileHandler =
+                    new FileHandler(
+                            logDir
+                                    + File.separator
+                                    + "error-"
+                                    + timeStampPattern.format(LocalDateTime.now())
+                                    + ".log",
+                            10_000_000, // max file size 10MB
+                            5, // 5 rotated files
+                            true // append to existing
+                            );
 
             fileHandler.setFormatter(new FileFormatter());
             fileHandler.setLevel(Level.INFO);
@@ -220,12 +245,14 @@ public class App {
         }
 
         // Diagnostics to stderr, payloads and prompts to stdout.
-        ConsoleHandler consoleHandler = new ConsoleHandler(){
-            @Override
-            protected synchronized void setOutputStream(OutputStream out) throws SecurityException {
-                super.setOutputStream(System.err);
-            }
-        };
+        ConsoleHandler consoleHandler =
+                new ConsoleHandler() {
+                    @Override
+                    protected synchronized void setOutputStream(OutputStream out)
+                            throws SecurityException {
+                        super.setOutputStream(System.err);
+                    }
+                };
         consoleHandler.setFormatter(new ConsoleFormatter());
         consoleHandler.setLevel(Level.FINE);
 

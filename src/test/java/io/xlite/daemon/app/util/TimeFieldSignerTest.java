@@ -1,5 +1,11 @@
 package io.xlite.daemon.app.util;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
@@ -20,35 +26,24 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * The signing contract for coins whose transactions carry an nTime field.
  *
- * <p>A Peercoin-derived chain serializes a transaction as {@code version +
- * nTime + vin + vout + locktime} and its legacy signature hash covers nTime:
- * the chain's own signature serializer writes nVersion and then nTime ahead
- * of every input. bitcoinj has no nTime field, so {@code addSignedInput} signs
- * a preimage the chain never computes, and the node rejects the transaction at
- * script verification -- surfaced as "mandatory-script-verify-flag-failed
- * (Signature must be zero for failed CHECK(MULTI)SIG operation)", the
- * NULLDUMBY error a failed CHECKSIG also raises.
+ * <p>A Peercoin-derived chain serializes a transaction as {@code version + nTime + vin + vout +
+ * locktime} and its legacy signature hash covers nTime: the chain's own signature serializer writes
+ * nVersion and then nTime ahead of every input. bitcoinj has no nTime field, so {@code
+ * addSignedInput} signs a preimage the chain never computes, and the node rejects the transaction
+ * at script verification -- surfaced as "mandatory-script-verify-flag-failed (Signature must be
+ * zero for failed CHECK(MULTI)SIG operation)", the NULLDUMBY error a failed CHECKSIG also raises.
  *
- * <p>Verification comes from two sources that are not this signer's code.
- * First, bitcoinj's {@code Transaction.hashForSignature} is a separate
- * implementation of the same legacy sighash by a different author: for
- * {@code SIGHASH_ALL} on a script without {@code OP_CODESEPARATOR}, our
- * preimage with the nTime field removed must hash to bitcoinj's result
- * byte-for-byte, and our full preimage must differ from it by exactly the
- * four nTime bytes. Second, {@link TxTimeFieldSigner#preimageBytes} exposes
- * the raw preimage, so the tests pin fragments of it directly -- the
- * null-output value, the stripped script, the nTime position -- rather than
- * re-transcribing the layout. A transcription can only agree with itself;
- * these checks cannot.
+ * <p>Verification comes from two sources that are not this signer's code. First, bitcoinj's {@code
+ * Transaction.hashForSignature} is a separate implementation of the same legacy sighash by a
+ * different author: for {@code SIGHASH_ALL} on a script without {@code OP_CODESEPARATOR}, our
+ * preimage with the nTime field removed must hash to bitcoinj's result byte-for-byte, and our full
+ * preimage must differ from it by exactly the four nTime bytes. Second, {@link
+ * TxTimeFieldSigner#preimageBytes} exposes the raw preimage, so the tests pin fragments of it
+ * directly -- the null-output value, the stripped script, the nTime position -- rather than
+ * re-transcribing the layout. A transcription can only agree with itself; these checks cannot.
  */
 class TimeFieldSignerTest {
 
@@ -60,10 +55,9 @@ class TimeFieldSignerTest {
     private final Script prevScript = p2pkh(key.getPubKeyHash());
 
     /**
-     * Built in @BeforeAll rather than in a field initialiser: the base
-     * parameter class asks for the coin's supply ceiling while it is still
-     * running its own constructor, so the configuration has to be in place
-     * before any instance of this test exists. An instance field would be
+     * Built in @BeforeAll rather than in a field initialiser: the base parameter class asks for the
+     * coin's supply ceiling while it is still running its own constructor, so the configuration has
+     * to be in place before any instance of this test exists. An instance field would be
      * initialised too late.
      */
     private static NetworkParameters params;
@@ -81,8 +75,10 @@ class TimeFieldSignerTest {
         e.put("DustAmount", "0");
         e.put("TxVersion", "1");
         io.xlite.daemon.app.coinconfig.CoinConfigRegistry.loadForTest(
-                java.util.Map.of("BLOCK", new io.xlite.daemon.app.coinconfig.CoinConfig(
-                        "BLOCK", "Blocknet", "block--test", e)));
+                java.util.Map.of(
+                        "BLOCK",
+                        new io.xlite.daemon.app.coinconfig.CoinConfig(
+                                "BLOCK", "Blocknet", "block--test", e)));
         params = new io.xlite.daemon.app.net.protocols.blocknet.BlocknetNetworkParameters();
     }
 
@@ -104,8 +100,7 @@ class TimeFieldSignerTest {
     /** A 32-byte parent txid; Sha256Hash.wrap needs exactly 32 bytes. */
     private static Sha256Hash parentHash() {
         byte[] hash = new byte[32];
-        for (int i = 0; i < hash.length; i++)
-            hash[i] = (byte) (i * 7 + 3);
+        for (int i = 0; i < hash.length; i++) hash[i] = (byte) (i * 7 + 3);
         return Sha256Hash.wrap(hash);
     }
 
@@ -116,10 +111,9 @@ class TimeFieldSignerTest {
     /** One P2PKH input spending 2.9, paying 0.01 out plus 2.79 change. */
     private Transaction fixture() {
         Transaction tx = new Transaction(params);
-        tx.addOutput(Coin.valueOf(10_000L),
-                LegacyAddress.fromPubKeyHash(params, new byte[20]));
-        tx.addOutput(Coin.valueOf(279_000_000L),
-                LegacyAddress.fromPubKeyHash(params, new byte[20]));
+        tx.addOutput(Coin.valueOf(10_000L), LegacyAddress.fromPubKeyHash(params, new byte[20]));
+        tx.addOutput(
+                Coin.valueOf(279_000_000L), LegacyAddress.fromPubKeyHash(params, new byte[20]));
         return tx;
     }
 
@@ -133,8 +127,11 @@ class TimeFieldSignerTest {
         Transaction tx = fixture();
         tx.addSignedInput(spendable(), prevScript, key, Transaction.SigHash.ALL, true);
 
-        assertFalse(TxTimeFieldSigner.verify(tx.getInputs().get(0).getScriptSig(),
-                        TxTimeFieldSigner.chainSighash(tx, prevScript, 0, flagByteOf(tx), TX_NTIME)),
+        assertFalse(
+                TxTimeFieldSigner.verify(
+                        tx.getInputs().get(0).getScriptSig(),
+                        TxTimeFieldSigner.chainSighash(
+                                tx, prevScript, 0, flagByteOf(tx), TX_NTIME)),
                 "a preimage without nTime cannot satisfy a chain whose sighash "
                         + "covers nTime; if this ever passes, the chain stopped "
                         + "hashing nTime and the custom signer is dead weight");
@@ -144,8 +141,11 @@ class TimeFieldSignerTest {
     @DisplayName("a signature over the chain's preimage verifies")
     void testChainPreimageSignatureVerifies() {
         Transaction tx = signedFixture();
-        assertTrue(TxTimeFieldSigner.verify(tx.getInputs().get(0).getScriptSig(),
-                        TxTimeFieldSigner.chainSighash(tx, prevScript, 0, flagByteOf(tx), TX_NTIME)),
+        assertTrue(
+                TxTimeFieldSigner.verify(
+                        tx.getInputs().get(0).getScriptSig(),
+                        TxTimeFieldSigner.chainSighash(
+                                tx, prevScript, 0, flagByteOf(tx), TX_NTIME)),
                 "signing the chain's own preimage must satisfy it");
     }
 
@@ -155,7 +155,8 @@ class TimeFieldSignerTest {
         Transaction tx = signedFixture();
         // bitcoinj cannot express nTime, so its hash is the independent
         // "standard" reference. Ours must differ (it covers 4 more bytes).
-        assertNotEquals(tx.hashForSignature(0, prevScript, Transaction.SigHash.ALL, false),
+        assertNotEquals(
+                tx.hashForSignature(0, prevScript, Transaction.SigHash.ALL, false),
                 TxTimeFieldSigner.chainSighash(tx, prevScript, 0, flagByteOf(tx), TX_NTIME),
                 "the two preimages must differ, or this suite proves nothing");
     }
@@ -166,10 +167,12 @@ class TimeFieldSignerTest {
         Transaction tx = signedFixture();
 
         byte[] wire = TxTimeField.insertNTime(tx.bitcoinSerialize(), TX_NTIME);
-        long wireNTime = ByteBuffer.wrap(wire, 4, 4)
-                .order(ByteOrder.LITTLE_ENDIAN).getInt() & 0xFFFFFFFFL;
+        long wireNTime =
+                ByteBuffer.wrap(wire, 4, 4).order(ByteOrder.LITTLE_ENDIAN).getInt() & 0xFFFFFFFFL;
 
-        assertEquals(TX_NTIME, wireNTime,
+        assertEquals(
+                TX_NTIME,
+                wireNTime,
                 "signing one nTime and broadcasting another produces a "
                         + "transaction nobody can verify");
     }
@@ -178,13 +181,19 @@ class TimeFieldSignerTest {
     @DisplayName("a different nTime yields a signature the chain rejects")
     void testSignatureIsBoundToTheNTimeItSigned() {
         Transaction signedWith = signedFixture();
-        assertTrue(TxTimeFieldSigner.verify(signedWith.getInputs().get(0).getScriptSig(),
-                TxTimeFieldSigner.chainSighash(signedWith, prevScript, 0, flagByteOf(signedWith), TX_NTIME)));
+        assertTrue(
+                TxTimeFieldSigner.verify(
+                        signedWith.getInputs().get(0).getScriptSig(),
+                        TxTimeFieldSigner.chainSighash(
+                                signedWith, prevScript, 0, flagByteOf(signedWith), TX_NTIME)));
 
         // Rewarding the same preimage under a different nTime must fail,
         // which is what makes nTime genuinely part of the signed message.
-        assertFalse(TxTimeFieldSigner.verify(signedWith.getInputs().get(0).getScriptSig(),
-                TxTimeFieldSigner.chainSighash(signedWith, prevScript, 0, flagByteOf(signedWith), TX_NTIME + 1)),
+        assertFalse(
+                TxTimeFieldSigner.verify(
+                        signedWith.getInputs().get(0).getScriptSig(),
+                        TxTimeFieldSigner.chainSighash(
+                                signedWith, prevScript, 0, flagByteOf(signedWith), TX_NTIME + 1)),
                 "nTime must be covered by the signature, not merely carried");
     }
 
@@ -194,18 +203,28 @@ class TimeFieldSignerTest {
         // Two inputs: each preimage covers the other, so signing input 0
         // before input 1 exists would leave input 0's signature invalid.
         Transaction tx = fixture();
-        TransactionOutPoint second = new TransactionOutPoint(params, 0,
-                Sha256Hash.wrap(new byte[32]));
+        TransactionOutPoint second =
+                new TransactionOutPoint(params, 0, Sha256Hash.wrap(new byte[32]));
 
-        TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key, key),
-                List.of(spendable(), second), List.of(prevScript, prevScript),
-                Transaction.SigHash.ALL, TX_NTIME);
+        TxTimeFieldSigner.addSignedInputs(
+                params,
+                tx,
+                List.of(key, key),
+                List.of(spendable(), second),
+                List.of(prevScript, prevScript),
+                Transaction.SigHash.ALL,
+                TX_NTIME);
 
         assertEquals(2, tx.getInputs().size());
         for (int i = 0; i < tx.getInputs().size(); i++) {
-            assertTrue(TxTimeFieldSigner.verify(tx.getInputs().get(i).getScriptSig(),
-                            TxTimeFieldSigner.chainSighash(tx, prevScript, i, flagByteOf(tx, i), TX_NTIME)),
-                    "input " + i + " must verify against the completed "
+            assertTrue(
+                    TxTimeFieldSigner.verify(
+                            tx.getInputs().get(i).getScriptSig(),
+                            TxTimeFieldSigner.chainSighash(
+                                    tx, prevScript, i, flagByteOf(tx, i), TX_NTIME)),
+                    "input "
+                            + i
+                            + " must verify against the completed "
                             + "transaction's preimage");
         }
     }
@@ -214,18 +233,28 @@ class TimeFieldSignerTest {
     @DisplayName("SIGHASH_SINGLE signs only its own output")
     void testSigHashSingleHonorsItsOutputRule() {
         Transaction tx = fixture();
-        TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key),
-                List.of(spendable()), List.of(prevScript),
-                Transaction.SigHash.SINGLE, TX_NTIME);
+        TxTimeFieldSigner.addSignedInputs(
+                params,
+                tx,
+                List.of(key),
+                List.of(spendable()),
+                List.of(prevScript),
+                Transaction.SigHash.SINGLE,
+                TX_NTIME);
 
         // SINGLE with nIn=0 locks in only output 0, so the hash must be
         // reproduced with the same rule, not with the ALL layout.
-        assertTrue(TxTimeFieldSigner.verify(tx.getInputs().get(0).getScriptSig(),
-                TxTimeFieldSigner.chainSighash(tx, prevScript, 0, flagByteOf(tx), TX_NTIME)));
+        assertTrue(
+                TxTimeFieldSigner.verify(
+                        tx.getInputs().get(0).getScriptSig(),
+                        TxTimeFieldSigner.chainSighash(
+                                tx, prevScript, 0, flagByteOf(tx), TX_NTIME)));
         // bitcoinj signs the standard layout (no nTime, all outputs); a SINGLE
         // signature over the chain's nTime-bearing preimage must not verify
         // against it.
-        assertFalse(TxTimeFieldSigner.verify(tx.getInputs().get(0).getScriptSig(),
+        assertFalse(
+                TxTimeFieldSigner.verify(
+                        tx.getInputs().get(0).getScriptSig(),
                         tx.hashForSignature(0, prevScript, Transaction.SigHash.ALL, false)),
                 "SINGLE must not be signed as if it covered every output");
     }
@@ -234,27 +263,57 @@ class TimeFieldSignerTest {
     @DisplayName("an out-of-range nTime is rejected before signing")
     void testOutOfRangeNTimeIsRejected() {
         Transaction tx = fixture();
-        assertThrows(IllegalArgumentException.class,
-                () -> TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key),
-                        List.of(spendable()), List.of(prevScript), Transaction.SigHash.ALL,
-                        0x1_0000_0000L));
-        assertThrows(IllegalArgumentException.class,
-                () -> TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key),
-                        List.of(spendable()), List.of(prevScript), Transaction.SigHash.ALL, -1L));
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        TxTimeFieldSigner.addSignedInputs(
+                                params,
+                                tx,
+                                List.of(key),
+                                List.of(spendable()),
+                                List.of(prevScript),
+                                Transaction.SigHash.ALL,
+                                0x1_0000_0000L));
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        TxTimeFieldSigner.addSignedInputs(
+                                params,
+                                tx,
+                                List.of(key),
+                                List.of(spendable()),
+                                List.of(prevScript),
+                                Transaction.SigHash.ALL,
+                                -1L));
     }
 
     @Test
     @DisplayName("mismatched per-input lists are rejected before signing")
     void testMismatchedInputListsAreRejected() {
         Transaction tx = fixture();
-        assertThrows(IllegalArgumentException.class,
-                () -> TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key, key),
-                        List.of(spendable()), List.of(prevScript, prevScript),
-                        Transaction.SigHash.ALL, TX_NTIME),
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        TxTimeFieldSigner.addSignedInputs(
+                                params,
+                                tx,
+                                List.of(key, key),
+                                List.of(spendable()),
+                                List.of(prevScript, prevScript),
+                                Transaction.SigHash.ALL,
+                                TX_NTIME),
                 "two keys against one outpoint must not sign");
-        assertThrows(IllegalArgumentException.class,
-                () -> TxTimeFieldSigner.addSignedInputs(params, tx, List.of(),
-                        List.of(), List.of(), Transaction.SigHash.ALL, TX_NTIME),
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        TxTimeFieldSigner.addSignedInputs(
+                                params,
+                                tx,
+                                List.of(),
+                                List.of(),
+                                List.of(),
+                                Transaction.SigHash.ALL,
+                                TX_NTIME),
                 "an input-less transaction cannot be signed");
     }
 
@@ -262,11 +321,19 @@ class TimeFieldSignerTest {
     @DisplayName("an input index beyond the transaction is rejected")
     void testOutOfRangeInputIndexIsRejected() {
         Transaction tx = fixture();
-        TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key),
-                List.of(spendable()), List.of(prevScript), Transaction.SigHash.ALL, TX_NTIME);
-        assertThrows(IllegalArgumentException.class,
-                () -> TxTimeFieldSigner.chainSighash(tx, prevScript, 5,
-                        Transaction.SigHash.ALL.value, TX_NTIME));
+        TxTimeFieldSigner.addSignedInputs(
+                params,
+                tx,
+                List.of(key),
+                List.of(spendable()),
+                List.of(prevScript),
+                Transaction.SigHash.ALL,
+                TX_NTIME);
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        TxTimeFieldSigner.chainSighash(
+                                tx, prevScript, 5, Transaction.SigHash.ALL.value, TX_NTIME));
     }
 
     @Test
@@ -284,13 +351,15 @@ class TimeFieldSignerTest {
         // same case. A one in the last byte would be 2^248 in that layout.
         byte[] uint256One = new byte[32];
         uint256One[0] = 1;
-        assertEquals(Sha256Hash.wrap(uint256One),
-                TxTimeFieldSigner.chainSighash(tx, prevScript, 2,
-                        Transaction.SigHash.SINGLE.value, TX_NTIME),
+        assertEquals(
+                Sha256Hash.wrap(uint256One),
+                TxTimeFieldSigner.chainSighash(
+                        tx, prevScript, 2, Transaction.SigHash.SINGLE.value, TX_NTIME),
                 "out-of-range SIGHASH_SINGLE must hash the constant one");
-        assertNotEquals(Sha256Hash.wrap(new byte[32]),
-                TxTimeFieldSigner.chainSighash(tx, prevScript, 2,
-                        Transaction.SigHash.SINGLE.value, TX_NTIME),
+        assertNotEquals(
+                Sha256Hash.wrap(new byte[32]),
+                TxTimeFieldSigner.chainSighash(
+                        tx, prevScript, 2, Transaction.SigHash.SINGLE.value, TX_NTIME),
                 "the constant is one, not zero");
     }
 
@@ -302,15 +371,21 @@ class TimeFieldSignerTest {
         // every SINGLE signature. Two inputs against two outputs puts nIn=1
         // squarely in range.
         Transaction tx = fixture();
-        TransactionOutPoint second = new TransactionOutPoint(params, 0,
-                Sha256Hash.wrap(new byte[32]));
-        TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key, key),
-                List.of(spendable(), second), List.of(prevScript, prevScript),
-                Transaction.SigHash.SINGLE, TX_NTIME);
+        TransactionOutPoint second =
+                new TransactionOutPoint(params, 0, Sha256Hash.wrap(new byte[32]));
+        TxTimeFieldSigner.addSignedInputs(
+                params,
+                tx,
+                List.of(key, key),
+                List.of(spendable(), second),
+                List.of(prevScript, prevScript),
+                Transaction.SigHash.SINGLE,
+                TX_NTIME);
 
-        assertNotEquals(Sha256Hash.wrap(new byte[32]),
-                TxTimeFieldSigner.chainSighash(tx, prevScript, 1,
-                        Transaction.SigHash.SINGLE.value, TX_NTIME),
+        assertNotEquals(
+                Sha256Hash.wrap(new byte[32]),
+                TxTimeFieldSigner.chainSighash(
+                        tx, prevScript, 1, Transaction.SigHash.SINGLE.value, TX_NTIME),
                 "an in-range SIGHASH_SINGLE must not collapse to the constant one");
     }
 
@@ -332,12 +407,12 @@ class TimeFieldSignerTest {
 
         Transaction tx = fixture();
         byte[] big = new byte[300];
-        for (int i = 0; i < big.length; i++)
-            big[i] = (byte) (i & 0xff);
+        for (int i = 0; i < big.length; i++) big[i] = (byte) (i & 0xff);
         Script bigScript = new ScriptBuilder().data(big).build();
         tx.addInput(parentHash(), 0, bigScript);
-        byte[] pre = TxTimeFieldSigner.preimageBytes(tx, bigScript, 0,
-                Transaction.SigHash.ALL.value, TX_NTIME);
+        byte[] pre =
+                TxTimeFieldSigner.preimageBytes(
+                        tx, bigScript, 0, Transaction.SigHash.ALL.value, TX_NTIME);
         // The script length prefix sits after version(4) + nTime(4) +
         // inCount(1) + outpoint(36): assert FD 2F 01 at that offset.
         int scriptLenOffset = 4 + 4 + 1 + 36;
@@ -349,8 +424,12 @@ class TimeFieldSignerTest {
     @Test
     @DisplayName("an opcode chunk is not reported as a signature")
     void testOpcodeChunkIsNotASignature() {
-        assertFalse(TxTimeFieldSigner.verify(
-                        new ScriptBuilder().op(ScriptOpCodes.OP_DUP).op(ScriptOpCodes.OP_HASH160).build(),
+        assertFalse(
+                TxTimeFieldSigner.verify(
+                        new ScriptBuilder()
+                                .op(ScriptOpCodes.OP_DUP)
+                                .op(ScriptOpCodes.OP_HASH160)
+                                .build(),
                         Sha256Hash.wrap(new byte[32])),
                 "a non-push chunk carries no signature data");
     }
@@ -362,20 +441,23 @@ class TimeFieldSignerTest {
         // to come from the signature loop: ask for a hash over a transaction
         // that has none.
         Transaction empty = new Transaction(params);
-        assertThrows(IllegalArgumentException.class,
-                () -> TxTimeFieldSigner.chainSighash(empty, prevScript, 0,
-                        Transaction.SigHash.ALL.value, TX_NTIME));
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        TxTimeFieldSigner.chainSighash(
+                                empty, prevScript, 0, Transaction.SigHash.ALL.value, TX_NTIME));
     }
 
     @Test
     @DisplayName("a scriptSig that is not a signature pair is not reported as valid")
     void testMalformedScriptSigIsNotValid() {
-        assertFalse(TxTimeFieldSigner.verify(null,
-                Sha256Hash.wrap(new byte[32])));
-        assertFalse(TxTimeFieldSigner.verify(new ScriptBuilder().build(),
-                Sha256Hash.wrap(new byte[32])));
+        assertFalse(TxTimeFieldSigner.verify(null, Sha256Hash.wrap(new byte[32])));
+        assertFalse(
+                TxTimeFieldSigner.verify(
+                        new ScriptBuilder().build(), Sha256Hash.wrap(new byte[32])));
         // Only a signature with no pubkey behind it.
-        assertFalse(TxTimeFieldSigner.verify(
+        assertFalse(
+                TxTimeFieldSigner.verify(
                         new ScriptBuilder().data(new byte[] {0x30, 0x00}).build(),
                         Sha256Hash.wrap(new byte[32])));
     }
@@ -387,7 +469,9 @@ class TimeFieldSignerTest {
         byte[] wire = TxTimeField.insertNTime(tx.bitcoinSerialize(), TX_NTIME);
 
         assertEquals(TX_NTIME, TxTimeField.parentNTime(wire));
-        assertArrayEquals(tx.bitcoinSerialize(), TxTimeField.stripNTime(wire),
+        assertArrayEquals(
+                tx.bitcoinSerialize(),
+                TxTimeField.stripNTime(wire),
                 "stripping nTime must recover exactly the signed bytes");
     }
 
@@ -397,8 +481,14 @@ class TimeFieldSignerTest {
 
     private Transaction signedFixture() {
         Transaction tx = fixture();
-        TxTimeFieldSigner.addSignedInputs(params, tx, List.of(key),
-                List.of(spendable()), List.of(prevScript), Transaction.SigHash.ALL, TX_NTIME);
+        TxTimeFieldSigner.addSignedInputs(
+                params,
+                tx,
+                List.of(key),
+                List.of(spendable()),
+                List.of(prevScript),
+                Transaction.SigHash.ALL,
+                TX_NTIME);
         return tx;
     }
 
@@ -427,8 +517,9 @@ class TimeFieldSignerTest {
         Transaction tx = fixture();
         tx.addInput(parentHash(), 0, prevScript);
         tx.addInput(Sha256Hash.wrap(new byte[32]), 1, prevScript);
-        byte[] pre = TxTimeFieldSigner.preimageBytes(tx, prevScript, 1,
-                Transaction.SigHash.SINGLE.value, TX_NTIME);
+        byte[] pre =
+                TxTimeFieldSigner.preimageBytes(
+                        tx, prevScript, 1, Transaction.SigHash.SINGLE.value, TX_NTIME);
         // Layout: version(4) + nTime(4) + inCount(1) + 2 inputs + outCount(1)
         // + output0(8 value + script). Find the first output value by
         // scanning past the fixed header and inputs is brittle; instead
@@ -436,8 +527,18 @@ class TimeFieldSignerTest {
         // and does NOT contain an 8-byte 00 run at an output position that
         // would indicate the old bug. The real output (10_000 = 0x2710 LE)
         // must also be present for output 1.
-        assertContains(pre, new byte[]{(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff,
-                (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff},
+        assertContains(
+                pre,
+                new byte[] {
+                    (byte) 0xff,
+                    (byte) 0xff,
+                    (byte) 0xff,
+                    (byte) 0xff,
+                    (byte) 0xff,
+                    (byte) 0xff,
+                    (byte) 0xff,
+                    (byte) 0xff
+                },
                 "nulled SINGLE output must be -1 (ff*8), matching CTxOut::SetNull");
     }
 
@@ -446,8 +547,9 @@ class TimeFieldSignerTest {
     void testNTimePositionInPreimage() {
         Transaction tx = fixture();
         tx.addInput(parentHash(), 0, prevScript);
-        byte[] pre = TxTimeFieldSigner.preimageBytes(tx, prevScript, 0,
-                Transaction.SigHash.ALL.value, TX_NTIME);
+        byte[] pre =
+                TxTimeFieldSigner.preimageBytes(
+                        tx, prevScript, 0, Transaction.SigHash.ALL.value, TX_NTIME);
         // version(4) then nTime(4 LE). TX_NTIME = 1_790_592_305 = 0x6ABA4531.
         // LE bytes: 31 45 BA 6A.
         assertEquals((byte) 0x31, pre[4]);
@@ -466,16 +568,18 @@ class TimeFieldSignerTest {
         // diverge beyond nTime, this fails.
         Transaction tx = fixture();
         tx.addInput(parentHash(), 0, prevScript);
-        byte[] ours = TxTimeFieldSigner.preimageBytes(tx, prevScript, 0,
-                Transaction.SigHash.ALL.value, TX_NTIME);
+        byte[] ours =
+                TxTimeFieldSigner.preimageBytes(
+                        tx, prevScript, 0, Transaction.SigHash.ALL.value, TX_NTIME);
         // Remove bytes 4-8 (nTime) to get the standard layout.
         byte[] withoutNTime = new byte[ours.length - 4];
         System.arraycopy(ours, 0, withoutNTime, 0, 4);
         System.arraycopy(ours, 8, withoutNTime, 4, ours.length - 8);
         Sha256Hash oursStripped = Sha256Hash.wrap(Sha256Hash.hashTwice(withoutNTime));
-        Sha256Hash theirs = tx.hashForSignature(0, prevScript,
-                Transaction.SigHash.ALL, false);
-        assertEquals(theirs, oursStripped,
+        Sha256Hash theirs = tx.hashForSignature(0, prevScript, Transaction.SigHash.ALL, false);
+        assertEquals(
+                theirs,
+                oursStripped,
                 "our preimage minus the 4 nTime bytes must equal bitcoinj's "
                         + "preimage hash; any other divergence is a layout bug");
     }
@@ -488,18 +592,20 @@ class TimeFieldSignerTest {
         // program would produce a signature the node rejects for any script
         // carrying the opcode. P2PKH never contains it, so this needs its
         // own fixture rather than reusing prevScript.
-        Script withSep = new ScriptBuilder()
-                .op(ScriptOpCodes.OP_DUP)
-                .op(ScriptOpCodes.OP_CODESEPARATOR)
-                .op(ScriptOpCodes.OP_HASH160)
-                .data(new byte[20])
-                .op(ScriptOpCodes.OP_EQUALVERIFY)
-                .op(ScriptOpCodes.OP_CHECKSIG)
-                .build();
+        Script withSep =
+                new ScriptBuilder()
+                        .op(ScriptOpCodes.OP_DUP)
+                        .op(ScriptOpCodes.OP_CODESEPARATOR)
+                        .op(ScriptOpCodes.OP_HASH160)
+                        .data(new byte[20])
+                        .op(ScriptOpCodes.OP_EQUALVERIFY)
+                        .op(ScriptOpCodes.OP_CHECKSIG)
+                        .build();
         Transaction tx = fixture();
         tx.addInput(parentHash(), 0, withSep);
-        byte[] pre = TxTimeFieldSigner.preimageBytes(tx, withSep, 0,
-                Transaction.SigHash.ALL.value, TX_NTIME);
+        byte[] pre =
+                TxTimeFieldSigner.preimageBytes(
+                        tx, withSep, 0, Transaction.SigHash.ALL.value, TX_NTIME);
         // The opcode byte 0xAB must not appear in the preimage's script
         // section. The stripped script is 1 byte shorter; assert the exact
         // reduced length prefix at the script position rather than scanning
@@ -508,10 +614,13 @@ class TimeFieldSignerTest {
         // version(4) + nTime(4) + inCount(1) + outpoint(36) + scriptLen(1)
         // gives the offset of the script length byte for a 1-input tx.
         int scriptLenOffset = 4 + 4 + 1 + 36;
-        assertEquals((byte) scriptLen, pre[scriptLenOffset],
+        assertEquals(
+                (byte) scriptLen,
+                pre[scriptLenOffset],
                 "hashed script length must be one less than the raw program");
         for (int i = scriptLenOffset + 1; i < scriptLenOffset + 1 + scriptLen; i++)
-            assertFalse(pre[i] == (byte) ScriptOpCodes.OP_CODESEPARATOR,
+            assertFalse(
+                    pre[i] == (byte) ScriptOpCodes.OP_CODESEPARATOR,
                     "OP_CODESEPARATOR (0xAB) must not be hashed");
     }
 
@@ -519,8 +628,7 @@ class TimeFieldSignerTest {
         outer:
         for (int i = 0; i <= haystack.length - needle.length; i++) {
             for (int j = 0; j < needle.length; j++)
-                if (haystack[i + j] != needle[j])
-                    continue outer;
+                if (haystack[i + j] != needle[j]) continue outer;
             return;
         }
         org.junit.jupiter.api.Assertions.fail(msg);

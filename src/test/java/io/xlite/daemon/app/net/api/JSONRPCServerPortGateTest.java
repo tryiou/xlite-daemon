@@ -1,14 +1,15 @@
 package io.xlite.daemon.app.net.api;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+
 import io.xlite.daemon.app.net.CoinInstance;
+
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
 import java.net.ServerSocket;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
 
 public class JSONRPCServerPortGateTest {
 
@@ -27,8 +28,7 @@ public class JSONRPCServerPortGateTest {
     @Test
     public void testPortBindable_FalseWhileHeld() throws Exception {
         int port = freePort();
-        try (ServerSocket holder = new ServerSocket(port, 1,
-                InetAddress.getByName("127.0.0.1"))) {
+        try (ServerSocket holder = new ServerSocket(port, 1, InetAddress.getByName("127.0.0.1"))) {
             // A plain listener without SO_REUSEADDR must make the gated
             // probe report the port as not bindable.
             assertFalse(JSONRPCServer.portBindable("127.0.0.1", port));
@@ -39,8 +39,7 @@ public class JSONRPCServerPortGateTest {
     @Test
     public void testAwaitPortBindable_TimesOutWhileHeld() throws Exception {
         int port = freePort();
-        try (ServerSocket holder = new ServerSocket(port, 1,
-                InetAddress.getByName("127.0.0.1"))) {
+        try (ServerSocket holder = new ServerSocket(port, 1, InetAddress.getByName("127.0.0.1"))) {
             long t0 = System.currentTimeMillis();
             assertFalse(JSONRPCServer.awaitPortBindable("127.0.0.1", port, 400));
             assertTrue(System.currentTimeMillis() - t0 >= 350);
@@ -50,16 +49,17 @@ public class JSONRPCServerPortGateTest {
     @Test
     public void testAwaitPortBindable_ReturnsOnceReleased() throws Exception {
         int port = freePort();
-        try (ServerSocket holder = new ServerSocket(port, 1,
-                InetAddress.getByName("127.0.0.1"))) {
+        try (ServerSocket holder = new ServerSocket(port, 1, InetAddress.getByName("127.0.0.1"))) {
             // Release after a short delay.
-            new Thread(() -> {
-                try {
-                    Thread.sleep(250);
-                    holder.close();
-                } catch (Exception ignored) {
-                }
-            }).start();
+            new Thread(
+                            () -> {
+                                try {
+                                    Thread.sleep(250);
+                                    holder.close();
+                                } catch (Exception ignored) {
+                                }
+                            })
+                    .start();
             long t0 = System.currentTimeMillis();
             assertTrue(JSONRPCServer.awaitPortBindable("127.0.0.1", port, 3000));
             // Prompt-return proof: success lands well under 2s once released,

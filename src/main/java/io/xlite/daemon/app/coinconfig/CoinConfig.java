@@ -6,12 +6,11 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Immutable view of one coin's configuration as carried by the
- * blockchain-configuration-files repository (manifest entry + the coin's
- * section inside its xbridge conf file).
+ * Immutable view of one coin's configuration as carried by the blockchain-configuration-files
+ * repository (manifest entry + the coin's section inside its xbridge conf file).
  *
- * <p>Values are exposed exactly as parsed; interpretation and range checks
- * belong to the parameter layer built on top of this class, not here.</p>
+ * <p>Values are exposed exactly as parsed; interpretation and range checks belong to the parameter
+ * layer built on top of this class, not here.
  */
 public final class CoinConfig {
 
@@ -20,12 +19,14 @@ public final class CoinConfig {
     private final String verId;
     private final Map<String, String> confEntries;
 
-    public CoinConfig(String ticker, String blockchain, String verId, Map<String, String> confEntries) {
+    public CoinConfig(
+            String ticker, String blockchain, String verId, Map<String, String> confEntries) {
         this.ticker = Objects.requireNonNull(ticker, "ticker");
         this.blockchain = Objects.requireNonNull(blockchain, "blockchain");
         this.verId = verId == null ? "" : verId;
-        this.confEntries = Collections.unmodifiableMap(new LinkedHashMap<>(
-                Objects.requireNonNull(confEntries, "confEntries")));
+        this.confEntries =
+                Collections.unmodifiableMap(
+                        new LinkedHashMap<>(Objects.requireNonNull(confEntries, "confEntries")));
     }
 
     public String getTicker() {
@@ -48,7 +49,8 @@ public final class CoinConfig {
     private String required(String key) {
         String v = confEntries.get(key);
         if (v == null || v.trim().isEmpty())
-            throw new IllegalStateException("[" + ticker + "] missing required config key '" + key + "'");
+            throw new IllegalStateException(
+                    "[" + ticker + "] missing required config key '" + key + "'");
         return v.trim();
     }
 
@@ -56,8 +58,15 @@ public final class CoinConfig {
         try {
             return Long.parseLong(required(key));
         } catch (NumberFormatException e) {
-            throw new IllegalStateException("[" + ticker + "] config key '" + key
-                    + "' is not a number: '" + confEntries.get(key) + "'", e);
+            throw new IllegalStateException(
+                    "["
+                            + ticker
+                            + "] config key '"
+                            + key
+                            + "' is not a number: '"
+                            + confEntries.get(key)
+                            + "'",
+                    e);
         }
     }
 
@@ -65,8 +74,14 @@ public final class CoinConfig {
         try {
             return Math.toIntExact(requiredLong(key));
         } catch (ArithmeticException e) {
-            throw new IllegalStateException("[" + ticker + "] config key '" + key
-                    + "' exceeds the int range: " + confEntries.get(key), e);
+            throw new IllegalStateException(
+                    "["
+                            + ticker
+                            + "] config key '"
+                            + key
+                            + "' exceeds the int range: "
+                            + confEntries.get(key),
+                    e);
         }
     }
 
@@ -95,47 +110,51 @@ public final class CoinConfig {
     }
 
     /**
-     * The coin's transaction version from the BCF xbridge conf. Required, never
-     * defaulted: the value is the one the chain's own wallet writes, and the
-     * daemon has no basis for choosing a different one.
+     * The coin's transaction version from the BCF xbridge conf. Required, never defaulted: the
+     * value is the one the chain's own wallet writes, and the daemon has no basis for choosing a
+     * different one.
      */
     public int txVersion() {
         return requiredInt("TxVersion");
     }
 
     /**
-     * Whether the coin's wire format carries an nTime field after nVersion
-     * (Peercoin-derived chains set TxWithTimeField=true in BCF). Opt-in:
-     * absent/blank yields false; a present-but-unparseable value throws.
+     * Whether the coin's wire format carries an nTime field after nVersion (Peercoin-derived chains
+     * set TxWithTimeField=true in BCF). Opt-in: absent/blank yields false; a
+     * present-but-unparseable value throws.
      */
     public boolean txWithTimeField() {
         String v = confEntries.get("TxWithTimeField");
-        if (v == null || v.trim().isEmpty())
-            return false;
-        if (v.trim().equalsIgnoreCase("true"))
-            return true;
-        if (v.trim().equalsIgnoreCase("false"))
-            return false;
-        throw new IllegalStateException("[" + ticker + "] config key 'TxWithTimeField"
-                + "' is not true/false: '" + v + "'");
+        if (v == null || v.trim().isEmpty()) return false;
+        if (v.trim().equalsIgnoreCase("true")) return true;
+        if (v.trim().equalsIgnoreCase("false")) return false;
+        throw new IllegalStateException(
+                "["
+                        + ticker
+                        + "] config key 'TxWithTimeField"
+                        + "' is not true/false: '"
+                        + v
+                        + "'");
     }
 
     /**
-     * The coin's dust floor in base units, from BCF. Required; 0 means the
-     * coin's daemon has no dust gate (Firo), not "unspecified".
+     * The coin's dust floor in base units, from BCF. Required; 0 means the coin's daemon has no
+     * dust gate (Firo), not "unspecified".
      */
     public long dustAmount() {
         return requiredLong("DustAmount");
     }
 
-    /** Wallet listen port from the xbridge conf; wallet-conf rpcport may override per user settings. */
+    /**
+     * Wallet listen port from the xbridge conf; wallet-conf rpcport may override per user settings.
+     */
     public int port() {
         return requiredInt("Port");
     }
 
     /**
-     * DTO map for RPC exposure — 11-field (identity + prefixes/fees/port/dust).
-     * dustAmount passes through verbatim: 0 is a real value, not an absence.
+     * DTO map for RPC exposure — 11-field (identity + prefixes/fees/port/dust). dustAmount passes
+     * through verbatim: 0 is a real value, not an absence.
      */
     public Map<String, Object> toDtoMap() {
         LinkedHashMap<String, Object> m = new LinkedHashMap<>();

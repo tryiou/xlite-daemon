@@ -39,5 +39,4 @@ public class XRouterCommandUtils {
         String command = commands.inverse().get(commandId);
         return command == null ? "xrInvalid" : command;
     }
-
 }

@@ -1,7 +1,11 @@
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.xlite.daemon.app.util.ConfigHelper;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,13 +13,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.junit.jupiter.api.io.TempDir;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Test class for ConfigHelper functionality.
- * Tests configuration file operations, address count management, and directory handling.
+ * Test class for ConfigHelper functionality. Tests configuration file operations, address count
+ * management, and directory handling.
  */
 class ConfigHelperTest extends TestHelper {
 
@@ -177,15 +177,16 @@ class ConfigHelperTest extends TestHelper {
 
     @Test
     void testLoadConfigFromFile() {
-        String configContent = "{\n" +
-                "    \"feeperbyte\": 60,\n" +
-                "    \"mintxfee\": 12000,\n" +
-                "    \"rpcEnabled\": true,\n" +
-                "    \"rpcUsername\": \"testuser\",\n" +
-                "    \"rpcPassword\": \"testpass\",\n" +
-                "    \"rpcPort\": 9000,\n" +
-                "    \"addressCount\": 25\n" +
-                "}";
+        String configContent =
+                "{\n"
+                        + "    \"feeperbyte\": 60,\n"
+                        + "    \"mintxfee\": 12000,\n"
+                        + "    \"rpcEnabled\": true,\n"
+                        + "    \"rpcUsername\": \"testuser\",\n"
+                        + "    \"rpcPassword\": \"testpass\",\n"
+                        + "    \"rpcPort\": 9000,\n"
+                        + "    \"addressCount\": 25\n"
+                        + "}";
 
         String localDataDir = ConfigHelper.getLocalDataDirectory();
         File settingsDir = new File(localDataDir, "settings");
@@ -216,7 +217,8 @@ class ConfigHelperTest extends TestHelper {
             ConfigHelper.CONFIG_DIR = tmp.toString();
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
-            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(newDir), "new dir must not exist before migration");
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    Files.exists(newDir), "new dir must not exist before migration");
             Files.createDirectories(oldDir.resolve("settings"));
             Path legacyFile = oldDir.resolve("settings").resolve("config-legacy.json");
             String content = "{\"feeperbyte\":1}";
@@ -224,14 +226,19 @@ class ConfigHelperTest extends TestHelper {
 
             // Act: trigger migration via getLocalDataDirectory
             String returned = ConfigHelper.getLocalDataDirectory();
-            org.junit.jupiter.api.Assertions.assertTrue(returned.endsWith("xlite-daemon" + File.separator));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    returned.endsWith("xlite-daemon" + File.separator));
 
             // Assert: legacy content migrated to new location
             Path migratedFile = newDir.resolve("settings").resolve("config-legacy.json");
-            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(newDir), "xlite-daemon dir must exist after migration");
-            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(migratedFile), "legacy file must be migrated to new dir");
-            assertEquals(content, new String(Files.readAllBytes(migratedFile), StandardCharsets.UTF_8));
-            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(oldDir), "old CloudChains dir must be moved (not remain)");
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    Files.exists(newDir), "xlite-daemon dir must exist after migration");
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    Files.exists(migratedFile), "legacy file must be migrated to new dir");
+            assertEquals(
+                    content, new String(Files.readAllBytes(migratedFile), StandardCharsets.UTF_8));
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    Files.exists(oldDir), "old CloudChains dir must be moved (not remain)");
         } finally {
             ConfigHelper.CONFIG_DIR = originalConfigDir;
             // Cleanup temp-data dirs created via CONFIG_DIR override so commonCleanup().deleteDir
@@ -259,12 +266,17 @@ class ConfigHelperTest extends TestHelper {
             // Fail-closed merge: disjoint legacy files are merged in, never
             // orphaned, and the legacy dir is archived (not left live).
             Path mergedFile = newDir.resolve("settings").resolve("config-old.json");
-            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(mergedFile),
-                    "disjoint legacy file must be merged into new dir");
-            assertEquals("{\"a\":1}", new String(Files.readAllBytes(mergedFile), StandardCharsets.UTF_8));
-            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(newFile), "existing new file must be kept");
-            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(oldDir), "legacy dir must be archived, not left live");
-            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(tmp.resolve("CloudChains.bak")),
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    Files.exists(mergedFile), "disjoint legacy file must be merged into new dir");
+            assertEquals(
+                    "{\"a\":1}",
+                    new String(Files.readAllBytes(mergedFile), StandardCharsets.UTF_8));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    Files.exists(newFile), "existing new file must be kept");
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    Files.exists(oldDir), "legacy dir must be archived, not left live");
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    Files.exists(tmp.resolve("CloudChains.bak")),
                     "legacy dir must be preserved as backup");
         } finally {
             ConfigHelper.CONFIG_DIR = originalConfigDir;
@@ -279,23 +291,28 @@ class ConfigHelperTest extends TestHelper {
             Path oldDir = tmp.resolve("CloudChains");
             Path newDir = tmp.resolve("xlite-daemon");
             Files.createDirectories(oldDir.resolve("settings"));
-            Files.write(oldDir.resolve("settings").resolve("config-a.json"),
+            Files.write(
+                    oldDir.resolve("settings").resolve("config-a.json"),
                     "{\"a\":1}".getBytes(StandardCharsets.UTF_8));
-            Files.write(oldDir.resolve("settings").resolve("config-b.json"),
+            Files.write(
+                    oldDir.resolve("settings").resolve("config-b.json"),
                     "{\"b\":2}".getBytes(StandardCharsets.UTF_8));
             // Simulate an interrupted migration: only one file made it over.
             Files.createDirectories(newDir.resolve("settings"));
-            Files.write(newDir.resolve("settings").resolve("config-a.json"),
+            Files.write(
+                    newDir.resolve("settings").resolve("config-a.json"),
                     "{\"a\":1}".getBytes(StandardCharsets.UTF_8));
 
             ConfigHelper.getLocalDataDirectory();
 
             // Must complete the migration, never boot on the partial dir.
             Path resumed = newDir.resolve("settings").resolve("config-b.json");
-            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(resumed),
-                    "interrupted migration must resume and complete");
-            assertEquals("{\"b\":2}", new String(Files.readAllBytes(resumed), StandardCharsets.UTF_8));
-            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(oldDir), "legacy dir must be archived after resume");
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    Files.exists(resumed), "interrupted migration must resume and complete");
+            assertEquals(
+                    "{\"b\":2}", new String(Files.readAllBytes(resumed), StandardCharsets.UTF_8));
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    Files.exists(oldDir), "legacy dir must be archived after resume");
         } finally {
             ConfigHelper.CONFIG_DIR = originalConfigDir;
         }
@@ -312,13 +329,16 @@ class ConfigHelperTest extends TestHelper {
             Files.createDirectories(newDir.resolve("settings"));
             // Same relative path, different bytes: no safe automatic choice
             // (either side could be the real wallet), so refuse to boot.
-            Files.write(oldDir.resolve("settings").resolve("config-c.json"),
+            Files.write(
+                    oldDir.resolve("settings").resolve("config-c.json"),
                     "{\"c\":1}".getBytes(StandardCharsets.UTF_8));
-            Files.write(newDir.resolve("settings").resolve("config-c.json"),
+            Files.write(
+                    newDir.resolve("settings").resolve("config-c.json"),
                     "{\"c\":2}".getBytes(StandardCharsets.UTF_8));
             // Plus a disjoint file: refusal must be side-effect-free, so even
             // mergeable files must NOT be copied before the throw.
-            Files.write(oldDir.resolve("settings").resolve("config-d.json"),
+            Files.write(
+                    oldDir.resolve("settings").resolve("config-d.json"),
                     "{\"d\":1}".getBytes(StandardCharsets.UTF_8));
 
             assertThrows(IllegalStateException.class, ConfigHelper::getLocalDataDirectory);
@@ -370,9 +390,11 @@ class ConfigHelperTest extends TestHelper {
             Path newDir = tmp.resolve("xlite-daemon");
             Files.createDirectories(oldDir.resolve("settings"));
             Files.createDirectories(newDir.resolve("settings"));
-            Files.write(oldDir.resolve("settings").resolve("config-old.json"),
+            Files.write(
+                    oldDir.resolve("settings").resolve("config-old.json"),
                     "{\"a\":1}".getBytes(StandardCharsets.UTF_8));
-            Files.write(newDir.resolve("settings").resolve("config-new.json"),
+            Files.write(
+                    newDir.resolve("settings").resolve("config-new.json"),
                     "{\"b\":2}".getBytes(StandardCharsets.UTF_8));
             // A previous archival already parked a backup here: archiving
             // again would destroy rollback data, so refuse instead.
@@ -399,7 +421,8 @@ class ConfigHelperTest extends TestHelper {
             Path newDir = tmp.resolve("xlite-daemon");
             Path staging = tmp.resolve("xlite-daemon.migrating");
             Files.createDirectories(oldDir.resolve("settings"));
-            Files.write(oldDir.resolve("settings").resolve("config-a.json"),
+            Files.write(
+                    oldDir.resolve("settings").resolve("config-a.json"),
                     "{\"a\":1}".getBytes(StandardCharsets.UTF_8));
             // Leftover of an interrupted copy-verify-rename: stale junk only.
             Files.createDirectories(staging);
@@ -408,12 +431,15 @@ class ConfigHelperTest extends TestHelper {
             ConfigHelper.getLocalDataDirectory();
 
             // Redone from the intact source: junk gone, content verified.
-            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(staging.resolve("junk.tmp")),
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    Files.exists(staging.resolve("junk.tmp")),
                     "stale staging content must not leak into the data dir");
             Path migrated = newDir.resolve("settings").resolve("config-a.json");
             org.junit.jupiter.api.Assertions.assertTrue(Files.exists(migrated));
-            assertEquals("{\"a\":1}", new String(Files.readAllBytes(migrated), StandardCharsets.UTF_8));
-            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(oldDir), "legacy dir must be archived after redo");
+            assertEquals(
+                    "{\"a\":1}", new String(Files.readAllBytes(migrated), StandardCharsets.UTF_8));
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    Files.exists(oldDir), "legacy dir must be archived after redo");
         } finally {
             ConfigHelper.CONFIG_DIR = originalConfigDir;
         }
@@ -430,9 +456,10 @@ class ConfigHelperTest extends TestHelper {
             Files.createDirectories(dataDir);
             Files.write(dataDir.resolve("settings"), "not-a-dir".getBytes(StandardCharsets.UTF_8));
 
-            IllegalStateException e = assertThrows(IllegalStateException.class,
-                    () -> new ConfigHelper("test"));
-            org.junit.jupiter.api.Assertions.assertTrue(e.getMessage().contains("data directory unusable"),
+            IllegalStateException e =
+                    assertThrows(IllegalStateException.class, () -> new ConfigHelper("test"));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    e.getMessage().contains("data directory unusable"),
                     "message must name the failure, got: " + e.getMessage());
         } finally {
             ConfigHelper.CONFIG_DIR = originalConfigDir;

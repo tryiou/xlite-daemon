@@ -4,14 +4,11 @@ import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
 /**
- * Custom formatter for console output that produces clean, readable logs.
- * Format: LEVEL: message
+ * Custom formatter for console output that produces clean, readable logs. Format: LEVEL: message
  * Example: INFO: Wallet initialized successfully
- * 
- * This formatter:
- * - Uses English locale for consistent output
- * - Excludes timestamps and class/method information
- * - Provides clean, user-friendly console output
+ *
+ * <p>This formatter: - Uses English locale for consistent output - Excludes timestamps and
+ * class/method information - Provides clean, user-friendly console output
  */
 public class ConsoleFormatter extends Formatter {
 

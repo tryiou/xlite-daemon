@@ -1,8 +1,10 @@
 package io.xlite.daemon.app.net.protocols.blocknet;
 
 import com.subgraph.orchid.encoders.Hex;
+
 import io.xlite.daemon.app.net.protocols.blocknet.messages.VersionMessageImpl;
 import io.xlite.daemon.app.net.xrouter.XRouterMessage;
+
 import org.bitcoinj.core.*;
 
 import java.io.IOException;
@@ -14,8 +16,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class BlocknetSerializer extends BitcoinSerializer {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private BlocknetParameters params;
     private boolean parseRetain;
@@ -59,15 +61,16 @@ public class BlocknetSerializer extends BitcoinSerializer {
 
     @Override
     public BlocknetPacketHeader deserializeHeader(ByteBuffer in) throws ProtocolException {
-        //in.position(0);
-        //seekPastMagicBytes(in);
+        // in.position(0);
+        // seekPastMagicBytes(in);
         return new BlocknetPacketHeader(in);
     }
 
     @Override
-    public Message deserializePayload(BitcoinSerializer.BitcoinPacketHeader header, ByteBuffer in) throws ProtocolException, BufferUnderflowException {
-        //in.position(0);
-        //seekPastMagicBytes(in);
+    public Message deserializePayload(BitcoinSerializer.BitcoinPacketHeader header, ByteBuffer in)
+            throws ProtocolException, BufferUnderflowException {
+        // in.position(0);
+        // seekPastMagicBytes(in);
         BlocknetPacketHeader blocknetPacketHeader = (BlocknetPacketHeader) header;
 
         byte[] payloadBytes = new byte[blocknetPacketHeader.getLength()];
@@ -79,26 +82,36 @@ public class BlocknetSerializer extends BitcoinSerializer {
 
         switch (blocknetPacketHeader.getCommand().toLowerCase()) {
             case "xrouter":
-                LOGGER.finer("[blocknet-serializer] Received XRouter packet, at position: " + in.position());
+                LOGGER.finer(
+                        "[blocknet-serializer] Received XRouter packet, at position: "
+                                + in.position());
                 return new XRouterMessage(params, payloadBytes);
             case "version":
-//				LOGGER.finer("[blocknet-serializer] Version message received");
+                //				LOGGER.finer("[blocknet-serializer] Version message received");
                 return new VersionMessage(params, payloadBytes);
             case "inv":
-//				LOGGER.finer("[blocknet-serializer] Warning: Inventory messages are ignored");
+                //				LOGGER.finer("[blocknet-serializer] Warning: Inventory messages are ignored");
                 return null;
             case "block":
                 return new Block(params, payloadBytes, 0, this, blocknetPacketHeader.getLength());
             case "merkleblock":
                 return new FilteredBlock(params, payloadBytes);
             case "getdata":
-                return new GetDataMessage(params, payloadBytes, this, blocknetPacketHeader.getLength());
+                return new GetDataMessage(
+                        params, payloadBytes, this, blocknetPacketHeader.getLength());
             case "getblocks":
                 return new GetBlocksMessage(params, payloadBytes);
             case "getheaders":
                 return new GetHeadersMessage(params, payloadBytes);
             case "tx":
-                return new Transaction(params, payloadBytes, 0, null, this, blocknetPacketHeader.getLength(), null);
+                return new Transaction(
+                        params,
+                        payloadBytes,
+                        0,
+                        null,
+                        this,
+                        blocknetPacketHeader.getLength(),
+                        null);
             case "addr":
                 return makeAddressMessage(payloadBytes, blocknetPacketHeader.getLength());
             case "alert":
@@ -127,20 +140,25 @@ public class BlocknetSerializer extends BitcoinSerializer {
             case "ssc":
             case "mnget":
             case "xbridge":
-//				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support deserializing xbridge/ssc/mnget/getsporks packets yet.");
+                //				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support
+                // deserializing xbridge/ssc/mnget/getsporks packets yet.");
                 return null;
             case "dseg":
-//				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support deserializing dseg packets yet.");
+                //				LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support
+                // deserializing dseg packets yet.");
                 return null;
             default:
-                LOGGER.finer("[blocknet-serializer] Warning: This serializer does not support deserializing " + blocknetPacketHeader.getCommand() + " packets (yet).");
+                LOGGER.finer(
+                        "[blocknet-serializer] Warning: This serializer does not support deserializing "
+                                + blocknetPacketHeader.getCommand()
+                                + " packets (yet).");
                 return new UnknownMessage(params, blocknetPacketHeader.getCommand(), payloadBytes);
         }
     }
 
     @Override
     public Message deserialize(ByteBuffer in) throws ProtocolException {
-        //in.position(0);
+        // in.position(0);
         seekPastMagicBytes(in);
         BlocknetPacketHeader header = new BlocknetPacketHeader(in);
 
@@ -153,37 +171,44 @@ public class BlocknetSerializer extends BitcoinSerializer {
     }
 
     @Override
-    public AddressMessage makeAddressMessage(byte[] payloadBytes, int length) throws ProtocolException, UnsupportedOperationException {
+    public AddressMessage makeAddressMessage(byte[] payloadBytes, int length)
+            throws ProtocolException, UnsupportedOperationException {
         return null;
     }
 
     @Override
-    public Message makeAlertMessage(byte[] payloadBytes) throws ProtocolException, UnsupportedOperationException {
+    public Message makeAlertMessage(byte[] payloadBytes)
+            throws ProtocolException, UnsupportedOperationException {
         return new AlertMessage(params, payloadBytes);
     }
 
     @Override
-    public Block makeBlock(byte[] payloadBytes, int offset, int length) throws ProtocolException, UnsupportedOperationException {
+    public Block makeBlock(byte[] payloadBytes, int offset, int length)
+            throws ProtocolException, UnsupportedOperationException {
         return new Block(params, payloadBytes, offset, this, length);
     }
 
     @Override
-    public Message makeBloomFilter(byte[] payloadBytes) throws ProtocolException, UnsupportedOperationException {
+    public Message makeBloomFilter(byte[] payloadBytes)
+            throws ProtocolException, UnsupportedOperationException {
         return new BloomFilter(params, payloadBytes);
     }
 
     @Override
-    public FilteredBlock makeFilteredBlock(byte[] payloadBytes) throws ProtocolException, UnsupportedOperationException {
+    public FilteredBlock makeFilteredBlock(byte[] payloadBytes)
+            throws ProtocolException, UnsupportedOperationException {
         return new FilteredBlock(params, payloadBytes);
     }
 
     @Override
-    public InventoryMessage makeInventoryMessage(byte[] payloadBytes, int length) throws ProtocolException, UnsupportedOperationException {
+    public InventoryMessage makeInventoryMessage(byte[] payloadBytes, int length)
+            throws ProtocolException, UnsupportedOperationException {
         return new InventoryMessage(params, payloadBytes, this, length);
     }
 
     @Override
-    public Transaction makeTransaction(byte[] payloadBytes, int offset, int length, byte[] hash) throws ProtocolException, UnsupportedOperationException {
+    public Transaction makeTransaction(byte[] payloadBytes, int offset, int length, byte[] hash)
+            throws ProtocolException, UnsupportedOperationException {
         return new Transaction(params, payloadBytes, offset, null, this, length, hash);
     }
 
@@ -193,13 +218,19 @@ public class BlocknetSerializer extends BitcoinSerializer {
     }
 
     @Override
-    public void serialize(String name, byte[] message, OutputStream out) throws IOException, UnsupportedOperationException {
+    public void serialize(String name, byte[] message, OutputStream out)
+            throws IOException, UnsupportedOperationException {
         byte[] header = BlocknetUtils.getHeader(name, (int) params.getPacketMagic(), message);
 
         out.write(header);
         out.write(message);
 
-        LOGGER.finer("[blocknet-serializer] Serialized " + name + " message. Bytes: " + new String(Hex.encode(header)) + new String(Hex.encode(message)));
+        LOGGER.finer(
+                "[blocknet-serializer] Serialized "
+                        + name
+                        + " message. Bytes: "
+                        + new String(Hex.encode(header))
+                        + new String(Hex.encode(message)));
     }
 
     @Override
@@ -209,7 +240,10 @@ public class BlocknetSerializer extends BitcoinSerializer {
         } else {
             String name = messageNames.get(message.getClass());
             if (name == null) {
-                LOGGER.finer("[blocknet-serializer] ERROR: BlocknetSerializer cannot serialize " + message.getClass().getSimpleName() + " (yet)!");
+                LOGGER.finer(
+                        "[blocknet-serializer] ERROR: BlocknetSerializer cannot serialize "
+                                + message.getClass().getSimpleName()
+                                + " (yet)!");
                 return;
             }
             serialize(name, message.bitcoinSerialize(), out);

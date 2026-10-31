@@ -1,8 +1,12 @@
 package io.xlite.daemon.app.net.api.http.client;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.google.gson.JsonObject;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,13 +20,10 @@ import java.util.logging.LogManager;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Height-staleness logging: a backend that stops answering for a coin must
- * be LOUD exactly twice per episode (first miss, recovery), and a null or
- * malformed /height response must count against every coin instead of
- * freezing all heights in total silence. Steady-state success stays quiet.
+ * Height-staleness logging: a backend that stops answering for a coin must be LOUD exactly twice
+ * per episode (first miss, recovery), and a null or malformed /height response must count against
+ * every coin instead of freezing all heights in total silence. Steady-state success stays quiet.
  */
 class HTTPClientHeightStalenessTest {
 
@@ -55,18 +56,17 @@ class HTTPClientHeightStalenessTest {
         }
 
         @Override
-        public void flush() {
-        }
+        public void flush() {}
 
         @Override
-        public void close() {
-        }
+        public void close() {}
 
         List<String> warningsFor(String ticker) {
             List<String> out = new ArrayList<>();
             for (LogRecord r : records) {
                 if (r.getLevel().intValue() >= java.util.logging.Level.WARNING.intValue()
-                        && r.getMessage() != null && r.getMessage().contains(ticker)) {
+                        && r.getMessage() != null
+                        && r.getMessage().contains(ticker)) {
                     out.add(r.getMessage());
                 }
             }
@@ -140,7 +140,9 @@ class HTTPClientHeightStalenessTest {
         client.serveHeights(null);
         client.getAllBlockCounts();
         for (CoinInstance ci : CoinInstance.getCoinInstances()) {
-            assertEquals(1, ci.getUpdateFailures(),
+            assertEquals(
+                    1,
+                    ci.getUpdateFailures(),
                     "null /height must count, not early-return: " + ci.getTicker());
         }
         assertFalse(handler.warningsFor("BLOCK").isEmpty());
@@ -151,7 +153,9 @@ class HTTPClientHeightStalenessTest {
         client.serveHeights("not json at all {{{");
         client.getAllBlockCounts();
         for (CoinInstance ci : CoinInstance.getCoinInstances()) {
-            assertEquals(1, ci.getUpdateFailures(),
+            assertEquals(
+                    1,
+                    ci.getUpdateFailures(),
                     "malformed /height must count, not abort: " + ci.getTicker());
         }
         assertFalse(handler.warningsFor("BLOCK").isEmpty());
@@ -161,8 +165,8 @@ class HTTPClientHeightStalenessTest {
     void testWrongTypedHeightValueCountsAsMiss() {
         client.serveHeights("{\"result\":{\"BLOCK\":\"bogus\"}}");
         client.getAllBlockCounts();
-        assertEquals(1, block.getUpdateFailures(),
-                "wrong-typed height must count, not abort the loop");
+        assertEquals(
+                1, block.getUpdateFailures(), "wrong-typed height must count, not abort the loop");
         assertFalse(handler.warningsFor("BLOCK").isEmpty());
     }
 

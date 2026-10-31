@@ -1,7 +1,12 @@
 package io.xlite.daemon.app.net.api;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.RpcPorts;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -11,22 +16,16 @@ import org.junit.jupiter.api.io.TempDir;
 import java.net.ServerSocket;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 /**
  * A controller handout must always be a server that can still be started.
  *
- * <p>{@code Thread} cannot be restarted, so a listener whose bind failed (or
- * that was deinitialized) is permanently dead. Handing that instance back
- * would make every later {@code start()} a silent no-op and leave the coin's
- * RPC unavailable until the process restarted.</p>
+ * <p>{@code Thread} cannot be restarted, so a listener whose bind failed (or that was
+ * deinitialized) is permanently dead. Handing that instance back would make every later {@code
+ * start()} a silent no-op and leave the coin's RPC unavailable until the process restarted.
  */
 public class JSONRPCControllerDeadServerTest {
 
-    @TempDir
-    static Path tempConfigDir;
+    @TempDir static Path tempConfigDir;
 
     /** Restored after the class so a later class never sees a deleted path. */
     private static String previousConfigDir;
@@ -94,7 +93,9 @@ public class JSONRPCControllerDeadServerTest {
         first.start();
         try {
             assertTrue(first.awaitBound(5000));
-            assertSame(first, JSONRPCController.getRPCServer(coin),
+            assertSame(
+                    first,
+                    JSONRPCController.getRPCServer(coin),
                     "a live listener must be reused, not replaced");
         } finally {
             first.deinit();

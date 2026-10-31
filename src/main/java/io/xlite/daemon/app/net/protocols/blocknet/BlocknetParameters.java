@@ -1,6 +1,7 @@
 package io.xlite.daemon.app.net.protocols.blocknet;
 
 import io.xlite.daemon.app.net.xrouter.XRouterMessageSerializer;
+
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
 

@@ -1,5 +1,9 @@
 package io.xlite.daemon.app.util;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,22 +13,16 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * rpcBindAddress validation and config round-trip.
  *
- * A wallet RPC must bind one specific interface. Wildcards, blanks and
- * unresolvable names fail validation so the server refuses to start loudly
- * instead of listening on every interface. Missing keys migrate silently to
- * loopback, keeping existing datadirs and the GUI working.
+ * <p>A wallet RPC must bind one specific interface. Wildcards, blanks and unresolvable names fail
+ * validation so the server refuses to start loudly instead of listening on every interface. Missing
+ * keys migrate silently to loopback, keeping existing datadirs and the GUI working.
  */
 public class ConfigBindAddressTest {
 
-    @TempDir
-    Path tmp;
+    @TempDir Path tmp;
 
     private String savedConfigDir;
 
@@ -93,7 +91,8 @@ public class ConfigBindAddressTest {
     @Test
     void testPaddedAddressNormalizedOnRead() throws Exception {
         File f = settingsFile("BINDPAD");
-        Files.writeString(f.toPath(), "{\"rpcPort\": 41419, \"rpcBindAddress\": \"  127.0.0.1  \"}");
+        Files.writeString(
+                f.toPath(), "{\"rpcPort\": 41419, \"rpcBindAddress\": \"  127.0.0.1  \"}");
 
         ConfigHelper helper = new ConfigHelper("BINDPAD");
         assertEquals("127.0.0.1", helper.getRpcBindAddress());

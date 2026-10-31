@@ -12,8 +12,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class XRouterConfiguration {
-    private final static LogManager LOGMANAGER = LogManager.getLogManager();
-    private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final LogManager LOGMANAGER = LogManager.getLogManager();
+    private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     private final String rawXRouterConfig;
     private final HashMap<String, Double> feeMap = new HashMap<>();
@@ -54,7 +54,11 @@ public class XRouterConfiguration {
             try {
                 properties = getPluginProperties(rawPluginConfig);
             } catch (IOException e) {
-                LOGGER.warning("[xrouter-config] Failed to parse plugin config for " + pluginName + ": " + e.getMessage());
+                LOGGER.warning(
+                        "[xrouter-config] Failed to parse plugin config for "
+                                + pluginName
+                                + ": "
+                                + e.getMessage());
                 return;
             }
 
@@ -64,18 +68,21 @@ public class XRouterConfiguration {
                 String[] rawParamTypes;
 
                 if (properties.containsKey("parameters"))
-                    rawParamTypes = properties.getProperty("parameters").split(",");else if (properties.containsKey("paramsType"))
+                    rawParamTypes = properties.getProperty("parameters").split(",");
+                else if (properties.containsKey("paramsType"))
                     rawParamTypes = properties.getProperty("paramsType").split(",");
-                else
-                    return;
+                else return;
 
                 for (String rawParamType : rawParamTypes) {
-                    if (rawParamType.isEmpty())
-                        continue;
+                    if (rawParamType.isEmpty()) continue;
 
                     if (!pluginParamTypes.containsKey(rawParamType)) {
-                        LOGGER.finer("[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin parameter type: " + rawParamType + ". Failing.");
-                        throw new IllegalArgumentException("Invalid/unsupported plugin parameter type: " + rawParamType);
+                        LOGGER.finer(
+                                "[xrouter-plugin-config-parser] ERROR: Invalid/unsupported plugin parameter type: "
+                                        + rawParamType
+                                        + ". Failing.");
+                        throw new IllegalArgumentException(
+                                "Invalid/unsupported plugin parameter type: " + rawParamType);
                     }
 
                     paramTypes.add(pluginParamTypes.get(rawParamType));
@@ -94,13 +101,18 @@ public class XRouterConfiguration {
                 clientRequestLimit = 100;
             }
 
-            LOGGER.finer("[xrouter-plugin-config-parser] Processing '" + pluginName + "' complete.");
+            LOGGER.finer(
+                    "[xrouter-plugin-config-parser] Processing '" + pluginName + "' complete.");
             LOGGER.finer("[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": fee = " + fee);
             LOGGER.finer("[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": params = ");
             for (int i = 0; i < paramTypes.size(); i++) {
                 LOGGER.finer("Parameter " + i + ":\t" + paramTypes.get(i).getSimpleName());
             }
-            LOGGER.finer("[xrouter-plugin-config-parser] DEBUG: " + pluginName + ": clientRequestLimit = " + clientRequestLimit);
+            LOGGER.finer(
+                    "[xrouter-plugin-config-parser] DEBUG: "
+                            + pluginName
+                            + ": clientRequestLimit = "
+                            + clientRequestLimit);
         }
 
         private static Properties getPluginProperties(String rawConfig) throws IOException {
@@ -135,12 +147,12 @@ public class XRouterConfiguration {
     public void parseConfig() {
         HashMap<String, Properties> properties = getProperties(rawXRouterConfig);
 
-        if (properties == null)
-            return;
+        if (properties == null) return;
 
         LOGGER.finer("[xrouter-config-parser] DEBUG: Properties: " + properties.toString());
 
-        supportedWallets.addAll(Arrays.asList(((String) properties.get("Main").get("wallets")).split(",")));
+        supportedWallets.addAll(
+                Arrays.asList(((String) properties.get("Main").get("wallets")).split(",")));
         timeout = Integer.parseInt((String) properties.get("Main").get("timeout"));
         blockLimit = Integer.parseInt((String) properties.get("Main").get("blocklimit"));
         feeAddress = (String) properties.get("Main").get("paymentaddress");
@@ -186,12 +198,10 @@ public class XRouterConfiguration {
             public Object put(Object key, Object value) {
                 String header = (key + " " + value).trim();
                 if (header.startsWith("[") && header.endsWith("]"))
-                    return result.put(header.substring(1, header.length() - 1),
-                            section = new Properties());
-                else
-                    return section.put(key, value);
+                    return result.put(
+                            header.substring(1, header.length() - 1), section = new Properties());
+                else return section.put(key, value);
             }
-
         }.load(new StringReader(toRead));
         return result;
     }
