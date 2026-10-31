@@ -15,7 +15,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Handler;
@@ -115,7 +117,7 @@ public final class App {
         if (dataHomeEnv != null && !dataHomeEnv.trim().isEmpty()) {
             return new File(dataHomeEnv.trim()).getAbsoluteFile().getPath();
         }
-        String platform = osName.toLowerCase();
+        String platform = osName.toLowerCase(Locale.ROOT);
         if (platform.contains("win")) {
             // Fail fast: returning a null AppData would stringify into a
             // bogus relative "null/xlite-daemon/" dir and fork the wallet.
@@ -154,7 +156,7 @@ public final class App {
             return defaultLevel;
         }
         try {
-            return Level.parse(envValue.trim().toUpperCase());
+            return Level.parse(envValue.trim().toUpperCase(Locale.ROOT));
         } catch (Exception e) {
             LOGGER.warning(
                     "[app] Invalid log level '" + envValue + "', using default " + defaultLevel);
@@ -271,7 +273,8 @@ public final class App {
                             logDir
                                     + File.separator
                                     + "error-"
-                                    + timeStampPattern.format(LocalDateTime.now())
+                                    + timeStampPattern.format(
+                                            LocalDateTime.now(ZoneId.systemDefault()))
                                     + ".log",
                             10_000_000, // max file size 10MB
                             5, // 5 rotated files

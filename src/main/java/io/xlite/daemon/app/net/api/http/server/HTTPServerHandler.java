@@ -2894,15 +2894,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     private boolean isValidJSON(String content) {
         try {
-            new Gson().fromJson(content, JsonObject.class);
-        } catch (JsonParseException jsExcp) {
-            try {
-                new Gson().fromJson(content, JsonArray.class);
-            } catch (JsonParseException jsExcp1) {
-                return false;
-            }
+            return new Gson().fromJson(content, JsonElement.class) != null;
+        } catch (JsonParseException invalid) {
+            return false;
         }
-        return true;
     }
 
     private boolean writeResponse(

@@ -12,6 +12,7 @@ import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.background.BackgroundTimerThread;
 
 import java.io.Console;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -67,7 +68,7 @@ public class ConsoleMenu {
     public void init() {
         int selection;
         String newWalletStr = "";
-        Scanner input = new Scanner(System.in);
+        Scanner input = new Scanner(System.in, StandardCharsets.UTF_8);
 
         if (KeyHandler.existsBaseECKeyFromLocal()) {
             newWalletStr = "- Disabled. Wallet already exists.";

@@ -94,13 +94,13 @@ public class XRouterConfiguration {
                 }
             }
 
-            if (properties.contains("fee")) {
+            if (properties.containsKey("fee")) {
                 fee = Double.parseDouble(properties.getProperty("fee"));
             } else {
                 fee = 0;
             }
 
-            if (properties.contains("clientrequestlimit")) {
+            if (properties.containsKey("clientrequestlimit")) {
                 clientRequestLimit = Integer.parseInt(properties.getProperty("clientrequestlimit"));
             } else {
                 clientRequestLimit = 100;

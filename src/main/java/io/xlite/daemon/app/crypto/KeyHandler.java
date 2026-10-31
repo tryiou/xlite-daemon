@@ -13,16 +13,19 @@ import org.bitcoinj.wallet.DeterministicSeed;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
@@ -416,7 +419,9 @@ public class KeyHandler {
      * @throws IOException if the file is missing, incomplete, or corrupted
      */
     private static WalletData readWalletFile(File file) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+        try (BufferedReader reader =
+                new BufferedReader(
+                        new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
             String firstLine = reader.readLine();
             int version = detectWalletVersion(firstLine);
 
@@ -452,7 +457,10 @@ public class KeyHandler {
     private static void writeWalletFile(File file, byte[] salt, String ivB64, String encryptedSeed)
             throws IOException {
         file.getParentFile().mkdirs();
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+        try (BufferedWriter writer =
+                new BufferedWriter(
+                        new OutputStreamWriter(
+                                new FileOutputStream(file), StandardCharsets.UTF_8))) {
             writer.write(VERSION_HEADER + CURRENT_VERSION);
             writer.newLine();
             writer.write(new String(Base64.encode(salt), StandardCharsets.UTF_8));
@@ -481,7 +489,7 @@ public class KeyHandler {
                     "[security] Failed to create backups directory: " + backupsDir.getPath());
         }
 
-        String timestamp = TIMESTAMP_FORMAT.format(LocalDateTime.now());
+        String timestamp = TIMESTAMP_FORMAT.format(ZonedDateTime.now(ZoneId.systemDefault()));
         File backup = new File(backupsDir, "key-" + timestamp + ".dat");
         if (!keyFile.renameTo(backup)) {
             LOGGER.warning("[security] Failed to move wallet to backup location");
@@ -583,7 +591,7 @@ public class KeyHandler {
 
             // Create a distinctly named legacy backup (not in the backups/ subdir, so
             // it is easy to find and recover manually).
-            String timestamp = TIMESTAMP_FORMAT.format(LocalDateTime.now());
+            String timestamp = TIMESTAMP_FORMAT.format(ZonedDateTime.now(ZoneId.systemDefault()));
             legacyBackup =
                     new File(
                             ConfigHelper.getLocalDataDirectory(),

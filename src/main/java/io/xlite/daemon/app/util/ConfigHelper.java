@@ -8,9 +8,11 @@ import io.xlite.daemon.app.App;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
+import java.io.Writer;
 import java.net.InetAddress;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -449,7 +451,9 @@ public class ConfigHelper {
                 }
             }
 
-            try (FileWriter fw = new FileWriter(file, false)) {
+            try (Writer fw =
+                    new OutputStreamWriter(
+                            new FileOutputStream(file, false), StandardCharsets.UTF_8)) {
                 fw.write(newContent);
             }
         } catch (IOException e) {

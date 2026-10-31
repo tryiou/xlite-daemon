@@ -42,6 +42,7 @@
     <checkstyle.version>14.4.0</checkstyle.version>
     <spotless.maven.plugin.version>3.10.4</spotless.maven.plugin.version>
     <google.java.format.version>2.0.0</google.java.format.version>
+    <error.prone.version>2.43.0</error.prone.version>
   </properties>
 
   <!-- Dependency Management -->
@@ -215,10 +216,43 @@
           <target>${java.version}</target>
           <release>${java.version}</release>
           <compilerArgs>
+            <!-- Error Prone: bug patterns javac does not know about. It needs
+                 a forked compiler (it hooks into javac's internals) and the
+                 module exports below, which is why <fork> is on. -->
+            <arg>-XDcompilePolicy=simple</arg>
+            <arg>-XDshould-stop.ifError=FLOW</arg>
+            <!-- Checks switched off, with the reason. Everything else is on.
+                 SystemConsoleNull: only true from JDK 22 onward; this project
+                   compiles with release 21, where System.console() really can
+                   be null, so the null check is required code.
+                 Excluded paths: net/protocols/blocknet and net/xrouter are the
+                   XRouter-over-p2p path that is currently disabled and being
+                   reworked; its members are deliberately unwired, so unused-code
+                   findings there are expected, not defects. Remove this
+                   exclusion when that path is switched back on. -->
+            <arg>-Xplugin:ErrorProne -XepAllErrorsAsWarnings -Xep:SystemConsoleNull:OFF -XepExcludedPaths:.*/net/protocols/blocknet/.*|.*/net/xrouter/.*</arg>
             <arg>-Xlint:unchecked</arg>
             <arg>-Xlint:deprecation</arg>
             <arg>-Xlint:fallthrough</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+            <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
           </compilerArgs>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.google.errorprone</groupId>
+              <artifactId>error_prone_core</artifactId>
+              <version>${error.prone.version}</version>
+            </path>
+          </annotationProcessorPaths>
+          <fork>true</fork>
         </configuration>
       </plugin>
 

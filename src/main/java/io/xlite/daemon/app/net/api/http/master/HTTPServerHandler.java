@@ -105,7 +105,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if (httpHeaders.contains("Authorization")) {
                 String authorization = httpHeaders.get("Authorization");
 
-                if (authorization != null && authorization.toLowerCase().startsWith("basic")) {
+                if (authorization != null
+                        && authorization.toLowerCase(Locale.ROOT).startsWith("basic")) {
                     String base64Credentials = authorization.substring("Basic".length()).trim();
                     byte[] credDecoded = Base64.decode(base64Credentials);
                     String credentials = new String(credDecoded, StandardCharsets.UTF_8);
