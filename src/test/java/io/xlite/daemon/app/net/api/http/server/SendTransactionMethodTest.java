@@ -63,6 +63,7 @@ class SendTransactionMethodTest {
         entries.put("Port", "20102");
         entries.put("DustAmount", "0");
         entries.put("TxVersion", "1");
+        entries.put("CreateTxMethod", "BTC");
         entries.put("Title", "Verge");
         return new CoinConfig("XVG", "Verge", "verge--test", entries);
     }

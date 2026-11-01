@@ -19,7 +19,7 @@ public final class CoinTickerUtils {
         tickers.put(CoinTicker.PIVX, "PIVX");
 
         tickers.put(CoinTicker.DIGIBYTE, "DGB");
-        //		tickers.put(CoinTicker.BITCOIN_CASH, "BCH");
+        tickers.put(CoinTicker.BITCOIN_CASH, "BCH");
         tickers.put(CoinTicker.RAVENCOIN, "RVN");
         tickers.put(CoinTicker.BITCORE, "BTX");
 
@@ -39,9 +39,9 @@ public final class CoinTickerUtils {
     /**
      * Active (mainnet, wallet-capable) tickers: the canonical supported list {@link
      * CoinTicker#coins()}. There are no testnet variants; a delisted coin is excluded from {@code
-     * coins()} (its enum variant may linger, e.g. BITCOIN_CASH). To (re-)add one, restore its
-     * {@code coins()} entry, string mapping, supplement row and CoinInstance init case together
-     * (the source-of-truth test pins the set, mapping and supplement; wire the init case by hand).
+     * coins()} while its enum variant may linger. (Re-)adding one means the {@code coins()} entry,
+     * this string mapping, the mainnet display name, the compiled supplement and the signed-message
+     * header together; the source-of-truth test pins the set, mapping and supplement.
      */
     public static CoinTicker[] getActiveTickers() {
         return CoinTicker.coins().toArray(new CoinTicker[0]);

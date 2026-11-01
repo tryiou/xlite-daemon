@@ -7,10 +7,13 @@ import com.google.gson.JsonParseException;
 import com.subgraph.orchid.encoders.Hex;
 
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
+import io.xlite.daemon.app.coinconfig.CompiledCoinSupplement;
+import io.xlite.daemon.app.coinconfig.SighashStyle;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
 import io.xlite.daemon.app.util.CoinTransactions;
+import io.xlite.daemon.app.util.ForkIdSigner;
 import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.TxTimeFieldSigner;
@@ -390,6 +393,7 @@ final class RawTransactionMethods {
         List<ECKey> keys = new ArrayList<>();
         List<TransactionOutPoint> outPoints = new ArrayList<>();
         List<Script> scripts = new ArrayList<>();
+        List<Coin> amounts = new ArrayList<>();
         for (TransactionInput input : transaction.getInputs()) {
             Sha256Hash txid = input.getOutpoint().getHash();
             long vout = input.getOutpoint().getIndex();
@@ -405,11 +409,23 @@ final class RawTransactionMethods {
                     new TransactionOutPoint(
                             coin.getNetworkParameters(), spent.getIndex(), spent.getHash()));
             scripts.add(spent.getScript());
+            amounts.add(spent.getValue());
         }
-        return new SigningInputs(keys, outPoints, scripts);
+        return new SigningInputs(keys, outPoints, scripts, amounts);
     }
 
     private void signInputs(Transaction signed, SigningInputs inputs, long signedNTime) {
+        SighashStyle style =
+                CompiledCoinSupplement.forTicker(CoinTickerUtils.tickerToString(coin.getTicker()))
+                        .sighashStyle();
+        if (style == SighashStyle.FORKID) {
+            ForkIdSigner.addSignedInputs(
+                    coin.getNetworkParameters(),
+                    signed,
+                    new ForkIdSigner.InputsToSign(
+                            inputs.keys(), inputs.outPoints(), inputs.scripts(), inputs.amounts()));
+            return;
+        }
         if (signedNTime >= 0) {
             // The chain signs nTime, so the chosen value belongs in the preimage, not
             // spliced in afterwards.
@@ -491,5 +507,8 @@ final class RawTransactionMethods {
 
     /** The keys, outpoints and scripts needed to sign every input of a transaction. */
     private record SigningInputs(
-            List<ECKey> keys, List<TransactionOutPoint> outPoints, List<Script> scripts) {}
+            List<ECKey> keys,
+            List<TransactionOutPoint> outPoints,
+            List<Script> scripts,
+            List<Coin> amounts) {}
 }

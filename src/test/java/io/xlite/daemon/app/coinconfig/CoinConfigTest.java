@@ -21,6 +21,7 @@ class CoinConfigTest {
         entries.put("Port", "9332");
         entries.put("DustAmount", "0");
         entries.put("TxVersion", "2");
+        entries.put("CreateTxMethod", "BTC");
         return new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", entries);
     }
 
@@ -139,6 +140,7 @@ class CoinConfigTest {
 
         Map<String, String> bad = new LinkedHashMap<>();
         bad.put("TxVersion", "one");
+        bad.put("CreateTxMethod", "BTC");
         IllegalStateException malformed =
                 assertThrows(
                         IllegalStateException.class,
@@ -172,6 +174,7 @@ class CoinConfigTest {
         for (String value : new String[] {"0", "-1", "two"}) {
             Map<String, String> bad = gateValid("LTC", "false");
             bad.put("TxVersion", value);
+            bad.put("CreateTxMethod", "BTC");
             IllegalStateException e =
                     assertThrows(
                             IllegalStateException.class,
@@ -211,6 +214,7 @@ class CoinConfigTest {
         m.put("Port", "9332");
         m.put("DustAmount", "0");
         m.put("TxVersion", txVersion);
+        m.put("CreateTxMethod", "BTC");
         m.put("TxWithTimeField", timeField);
         return m;
     }

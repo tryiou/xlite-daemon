@@ -26,6 +26,7 @@ public final class CoinFixture {
     private String dustAmount = "0";
     private int txVersion = 1;
     private boolean timeField = false;
+    private String createTxMethod = "BTC";
 
     private CoinFixture(String ticker, String blockchain) {
         this.ticker = ticker;
@@ -75,6 +76,11 @@ public final class CoinFixture {
         return this;
     }
 
+    public CoinFixture createTxMethod(String createTxMethod) {
+        this.createTxMethod = createTxMethod;
+        return this;
+    }
+
     public CoinConfig build() {
         Map<String, String> entries = new LinkedHashMap<>();
         entries.put("AddressPrefix", Integer.toString(addressPrefix));
@@ -87,6 +93,7 @@ public final class CoinFixture {
         entries.put("DustAmount", dustAmount);
         entries.put("TxVersion", Integer.toString(txVersion));
         entries.put("TxWithTimeField", Boolean.toString(timeField));
+        entries.put("CreateTxMethod", createTxMethod);
         return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", entries);
     }
 }

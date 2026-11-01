@@ -3,6 +3,8 @@ package io.xlite.daemon.app.wallet;
 import com.google.common.base.Preconditions;
 
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
+import io.xlite.daemon.app.coinconfig.CompiledCoinSupplement;
+import io.xlite.daemon.app.coinconfig.SighashStyle;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
@@ -11,6 +13,7 @@ import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.CloudTransaction;
 import io.xlite.daemon.app.util.CoinTransactions;
+import io.xlite.daemon.app.util.ForkIdSigner;
 import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.TxTimeFieldSigner;
@@ -162,6 +165,8 @@ public class WalletHelper {
 
             if (nTime != NO_NTIME) {
                 signTimeFieldInputs(tx, selectedUtxos, nTime);
+            } else if (sighashStyle() == SighashStyle.FORKID) {
+                signForkIdInputs(tx, selectedUtxos);
             } else {
                 for (UTXO utxo : selectedUtxos) {
                     if (utxo.isSpent()) {
@@ -189,6 +194,44 @@ public class WalletHelper {
                             + "] Error creating transaction"
                             + e.getMessage());
             return null;
+        }
+    }
+
+    /** The compiled signature hash this coin's verifier accepts. */
+    private SighashStyle sighashStyle() {
+        return CompiledCoinSupplement.forTicker(CoinTickerUtils.tickerToString(coin.getTicker()))
+                .sighashStyle();
+    }
+
+    /**
+     * Collect the unspent inputs with their keys, scripts and values, then sign them through the
+     * ForkID signer. The spent value is part of that preimage, so it is carried per input.
+     */
+    private void signForkIdInputs(Transaction tx, List<UTXO> selectedUtxos) {
+        List<ECKey> keys = new ArrayList<>();
+        List<TransactionOutPoint> outpoints = new ArrayList<>();
+        List<Script> scripts = new ArrayList<>();
+        List<Coin> amounts = new ArrayList<>();
+        for (UTXO utxo : selectedUtxos) {
+            if (utxo.isSpent()) {
+                continue;
+            }
+            org.bitcoinj.core.UTXO bUtxo = utxo.createUTXO();
+            AddressBalance addressBalance = requireAddressBalance(utxo);
+            keys.add(addressBalance.getPrivateKey().getKey());
+            outpoints.add(
+                    new TransactionOutPoint(networkParameters, bUtxo.getIndex(), bUtxo.getHash()));
+            scripts.add(bUtxo.getScript());
+            amounts.add(bUtxo.getValue());
+        }
+        ForkIdSigner.addSignedInputs(
+                networkParameters,
+                tx,
+                new ForkIdSigner.InputsToSign(keys, outpoints, scripts, amounts));
+        for (UTXO utxo : selectedUtxos) {
+            if (!utxo.isSpent()) {
+                logSignedInput(utxo);
+            }
         }
     }
 

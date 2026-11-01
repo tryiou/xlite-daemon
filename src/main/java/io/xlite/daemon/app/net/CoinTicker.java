@@ -29,7 +29,7 @@ public enum CoinTicker {
         return Arrays.asList(
                 BLOCKNET,
                 BITCOIN,
-                //            BITCOIN_CASH, - not support on backend
+                BITCOIN_CASH,
                 BITCORE,
                 LITECOIN,
                 DASHCOIN,

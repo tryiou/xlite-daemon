@@ -93,6 +93,7 @@ class TxWireTxidTest {
         e.put("Port", "9332");
         e.put("DustAmount", "0");
         e.put("TxVersion", "1");
+        e.put("CreateTxMethod", "BTC");
         CoinConfig cfg = new CoinConfig("LTC", "Litecoin", "litecoin--test", e);
         return io.xlite.daemon.app.coinconfig.ConfigurableNetworkParameters.from(cfg);
     }

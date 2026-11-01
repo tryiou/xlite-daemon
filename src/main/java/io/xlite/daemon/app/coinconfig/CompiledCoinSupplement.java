@@ -30,8 +30,14 @@ public final class CompiledCoinSupplement {
          */
         private final boolean requiresParentNTime;
 
+        /**
+         * The signature hash the chain's verifier accepts. Consensus, not preference: signing a
+         * Bitcoin Cash spend with the legacy hash is rejected with MUST_USE_FORKID.
+         */
+        private final SighashStyle sighashStyle;
+
         public Supplement(long maxMoneyCoins, int protocolVersion, String id, String chainName) {
-            this(maxMoneyCoins, protocolVersion, id, chainName, false);
+            this(maxMoneyCoins, protocolVersion, id, chainName, false, SighashStyle.LEGACY);
         }
 
         public Supplement(
@@ -40,11 +46,28 @@ public final class CompiledCoinSupplement {
                 String id,
                 String chainName,
                 boolean requiresParentNTime) {
+            this(
+                    maxMoneyCoins,
+                    protocolVersion,
+                    id,
+                    chainName,
+                    requiresParentNTime,
+                    SighashStyle.LEGACY);
+        }
+
+        public Supplement(
+                long maxMoneyCoins,
+                int protocolVersion,
+                String id,
+                String chainName,
+                boolean requiresParentNTime,
+                SighashStyle sighashStyle) {
             this.maxMoneyCoins = maxMoneyCoins;
             this.protocolVersion = protocolVersion;
             this.id = id;
             this.chainName = chainName;
             this.requiresParentNTime = requiresParentNTime;
+            this.sighashStyle = sighashStyle;
         }
 
         public long maxMoneyCoins() {
@@ -66,6 +89,10 @@ public final class CompiledCoinSupplement {
         public boolean requiresParentNTime() {
             return requiresParentNTime;
         }
+
+        public SighashStyle sighashStyle() {
+            return sighashStyle;
+        }
     }
 
     private static final Map<String, Supplement> BY_TICKER =
@@ -83,7 +110,13 @@ public final class CompiledCoinSupplement {
                     Map.entry(
                             "BTC",
                             new Supplement(21_000_000L, 70012, "org.bitcoin.production", "main")),
-                    Map.entry("BCH", new Supplement(21_000_000L, 70012, "BCH", "main")),
+                    // BCHN v29 speaks 70016; the legacy preimage is rejected with
+                    // MUST_USE_FORKID (src/script/sigencoding.cpp), so the signature
+                    // hash is the ForkID one.
+                    Map.entry(
+                            "BCH",
+                            new Supplement(
+                                    21_000_000L, 70016, "BCH", "main", false, SighashStyle.FORKID)),
                     // BitCore 0.90.9.10: MAX_MONEY 84000000 COIN (src/amount.h:26),
                     // PROTOCOL_VERSION 80008 (src/version.h:15).
                     Map.entry("BTX", new Supplement(84_000_000L, 80008, "BTX", "main")),

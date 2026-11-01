@@ -36,6 +36,7 @@ class RpcPortClaimsTest {
         e.put("Port", Integer.toString(port));
         e.put("DustAmount", "546");
         e.put("TxVersion", "1");
+        e.put("CreateTxMethod", "BTC");
         e.put("Title", ticker);
         return new CoinConfig(ticker, ticker, ticker.toLowerCase() + "--test", e);
     }

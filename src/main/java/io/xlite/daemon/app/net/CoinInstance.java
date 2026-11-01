@@ -8,6 +8,8 @@ import com.subgraph.orchid.encoders.Hex;
 
 import io.xlite.daemon.app.Version;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
+import io.xlite.daemon.app.coinconfig.CompiledCoinSupplement;
+import io.xlite.daemon.app.coinconfig.SighashStyle;
 import io.xlite.daemon.app.crypto.KeyHandler;
 import io.xlite.daemon.app.net.api.JSONRPCController;
 import io.xlite.daemon.app.net.api.JSONRPCServer;
@@ -95,6 +97,7 @@ public final class CoinInstance {
             Map.ofEntries(
                     Map.entry(CoinTicker.BLOCKNET, "Blocknet"),
                     Map.entry(CoinTicker.BITCOIN, "Bitcoin"),
+                    Map.entry(CoinTicker.BITCOIN_CASH, "Bitcoin Cash"),
                     Map.entry(CoinTicker.BITCORE, "BitCore"),
                     Map.entry(CoinTicker.LITECOIN, "Litecoin"),
                     Map.entry(CoinTicker.DASHCOIN, "Dashcoin"),
@@ -500,6 +503,10 @@ public final class CoinInstance {
         if (error != null) {
             return error;
         }
+        error = checkSighashPolicy();
+        if (error != null) {
+            return error;
+        }
         if (ticker == CoinTicker.BLOCKNET) {
             // Constructing this object consults the loaded configuration, so it has to come
             // after the load succeeded: moving it up would throw out of init() instead of
@@ -656,6 +663,38 @@ public final class CoinInstance {
             }
         }
         return ports[0] + "-" + ports[ports.length - 1];
+    }
+
+    /**
+     * The compiled signing policy and the configuration repository's transaction builder must name
+     * the same signature hash. A disagreement means one of the two no longer describes this chain,
+     * and signing with the wrong hash produces a transaction the network rejects. Refuse the coin
+     * at unlock with both values logged rather than fail on the user's first send.
+     */
+    private CoinError checkSighashPolicy() {
+        String tickerStr = CoinTickerUtils.tickerToString(ticker);
+        String method;
+        try {
+            method = CoinConfigRegistry.get(tickerStr).createTxMethod();
+        } catch (RuntimeException e) {
+            LOGGER.severe("[coin] [" + tickerStr + "] " + e.getMessage());
+            return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
+        }
+        SighashStyle compiled = CompiledCoinSupplement.forTicker(tickerStr).sighashStyle();
+        if (!compiled.matchesCreateTxMethod(method)) {
+            LOGGER.severe(
+                    "[coin] ["
+                            + tickerStr
+                            + "] signing policy mismatch: config CreateTxMethod="
+                            + method
+                            + " ("
+                            + SighashStyle.fromCreateTxMethod(method)
+                            + "), compiled "
+                            + compiled
+                            + "; refusing the coin");
+            return new CoinError("Unsupported coin", CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
+        }
+        return null;
     }
 
     private CoinError loadMigratedParams() {

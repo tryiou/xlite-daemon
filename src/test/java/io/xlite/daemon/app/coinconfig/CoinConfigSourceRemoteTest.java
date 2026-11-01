@@ -44,7 +44,7 @@ class CoinConfigSourceRemoteTest {
                 "[{\"blockchain\":\"Litecoin\",\"ticker\":\"LTC\",\"ver_id\":\"litecoin--v0.21.1\",\"xbridge_conf\":\"litecoin--v0.21.1.conf\"},"
                     + "{\"blockchain\":\"Dogecoin\",\"ticker\":\"DOGE\",\"ver_id\":\"doge--v1\",\"xbridge_conf\":\"doge--v1.conf\"},"
                     + "{\"blockchain\":\"Fake\",\"ticker\":\"FAKE\",\"ver_id\":\"fake--v1\",\"xbridge_conf\":\"fake--v1.conf\"},"
-                    + "{\"blockchain\":\"BitcoinCash\",\"ticker\":\"BCH\",\"ver_id\":\"bch--v1\",\"xbridge_conf\":\"bch--v1.conf\"}]");
+                    + "{\"blockchain\":\"Particl\",\"ticker\":\"PART\",\"ver_id\":\"part--v1\",\"xbridge_conf\":\"part--v1.conf\"}]");
         stub.bodies.put(
                 BASE + "/xbridge-confs/litecoin--v0.21.1.conf",
                 "[LTC]\n"
@@ -82,7 +82,7 @@ class CoinConfigSourceRemoteTest {
         assertEquals("litecoin--v0.21.1", all.get("LTC").getVerId());
         for (String url : stub.calls) {
             assertFalse(url.contains("fake--v1.conf"), "FAKE must never be fetched: " + url);
-            assertFalse(url.contains("bch--v1.conf"), "BCH must never be fetched: " + url);
+            assertFalse(url.contains("part--v1.conf"), "PART must never be fetched: " + url);
         }
         assertEquals(3, stub.calls.size(), "1 manifest + 2 supported confs, got " + stub.calls);
     }

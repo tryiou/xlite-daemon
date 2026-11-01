@@ -120,6 +120,21 @@ public final class CoinConfig {
     }
 
     /**
+     * The configuration repository's transaction-builder name for this coin (BTC, BCH, PART).
+     *
+     * <p>Required, never defaulted. It is consulted only to cross-check the compiled signing
+     * policy; the signer does not take its rule from here.
+     */
+    public String createTxMethod() {
+        String v = confEntries.get("CreateTxMethod");
+        if (v == null || v.trim().isEmpty()) {
+            throw new IllegalStateException(
+                    "[" + ticker + "] missing required config key 'CreateTxMethod'");
+        }
+        return v.trim();
+    }
+
+    /**
      * Whether the coin's wire format carries an nTime field after nVersion (Peercoin-derived chains
      * set TxWithTimeField=true in BCF). Opt-in: absent/blank yields false; a
      * present-but-unparseable value throws.

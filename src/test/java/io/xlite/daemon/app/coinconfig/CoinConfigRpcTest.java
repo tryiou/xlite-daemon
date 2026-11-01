@@ -23,29 +23,39 @@ public class CoinConfigRpcTest {
 
     private static Map<String, CoinConfig> simpleCfgs() {
         Map<String, CoinConfig> m = new LinkedHashMap<>();
-        Map<String, String> ltc = new LinkedHashMap<>();
-        ltc.put("AddressPrefix", "48");
-        ltc.put("ScriptPrefix", "50");
-        ltc.put("SecretPrefix", "176");
-        ltc.put("COIN", "100000000");
-        ltc.put("FeePerByte", "10");
-        ltc.put("MinTxFee", "5000");
-        ltc.put("Port", "9332");
-        ltc.put("DustAmount", "0");
-        ltc.put("TxVersion", "2");
-        m.put("LTC", new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", ltc));
-        Map<String, String> block = new LinkedHashMap<>();
-        block.put("AddressPrefix", "26");
-        block.put("ScriptPrefix", "28");
-        block.put("SecretPrefix", "154");
-        block.put("COIN", "100000000");
-        block.put("FeePerByte", "20");
-        block.put("MinTxFee", "10000");
-        block.put("Port", "41414");
-        block.put("DustAmount", "0");
-        block.put("TxVersion", "1");
-        m.put("BLOCK", new CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", block));
+        m.put("LTC", ltc());
+        m.put("BLOCK", block());
         return m;
+    }
+
+    private static CoinConfig ltc() {
+        Map<String, String> e = new LinkedHashMap<>();
+        e.put("AddressPrefix", "48");
+        e.put("ScriptPrefix", "50");
+        e.put("SecretPrefix", "176");
+        e.put("COIN", "100000000");
+        e.put("FeePerByte", "10");
+        e.put("MinTxFee", "5000");
+        e.put("Port", "9332");
+        e.put("DustAmount", "0");
+        e.put("TxVersion", "2");
+        e.put("CreateTxMethod", "BTC");
+        return new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", e);
+    }
+
+    private static CoinConfig block() {
+        Map<String, String> e = new LinkedHashMap<>();
+        e.put("AddressPrefix", "26");
+        e.put("ScriptPrefix", "28");
+        e.put("SecretPrefix", "154");
+        e.put("COIN", "100000000");
+        e.put("FeePerByte", "20");
+        e.put("MinTxFee", "10000");
+        e.put("Port", "41414");
+        e.put("DustAmount", "0");
+        e.put("TxVersion", "1");
+        e.put("CreateTxMethod", "BTC");
+        return new CoinConfig("BLOCK", "Blocknet", "blocknet--v4.2.0", e);
     }
 
     @BeforeEach

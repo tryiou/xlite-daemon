@@ -43,6 +43,7 @@ class CoinConfigDivisorTest {
         e.put("Port", "41414");
         e.put("DustAmount", "0");
         e.put("TxVersion", "1");
+        e.put("CreateTxMethod", "BTC");
         e.put("Title", blockchain);
         return new CoinConfig(ticker, blockchain, ticker.toLowerCase() + "--test", e);
     }

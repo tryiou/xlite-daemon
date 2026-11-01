@@ -64,6 +64,7 @@ class WalletHelperRecipientDustTest {
         entries.put("Port", "41414");
         entries.put("DustAmount", Long.toString(DUST));
         entries.put("TxVersion", "1");
+        entries.put("CreateTxMethod", "BTC");
         entries.put("Title", "Blocknet");
 
         Map<String, CoinConfig> cfgs = new LinkedHashMap<>();

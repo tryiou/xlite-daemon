@@ -30,6 +30,7 @@ class CoinConfigSourceLocalTest {
         m.put("Port", "9332");
         m.put("DustAmount", "0");
         m.put("TxVersion", "2");
+        m.put("CreateTxMethod", "BTC");
         return new CoinConfig("LTC", "Litecoin", "litecoin--v0.21.1", m);
     }
 

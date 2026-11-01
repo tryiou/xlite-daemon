@@ -27,6 +27,7 @@ public class CoinTickerSourceOfTruthTest {
                 EnumSet.of(
                         CoinTicker.BLOCKNET,
                         CoinTicker.BITCOIN,
+                        CoinTicker.BITCOIN_CASH,
                         CoinTicker.LITECOIN,
                         CoinTicker.DASHCOIN,
                         CoinTicker.DOGECOIN,

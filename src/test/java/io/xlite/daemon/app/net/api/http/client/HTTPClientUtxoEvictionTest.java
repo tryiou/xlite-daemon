@@ -87,6 +87,7 @@ public class HTTPClientUtxoEvictionTest {
         block.put("Port", "41414");
         block.put("DustAmount", "0");
         block.put("TxVersion", "1");
+        block.put("CreateTxMethod", "BTC");
         block.put("Title", "Blocknet");
         cfgs.put(
                 "BLOCK",

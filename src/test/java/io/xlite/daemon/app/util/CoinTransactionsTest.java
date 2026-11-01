@@ -52,6 +52,7 @@ class CoinTransactionsTest {
         e.put("Port", "9332");
         e.put("DustAmount", "0");
         e.put("TxVersion", Integer.toString(txVersion));
+        e.put("CreateTxMethod", "BTC");
         return new CoinConfig(ticker, ticker, ticker.toLowerCase() + "--test", e);
     }
 
