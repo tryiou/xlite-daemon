@@ -94,6 +94,12 @@ Each coin's RPC credentials, bind address and port live in its own file; the
 daemon generates credentials on first run and never listens off loopback unless
 an operator configures it otherwise.
 
+The master endpoint steps to the next free port of its window when the
+configured one is held, and writes the port it bound back to
+`config-master.json` before it announces readiness. Two daemons, or a restart
+while the previous one is still shutting down, therefore keep a usable master
+endpoint instead of the second one starting without one.
+
 ## Data providers
 
 By default the daemon uses a hosted provider. Two environment variables or

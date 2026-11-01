@@ -537,6 +537,12 @@
             <arg>--initialize-at-build-time=io.xlite.daemon.app.util</arg>
             <arg>--initialize-at-build-time=io.xlite.daemon.app.crypto</arg>
             <arg>--initialize-at-build-time=io.xlite.daemon.app.console</arg>
+            <!-- The enum's constants are keys in maps owned by build-time
+                 initialised classes (the signed-message headers), so the enum
+                 itself has to be build-time too or those maps would hold
+                 objects of a run-time initialised class in the image heap. It
+                 has no state beyond the constants. -->
+            <arg>--initialize-at-build-time=io.xlite.daemon.app.net.CoinTicker</arg>
             <arg>--initialize-at-build-time=io.xlite.daemon.app.net.api</arg>
             <arg>--initialize-at-build-time=io.xlite.daemon.app.net.protocols</arg>
             <arg>--initialize-at-build-time=io.xlite.daemon.app.net.xrouter</arg>

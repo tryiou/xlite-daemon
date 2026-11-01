@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Pins which ports a stepping listener may not take: the master listener's port, another coin's own
- * daemon port, and another coin's derived listener port.
+ * Pins which ports a stepping listener may not take: every port the master listener may bind,
+ * another coin's own daemon port, and another coin's derived listener port.
  */
 class RpcPortClaimsTest {
 
@@ -53,6 +53,17 @@ class RpcPortClaimsTest {
         assertTrue(claimed.contains(9335), "LTC's derived listener port");
         assertFalse(claimed.contains(41414), "the asking coin's own daemon port");
         assertFalse(claimed.contains(41417), "the asking coin's own derived port");
+    }
+
+    @Test
+    void testClaimsIncludeTheWholeMasterWindow() {
+        CoinConfigRegistry.loadForTest(Map.of());
+
+        // The master steps inside its window and coins bind first: reserving only the
+        // first port would let a coin take the port the master then needs.
+        Set<Integer> claimed = RpcPortClaims.excluding("BLOCK", 9955, 9956, 9957);
+
+        assertEquals(Set.of(9955, 9956, 9957), claimed);
     }
 
     @Test

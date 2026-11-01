@@ -9,11 +9,13 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Ports a stepping listener must not take: the master listener's port and every other coin's daemon
- * and derived listener ports.
+ * Ports a stepping listener must not take: every port the master listener may bind, and every other
+ * coin's daemon and derived listener ports.
  *
  * <p>The master port is passed in rather than read here: it is the operator's configured value, not
- * a constant, and this class stays free of file access.
+ * a constant, and this class stays free of file access. The whole window is passed because the
+ * master steps within it, and coins bind first: reserving only the first port would let a coin take
+ * the port the master then needs.
  */
 public final class RpcPortClaims {
 
@@ -23,11 +25,13 @@ public final class RpcPortClaims {
      * Ports claimed by everything except {@code ticker}.
      *
      * @param ticker the asking coin; its own ports are not claimed
-     * @param masterPort the master listener's port, never handed to a coin
+     * @param masterPorts every port the master listener may bind, never handed to a coin
      */
-    public static Set<Integer> excluding(String ticker, int masterPort) {
+    public static Set<Integer> excluding(String ticker, int... masterPorts) {
         Set<Integer> claimed = new LinkedHashSet<>();
-        claimed.add(masterPort);
+        for (int masterPort : masterPorts) {
+            claimed.add(masterPort);
+        }
         if (!CoinConfigRegistry.isLoaded()) {
             return claimed;
         }

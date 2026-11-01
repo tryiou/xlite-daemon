@@ -3,7 +3,6 @@ package io.xlite.daemon.app.net.api;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -15,7 +14,6 @@ import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.RpcPorts;
 
 import java.io.IOException;
-import java.net.BindException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -36,19 +34,6 @@ public class JSONRPCServer extends Thread {
 
     private volatile int port;
 
-    /**
-     * Retry budget for a single candidate: the kernel can hold a just-closed socket for up to ~1 s,
-     * so retrying the same port is the only recovery.
-     */
-    private static final int SINGLE_CANDIDATE_PASSES = 20;
-
-    /**
-     * Retry budget for a window: stepping to the next candidate is the recovery, so a second pass
-     * only covers a listener that released its socket between passes.
-     */
-    private static final int WINDOW_PASSES = 2;
-
-    private static final long PASS_DELAY_MS = 250;
     private volatile boolean stopping = false;
     private volatile boolean bound = false;
     private volatile boolean bindFailed = false;
@@ -116,7 +101,12 @@ public class JSONRPCServer extends Thread {
         }
         try {
             // Shared group, daemon threads, released once at app shutdown.
-            Bound bound = bindWithRetries(NettyEventLoops.shared(), bindInetAddress);
+            RpcBinder.Bound bound =
+                    RpcBinder.bind(
+                            serverBootstrap(NettyEventLoops.shared()),
+                            bindInetAddress,
+                            candidates,
+                            () -> stopping);
             if (bound == null) {
                 return;
             }
@@ -156,15 +146,12 @@ public class JSONRPCServer extends Thread {
     }
 
     /**
-     * Binds the first free candidate, retrying the whole window while the kernel releases a port
-     * that a previous listener has only just closed.
+     * The bootstrap every coin listener shares: same options, its own child handler.
      *
-     * <p>A single candidate must wait out that release lag; a window recovers by stepping instead.
-     *
-     * @return the bound channel and its port, or null when a stop was requested first
+     * <p>Built per attempt rather than kept: a listener that steps rebuilds it for each candidate
+     * pass, and the options are the same object either way.
      */
-    private Bound bindWithRetries(EventLoopGroup workerGroup, InetAddress bindInetAddress)
-            throws Exception {
+    private ServerBootstrap serverBootstrap(EventLoopGroup workerGroup) {
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap
                 .group(workerGroup)
@@ -173,116 +160,7 @@ public class JSONRPCServer extends Thread {
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new HTTPServerInitializer(coin));
-
-        int passes = candidates.length == 1 ? SINGLE_CANDIDATE_PASSES : WINDOW_PASSES;
-        Exception lastBindError = null;
-        for (int pass = 0; pass < passes && !stopping; pass++) {
-            Attempt attempt = bindCandidate(bootstrap, bindInetAddress);
-            if (attempt.channel() != null) {
-                return new Bound(attempt.channel(), attempt.port());
-            }
-            lastBindError = attempt.error();
-            if (attempt.interrupted()) {
-                break;
-            }
-            if (pass + 1 < passes) {
-                InterruptedException pause = pauseBeforeRetry();
-                if (pause != null) {
-                    lastBindError = pause;
-                    break;
-                }
-            }
-        }
-        if (stopping) {
-            // Stop requested while retries were pending — a normal shutdown, not a bind
-            // failure. Do not stamp bindFailed.
-            LOGGER.finer("[rpc-server] bind retries abandoned: stopping");
-            return null;
-        }
-        throw lastBindError != null
-                ? lastBindError
-                : new IllegalStateException("bind failed without exception");
-    }
-
-    /** Tries every candidate once, stopping at the first that binds. */
-    private Attempt bindCandidate(ServerBootstrap bootstrap, InetAddress bindInetAddress)
-            throws Exception {
-        Exception lastCandidateError = null;
-        for (int candidate : candidates) {
-            if (stopping) {
-                return Attempt.stopped();
-            }
-            ChannelFuture bindFuture = null;
-            try {
-                bindFuture = bootstrap.bind(new InetSocketAddress(bindInetAddress, candidate));
-                bindFuture.sync();
-                return Attempt.bound(bindFuture.channel(), candidate);
-            } catch (InterruptedException e) {
-                // Stop requested mid-retry: keep the flag, close any channel the bind produced.
-                interrupt();
-                closeQuietly(bindFuture);
-                return Attempt.interrupted(e);
-            } catch (Exception e) {
-                if (!isCauseBindException(e)) {
-                    throw e;
-                }
-                // The candidate is taken; try the next one.
-                lastCandidateError = e;
-            }
-        }
-        return Attempt.failed(lastCandidateError);
-    }
-
-    /** Waits out the kernel's release lag; returns the interruption when one happened. */
-    private static InterruptedException pauseBeforeRetry() {
-        try {
-            sleep(PASS_DELAY_MS);
-            return null;
-        } catch (InterruptedException e) {
-            // Sibling clause cannot intercept this; keep the flag.
-            Thread.currentThread().interrupt();
-            return e;
-        }
-    }
-
-    private static void closeQuietly(ChannelFuture future) {
-        if (future != null) {
-            future.channel().close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
-        }
-    }
-
-    /** One pass over the candidate ports. */
-    private record Attempt(Channel channel, int port, boolean interrupted, Exception error) {
-
-        static Attempt bound(Channel channel, int port) {
-            return new Attempt(channel, port, false, null);
-        }
-
-        static Attempt interrupted(InterruptedException error) {
-            return new Attempt(null, 0, true, error);
-        }
-
-        static Attempt stopped() {
-            return new Attempt(null, 0, true, null);
-        }
-
-        static Attempt failed(Exception error) {
-            return new Attempt(null, 0, false, error);
-        }
-    }
-
-    /** A successful bind. */
-    private record Bound(Channel channel, int port) {}
-
-    private static boolean isCauseBindException(Throwable e) {
-        Throwable t = e;
-        while (t != null) {
-            if (t instanceof BindException) {
-                return true;
-            }
-            t = t.getCause();
-        }
-        return false;
+        return bootstrap;
     }
 
     /**

@@ -1239,7 +1239,8 @@ public final class CoinInstance {
                 rpcPort,
                 RpcPorts.WINDOW,
                 RpcPortClaims.excluding(
-                        CoinTickerUtils.tickerToString(ticker), JSONRPCController.getMasterPort()));
+                        CoinTickerUtils.tickerToString(ticker),
+                        JSONRPCController.getMasterCandidatePorts()));
     }
 
     public String getRpcBindAddress() {

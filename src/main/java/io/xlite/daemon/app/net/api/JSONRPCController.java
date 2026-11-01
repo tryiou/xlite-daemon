@@ -26,17 +26,20 @@ public final class JSONRPCController {
     private static final ConcurrentHashMap<CoinInstance, ReentrantLock> LOCKS =
             new ConcurrentHashMap<>();
     private static final ConfigHelper MASTER_CONFIG = new ConfigHelper(ConfigHelper.MASTER_TICKER);
-    private static JSONRPCMasterServer masterServer =
-            new JSONRPCMasterServer(
-                    MASTER_CONFIG.getMasterRpcPort(), MASTER_CONFIG.getRpcBindAddress());
+    private static final JSONRPCMasterServer MASTER_SERVER = new JSONRPCMasterServer(MASTER_CONFIG);
 
     public static JSONRPCMasterServer getMasterServer() {
-        return masterServer;
+        return MASTER_SERVER;
     }
 
-    /** The port the master listener is configured to bind. */
-    public static int getMasterPort() {
-        return MASTER_CONFIG.getMasterRpcPort();
+    /**
+     * Ports the master listener may take, in order: its configured port and the next window.
+     *
+     * <p>Coins bind before the master does, so they must avoid the whole window rather than its
+     * first port: the master steps into one of the remaining ones when its preferred port is held.
+     */
+    public static int[] getMasterCandidatePorts() {
+        return MASTER_SERVER.candidatePorts();
     }
 
     /**
