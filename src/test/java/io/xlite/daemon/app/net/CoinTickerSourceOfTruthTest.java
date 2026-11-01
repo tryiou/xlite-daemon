@@ -34,6 +34,7 @@ public class CoinTickerSourceOfTruthTest {
                         CoinTicker.PIVX,
                         CoinTicker.DIGIBYTE,
                         CoinTicker.RAVENCOIN,
+                        CoinTicker.BITCORE,
                         CoinTicker.UNOBTANIUM,
                         CoinTicker.PKOIN,
                         CoinTicker.VERGE);

@@ -37,6 +37,7 @@ class SignedMessagesTest {
         assertEquals("Dogecoin Signed Message:\n", SignedMessages.header(CoinTicker.DOGECOIN));
         assertEquals("Syscoin Signed Message:\n", SignedMessages.header(CoinTicker.SYSCOIN));
         assertEquals("VERGE Signed Message:\n", SignedMessages.header(CoinTicker.VERGE));
+        assertEquals("BitCore Signed Message:\n", SignedMessages.header(CoinTicker.BITCORE));
     }
 
     @Test

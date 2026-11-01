@@ -8,6 +8,7 @@ public enum CoinTicker {
 
     BITCOIN,
     BITCOIN_CASH,
+    BITCORE,
     LITECOIN,
     DASHCOIN,
     DIGIBYTE,
@@ -29,6 +30,7 @@ public enum CoinTicker {
                 BLOCKNET,
                 BITCOIN,
                 //            BITCOIN_CASH, - not support on backend
+                BITCORE,
                 LITECOIN,
                 DASHCOIN,
                 DIGIBYTE,

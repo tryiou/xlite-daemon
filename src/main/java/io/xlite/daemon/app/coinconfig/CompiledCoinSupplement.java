@@ -84,6 +84,9 @@ public final class CompiledCoinSupplement {
                             "BTC",
                             new Supplement(21_000_000L, 70012, "org.bitcoin.production", "main")),
                     Map.entry("BCH", new Supplement(21_000_000L, 70012, "BCH", "main")),
+                    // BitCore 0.90.9.10: MAX_MONEY 84000000 COIN (src/amount.h:26),
+                    // PROTOCOL_VERSION 80008 (src/version.h:15).
+                    Map.entry("BTX", new Supplement(84_000_000L, 80008, "BTX", "main")),
                     Map.entry("DASH", new Supplement(22_000_000L, 70210, "DASH", "main")),
                     Map.entry("DGB", new Supplement(2_000_000_000L, 70002, "DGB", "main")),
                     Map.entry("DOGE", new Supplement(2_000_000_000L, 70004, "DOGE", "main")),

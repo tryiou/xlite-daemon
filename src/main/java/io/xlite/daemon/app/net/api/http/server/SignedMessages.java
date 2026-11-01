@@ -30,6 +30,7 @@ final class SignedMessages {
                     Map.entry(CoinTicker.BLOCKNET, "Blocknet Signed Message:\n"),
                     Map.entry(CoinTicker.BITCOIN, "Bitcoin Signed Message:\n"),
                     Map.entry(CoinTicker.BITCOIN_CASH, "Bitcoin Signed Message:\n"),
+                    Map.entry(CoinTicker.BITCORE, "BitCore Signed Message:\n"),
                     Map.entry(CoinTicker.LITECOIN, "Litecoin Signed Message:\n"),
                     Map.entry(CoinTicker.PIVX, "DarkNet Signed Message:\n"),
                     Map.entry(CoinTicker.DASHCOIN, "DarkCoin Signed Message:\n"),

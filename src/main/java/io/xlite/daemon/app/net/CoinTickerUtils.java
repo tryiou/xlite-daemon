@@ -21,6 +21,7 @@ public final class CoinTickerUtils {
         tickers.put(CoinTicker.DIGIBYTE, "DGB");
         //		tickers.put(CoinTicker.BITCOIN_CASH, "BCH");
         tickers.put(CoinTicker.RAVENCOIN, "RVN");
+        tickers.put(CoinTicker.BITCORE, "BTX");
 
         tickers.put(CoinTicker.UNOBTANIUM, "UNO");
         tickers.put(CoinTicker.PKOIN, "PKOIN");

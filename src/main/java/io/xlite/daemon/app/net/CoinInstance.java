@@ -95,6 +95,7 @@ public final class CoinInstance {
             Map.ofEntries(
                     Map.entry(CoinTicker.BLOCKNET, "Blocknet"),
                     Map.entry(CoinTicker.BITCOIN, "Bitcoin"),
+                    Map.entry(CoinTicker.BITCORE, "BitCore"),
                     Map.entry(CoinTicker.LITECOIN, "Litecoin"),
                     Map.entry(CoinTicker.DASHCOIN, "Dashcoin"),
                     Map.entry(CoinTicker.DIGIBYTE, "Digibyte"),
