@@ -49,6 +49,19 @@ final class WalletMethods {
         if (engine == null || !engine.isReady()) {
             return RpcResponse.error(3002, "listtransactions not ready");
         }
+        HistoryEngine.Status snapshot = engine.status();
+        if (!snapshot.complete()) {
+            // An address the indexer refuses is permanent for that address, so serving the rows
+            // that did load would present a short history as a whole one. The count is what a
+            // caller needs; the addresses are in historystatus.
+            return RpcResponse.error(
+                    3003,
+                    "history incomplete: "
+                            + snapshot.failed().size()
+                            + " of "
+                            + snapshot.addresses()
+                            + " addresses cannot be read");
+        }
         return RpcResponse.ok(filterHistory(coin.getAllTransactions(), startTime, endTime));
     }
 
@@ -77,10 +90,18 @@ final class WalletMethods {
         }
         HistoryEngine.Status snapshot = engine.status();
         status.addProperty("ready", snapshot.ready());
+        status.addProperty("complete", snapshot.complete());
         status.addProperty("addresses", snapshot.addresses());
-        status.addProperty("loaded", snapshot.loaded());
         status.addProperty("rows", snapshot.rows());
         status.addProperty("tip", snapshot.tip());
+        JsonArray failed = new JsonArray();
+        for (HistoryEngine.Failure failure : snapshot.failed()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("address", failure.address());
+            entry.addProperty("reason", failure.reason());
+            failed.add(entry);
+        }
+        status.add("failed", failed);
         return RpcResponse.ok(status);
     }
 

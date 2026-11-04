@@ -76,8 +76,50 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
         default void onReady() {}
     }
 
-    /** Readiness and size, for the daemon's history status endpoint. */
-    public record Status(boolean ready, int addresses, int loaded, int rows, int tip) {}
+    /**
+     * Readiness, size and completeness, for the daemon's history status endpoint.
+     *
+     * <p>{@code ready} means the first reconcile finished; {@code complete} means every address's
+     * history was read. They differ when the indexer refuses an address — a permanent condition for
+     * that address, not a slow sync — and {@code failed} names each one so an operator can see why
+     * a history is short instead of guessing.
+     */
+    public record Status(
+            boolean ready,
+            boolean complete,
+            int addresses,
+            int rows,
+            int tip,
+            List<Failure> failed) {
+        public Status {
+            failed = List.copyOf(failed);
+        }
+    }
+
+    /** One address whose history the indexer refused, and what it said. */
+    public record Failure(String address, String reason) {}
+
+    /**
+     * One item's answer from a batch: its value, or the error that stood in for it.
+     *
+     * <p>A JSON-RPC batch answers per item, so a refused address must not be allowed to speak for
+     * its neighbours. Keeping each item's own outcome is what makes that possible without
+     * re-asking.
+     */
+    private record Reply(JsonElement value, Throwable error) {
+        private static Reply of(JsonElement value) {
+            return new Reply(value, null);
+        }
+
+        private boolean ok() {
+            return error == null;
+        }
+
+        /** A refusal is the indexer's own answer, not a transport failure. */
+        private boolean refused() {
+            return error instanceof ElectrumException;
+        }
+    }
 
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(60);
     private static final int FETCH_BATCH = 64;
@@ -147,13 +189,13 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
 
     public Status status() {
         List<AddressState> snapshot = snapshotStates();
-        int loaded = 0;
+        List<Failure> failed = new ArrayList<>();
         for (AddressState state : snapshot) {
-            if (state.loaded) {
-                loaded++;
+            if (state.failure != null) {
+                failed.add(new Failure(state.address, state.failure));
             }
         }
-        return new Status(ready, snapshot.size(), loaded, publishedRows, tip);
+        return new Status(ready, failed.isEmpty(), snapshot.size(), publishedRows, tip, failed);
     }
 
     @Override
@@ -234,39 +276,61 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
             return;
         }
         List<AddressState> snapshot = snapshotStates();
-        List<JsonElement> statuses = awaitBatch(subscribeCalls(snapshot));
-        if (statuses == null) {
-            scheduleRetry();
-            return;
-        }
-        Applied applied = applyChanged(changedStates(snapshot, statuses));
-        if (!applied.fetched()) {
+        List<Pending> pending = changedStates(snapshot, awaitBatch(subscribeCalls(snapshot)));
+        Applied applied = pending == null ? Applied.NOTHING_ANSWERED : applyChanged(pending);
+        if (!applied.answered()) {
             scheduleRetry();
             return;
         }
         publish();
-        if (!applied.complete()) {
+        if (applied.deferred()) {
+            // A transport failure leaves addresses unread without saying so, so the first pass
+            // stays open and the retry timer finishes it.
             scheduleRetry();
             return;
         }
+        // A refusal is an answer, not an outage: the coin serves the addresses it could read and
+        // reports the rest through Status.
         markReady();
     }
 
     /** One address whose history must be re-read, with the status it now reports. */
     private record Pending(AddressState state, JsonElement status) {}
 
-    /** Outcome of one reconcile pass: whether the provider answered, and whether it fully did. */
-    private record Applied(boolean fetched, boolean complete) {
-        private static final Applied FAILED = new Applied(false, false);
+    /**
+     * Outcome of one reconcile pass.
+     *
+     * <p>{@code answered} means the provider spoke about at least one address. {@code deferred}
+     * means some answer was a transport failure rather than the indexer's verdict, so the pass is
+     * not finished and must be retried. A refused address is neither: it is the indexer's final
+     * answer, recorded on the address and reported through {@link Status}.
+     */
+    private record Applied(boolean answered, boolean deferred) {
+        private static final Applied NOTHING_ANSWERED = new Applied(false, true);
     }
 
-    /** Pairs each state with its status, keeping those that still need work. */
-    private static List<Pending> changedStates(
-            List<AddressState> states, List<JsonElement> statuses) {
+    /**
+     * Pairs each state with its status, keeping those that still need work.
+     *
+     * <p>Returns null when the provider could not be asked at all, which is the one case that
+     * belongs to the retry timer rather than to the per-address outcome. An address the indexer
+     * refuses is recorded here and left out: it is answered, not pending.
+     */
+    private List<Pending> changedStates(List<AddressState> states, List<Reply> statuses) {
+        if (statuses == null || statuses.size() != states.size()) {
+            return null;
+        }
         List<Pending> changed = new ArrayList<>();
         for (int index = 0; index < states.size(); index++) {
             AddressState state = states.get(index);
-            JsonElement status = statuses.get(index);
+            Reply reply = statuses.get(index);
+            if (!reply.ok()) {
+                if (reply.refused()) {
+                    markRefused(state, reply.error());
+                }
+                continue;
+            }
+            JsonElement status = reply.value();
             // unspentsLoaded matters on its own: a failed unspent fetch leaves the
             // status unchanged, so retrying on status alone would never happen.
             if (!state.loaded || !state.unspentsLoaded || !Objects.equals(status, state.status)) {
@@ -283,42 +347,68 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
      * wallet's rows and its coin balance can never disagree about which tip they describe.
      */
     private Applied applyChanged(List<Pending> pending) {
+        if (pending.isEmpty()) {
+            // Nothing needed re-reading, which is a complete pass, not a failed one: an empty
+            // wallet and an unchanged status on reconnect both land here.
+            return new Applied(true, false);
+        }
         List<AddressState> states = new ArrayList<>(pending.size());
         for (Pending entry : pending) {
             states.add(entry.state());
         }
-        List<JsonElement> histories = awaitBatch(historyCalls(states));
-        if (histories == null) {
-            return Applied.FAILED;
-        }
+        List<Reply> histories = awaitBatch(historyCalls(states));
         // Read both together, but let the wallet see the history rows it did get:
         // an unspent failure leaves the balance stale, not the transaction list empty.
-        List<JsonArray> unspents = asRows(awaitBatch(unspentCalls(states)), states.size());
-        boolean complete = unspents != null;
+        List<Reply> unspents = awaitBatch(unspentCalls(states));
+
+        boolean answered = false;
+        boolean deferred = false;
         for (int index = 0; index < states.size(); index++) {
             AddressState state = states.get(index);
-            complete &= applyHistory(state, pending.get(index).status(), histories.get(index));
-            state.unspentsLoaded = unspents != null;
-            if (unspents != null) {
-                sink.applyUnspents(state.address, unspents.get(index));
+            Reply history = histories.get(index);
+            if (history.ok()) {
+                answered = true;
+                applyHistory(state, pending.get(index).status(), history.value());
+            } else if (history.refused()) {
+                // A refusal is the indexer's answer about this address, not a lost connection: the
+                // rest of the wallet loads, and the snapshot says which address is missing.
+                answered = true;
+                markRefused(state, history.error());
+            } else {
+                deferred = true;
+            }
+
+            Reply unspent = unspents.get(index);
+            if (unspent.ok() && unspent.value() != null && unspent.value().isJsonArray()) {
+                state.unspentsLoaded = true;
+                sink.applyUnspents(state.address, unspent.value().getAsJsonArray());
+            } else {
+                state.unspentsLoaded = false;
+                if (unspent.refused()) {
+                    markRefused(state, unspent.error());
+                } else {
+                    deferred = true;
+                }
             }
         }
-        return new Applied(true, complete);
+        return new Applied(answered, deferred);
     }
 
-    /** The per-address array results, or null when the provider answered with something else. */
-    private static List<JsonArray> asRows(List<JsonElement> values, int expected) {
-        if (values == null || values.size() != expected) {
-            return null;
+    /**
+     * Records that this address's history cannot be read, and drops the rows it had.
+     *
+     * <p>Stale rows would be worse than none: they describe a history the indexer no longer vouches
+     * for, and the caller is told the snapshot is incomplete either way.
+     */
+    private void markRefused(AddressState state, Throwable error) {
+        String reason = error == null ? "refused" : error.getMessage();
+        if (!reason.equals(state.failure)) {
+            LOGGER.warning(
+                    "[history-" + name + "] " + state.address + " cannot be read: " + reason);
         }
-        List<JsonArray> rows = new ArrayList<>(expected);
-        for (JsonElement value : values) {
-            if (value == null || !value.isJsonArray()) {
-                return null;
-            }
-            rows.add(value.getAsJsonArray());
-        }
-        return rows;
+        state.failure = reason;
+        state.rows = List.of();
+        state.loaded = true;
     }
 
     private void markReady() {
@@ -349,22 +439,14 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
         if (added.isEmpty()) {
             return;
         }
-        List<JsonElement> statuses = awaitBatch(subscribeCalls(added));
-        if (statuses == null) {
-            scheduleRetry();
-            return;
-        }
-        List<Pending> pending = new ArrayList<>(added.size());
-        for (int index = 0; index < added.size(); index++) {
-            pending.add(new Pending(added.get(index), statuses.get(index)));
-        }
-        Applied applied = applyChanged(pending);
-        if (!applied.fetched()) {
+        List<Pending> pending = changedStates(added, awaitBatch(subscribeCalls(added)));
+        Applied applied = pending == null ? Applied.NOTHING_ANSWERED : applyChanged(pending);
+        if (!applied.answered()) {
             scheduleRetry();
             return;
         }
         publish();
-        if (!applied.complete()) {
+        if (applied.deferred()) {
             scheduleRetry();
         }
     }
@@ -410,39 +492,65 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
         return calls;
     }
 
-    private List<JsonElement> awaitBatch(List<Call> calls) {
-        List<JsonElement> values = new ArrayList<>();
+    /**
+     * Every request's own outcome, in order.
+     *
+     * <p>One item's failure does not speak for the others: a JSON-RPC batch reports each request
+     * separately, so an indexer that refuses one address still answered the rest. Returning a
+     * single failure for the chunk would throw those answers away and withhold up to {@value
+     * #BATCH_SIZE} addresses over one refusal.
+     */
+    private List<Reply> awaitBatch(List<Call> calls) {
+        List<Reply> replies = new ArrayList<>(calls.size());
         for (int start = 0; start < calls.size(); start += BATCH_SIZE) {
             List<Call> chunk = calls.subList(start, Math.min(start + BATCH_SIZE, calls.size()));
-            List<JsonElement> part = awaitChunk(chunk);
-            if (part == null) {
-                return null;
-            }
-            values.addAll(part);
+            replies.addAll(awaitChunk(chunk));
         }
-        return values;
+        return replies;
     }
 
-    private List<JsonElement> awaitChunk(List<Call> calls) {
+    private List<Reply> awaitChunk(List<Call> calls) {
         List<CompletableFuture<JsonElement>> futures = api.batch(calls);
         try {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0]))
                     .get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return null;
-        } catch (ExecutionException | TimeoutException e) {
-            // Inspected per item below: one missing result must not hide the rest.
+            return timeoutReplies(calls.size(), "interrupted");
+        } catch (TimeoutException e) {
+            // No item's fate is known when the frame itself does not complete.
+            LOGGER.log(Level.FINE, "[history-" + name + "] a batch timed out", e);
+            return timeoutReplies(calls.size(), "no answer");
+        } catch (ExecutionException e) {
+            // Inspected per item below: one failing item must not hide the rest.
             LOGGER.log(Level.FINE, "[history-" + name + "] a batch item failed", e);
         }
-        List<JsonElement> values = new ArrayList<>();
+        List<Reply> replies = new ArrayList<>(futures.size());
         for (CompletableFuture<JsonElement> future : futures) {
-            if (!future.isDone() || future.isCompletedExceptionally()) {
-                return null;
-            }
-            values.add(future.getNow(null));
+            replies.add(replyOf(future));
         }
-        return values;
+        return replies;
+    }
+
+    private static Reply replyOf(CompletableFuture<JsonElement> future) {
+        if (future.isCompletedExceptionally()) {
+            Throwable error = failureOf(future);
+            return new Reply(
+                    null, error == null ? new ElectrumUnavailableException("no answer") : error);
+        }
+        if (!future.isDone()) {
+            return new Reply(null, new ElectrumUnavailableException("no answer"));
+        }
+        return Reply.of(future.getNow(null));
+    }
+
+    /** Every item failed the same way, with nothing learned about any of them. */
+    private static List<Reply> timeoutReplies(int count, String reason) {
+        List<Reply> replies = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            replies.add(new Reply(null, new ElectrumUnavailableException(reason)));
+        }
+        return replies;
     }
 
     /** Every script hash the wallet owns, for whole-wallet output attribution. */
@@ -468,11 +576,7 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
                     materialiser.rows(state.address, state.addressHashX, walletHashX(), history);
             state.status = status;
             state.loaded = true;
-            return true;
-        } catch (HistoryMaterialiser.HistoryTooLargeException e) {
-            LOGGER.severe("[history-" + name + "] " + e.getMessage());
-            state.loaded = true;
-            state.rows = List.of();
+            state.failure = null;
             return true;
         } catch (TransientFailure e) {
             LOGGER.log(
@@ -489,12 +593,14 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
         }
         try {
             refresh(state, status, true);
-        } catch (HistoryMaterialiser.HistoryTooLargeException e) {
-            LOGGER.severe("[history-" + name + "] " + e.getMessage());
-            state.loaded = true;
-            state.rows = List.of();
-            publish();
         } catch (TransientFailure e) {
+            if (e.getCause() instanceof ElectrumException refused) {
+                // The indexer answered for this address and refused it: permanent for that address,
+                // so it is reported instead of retried.
+                markRefused(state, refused);
+                publish();
+                return;
+            }
             LOGGER.log(Level.WARNING, "[history-" + name + "] cannot refresh " + state.address, e);
             scheduleRetry();
         }
@@ -507,6 +613,7 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
         state.rows = materialiser.rows(state.address, state.addressHashX, walletHashX(), history);
         state.status = status;
         state.loaded = true;
+        state.failure = null;
         sink.applyUnspents(
                 state.address,
                 request("blockchain.scripthash.listunspent", args(state.scripthash))
@@ -698,9 +805,11 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             if (cause instanceof ElectrumException electrum) {
-                throw new TransientFailure(electrum.getMessage());
+                // The indexer refused this request and said why. Carried as the cause so the
+                // caller can tell a permanent refusal from a transport failure.
+                throw new TransientFailure(electrum.getMessage(), electrum);
             }
-            throw new TransientFailure("request failed: " + method);
+            throw new TransientFailure("request failed: " + method, cause);
         } catch (TimeoutException e) {
             throw new TransientFailure("request timed out: " + method);
         }
@@ -737,6 +846,9 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
         private boolean loaded;
         private boolean unspentsLoaded;
 
+        /** Why the indexer would not answer for this address, or null when it did. */
+        private String failure;
+
         private AddressState(String address, String scripthash, String addressHashX) {
             this.address = address;
             this.scripthash = scripthash;
@@ -748,6 +860,10 @@ public final class HistoryEngine implements AutoCloseable, ElectrumClient.Listen
     private static final class TransientFailure extends RuntimeException {
         private TransientFailure(String message) {
             super(message);
+        }
+
+        private TransientFailure(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }

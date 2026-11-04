@@ -684,6 +684,9 @@ public final class CoinInstance {
             engine.start();
             LOGGER.info("[history] native history enabled for " + tickerName);
         } catch (RuntimeException e) {
+            // The wallet keeps working without history: sending, balance and broadcast come from
+            // the provider session, which is already up. Only the history view is missing, and
+            // historystatus reports that rather than the coin failing to load.
             LOGGER.log(
                     java.util.logging.Level.SEVERE,
                     "[history] cannot start native history for " + tickerName,
@@ -1577,9 +1580,18 @@ public final class CoinInstance {
         worker.start();
     }
 
+    /**
+     * Whether this coin can serve chain data right now.
+     *
+     * <p>That is the provider session, not the history snapshot: balance, unspents, transactions,
+     * broadcast and the tip all come from the session, while history is a derived view of it. Tying
+     * the two together made one address the indexer refuses disable sending for the whole coin. An
+     * incomplete history is reported by {@code historystatus} and by {@code listtransactions}' own
+     * error instead.
+     */
     public boolean isInstanceRunning() {
-        HistoryEngine engine = historyEngine;
-        return engine != null && engine.isReady();
+        ElectrumApi api = electrumApi;
+        return api != null && api.isConnected();
     }
 
     public static void setAddressDiscoveryEnabled(boolean enabled) {

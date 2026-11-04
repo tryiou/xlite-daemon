@@ -40,7 +40,6 @@ import java.util.logging.Logger;
  */
 final class HistoryMaterialiser {
 
-    static final int MAX_TXS = 2000;
     private static final int MIN_SPENDS_TO_COMPARE = 2;
     private static final double EPSILON = Math.ulp(1.0);
 
@@ -82,9 +81,6 @@ final class HistoryMaterialiser {
      */
     List<Transaction> rows(
             String address, String addressHashX, Set<String> walletHashX, List<TxRef> history) {
-        if (history.size() > MAX_TXS) {
-            throw new HistoryTooLargeException(address, history.size());
-        }
         if (addressHashX == null) {
             LOGGER.warning("[history] cannot decode wallet address " + address);
             return List.of();
@@ -397,20 +393,6 @@ final class HistoryMaterialiser {
             row.setBlockheight(height);
             row.setTime(time);
             spends.add(row);
-        }
-    }
-
-    /** One address holds more transactions than one wallet snapshot may carry. */
-    static final class HistoryTooLargeException extends RuntimeException {
-        HistoryTooLargeException(String address, int count) {
-            super(
-                    "history too large for "
-                            + address
-                            + ": "
-                            + count
-                            + " transactions (max "
-                            + MAX_TXS
-                            + ")");
         }
     }
 }

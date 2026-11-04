@@ -2,7 +2,6 @@ package io.xlite.daemon.app.net.electrumx;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonArray;
@@ -194,18 +193,6 @@ class HistoryMaterialiserTest {
         assertEquals(0, rows.get(0).getConfirmations());
         assertEquals(1_700_000_000, rows.get(0).getTime());
         assertNull(rows.get(0).getBlockhash());
-    }
-
-    @Test
-    void anOversizedAddressIsRefusedNotTruncated() {
-        long count = HistoryMaterialiser.MAX_TXS + 1L;
-        List<TxRef> history = new java.util.ArrayList<>();
-        for (int index = 0; index < count; index++) {
-            history.add(new TxRef("t" + index, index + 1));
-        }
-        assertThrows(
-                HistoryMaterialiser.HistoryTooLargeException.class,
-                () -> materialiser().rows(WALLET, WALLET_HASH_X, history));
     }
 
     @Test

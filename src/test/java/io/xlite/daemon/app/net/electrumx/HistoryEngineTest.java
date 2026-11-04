@@ -189,7 +189,8 @@ class HistoryEngineTest {
         List<Transaction> updated = sink.next();
         assertTrue(updated.stream().anyMatch(row -> "t2".equals(row.getTxid())));
         assertEquals(2, engine.status().addresses());
-        assertEquals(2, engine.status().loaded());
+        assertTrue(engine.status().complete());
+        assertTrue(engine.status().failed().isEmpty());
         engine.close();
     }
 
@@ -290,6 +291,68 @@ class HistoryEngineTest {
         sink.next();
         assertReady(engine);
         assertEquals(1, sink.unspentsFor(ADDRESS.toBase58()));
+        engine.close();
+    }
+
+    /**
+     * A refused address must not speak for its neighbours.
+     *
+     * <p>The indexer answers each batch item separately; one address it will not serve is that
+     * address's problem. The rest of the wallet loads, the pass finishes, and the status names the
+     * one that did not.
+     */
+    @Test
+    void aRefusedAddressIsReportedWithoutHoldingBackTheRest() throws Exception {
+        LegacyAddress other = address(2);
+        sink.addresses.add(new AddressBalance(other, null));
+        String otherScripthash = ScriptHashes.scripthash(other);
+
+        api.batch("blockchain.scripthash.subscribe", args(SCRIPTHASH), "s1");
+        api.batch("blockchain.scripthash.subscribe", args(otherScripthash), "s2");
+        api.batch("blockchain.scripthash.get_history", args(SCRIPTHASH), history("t1", 10));
+        api.batch("blockchain.transaction.get", args("t1", true), receive("t1", 4.0));
+        api.refuse("blockchain.scripthash.get_history", args(otherScripthash), "history too large");
+
+        HistoryEngine engine = engine();
+        engine.start();
+        api.fireConnected();
+
+        List<Transaction> published = sink.next();
+        assertEquals(1, published.size());
+        assertEquals("t1", published.get(0).getTxid());
+        assertReady(engine);
+
+        HistoryEngine.Status status = engine.status();
+        assertEquals(2, status.addresses());
+        assertFalse(status.complete());
+        assertEquals(1, status.failed().size());
+        assertEquals(other.toBase58(), status.failed().get(0).address());
+        assertTrue(status.failed().get(0).reason().contains("history too large"));
+        engine.close();
+    }
+
+    /** A refusal that clears leaves the address readable and the snapshot whole again. */
+    @Test
+    void aRefusalThatClearsRestoresTheSnapshot() throws Exception {
+        api.batch("blockchain.scripthash.subscribe", args(SCRIPTHASH), "s1");
+        api.refuse("blockchain.scripthash.get_history", args(SCRIPTHASH), "history too large");
+
+        HistoryEngine engine = engine();
+        engine.start();
+        api.fireConnected();
+        sink.next();
+        assertReady(engine);
+        assertFalse(engine.status().complete());
+
+        api.cleared();
+        api.batch("blockchain.scripthash.get_history", args(SCRIPTHASH), history("t1", 10));
+        api.batch("blockchain.transaction.get", args("t1", true), receive("t1", 4.0));
+        api.fireNotification("blockchain.scripthash.subscribe", args(SCRIPTHASH, "s2"));
+
+        List<Transaction> rows = sink.next();
+        assertEquals(1, rows.size());
+        assertTrue(engine.status().complete());
+        assertTrue(engine.status().failed().isEmpty());
         engine.close();
     }
 
@@ -448,6 +511,7 @@ class HistoryEngineTest {
         private final Map<String, Object> responses = new HashMap<>();
         private final Map<String, Integer> calls = new HashMap<>();
         private final Set<String> failOnce = new HashSet<>();
+        private final Set<String> refused = new HashSet<>();
         private ElectrumClient.Listener listener;
 
         private void batch(String method, JsonArray params, Object response) {
@@ -456,6 +520,16 @@ class HistoryEngineTest {
 
         private void failOnce(String method, JsonArray params) {
             failOnce.add(method + params);
+        }
+
+        /** The indexer answered, and its answer is a refusal that will not change. */
+        private void refuse(String method, JsonArray params, String reason) {
+            refused.add(method + params + "|" + reason);
+        }
+
+        /** The refusal is gone: the indexer serves this address again. */
+        private void cleared() {
+            refused.clear();
         }
 
         private int count(String method) {
@@ -503,6 +577,12 @@ class HistoryEngineTest {
             if (failOnce.remove(key)) {
                 return CompletableFuture.failedFuture(
                         new ElectrumUnavailableException("transport lost"));
+            }
+            for (String entry : refused) {
+                if (entry.startsWith(key + "|")) {
+                    return CompletableFuture.failedFuture(
+                            new ElectrumException(1, entry.substring((key + "|").length())));
+                }
             }
             Object response = responses.get(key);
             if (response == null) {
