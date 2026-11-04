@@ -95,6 +95,13 @@ public final class CompiledCoinSupplement {
         }
     }
 
+    /**
+     * CashAddr HRP for coins whose chain defines that spelling. A connector's C++ counterpart
+     * carries the same default in its compiled init (BCH: {@code cashaddrPrefix = "bitcoincash"} in
+     * {@code xbridgewalletconnectorbch.cpp}); the configuration repository does not carry it.
+     */
+    private static final Map<String, String> CASH_ADDR_PREFIX = Map.of("BCH", "bitcoincash");
+
     private static final Map<String, Supplement> BY_TICKER =
             Map.ofEntries(
                     // Verge rejects a spend whose nTime is older than any input's
@@ -174,6 +181,11 @@ public final class CompiledCoinSupplement {
                             + "' — the coin cannot run without its non-config constants");
         }
         return s;
+    }
+
+    /** The coin's CashAddr HRP, or an empty string when the chain has no such spelling. */
+    public static String cashAddrPrefix(String ticker) {
+        return CASH_ADDR_PREFIX.getOrDefault(ticker, "");
     }
 
     public static boolean supports(String ticker) {

@@ -8,13 +8,10 @@ import com.subgraph.orchid.encoders.Hex;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.electrumx.HistoryEngine;
 import io.xlite.daemon.app.util.AddressBalance;
-import io.xlite.daemon.app.util.Utility;
 
 import org.bitcoinj.core.Address;
-import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.SegwitAddress;
 import org.bitcoinj.core.TransactionOutput;
 
@@ -133,7 +130,7 @@ final class WalletMethods {
         if (params.size() != 1) {
             return RpcResponse.usage("Usage: dumpprivkey address\n\naddress (string, required)");
         }
-        AddressBalance address = coin.getAddress(params.get(0).getAsString());
+        AddressBalance address = coin.getAddressBalance(params.get(0).getAsString());
         if (address == null) {
             return RpcResponse.error(-4, "Address does not exist");
         }
@@ -147,8 +144,9 @@ final class WalletMethods {
                             + "address (string, required) - The address to validate.");
         }
         String address = params.get(0).getAsString();
-        boolean valid = Utility.isValidAddress(coin.getNetworkParameters(), address);
-        AddressScript script = valid ? scriptOf(address) : new AddressScript("", false);
+        Address parsed = coin.parseAddress(address);
+        boolean valid = parsed != null;
+        AddressScript script = valid ? scriptOf(parsed) : new AddressScript("", false);
 
         JsonObject result = new JsonObject();
         result.addProperty("isvalid", valid);
@@ -161,22 +159,20 @@ final class WalletMethods {
     /**
      * The script an address pays to, and whether that script is a P2SH one.
      *
-     * <p>{@code Utility.isValidAddress} accepts bech32 addresses too, and those have no base58
-     * form: they are derived from the witness program rather than being a parse failure.
+     * <p>{@code coin.parseAddress} already decoded every accepted spelling — base58check, bech32
+     * and a chain-specific alias such as CashAddr — so this method only has to turn the decoded
+     * address into its output script.
      */
-    private AddressScript scriptOf(String address) {
-        NetworkParameters params = coin.getNetworkParameters();
-        Address parsed;
-        try {
-            parsed = LegacyAddress.fromBase58(params, address);
-        } catch (AddressFormatException e) {
-            SegwitAddress segwit = SegwitAddress.fromBech32(params, address);
+    private AddressScript scriptOf(Address parsed) {
+        if (parsed instanceof SegwitAddress segwit) {
             return new AddressScript(witnessScript(segwit), false);
         }
-        if (!BitcoinScripts.isPayToScriptHash(params, address)) {
+        LegacyAddress legacy = (LegacyAddress) parsed;
+        if (!legacy.isP2SHAddress()) {
             return new AddressScript("", false);
         }
-        TransactionOutput output = new TransactionOutput(params, null, Coin.valueOf(0), parsed);
+        TransactionOutput output =
+                new TransactionOutput(coin.getNetworkParameters(), null, Coin.valueOf(0), legacy);
         return new AddressScript(hex(output.getScriptPubKey().getProgram()), true);
     }
 

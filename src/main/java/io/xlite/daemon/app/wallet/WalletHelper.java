@@ -18,6 +18,7 @@ import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.TxTimeFieldSigner;
 import io.xlite.daemon.app.util.UTXO;
+import io.xlite.daemon.app.util.Utility;
 
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Coin;
@@ -583,9 +584,13 @@ public class WalletHelper {
         }
     }
 
-    /** The coin's parameters, wallet, base-unit factor and spendable outputs. */
+    /** The coin's instance, parameters, wallet, base-unit factor and spendable outputs. */
     private record BuildContext(
-            NetworkParameters params, WalletHelper wallet, long coinUnit, List<UTXO> utxos) {}
+            CoinInstance coin,
+            NetworkParameters params,
+            WalletHelper wallet,
+            long coinUnit,
+            List<UTXO> utxos) {}
 
     /** The outputs to add, the inputs that fund them, and the change left over. */
     private record Selection(List<UTXO> selected, List<UTXO> outputs, double change) {}
@@ -739,7 +744,8 @@ public class WalletHelper {
         long coinUnit =
                 CoinConfigRegistry.get(CoinTickerUtils.tickerToString(request.ticker()))
                         .coinFactor();
-        return new BuildContext(coinInstance.getNetworkParameters(), wallet, coinUnit, utxos);
+        return new BuildContext(
+                coinInstance, coinInstance.getNetworkParameters(), wallet, coinUnit, utxos);
     }
 
     /**
@@ -823,7 +829,11 @@ public class WalletHelper {
         Transaction transaction =
                 CoinTransactions.newTransaction(context.params(), request.ticker());
         for (UTXO output : selection.outputs()) {
-            Address address = LegacyAddress.fromBase58(context.params(), output.getAddress());
+            Address address =
+                    Utility.requireLegacyAddress(
+                            context.params(),
+                            CoinTickerUtils.tickerToString(request.ticker()),
+                            output.getAddress());
             transaction.addOutput(
                     Coin.valueOf(Sats.fromWholeCoins(output.getAmount(), context.coinUnit())),
                     address);
@@ -935,10 +945,11 @@ public class WalletHelper {
     // bitcoinj's global registry and rejects every altcoin address.
     static UTXO createTransactionOutput(
             CoinTicker ticker, String address, double amount, NetworkParameters params) {
-        // Validates the address against this coin's version bytes; throws
-        // AddressFormatException on mismatch. Do not remove: a null-params
-        // lookup here rejects every non-BTC address ("No network found").
-        LegacyAddress.fromBase58(params, address);
+        // Validates the address against this coin's version bytes and accepted
+        // spellings; throws AddressFormatException on mismatch. Do not remove:
+        // a null-params lookup here rejects every non-BTC address ("No network
+        // found"), and a BCH peer supplies this destination as a CashAddr.
+        Utility.requireLegacyAddress(params, CoinTickerUtils.tickerToString(ticker), address);
         long coinUnit = CoinConfigRegistry.get(CoinTickerUtils.tickerToString(ticker)).coinFactor();
         Coin coin = Coin.valueOf(Sats.fromWholeCoins(amount, coinUnit));
         return new UTXO(ticker, address, "", 0, 0, coin.value);

@@ -18,6 +18,7 @@ import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.TxTimeField;
 import io.xlite.daemon.app.util.TxTimeFieldSigner;
 import io.xlite.daemon.app.util.UTXO;
+import io.xlite.daemon.app.util.Utility;
 
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.ECKey;
@@ -194,9 +195,11 @@ final class RawTransactionMethods {
     private void addOutput(
             Transaction transaction, OutputEntry output, long coinUnit, boolean scriptHash) {
         LegacyAddress address =
-                LegacyAddress.fromBase58(coin.getNetworkParameters(), output.address());
-        boolean isScriptHash =
-                BitcoinScripts.isPayToScriptHash(coin.getNetworkParameters(), output.address());
+                Utility.requireLegacyAddress(
+                        coin.getNetworkParameters(),
+                        CoinTickerUtils.tickerToString(coin.getTicker()),
+                        output.address());
+        boolean isScriptHash = address.isP2SHAddress();
         if (isScriptHash != scriptHash) {
             return;
         }

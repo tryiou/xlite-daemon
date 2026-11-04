@@ -11,6 +11,7 @@ import io.xlite.daemon.app.net.CoinTickerUtils;
 
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
@@ -143,9 +144,10 @@ public class UTXO {
     }
 
     public org.bitcoinj.core.UTXO createUTXO() {
+        NetworkParameters params = CoinInstance.getInstance(this.ticker).getNetworkParameters();
         LegacyAddress address =
-                LegacyAddress.fromBase58(
-                        CoinInstance.getInstance(this.ticker).getNetworkParameters(), getAddress());
+                Utility.requireLegacyAddress(
+                        params, CoinTickerUtils.tickerToString(this.ticker), getAddress());
 
         Script scriptForUTXO = ScriptBuilder.createOutputScript(address);
 

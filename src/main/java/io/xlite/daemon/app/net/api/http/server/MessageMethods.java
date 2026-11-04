@@ -7,6 +7,7 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.AddressBalance;
 
+import org.bitcoinj.core.Address;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
 
@@ -74,8 +75,11 @@ final class MessageMethods {
         boolean verified;
         try {
             ECKey key = SignedMessages.recoverKey(coin.getTicker(), signature, message);
-            String derived = LegacyAddress.fromKey(coin.getNetworkParameters(), key).toBase58();
-            verified = address.equals(derived);
+            Address claimed = coin.parseAddress(address);
+            verified =
+                    claimed != null
+                            && claimed.equals(
+                                    LegacyAddress.fromKey(coin.getNetworkParameters(), key));
             if (!verified) {
                 LOGGER.warning("[http-server-handler] ERROR: Addresses do not match! Failing.");
             }

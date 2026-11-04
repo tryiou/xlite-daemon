@@ -9,7 +9,6 @@ import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.net.api.http.client.HTTPClient;
-import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
 
@@ -168,12 +167,7 @@ final class UtxoMethods {
     }
 
     private boolean isWalletAddress(String address) {
-        for (AddressBalance balance : coin.getAddressKeyPairs()) {
-            if (address.equals(balance.getAddress().toString())) {
-                return true;
-            }
-        }
-        return false;
+        return coin.getAddressBalance(address) != null;
     }
 
     /**

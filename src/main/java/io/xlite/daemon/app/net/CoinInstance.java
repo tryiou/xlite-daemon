@@ -33,9 +33,11 @@ import io.xlite.daemon.app.util.RpcPortClaims;
 import io.xlite.daemon.app.util.RpcPorts;
 import io.xlite.daemon.app.util.Sats;
 import io.xlite.daemon.app.util.UTXO;
+import io.xlite.daemon.app.util.Utility;
 import io.xlite.daemon.app.util.history.Transaction;
 import io.xlite.daemon.app.wallet.WalletHelper;
 
+import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.Monetary;
@@ -67,7 +69,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -250,14 +251,23 @@ public final class CoinInstance {
         return activeCurrency;
     }
 
-    public AddressBalance getAddress(String addressB58) {
-        for (AddressBalance address : addressKeyPairs) {
-            if (address.getAddress().toBase58().equals(addressB58)) {
-                return address;
-            }
-        }
+    /**
+     * Decodes an address in any spelling this coin's chain accepts, or null when it names none.
+     *
+     * <p>Callers that test ownership or build an output compare the decoded address, not the
+     * spelling: one key can reach the wallet as legacy base58check or (on BCH) as CashAddr.
+     */
+    public Address parseAddress(String address) {
+        return Utility.parseAddress(
+                getNetworkParameters(), CoinTickerUtils.tickerToString(getTicker()), address);
+    }
 
-        return null;
+    /**
+     * The address in its legacy form, or an exception when it names none of this coin's addresses.
+     */
+    public LegacyAddress requireLegacyAddress(String address) {
+        return Utility.requireLegacyAddress(
+                getNetworkParameters(), CoinTickerUtils.tickerToString(getTicker()), address);
     }
 
     public AddressBalance generateAddress(boolean updateConfig) {
@@ -664,7 +674,12 @@ public final class CoinInstance {
                             networkParameters,
                             api,
                             new EngineSink(),
-                            Function.identity());
+                            address -> {
+                                Address parsed =
+                                        Utility.parseAddress(
+                                                networkParameters, tickerName, address);
+                                return parsed == null ? address : parsed.toString();
+                            });
             historyEngine = engine;
             engine.start();
             LOGGER.info("[history] native history enabled for " + tickerName);
@@ -1233,8 +1248,12 @@ public final class CoinInstance {
     }
 
     public AddressBalance getAddressBalance(String address) {
+        Address parsed = parseAddress(address);
+        if (!(parsed instanceof LegacyAddress)) {
+            return null;
+        }
         for (AddressBalance addressBalance : getAddressKeyPairs()) {
-            if (addressBalance.getAddress().toBase58().equals(address)) {
+            if (addressBalance.getAddress().equals(parsed)) {
                 return addressBalance;
             }
         }
@@ -1311,7 +1330,7 @@ public final class CoinInstance {
         for (UTXO utxo : utxoList) {
             String addr = utxo.getAddress();
             if (clearedAddresses.add(addr)) {
-                AddressBalance addressBalance = getAddress(addr);
+                AddressBalance addressBalance = getAddressBalance(addr);
                 if (addressBalance != null) {
                     addressBalance.clearUtxos();
                 }
@@ -1319,7 +1338,7 @@ public final class CoinInstance {
         }
 
         for (UTXO utxo : utxoList) {
-            AddressBalance addressBalance = getAddress(utxo.getAddress());
+            AddressBalance addressBalance = getAddressBalance(utxo.getAddress());
             if (addressBalance == null) {
                 LOGGER.warning(
                         "[utxo-parser] Warning: Encountered non-tracked address in reply: "

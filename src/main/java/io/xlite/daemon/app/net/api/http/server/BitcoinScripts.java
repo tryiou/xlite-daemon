@@ -1,7 +1,5 @@
 package io.xlite.daemon.app.net.api.http.server;
 
-import org.bitcoinj.core.Base58;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.script.Script;
 
 /** Script and address presentation shared by the RPC methods. */
@@ -35,11 +33,5 @@ final class BitcoinScripts {
             return "scripthash";
         }
         return "unknown";
-    }
-
-    /** Whether {@code address} pays to this chain's script hash. */
-    static boolean isPayToScriptHash(NetworkParameters params, String address) {
-        byte[] versionAndData = Base58.decodeChecked(address);
-        return params.getP2SHHeader() == (versionAndData[0] & 0xFF);
     }
 }
