@@ -20,6 +20,8 @@ public class Transaction {
     private int vout;
     private int confirmations;
     private int blocktime;
+    private int blockheight;
+    private int time;
 
     public Transaction(
             String addressB58,
@@ -37,6 +39,7 @@ public class Transaction {
 
         this.confirmations = confirmations;
         this.blocktime = blocktime;
+        this.time = blocktime;
     }
 
     public void setCategory(String category) {
@@ -71,12 +74,37 @@ public class Transaction {
         return value;
     }
 
+    public void setValue(double value) {
+        this.value = value;
+    }
+
     public int getVout() {
         return vout;
     }
 
     public int getBlocktime() {
         return blocktime;
+    }
+
+    /** Height the transaction was mined at; 0 while it is still in the mempool. */
+    public int getBlockheight() {
+        return blockheight;
+    }
+
+    public void setBlockheight(int blockheight) {
+        this.blockheight = blockheight;
+    }
+
+    /**
+     * Sort/display time. Confirmed rows use their block time; a mempool row uses the transaction's
+     * own timestamp and never 0, because the GUI indexes history by this field.
+     */
+    public int getTime() {
+        return time;
+    }
+
+    public void setTime(int time) {
+        this.time = time;
     }
 
     public int getConfirmations() {

@@ -142,4 +142,25 @@ class AppTest {
                     () -> App.resolveUserConfigDir(null, "Mac OS X", blank, null));
         }
     }
+
+    @Test
+    @DisplayName("a flag value already chosen wins over the environment")
+    void testBaseUrl_FlagWinsOverEnv() {
+        assertNull(App.chooseBaseUrl(true, "http://env-value/"));
+    }
+
+    @Test
+    @DisplayName("a blank BASE_URL never replaces the built-in provider")
+    void testBaseUrl_BlankEnvIsIgnored() {
+        for (String blank : new String[] {null, "", "   "}) {
+            assertNull(App.chooseBaseUrl(false, blank));
+        }
+    }
+
+    @Test
+    @DisplayName("BASE_URL in the environment is trimmed before use")
+    void testBaseUrl_EnvValueIsTrimmed() {
+        assertEquals(
+                "http://127.0.0.1:5000/", App.chooseBaseUrl(false, "  http://127.0.0.1:5000/  "));
+    }
 }

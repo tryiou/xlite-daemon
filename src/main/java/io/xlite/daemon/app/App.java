@@ -4,8 +4,6 @@ import io.github.cdimascio.dotenv.Dotenv;
 import io.xlite.daemon.app.console.ConsoleMenu;
 import io.xlite.daemon.app.net.api.JSONRPCController;
 import io.xlite.daemon.app.net.api.JSONRPCMasterServer;
-import io.xlite.daemon.app.net.api.http.client.EXRServerPool;
-import io.xlite.daemon.app.net.api.http.client.HTTPClient;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.ConsoleFormatter;
 import io.xlite.daemon.app.util.FileFormatter;
@@ -31,14 +29,15 @@ public final class App {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
-    /** Upstream used when no EXR pool is configured. */
+    /** Provider used when neither EXR_ENDPOINT nor an explicit override is configured. */
     private static volatile String baseUrl = "https://xliterevp.mywire.org/";
 
-    private static volatile String exrEndpoint = null;
-    private static volatile EXRServerPool exrServerPool = null;
+    /** True once BASE_URL or --development-endpoint explicitly selected the provider. */
+    private static volatile boolean baseUrlExplicit = false;
 
-    private static final HTTPClient FEE_UPDATE_HTTP_CLIENT = new HTTPClient(2);
-    private static final HTTPClient HEIGHT_UPDATE_HTTP_CLIENT = new HTTPClient(2);
+    private static volatile String exrEndpoint = null;
+    private static volatile String electrumEndpoint = null;
+
     private static final JSONRPCMasterServer MASTER_RPC = JSONRPCController.getMasterServer();
 
     private static ConsoleMenu console = null;
@@ -49,6 +48,7 @@ public final class App {
 
     public static void setBaseUrl(String url) {
         baseUrl = url;
+        baseUrlExplicit = true;
     }
 
     public static String getExrEndpoint() {
@@ -59,20 +59,48 @@ public final class App {
         exrEndpoint = endpoint;
     }
 
-    public static EXRServerPool getExrServerPool() {
-        return exrServerPool;
+    /** Direct native endpoint override, for testing one indexer without a node. */
+    public static String getElectrumEndpoint() {
+        return electrumEndpoint;
     }
 
-    public static void setExrServerPool(EXRServerPool pool) {
-        exrServerPool = pool;
+    public static void setElectrumEndpoint(String endpoint) {
+        electrumEndpoint = endpoint;
     }
 
-    public static HTTPClient getFeeUpdateHttpClient() {
-        return FEE_UPDATE_HTTP_CLIENT;
+    /**
+     * The single provider endpoint this coin talks to.
+     *
+     * <p>Exactly one source wins: the single-indexer test override, else the EXR connector, else
+     * BASE_URL. No fallback and no aggregation — a coin whose provider cannot serve it fails.
+     */
+    public static String resolveProviderEndpoint(String ticker) {
+        String override = electrumEndpoint;
+        if (override != null && !override.isBlank()) {
+            return override;
+        }
+        String exr = exrEndpoint;
+        if (exr != null && !exr.isBlank()) {
+            // One connector: the first configured node is the provider, not a pool to mix.
+            String first = exr.split(",")[0].trim();
+            return first.isEmpty() ? null : first;
+        }
+        return baseUrl;
     }
 
-    public static HTTPClient getHeightUpdateHttpClient() {
-        return HEIGHT_UPDATE_HTTP_CLIENT;
+    /** Refuse configurations that would mix two providers. */
+    public static void validateProviderConfig() {
+        boolean hasExr = exrEndpoint != null && !exrEndpoint.isBlank();
+        boolean hasOverride = electrumEndpoint != null && !electrumEndpoint.isBlank();
+        if (hasExr && baseUrlExplicit) {
+            throw new IllegalStateException(
+                    "BASE_URL and EXR_ENDPOINT are both set; configure exactly one provider");
+        }
+        if (hasOverride && (hasExr || baseUrlExplicit)) {
+            throw new IllegalStateException(
+                    "ELECTRUM_ENDPOINT is a single-indexer test override and cannot be combined"
+                            + " with BASE_URL or EXR_ENDPOINT");
+        }
     }
 
     public static JSONRPCMasterServer getMasterRpc() {
@@ -198,12 +226,50 @@ public final class App {
         String endpoint = getEnv("EXR_ENDPOINT");
         if (endpoint != null && !endpoint.isEmpty()) {
             exrEndpoint = endpoint;
-            exrServerPool = new EXRServerPool(endpoint);
-            LOGGER.info(
-                    "[app] EXR mode enabled with "
-                            + exrServerPool.getServerCount()
-                            + " servers: "
-                            + endpoint);
+            LOGGER.info("[app] EXR provider enabled: " + endpoint);
+        }
+    }
+
+    /**
+     * Applies {@code BASE_URL} from the environment.
+     *
+     * <p>Without this the variable documented for the direct provider was only read when {@code
+     * --development-endpoint} appeared with no value, so an environment-only deployment silently
+     * kept the built-in default. It also never marked the provider explicit, which hid a mixed
+     * BASE_URL + EXR_ENDPOINT configuration from {@link #validateProviderConfig()}.
+     */
+    public static void initBaseUrl() {
+        if (applyBaseUrl(getEnv("BASE_URL"))) {
+            LOGGER.info("[app] development provider enabled: " + baseUrl);
+        }
+    }
+
+    /** Records an environment-supplied base URL unless a flag or an earlier source already did. */
+    static boolean applyBaseUrl(String endpoint) {
+        String chosen = chooseBaseUrl(baseUrlExplicit, endpoint);
+        if (chosen == null) {
+            return false;
+        }
+        setBaseUrl(chosen);
+        return true;
+    }
+
+    /** Pure precedence rule: an already-committed or blank source never overrides. */
+    static String chooseBaseUrl(boolean alreadyExplicit, String endpoint) {
+        if (alreadyExplicit || endpoint == null || endpoint.isBlank()) {
+            return null;
+        }
+        return endpoint.trim();
+    }
+
+    public static void initElectrumEndpoint() {
+        if (electrumEndpoint != null) {
+            return;
+        }
+        String endpoint = getEnv("ELECTRUM_ENDPOINT");
+        if (endpoint != null && !endpoint.isEmpty()) {
+            electrumEndpoint = endpoint;
+            LOGGER.info("[app] native history enabled through " + endpoint);
         }
     }
 
@@ -277,6 +343,8 @@ public final class App {
         installFileHandler();
         installConsoleHandler();
         initExrEndpoint();
+        initBaseUrl();
+        initElectrumEndpoint();
         initCoinConfigs(args);
         console = new ConsoleMenu(args);
         console.init();
@@ -368,13 +436,6 @@ public final class App {
 
         if (console != null) {
             console.deinit();
-        }
-
-        FEE_UPDATE_HTTP_CLIENT.close();
-        HEIGHT_UPDATE_HTTP_CLIENT.close();
-
-        if (exrServerPool != null) {
-            exrServerPool.close();
         }
 
         MASTER_RPC.deinit();

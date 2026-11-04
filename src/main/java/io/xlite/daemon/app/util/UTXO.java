@@ -1,5 +1,7 @@
 package io.xlite.daemon.app.util;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
 
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
@@ -30,6 +32,45 @@ public class UTXO {
         long coinFactor =
                 CoinConfigRegistry.get(CoinTickerUtils.tickerToString(ticker)).coinFactor();
         return Sats.fromWholeCoins(wholeCoins, coinFactor);
+    }
+
+    /**
+     * One {@code blockchain.scripthash.listunspent} entry for a known address.
+     *
+     * <p>Both the discovery probe and the history engine read that shape, so the field names and
+     * the base-unit conversion live here once instead of at each call site.
+     *
+     * @param ticker the coin the row belongs to
+     * @param address the wallet address the query was made for
+     * @param row the provider entry
+     * @return the output, or null when the entry is not a complete unspent row
+     */
+    public static UTXO fromUnspentRow(CoinTicker ticker, String address, JsonObject row) {
+        if (row == null) {
+            return null;
+        }
+        JsonElement txHash = row.get("tx_hash");
+        JsonElement txPos = row.get("tx_pos");
+        JsonElement height = row.get("height");
+        JsonElement value = row.get("value");
+        if (isAbsent(txHash) || isAbsent(txPos) || isAbsent(height) || isAbsent(value)) {
+            return null;
+        }
+        try {
+            return new UTXO(
+                    ticker,
+                    address,
+                    txHash.getAsString(),
+                    txPos.getAsInt(),
+                    height.getAsInt(),
+                    value.getAsLong());
+        } catch (RuntimeException error) {
+            return null;
+        }
+    }
+
+    private static boolean isAbsent(JsonElement element) {
+        return element == null || element.isJsonNull();
     }
 
     @SerializedName("address")

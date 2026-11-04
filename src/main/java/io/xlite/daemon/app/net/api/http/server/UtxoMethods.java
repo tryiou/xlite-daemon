@@ -75,7 +75,10 @@ final class UtxoMethods {
                     "[http-server-handler] WARNING: Client requested UTXO that is not ours!");
             return RpcResponse.error(-5, "Invalid or non-wallet transaction ID (not ours)");
         }
-        return RpcResponse.ok(providerUtxo(txid, vout));
+        JsonObject provider = providerUtxo(txid, vout);
+        // providerUtxo answers either the utxo or an error envelope; wrapping that envelope would
+        // nest a response inside a result, which no client can read.
+        return RpcResponse.hasError(provider) ? provider : RpcResponse.ok(provider);
     }
 
     private JsonObject cachedUtxo(UTXO requested) {

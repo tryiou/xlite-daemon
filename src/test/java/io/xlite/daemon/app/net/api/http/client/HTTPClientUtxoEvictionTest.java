@@ -2,12 +2,19 @@ package io.xlite.daemon.app.net.api.http.client;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
+import io.xlite.daemon.app.net.electrumx.ElectrumApi;
+import io.xlite.daemon.app.net.electrumx.ScriptHashes;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.UTXO;
 
+import org.bitcoinj.core.Address;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,19 +23,19 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Eviction of backend-omitted addresses from the UTXO view.
+ * Eviction of provider-omitted addresses from the UTXO view.
  *
- * <p>A successful getutxos response that omits a tracked address (or flags it in the backend
- * "errors" array) means the backend holds no unspent outputs for it. Stored rows for such addresses
- * must be dropped: otherwise a stale view re-serves dead outputs with live-looking confirmations
- * indefinitely (live 2026-09-24: hub rejects on just-spent fee/funding inputs the wallet kept
- * listing). Whole-batch failures (null / unparseable) must keep old rows (an outage must never wipe
- * the wallet).
+ * <p>{@code processUtxos} only clears addresses present in a response, so an address the provider
+ * reports as holding nothing must be evicted explicitly. Without that a spent output keeps showing
+ * live-looking confirmations forever. A whole-call failure must instead keep the stored rows: an
+ * outage must never wipe the wallet.
  */
 public class HTTPClientUtxoEvictionTest {
 
@@ -37,24 +44,69 @@ public class HTTPClientUtxoEvictionTest {
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
                     + " abandon about";
     private static final String PASSWORD = "eviction-test-password";
+    private static final String TX_A =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private static final String TX_B =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private static final long ROW_VALUE = 1000599;
 
     @TempDir Path tempDir;
 
     private CoinInstance coin;
     private String addrA;
     private String addrB;
+    private FakeApi api;
 
-    /** Canned backend: overrides the package-private transport, no network. */
-    static class CannedClient extends HTTPClient {
-        String canned;
+    /** One native session: per-scripthash unspent rows, no network. */
+    static final class FakeApi implements ElectrumApi {
+        final Map<String, JsonArray> rows = new HashMap<>();
+        boolean failing;
 
-        CannedClient() {
-            super(2);
+        @Override
+        public void setListener(io.xlite.daemon.app.net.electrumx.ElectrumClient.Listener l) {}
+
+        @Override
+        public void start() {}
+
+        @Override
+        public boolean isConnected() {
+            return true;
         }
 
         @Override
-        String executeRequest(String endpoint, com.google.gson.JsonObject params) {
-            return canned;
+        public CompletableFuture<JsonElement> request(String method, JsonArray params) {
+            CompletableFuture<JsonElement> result = new CompletableFuture<>();
+            if (failing) {
+                result.completeExceptionally(new IllegalStateException("provider down"));
+                return result;
+            }
+            result.complete(rows.getOrDefault(params.get(0).getAsString(), new JsonArray()));
+            return result;
+        }
+
+        @Override
+        public List<CompletableFuture<JsonElement>> batch(List<Call> calls) {
+            List<CompletableFuture<JsonElement>> futures = new ArrayList<>();
+            for (Call call : calls) {
+                futures.add(request(call.method(), call.params()));
+            }
+            return futures;
+        }
+
+        @Override
+        public void close() {}
+    }
+
+    static final class FakeClient extends HTTPClient {
+        private final FakeApi api;
+
+        FakeClient(FakeApi api) {
+            this.api = api;
+        }
+
+        @Override
+        ElectrumApi api(CoinTicker ticker) {
+            return api;
         }
     }
 
@@ -73,6 +125,7 @@ public class HTTPClientUtxoEvictionTest {
         addrA = pairs.get(0).getAddress().toBase58();
         addrB = pairs.get(1).getAddress().toBase58();
         assertNotEquals(addrA, addrB);
+        api = new FakeApi();
     }
 
     private void installCoinConfig() {
@@ -113,14 +166,23 @@ public class HTTPClientUtxoEvictionTest {
         CoinInstance.getCoinInstances().clear();
     }
 
-    // Well-formed 64-hex txids so the getAllUTXOS rendering path parses them
-    // (short placeholders are skipped as unparseable and would bypass the
-    // end-to-end fetch assertions below).
-    private static final String TX_A =
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    private static final String TX_B =
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    private static final double ROW_VALUE = 0.01000599;
+    /** Publish the unspent rows for one address, keyed by its native script hash. */
+    private void setRows(String address, String txid, int vout) {
+        JsonArray entries = new JsonArray();
+        if (txid != null) {
+            JsonObject row = new JsonObject();
+            row.addProperty("tx_hash", txid);
+            row.addProperty("tx_pos", vout);
+            row.addProperty("height", 100);
+            row.addProperty("value", ROW_VALUE);
+            entries.add(row);
+        }
+        api.rows.put(scripthash(address), entries);
+    }
+
+    private String scripthash(String address) {
+        return ScriptHashes.scripthash(Address.fromString(coin.getNetworkParameters(), address));
+    }
 
     private static double balanceOf(CoinInstance c, String addr) {
         AddressBalance balance = c.getAddressBalance(addr);
@@ -128,102 +190,76 @@ public class HTTPClientUtxoEvictionTest {
         return balance.getBalanceProp();
     }
 
-    private static String utxoRow(String address, String txid, int vout) {
-        return "{\"address\":\""
-                + address
-                + "\",\"txhash\":\""
-                + txid
-                + "\",\"vout\":"
-                + vout
-                + ",\"block_number\":100,\"value\":0.01000599}";
-    }
-
     private static List<String> txidsOf(CoinInstance c, String addr) {
         AddressBalance balance = c.getAddressBalance(addr);
         List<String> out = new ArrayList<>();
         if (balance != null) {
-            for (UTXO u : balance.getUtxos()) {
-                out.add(u.getTxid());
+            for (UTXO utxo : balance.getUtxos()) {
+                out.add(utxo.getTxid());
             }
         }
         return out;
     }
 
     @Test
-    void testOmittedAddressRowsEvictedOnNextSuccessfulFetch() {
-        CannedClient client = new CannedClient();
-        client.canned =
-                "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
+    void omittedAddressRowsAreEvictedOnNextFetch() {
+        FakeClient client = new FakeClient(api);
+        setRows(addrA, TX_A, 0);
+        setRows(addrB, TX_B, 0);
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
         assertEquals(List.of(TX_B), txidsOf(coin, addrB));
-        assertEquals(ROW_VALUE, balanceOf(coin, addrA), 1e-9);
-        assertEquals(ROW_VALUE, balanceOf(coin, addrB), 1e-9);
+        assertEquals(0.01000599, balanceOf(coin, addrA), 1e-9);
 
-        // Backend now omits addrB: its stored row must go, addrA untouched.
-        client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "]}";
+        setRows(addrB, null, 0);
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
         assertTrue(
                 txidsOf(coin, addrB).isEmpty(),
-                "backend-omitted address kept stale rows: " + txidsOf(coin, addrB));
-        // Eviction must also drop the cached balance: without a recalculation
-        // the address keeps reporting its old getbalance after its rows go.
-        assertEquals(ROW_VALUE, balanceOf(coin, addrA), 1e-9);
+                "provider-omitted address kept stale rows: " + txidsOf(coin, addrB));
+        assertEquals(0.01000599, balanceOf(coin, addrA), 1e-9);
         assertEquals(0.0, balanceOf(coin, addrB), 1e-9);
     }
 
     @Test
-    void testBackendErrorArrayEvictsFlaggedAddress() {
-        CannedClient client = new CannedClient();
-        client.canned =
-                "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
+    void wholeCallFailureKeepsStoredRows() {
+        FakeClient client = new FakeClient(api);
+        setRows(addrA, TX_A, 0);
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
-
-        // Both present but backend flags addrB failed: addrB rows must go.
-        client.canned =
-                "{\"utxos\":["
-                        + utxoRow(addrA, TX_A, 0)
-                        + ","
-                        + utxoRow(addrB, TX_B, 0)
-                        + "],"
-                        + "\"errors\":[{\"address\":\""
-                        + addrB
-                        + "\",\"message\":\"boom\"}]}";
-        assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
-        assertEquals(List.of(TX_A), txidsOf(coin, addrA));
-        assertTrue(txidsOf(coin, addrB).isEmpty());
-        assertEquals(ROW_VALUE, balanceOf(coin, addrA), 1e-9);
-        assertEquals(0.0, balanceOf(coin, addrB), 1e-9);
-    }
-
-    @Test
-    void testWholeBatchFailureKeepsStoredRows() {
-        CannedClient client = new CannedClient();
-        client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "]}";
-        assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
-
-        // Backend outage envelope (no "utxos" key): outage must never wipe.
-        client.canned =
-                "{\"result\":null,\"error\":{\"code\":-32000,\"message\":\"All addresses"
-                        + " failed\"}}";
+        api.failing = true;
         assertNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(List.of(TX_A), txidsOf(coin, addrA));
     }
 
     @Test
-    void testSpentMarkedRowsSurviveEviction() {
-        CannedClient client = new CannedClient();
-        client.canned =
-                "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "," + utxoRow(addrB, TX_B, 0) + "]}";
+    void spentMarkedRowsSurviveEviction() {
+        FakeClient client = new FakeClient(api);
+        setRows(addrA, TX_A, 0);
+        setRows(addrB, TX_B, 0);
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
-        // Wallet-originated spend marker must survive address eviction.
-        for (UTXO u : coin.getAddressBalance(addrB).getUtxos()) {
-            u.setSpent(true);
+        for (UTXO utxo : coin.getAddressBalance(addrB).getUtxos()) {
+            utxo.setSpent(true);
         }
-        client.canned = "{\"utxos\":[" + utxoRow(addrA, TX_A, 0) + "]}";
+        setRows(addrB, null, 0);
         assertNotNull(client.getUtxos(CoinTicker.BLOCKNET, 0));
         assertEquals(1, coin.getAddressBalance(addrB).getSpentUtxos().size());
         assertTrue(txidsOf(coin, addrB).isEmpty());
+    }
+
+    @Test
+    void unspentRowsCarryTheRpcSurfaceFields() {
+        FakeClient client = new FakeClient(api);
+        setRows(addrA, TX_A, 1);
+        JsonArray rows = client.getUtxosUncached(CoinTicker.BLOCKNET, new String[] {addrA});
+        assertNotNull(rows);
+        assertEquals(1, rows.size());
+        JsonObject row = rows.get(0).getAsJsonObject();
+        assertEquals(TX_A, row.get("txid").getAsString());
+        assertEquals(1, row.get("vout").getAsInt());
+        assertEquals(addrA, row.get("address").getAsString());
+        assertEquals(0.01000599, row.get("value").getAsDouble(), 1e-9);
+        assertTrue(row.get("spendable").getAsBoolean());
+        assertTrue(row.has("scriptPubKey"));
+        assertTrue(row.has("confirmations"));
     }
 }

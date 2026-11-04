@@ -52,13 +52,41 @@ public final class HTTPServerHandler extends SimpleChannelInboundHandler<FullHtt
     private static final Set<String> SENSITIVE_METHODS =
             Set.of("importprivkey", "dumpprivkey", "signmessage");
 
+    /**
+     * Methods that answer from local wallet state and therefore keep working while the provider is
+     * not serving this coin.
+     *
+     * <p>Everything else reads chain data and stays behind the {@code 503 -1112} gate: a wallet
+     * whose indexer is down can still report who it is and what it is waiting for, but it must not
+     * answer "no unspents" for a chain it cannot see.
+     */
+    private static final Set<String> LOCAL_METHODS =
+            Set.of(
+                    "help",
+                    "version",
+                    "ping",
+                    "reloadconfig",
+                    "getinfo",
+                    "getnetworkinfo",
+                    "getfees",
+                    "getblockchaininfo",
+                    "getblockcount",
+                    "getaddressesbyaccount",
+                    "getnewaddress",
+                    "importprivkey",
+                    "dumpprivkey",
+                    "validateaddress",
+                    "historystatus",
+                    "signmessage",
+                    "verifymessage");
+
     private final CoinInstance coin;
     private final ConfigHelper configHelper;
     private final HTTPClient httpClient;
     private final Map<String, RpcMethod> methods;
 
     HTTPServerHandler(CoinInstance coin) {
-        this(coin, new HTTPClient(5));
+        this(coin, new HTTPClient());
     }
 
     /** The client is owned by the caller, which closes it with the channel. */
@@ -76,7 +104,7 @@ public final class HTTPServerHandler extends SimpleChannelInboundHandler<FullHtt
         register(methods, new ServerMethods(coin).methods());
         register(methods, new NetworkMethods(coin).methods());
         register(methods, new ChainMethods(coin, httpClient).methods());
-        register(methods, new WalletMethods(coin, httpClient).methods());
+        register(methods, new WalletMethods(coin).methods());
         register(methods, new UtxoMethods(coin, httpClient, utxos).methods());
         register(methods, new RawTransactionMethods(coin, httpClient, utxos, nTimes).methods());
         register(methods, new SendTransactionMethod(coin, httpClient, utxos, nTimes).methods());
@@ -153,10 +181,22 @@ public final class HTTPServerHandler extends SimpleChannelInboundHandler<FullHtt
             return;
         }
 
-        JsonObject response =
-                invoke(
-                        jsonRequest.get("method").getAsString(),
-                        jsonRequest.get("params").getAsJsonArray());
+        JsonObject response;
+        String method = jsonRequest.get("method").getAsString();
+        String normalizedMethod = method.toLowerCase(Locale.ROOT);
+        if (!coin.isInstanceRunning()
+                && !LOCAL_METHODS.contains(normalizedMethod)
+                && methods.containsKey(normalizedMethod)) {
+            // Same response the gate always produced, now scoped to the methods that need chain
+            // data. A local method must answer or the caller cannot even see that the coin exists.
+            writeAndClose(
+                    ctx,
+                    request,
+                    HttpResponseStatus.SERVICE_UNAVAILABLE,
+                    RpcResponse.error(-1112, "This coin is temporarily unavailable."));
+            return;
+        }
+        response = invoke(method, jsonRequest.get("params").getAsJsonArray());
 
         FullHttpResponse httpResponse =
                 new DefaultFullHttpResponse(
@@ -169,20 +209,16 @@ public final class HTTPServerHandler extends SimpleChannelInboundHandler<FullHtt
     }
 
     /**
-     * The first guard the request fails, in the order the response contract defines.
+     * The transport guards: authentication, then the HTTP shape.
      *
      * <p>Authentication is checked first: an unauthenticated caller learns nothing about the wallet
-     * beyond the fact that it must authenticate, whatever else is wrong with the request.
+     * beyond the fact that it must authenticate, whatever else is wrong with the request. Whether
+     * the coin can serve chain data is a per-method question, decided after the envelope is parsed,
+     * so local wallet methods keep answering while the provider is down.
      */
     private Rejection rejection(FullHttpRequest request) {
         if (!authorized(request)) {
             return new Rejection(HttpResponseStatus.FORBIDDEN, -1111, "Unauthorized!");
-        }
-        if (!coin.isInstanceRunning()) {
-            return new Rejection(
-                    HttpResponseStatus.SERVICE_UNAVAILABLE,
-                    -1112,
-                    "This coin is temporarily unavailable.");
         }
         if (!HttpMethod.POST.equals(request.method())) {
             return new Rejection(

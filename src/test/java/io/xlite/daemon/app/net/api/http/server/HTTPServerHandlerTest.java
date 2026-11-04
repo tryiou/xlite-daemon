@@ -1,6 +1,7 @@
 package io.xlite.daemon.app.net.api.http.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,16 +51,21 @@ class HTTPServerHandlerTest {
     private static final String PASS = "testpass";
     private static final String TXID = "00".repeat(32);
 
-    private final CoinInstance coin = mock(CoinInstance.class);
-    private final HTTPClient httpClient = mock(HTTPClient.class);
-
     private HTTPServerHandler newHandler() {
+        return newHandler(true);
+    }
+
+    private HTTPServerHandler newHandler(boolean providerServing) {
+        // Fresh mocks per handler: reloadconfig schedules a delayed call on the
+        // coin, and a shared mock would let that thread race the next stub.
+        CoinInstance coin = mock(CoinInstance.class);
+        HTTPClient httpClient = mock(HTTPClient.class);
         ConfigHelper configHelper = mock(ConfigHelper.class);
         org.mockito.Mockito.when(coin.getConfigHelper()).thenReturn(configHelper);
         org.mockito.Mockito.when(configHelper.getRpcUsername()).thenReturn(USER);
         org.mockito.Mockito.when(configHelper.getRpcPassword()).thenReturn(PASS);
         org.mockito.Mockito.when(coin.getTicker()).thenReturn(CoinTicker.BLOCKNET);
-        org.mockito.Mockito.when(coin.isInstanceRunning()).thenReturn(true);
+        org.mockito.Mockito.when(coin.isInstanceRunning()).thenReturn(providerServing);
         HTTPServerHandler handler = new HTTPServerHandler(coin, httpClient);
         JsonObject txError = new JsonObject();
         JsonObject txErrorDetail = new JsonObject();
@@ -75,6 +81,11 @@ class HTTPServerHandlerTest {
     }
 
     private FullHttpResponse post(HttpMethod method, String uri, String body) {
+        return post(newHandler(), method, uri, body);
+    }
+
+    private FullHttpResponse post(
+            HTTPServerHandler handler, HttpMethod method, String uri, String body) {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         FullHttpRequest request =
                 new DefaultFullHttpRequest(
@@ -84,7 +95,7 @@ class HTTPServerHandlerTest {
                         .encodeToString((USER + ":" + PASS).getBytes(StandardCharsets.UTF_8));
         request.headers().set(HttpHeaderNames.AUTHORIZATION, "Basic " + credentials);
         request.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, bytes.length);
-        EmbeddedChannel channel = new EmbeddedChannel(newHandler());
+        EmbeddedChannel channel = new EmbeddedChannel(handler);
         try {
             channel.writeInbound(request);
             channel.flush();
@@ -126,6 +137,53 @@ class HTTPServerHandlerTest {
                     error.has("message") && error.get("message").isJsonPrimitive(),
                     "error message for: " + body);
         }
+    }
+
+    @Test
+    void aLocalMethodAnswersWhileTheProviderIsDown() {
+        FullHttpResponse response =
+                post(
+                        newHandler(false),
+                        HttpMethod.POST,
+                        "/",
+                        "{\"method\":\"historystatus\",\"params\":[]}");
+        assertEquals(HttpResponseStatus.OK, response.status());
+        JsonObject result = envelopeOf(response).getAsJsonObject("result");
+        assertFalse(result.get("native").getAsBoolean());
+    }
+
+    @Test
+    void aChainDataMethodStaysUnavailableWhileTheProviderIsDown() {
+        FullHttpResponse response =
+                post(
+                        newHandler(false),
+                        HttpMethod.POST,
+                        "/",
+                        "{\"method\":\"listunspent\",\"params\":[]}");
+        assertEquals(HttpResponseStatus.SERVICE_UNAVAILABLE, response.status());
+        assertEquals(-1112, errorCode(response));
+    }
+
+    @Test
+    void anUnknownMethodIsNotFoundRatherThanUnavailable() {
+        FullHttpResponse response =
+                post(
+                        newHandler(false),
+                        HttpMethod.POST,
+                        "/",
+                        "{\"method\":\"nosuchmethod\",\"params\":[]}");
+        assertEquals(HttpResponseStatus.OK, response.status());
+        assertEquals(-32601, errorCode(response));
+    }
+
+    @Test
+    void gettxoutDoesNotNestAnUpstreamEnvelope() {
+        FullHttpResponse response =
+                post("{\"method\":\"gettxout\",\"params\":[\"" + TXID + "\",0]}");
+        assertEquals(HttpResponseStatus.OK, response.status());
+        JsonObject envelope = envelopeOf(response);
+        assertTrue(envelope.get("result").isJsonNull(), "the upstream failure leaked into result");
+        assertEquals(-5, errorCode(response));
     }
 
     @Test

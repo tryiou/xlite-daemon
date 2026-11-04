@@ -44,7 +44,7 @@ final class NetworkMethods {
         info.addProperty("difficulty", 0.0);
         // Static because the peer-to-peer path is being retired: chain data comes from a provider.
         info.addProperty("connections", 1);
-        info.addProperty("blocks", CoinInstance.getBlockCountByTicker(coin.getTicker()));
+        info.addProperty("blocks", chainHeight());
         info.addProperty("keypoolsize", coin.getAddressKeyPairs().size());
         info.addProperty("keypoololdest", 0.0);
         info.addProperty("relayfee", relayFee());
@@ -55,7 +55,18 @@ final class NetworkMethods {
     }
 
     private JsonObject blockCount() {
-        return RpcResponse.ok(CoinInstance.getBlockCountByTicker(coin.getTicker()));
+        return RpcResponse.ok(chainHeight());
+    }
+
+    /**
+     * The provider's tip, or 0 while the coin has no session.
+     *
+     * <p>The cache's negative sentinel means "never polled"; a Bitcoin-RPC client reads {@code
+     * blocks} as a count, so an unsynchronised coin reports 0 rather than -1. The readiness flag is
+     * {@code rpcready}, not this number.
+     */
+    private int chainHeight() {
+        return Math.max(0, CoinInstance.getBlockCountByTicker(coin.getTicker()));
     }
 
     private JsonObject getNetworkInfo() {
@@ -79,8 +90,8 @@ final class NetworkMethods {
     private JsonObject blockchainInfo() {
         JsonObject blockchainInfo = new JsonObject();
         blockchainInfo.addProperty("chain", coin.getNetworkParameters().getPaymentProtocolId());
-        blockchainInfo.addProperty("blocks", CoinInstance.getBlockCountByTicker(coin.getTicker()));
-        blockchainInfo.addProperty("headers", CoinInstance.getBlockCountByTicker(coin.getTicker()));
+        blockchainInfo.addProperty("blocks", chainHeight());
+        blockchainInfo.addProperty("headers", chainHeight());
         blockchainInfo.addProperty("verificationprogress", 1.0);
         blockchainInfo.addProperty("difficulty", 0.0);
         blockchainInfo.addProperty("initialblockdownload", false);

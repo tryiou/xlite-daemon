@@ -1,11 +1,12 @@
 package io.xlite.daemon.app.net.api.http.server;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.subgraph.orchid.encoders.Hex;
 
 import io.xlite.daemon.app.net.CoinInstance;
-import io.xlite.daemon.app.net.api.http.client.HTTPClient;
+import io.xlite.daemon.app.net.electrumx.HistoryEngine;
 import io.xlite.daemon.app.util.AddressBalance;
 import io.xlite.daemon.app.util.Utility;
 
@@ -23,19 +24,16 @@ import java.util.Map;
 /** Wallet methods: addresses, keys and local history. */
 final class WalletMethods {
 
-    private static final int HISTORY_EXPIRY_SECONDS = 60 * 15;
-
     private final CoinInstance coin;
-    private final HTTPClient httpClient;
 
-    WalletMethods(CoinInstance coin, HTTPClient httpClient) {
+    WalletMethods(CoinInstance coin) {
         this.coin = coin;
-        this.httpClient = httpClient;
     }
 
     Map<String, RpcMethod> methods() {
         return Map.of(
                 "listtransactions", this::listTransactions,
+                "historystatus", this::historyStatus,
                 "getaddressesbyaccount", this::addressesByAccount,
                 "getnewaddress", this::newAddress,
                 "importprivkey", this::importPrivateKey,
@@ -50,12 +48,43 @@ final class WalletMethods {
             startTime = params.get(0).getAsInt();
             endTime = params.get(1).getAsInt();
         }
-        JsonArray transactions =
-                httpClient.getHistory(coin.getTicker(), startTime, endTime, HISTORY_EXPIRY_SECONDS);
-        if (transactions == null) {
+        HistoryEngine engine = coin.getHistoryEngine();
+        if (engine == null || !engine.isReady()) {
             return RpcResponse.error(3002, "listtransactions not ready");
         }
-        return RpcResponse.ok(transactions);
+        return RpcResponse.ok(filterHistory(coin.getAllTransactions(), startTime, endTime));
+    }
+
+    /** Time-window view of the in-memory snapshot; pending rows are always included. */
+    private static JsonArray filterHistory(JsonArray rows, int startTime, int endTime) {
+        JsonArray filtered = new JsonArray();
+        for (JsonElement element : rows) {
+            JsonObject row = element.getAsJsonObject();
+            int time = row.has("time") ? row.get("time").getAsInt() : 0;
+            int confirmations = row.has("confirmations") ? row.get("confirmations").getAsInt() : 0;
+            boolean pending = confirmations == 0;
+            if (pending || endTime <= 0 || (time >= startTime && time <= endTime)) {
+                filtered.add(row);
+            }
+        }
+        return filtered;
+    }
+
+    private JsonObject historyStatus(JsonArray params) {
+        JsonObject status = new JsonObject();
+        HistoryEngine engine = coin.getHistoryEngine();
+        status.addProperty("native", engine != null);
+        if (engine == null) {
+            status.addProperty("ready", false);
+            return RpcResponse.ok(status);
+        }
+        HistoryEngine.Status snapshot = engine.status();
+        status.addProperty("ready", snapshot.ready());
+        status.addProperty("addresses", snapshot.addresses());
+        status.addProperty("loaded", snapshot.loaded());
+        status.addProperty("rows", snapshot.rows());
+        status.addProperty("tip", snapshot.tip());
+        return RpcResponse.ok(status);
     }
 
     private JsonObject addressesByAccount(JsonArray params) {

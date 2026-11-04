@@ -6,7 +6,6 @@ import io.xlite.daemon.app.crypto.KeyHandler;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
-import io.xlite.daemon.app.net.api.http.client.EXRServerPool;
 import io.xlite.daemon.app.util.CoinConfigEnsurer;
 import io.xlite.daemon.app.util.ConfigHelper;
 import io.xlite.daemon.app.util.SecureTokens;
@@ -21,9 +20,11 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -38,11 +39,15 @@ public class ConsoleMenu {
     /** No argument position: the secret has to be prompted for. */
     private static final int NO_ARGUMENT = -1;
 
+    /** Upper bound on waiting for coin initialisation before the master endpoint starts. */
+    private static final int COIN_INIT_TIMEOUT_SECONDS = 30;
+
     private static final Set<String> STARTUP_FLAGS =
             Set.of(
                     "--enablerpcandconfigure",
                     "--development-endpoint",
                     "--exr-endpoint",
+                    "--electrum-endpoint",
                     "--blockchain-configuration-files",
                     "--version",
                     "--help");
@@ -88,6 +93,9 @@ public class ConsoleMenu {
         String newWalletStr =
                 KeyHandler.existsBaseECKeyFromLocal() ? "- Disabled. Wallet already exists." : "";
 
+        // Environment variables are already applied; refuse a mixed pair before any
+        // wallet work. Flag-provided endpoints re-check as each one is applied.
+        validateProviderOrExit();
         if (arguments.length > 0 && handleArguments(input)) {
             return;
         }
@@ -95,6 +103,16 @@ public class ConsoleMenu {
             return;
         }
         interactiveMenu(input, newWalletStr);
+    }
+
+    /** Refuses a mixed provider configuration, ending the process instead of starting one. */
+    private static void validateProviderOrExit() {
+        try {
+            App.validateProviderConfig();
+        } catch (IllegalStateException error) {
+            LOGGER.severe(error.getMessage());
+            System.exit(1);
+        }
     }
 
     /** Handles the command-line flags. Returns true when startup is finished and no menu is due. */
@@ -125,6 +143,7 @@ public class ConsoleMenu {
             }
             case "--development-endpoint" -> setDevelopmentEndpoint(index);
             case "--exr-endpoint" -> setExrEndpoint(index);
+            case "--electrum-endpoint" -> setElectrumEndpoint(index);
             case "--blockchain-configuration-files" -> consumeConfigSourceValue(index);
             case "--version" -> {
                 LOGGER.info(Version.CLIENT_VERSION);
@@ -181,11 +200,13 @@ public class ConsoleMenu {
                 return index;
             }
             App.setBaseUrl(customEndpoint);
+            validateProviderOrExit();
             return index + 1;
         }
         String envEndpoint = App.getEnv("BASE_URL");
         if (envEndpoint != null && !envEndpoint.isEmpty()) {
             App.setBaseUrl(envEndpoint);
+            validateProviderOrExit();
         } else {
             LOGGER.warning("Missing custom endpoint after '--development-endpoint'");
         }
@@ -211,15 +232,31 @@ public class ConsoleMenu {
         return index;
     }
 
+    private int setElectrumEndpoint(int index) {
+        if (index + 1 < arguments.length) {
+            String endpoint = arguments[index + 1];
+            if (endpoint.startsWith("--")) {
+                LOGGER.warning("Invalid endpoint: " + endpoint);
+                return index;
+            }
+            App.setElectrumEndpoint(endpoint);
+            LOGGER.info("[console] native history enabled through " + endpoint);
+            return index + 1;
+        }
+        String envEndpoint = App.getEnv("ELECTRUM_ENDPOINT");
+        if (envEndpoint != null && !envEndpoint.isEmpty()) {
+            App.setElectrumEndpoint(envEndpoint);
+            LOGGER.info("[console] native history enabled through " + envEndpoint);
+        } else {
+            LOGGER.warning("Missing endpoint after '--electrum-endpoint'");
+        }
+        return index;
+    }
+
     private void enableExr(String endpoint) {
         App.setExrEndpoint(endpoint);
-        App.setExrServerPool(new EXRServerPool(App.getExrEndpoint()));
-        LOGGER.info(
-                "[console] EXR mode enabled with "
-                        + App.getExrServerPool().getServerCount()
-                        + " servers: "
-                        + App.getExrEndpoint());
-        spawnExrCapabilityProbe();
+        LOGGER.info("[console] EXR provider enabled: " + endpoint);
+        validateProviderOrExit();
     }
 
     private int consumeConfigSourceValue(int index) {
@@ -590,9 +627,6 @@ public class ConsoleMenu {
         // shutdown.
         Thread timerAnchor = new Thread(backgroundTimerThread, "background-timer-anchor");
         timerAnchor.start();
-        if (App.getExrServerPool() != null) {
-            App.getExrServerPool().probeAllCapabilities();
-        }
     }
 
     private void initializeCoinsConcurrently(
@@ -663,7 +697,7 @@ public class ConsoleMenu {
                                             executor))
                             .toArray(CompletableFuture[]::new);
 
-            CompletableFuture.allOf(futures).join();
+            awaitCoins(futures);
 
         } finally {
             executor.shutdown();
@@ -679,23 +713,26 @@ public class ConsoleMenu {
     }
 
     /**
-     * Deferred best-effort capability probe for a freshly configured EXR pool. Daemon thread: a
-     * hung endpoint must never hold the JVM.
+     * Waits for coin initialisation without letting one wedged coin hold the master endpoint — the
+     * GUI's readiness signal — closed. Coins run on daemon threads, so a straggler keeps finishing
+     * in the background and the master listener starts regardless.
      */
-    private void spawnExrCapabilityProbe() {
-        Thread prober =
-                new Thread(
-                        () -> {
-                            try {
-                                Thread.sleep(1000);
-                                App.getExrServerPool().probeAllCapabilities();
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                            }
-                        },
-                        "EXR-Capability-Prober");
-        prober.setDaemon(true);
-        prober.start();
+    private static void awaitCoins(CompletableFuture<?>[] futures) {
+        if (futures.length == 0) {
+            return;
+        }
+        try {
+            CompletableFuture.allOf(futures).get(COIN_INIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            LOGGER.warning(
+                    "[coin] Coin initialization still running after "
+                            + COIN_INIT_TIMEOUT_SECONDS
+                            + "s; starting the master endpoint anyway");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            LOGGER.warning("[coin] Coin initialization failed: " + e.getMessage());
+        }
     }
 
     private void autoGenerateRPCConfig() {
@@ -749,6 +786,8 @@ public class ConsoleMenu {
                 + "  --exr-endpoint             Set EXR endpoint for EXR server\n"
                 + "                             Example: --exr-endpoint"
                 + " <http://exrproxy1.airdns.org:42114>\n"
+                + "  --electrum-endpoint        Base URL of the native ElectrumX hub\n"
+                + "                             Example: --electrum-endpoint ws://127.0.0.1:5000\n"
                 + "  --blockchain-configuration-files  Set blockchain-configuration-files"
                 + " source\n"
                 + "                             Example: --blockchain-configuration-files"

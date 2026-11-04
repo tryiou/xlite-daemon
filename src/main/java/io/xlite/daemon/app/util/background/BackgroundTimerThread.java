@@ -1,9 +1,7 @@
 package io.xlite.daemon.app.util.background;
 
-import io.xlite.daemon.app.App;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTickerUtils;
-import io.xlite.daemon.app.net.api.http.client.HTTPClient;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeerGroup;
 import io.xlite.daemon.app.util.LogRotationUtil;
@@ -33,7 +31,6 @@ public class BackgroundTimerThread implements Runnable {
     private static final int KEEPALIVE_INTERVAL = 10000;
 
     private BlocknetPeerGroup blocknetPeerGroup;
-    private HTTPClient heightUpdateHttpClient;
 
     private long lastKeepAliveTime;
 
@@ -58,7 +55,6 @@ public class BackgroundTimerThread implements Runnable {
         blocknetPeerGroup =
                 CoinInstance.getInstance(CoinInstance.getActiveBlocknetNetwork())
                         .getBlocknetPeerGroup();
-        heightUpdateHttpClient = App.getHeightUpdateHttpClient();
 
         lastKeepAliveTime = 0;
 
@@ -155,7 +151,8 @@ public class BackgroundTimerThread implements Runnable {
             }
 
             String name = CoinTickerUtils.tickerToString(coinInstance.getTicker());
-            if (CoinInstance.getBlockCountByTicker(coinInstance.getTicker()) > 0) {
+            // The same truth the RPC gate and getinfo.rpcready use: the engine is serving.
+            if (coinInstance.isInstanceRunning()) {
                 available.add(name);
             } else {
                 unavailable.add(name);
@@ -182,65 +179,41 @@ public class BackgroundTimerThread implements Runnable {
             return;
         }
 
-        if (HTTP_BLOCK_COUNT_UPDATES) {
-            heightUpdateHttpClient.getAllBlockCounts();
-        } else if (!blocknetPeerGroup.getConnectedPeers().isEmpty()) {
-            for (BlocknetPeer blocknetPeer : blocknetPeerGroup.getConnectedPeers()) {
-                XRouterConfiguration xRouterConfiguration = blocknetPeer.getxRouterConfiguration();
-                if (xRouterConfiguration == null) {
-                    continue;
-                }
-
-                for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-                    if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
-                        continue;
-                    } else if (!blocknetPeer
-                            .getxRouterConfiguration()
-                            .getSupportedWallets()
-                            .contains(coinInstance.getNetworkParameters().getId())) {
-                        continue;
-                    }
-
-                    coinInstance.sendXrGetBlockCount(blocknetPeer);
-                    LOGGER.finer(
-                            "[BackgroundTimer] Sent keepalive message: "
-                                    + coinInstance.getNetworkParameters().getId());
-                }
-            }
-        } else {
-            return;
+        if (blocknetPeerGroup != null && !blocknetPeerGroup.getConnectedPeers().isEmpty()) {
+            sendXRouterKeepAlive();
         }
 
         lastKeepAliveTime = System.currentTimeMillis();
+    }
+
+    /** Dormant XRouter-over-p2p keepalive; it only runs when heights are not polled. */
+    private void sendXRouterKeepAlive() {
+        for (BlocknetPeer blocknetPeer : blocknetPeerGroup.getConnectedPeers()) {
+            XRouterConfiguration xRouterConfiguration = blocknetPeer.getxRouterConfiguration();
+            if (xRouterConfiguration == null) {
+                continue;
+            }
+            for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
+                if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
+                    continue;
+                } else if (!blocknetPeer
+                        .getxRouterConfiguration()
+                        .getSupportedWallets()
+                        .contains(coinInstance.getNetworkParameters().getId())) {
+                    continue;
+                }
+                coinInstance.sendXrGetBlockCount(blocknetPeer);
+                LOGGER.finer(
+                        "[BackgroundTimer] Sent keepalive message: "
+                                + coinInstance.getNetworkParameters().getId());
+            }
+        }
     }
 
     @Override
     public void run() {
         workerThread = Thread.currentThread();
         LOGGER.finer("[BackgroundTimer] Waiting until initial messages are sent off.");
-
-        for (CoinInstance coinInstance : CoinInstance.getCoinInstances()) {
-            if (!CoinTickerUtils.isActiveTicker(coinInstance.getTicker())) {
-                continue;
-            }
-
-            Thread historyThread =
-                    new Thread(
-                            () -> {
-                                App.getFeeUpdateHttpClient()
-                                        .getHistory(
-                                                coinInstance.getTicker(),
-                                                0,
-                                                (int) System.currentTimeMillis(),
-                                                30000);
-                            },
-                            "history-fetch-"
-                                    + CoinTickerUtils.tickerToString(coinInstance.getTicker()));
-            // Daemon: a blocking initial-history fetch must never keep the
-            // JVM alive past shutdown.
-            historyThread.setDaemon(true);
-            historyThread.start();
-        }
 
         while (!Thread.currentThread().isInterrupted()) {
             if (shutdownRequested) {

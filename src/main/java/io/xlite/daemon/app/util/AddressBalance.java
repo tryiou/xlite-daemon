@@ -66,6 +66,36 @@ public class AddressBalance {
         }
     }
 
+    /**
+     * Makes this address's unspent set exactly {@code fresh}, and recomputes the balance.
+     *
+     * <p>An empty set is a real answer, not a missing one: the address holds nothing unspent, so
+     * the balance drops to zero instead of keeping a dead row alive. Rows the provider lists again
+     * are replaced rather than deduplicated against the spent history, which is what makes a
+     * reorged output spendable again.
+     *
+     * @param fresh the provider's unspent outputs for this address
+     * @return how many rows were added
+     */
+    public int replaceUnspents(List<UTXO> fresh) {
+        synchronized (this) {
+            utxos.removeIf(existing -> !existing.isSpent() || matchesAny(existing, fresh));
+            utxos.addAll(fresh);
+            calculateBalance();
+            return fresh.size();
+        }
+    }
+
+    /** True when {@code row} describes one of the outputs in {@code fresh}. */
+    private static boolean matchesAny(UTXO row, List<UTXO> fresh) {
+        for (UTXO candidate : fresh) {
+            if (candidate.getTxid().equals(row.getTxid()) && candidate.getVout() == row.getVout()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean addUtxo(UTXO utxo) {
         Preconditions.checkNotNull(utxo);
         synchronized (this) {

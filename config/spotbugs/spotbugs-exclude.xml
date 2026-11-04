@@ -50,6 +50,24 @@
         <Bug pattern="MS_EXPOSE_REP"/>
     </Match>
 
+    <!-- The history engine drives the live transport and publishes into the
+         coin's live snapshot; both are services with one instance each. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.electrumx.HistoryEngine"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- A batch request is a short-lived value handed to the transport; the
+         arrays are built fresh for it and never shared with wallet state. -->
+    <Match>
+        <Class name="io.xlite.daemon.app.net.electrumx.ElectrumApi$Call"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="io.xlite.daemon.app.net.electrumx.ElectrumApi$Call"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
     <!-- Channel initializer holds the coin whose handler it builds. -->
     <Match>
         <Class name="io.xlite.daemon.app.net.api.http.server.HTTPServerInitializer"/>

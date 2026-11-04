@@ -2,10 +2,12 @@ package io.xlite.daemon.app.net;
 
 import com.google.common.base.Joiner;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.subgraph.orchid.encoders.Hex;
 // import com.subgraph.orchid.encoders.Hex;
 
+import io.xlite.daemon.app.App;
 import io.xlite.daemon.app.Version;
 import io.xlite.daemon.app.coinconfig.CoinConfigRegistry;
 import io.xlite.daemon.app.coinconfig.CompiledCoinSupplement;
@@ -13,6 +15,10 @@ import io.xlite.daemon.app.coinconfig.SighashStyle;
 import io.xlite.daemon.app.crypto.KeyHandler;
 import io.xlite.daemon.app.net.api.JSONRPCController;
 import io.xlite.daemon.app.net.api.JSONRPCServer;
+import io.xlite.daemon.app.net.electrumx.ElectrumApi;
+import io.xlite.daemon.app.net.electrumx.ElectrumClient;
+import io.xlite.daemon.app.net.electrumx.ElectrumEndpoints;
+import io.xlite.daemon.app.net.electrumx.HistoryEngine;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetNetworkParameters;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetParameters;
 import io.xlite.daemon.app.net.protocols.blocknet.BlocknetPeer;
@@ -43,10 +49,12 @@ import org.bitcoinj.wallet.Wallet;
 import org.json.JSONArray;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,7 +65,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -123,7 +133,13 @@ public final class CoinInstance {
     private ConfigHelper configHelper;
     private WalletHelper walletHelper = null;
     private CoinTicker ticker;
-    private ConcurrentHashMap<String, Transaction> transactionList = new ConcurrentHashMap<>();
+    private volatile ConcurrentHashMap<String, Transaction> transactionList =
+            new ConcurrentHashMap<>();
+    private volatile HistoryEngine historyEngine;
+
+    /** The coin's single native provider connection; null until the engine starts. */
+    private volatile ElectrumApi electrumApi;
+
     private final CopyOnWriteArrayList<AddressBalance> addressKeyPairs =
             new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<CloudTransaction> transactionObservableList =
@@ -155,13 +171,14 @@ public final class CoinInstance {
     // read by lifecycle code (deinit) on other threads.
     private volatile JSONRPCServer coinRPCServer = null;
     private volatile long lastUtxoUpdate = 0;
-    private final AtomicInteger updateFailures = new AtomicInteger(0);
-    // Last wall-clock time a fresh height was accepted from the backend.
-    // A stuck clock here with a rising failure streak means the served
-    // height is stale — both are now logged, never silent.
-    private volatile long lastBlockCountMillis = 0;
     private volatile int generatedAddressCount;
-    private AddressDiscoveryService discoveryService = null;
+
+    /**
+     * Address-count discovery runs off the startup path, once a session actually serves the coin.
+     */
+    private final AtomicBoolean discoveryRunning = new AtomicBoolean();
+
+    private volatile boolean discoveryComplete;
     private static volatile boolean addressDiscoveryEnabled = true;
 
     private CoinInstance(CoinTicker ticker, ConfigHelper configHelper) {
@@ -258,6 +275,7 @@ public final class CoinInstance {
             configHelper.writeConfig();
             generatedAddressCount = configHelper.getAddressCount();
         }
+        syncHistoryAddresses();
 
         return addressKeyPair;
     }
@@ -272,6 +290,14 @@ public final class CoinInstance {
 
         if (addrExists == null) {
             addressKeyPairs.add(addressKeyPair);
+            syncHistoryAddresses();
+        }
+    }
+
+    private void syncHistoryAddresses() {
+        HistoryEngine engine = historyEngine;
+        if (engine != null) {
+            engine.syncAddresses();
         }
     }
 
@@ -414,6 +440,19 @@ public final class CoinInstance {
                                 + (interruptedDuringJoin ? " (join was interrupted)" : ""));
             }
         }
+        HistoryEngine engine = historyEngine;
+        if (engine != null) {
+            // The engine owns the session it was constructed with and closes it.
+            engine.close();
+            historyEngine = null;
+            electrumApi = null;
+        } else {
+            ElectrumApi api = electrumApi;
+            if (api != null) {
+                api.close();
+                electrumApi = null;
+            }
+        }
     }
 
     public CoinError init(char[] pw, String userMnemonic, boolean isMnemonic) {
@@ -424,11 +463,13 @@ public final class CoinInstance {
 
         configHelper.writeConfig();
         Context.propagate(new Context(networkParameters));
+        startProviderSession();
 
         CoinError walletError = initializeWallet(pw, userMnemonic, isMnemonic);
         if (walletError != null) {
             return walletError;
         }
+        startHistoryEngine();
         startRpcIfConfigured();
 
         // Blocknet Network / XRouter not used (Dec 10)
@@ -562,16 +603,145 @@ public final class CoinInstance {
                     "[wallet] Mnemonic generated for " + CoinTickerUtils.tickerToString(ticker));
         }
 
-        // Discovery runs once at wallet startup, in every case.
-        if (addressDiscoveryEnabled) {
-            LOGGER.fine("[coinAddressDiscoveryService created] Running address discovery");
-            runAddressDiscovery();
-        } else {
+        // Address discovery asks the provider which derived addresses hold funds. It is
+        // deliberately not part of wallet creation: startup must stay local, so it runs from
+        // onReady once a session actually answers for this coin.
+        if (!addressDiscoveryEnabled) {
             LOGGER.fine("[coin] Address discovery disabled");
         }
 
         // Make sure wallet addresses are available
         generateForwardAddresses(true);
+    }
+
+    /**
+     * Opens the coin's provider session before the wallet exists.
+     *
+     * <p>Address discovery asks the provider which derived addresses have funds, so the session has
+     * to be usable before {@code createWallet} runs. The history engine attaches to this same
+     * session afterwards; one connection per coin either way.
+     */
+    private void startProviderSession() {
+        String tickerName = CoinTickerUtils.tickerToString(ticker);
+        String endpoint = App.resolveProviderEndpoint(tickerName);
+        if (endpoint == null || endpoint.isBlank() || networkParameters == null) {
+            LOGGER.warning("[provider] no endpoint configured for " + tickerName);
+            return;
+        }
+        try {
+            URI uri = ElectrumEndpoints.websocket(endpoint, tickerName);
+            ElectrumClient client = new ElectrumClient(uri);
+            electrumApi = client;
+            client.start();
+            LOGGER.info("[provider] native session for " + tickerName + " via " + uri);
+        } catch (RuntimeException e) {
+            LOGGER.log(
+                    java.util.logging.Level.SEVERE,
+                    "[provider] cannot start the session for " + tickerName,
+                    e);
+        }
+    }
+
+    /**
+     * Starts the in-memory history engine on the coin's provider session.
+     *
+     * <p>It runs after the wallet's addresses exist and before the coin's RPC server accepts
+     * requests, so {@code listtransactions} never sees a half-built engine. A failure here is fatal
+     * to the coin's history, not to the wallet: the engine keeps retrying, and the RPC method
+     * reports "not ready" instead of serving an incomplete list.
+     */
+    private void startHistoryEngine() {
+        String tickerName = CoinTickerUtils.tickerToString(ticker);
+        ElectrumApi api = electrumApi;
+        if (api == null || networkParameters == null) {
+            LOGGER.warning("[history] no provider session for " + tickerName);
+            return;
+        }
+        try {
+            HistoryEngine engine =
+                    new HistoryEngine(
+                            tickerName,
+                            networkParameters,
+                            api,
+                            new EngineSink(),
+                            Function.identity());
+            historyEngine = engine;
+            engine.start();
+            LOGGER.info("[history] native history enabled for " + tickerName);
+        } catch (RuntimeException e) {
+            LOGGER.log(
+                    java.util.logging.Level.SEVERE,
+                    "[history] cannot start native history for " + tickerName,
+                    e);
+        }
+    }
+
+    public HistoryEngine getHistoryEngine() {
+        return historyEngine;
+    }
+
+    /** The coin's one native provider connection, or null while it is not configured. */
+    public ElectrumApi getElectrumApi() {
+        return electrumApi;
+    }
+
+    /** Replace the whole history snapshot atomically; readers keep a consistent map. */
+    public void publishHistory(List<Transaction> rows) {
+        ConcurrentHashMap<String, Transaction> next = new ConcurrentHashMap<>();
+        for (Transaction row : rows) {
+            next.put(row.uid(), row);
+        }
+        transactionList = next;
+    }
+
+    /** The engine's view of this coin: its addresses, a published snapshot and the tip. */
+    private final class EngineSink implements HistoryEngine.Sink {
+        @Override
+        public List<AddressBalance> addresses() {
+            return getAddressKeyPairs();
+        }
+
+        @Override
+        public void publish(List<Transaction> rows) {
+            publishHistory(rows);
+        }
+
+        @Override
+        public void onTip(int height) {
+            addBlockCount(ticker, height);
+        }
+
+        /**
+         * Makes the address's unspent set what the indexer says it is.
+         *
+         * <p>This is the only live feed of the wallet's coin balance: the local RPC used to
+         * populate it as a side effect of {@code listunspent}, so a fresh wallet reported zero
+         * until someone happened to call it.
+         */
+        @Override
+        public void applyUnspents(String address, JsonArray rows) {
+            AddressBalance balance = getAddressBalance(address);
+            if (balance == null) {
+                return;
+            }
+            List<UTXO> fresh = new ArrayList<>();
+            for (JsonElement row : rows) {
+                if (!row.isJsonObject()) {
+                    continue;
+                }
+                UTXO utxo = UTXO.fromUnspentRow(ticker, address, row.getAsJsonObject());
+                if (utxo != null) {
+                    fresh.add(utxo);
+                }
+            }
+            balance.replaceUnspents(fresh);
+        }
+
+        /** The chain is reachable: this is the first moment discovery can be attempted. */
+        @Override
+        public void onReady() {
+            scheduleAddressDiscovery();
+        }
     }
 
     private void startRpcIfConfigured() {
@@ -1010,8 +1180,15 @@ public final class CoinInstance {
     }
 
     public JsonArray getAllTransactions() {
+        List<Transaction> rows = new ArrayList<>(transactionList.values());
+        rows.sort(
+                Comparator.comparingInt(Transaction::getTime)
+                        .thenComparing(Transaction::getTxid)
+                        .thenComparingInt(Transaction::getVout)
+                        .thenComparing(Transaction::getCategory));
+        int tip = getBlockCountByTicker(getTicker());
         JsonArray transactionsJSON = new JsonArray();
-        for (Transaction tx : transactionList.values()) {
+        for (Transaction tx : rows) {
             JsonObject txJSON = new JsonObject();
             txJSON.addProperty("category", tx.getCategory());
             txJSON.addProperty("txid", tx.getTxid());
@@ -1023,14 +1200,22 @@ public final class CoinInstance {
             txJSON.addProperty("fee", tx.getFee());
             txJSON.addProperty("trusted", false);
             txJSON.addProperty("blocktime", tx.getBlocktime());
-            txJSON.addProperty("time", tx.getBlocktime());
-
-            txJSON.addProperty("confirmations", tx.getConfirmations());
+            txJSON.addProperty("time", tx.getTime());
+            txJSON.addProperty("blockheight", tx.getBlockheight());
+            txJSON.addProperty("confirmations", confirmations(tx, tip));
 
             transactionsJSON.add(txJSON);
         }
 
         return transactionsJSON;
+    }
+
+    /** Confirmations are derived from the current tip, so a new block never needs a row rewrite. */
+    private static int confirmations(Transaction tx, int tip) {
+        if (tx.getBlockheight() <= 0) {
+            return 0;
+        }
+        return Math.max(0, tip - tx.getBlockheight() + 1);
     }
 
     public List<String> getUTXOParams() {
@@ -1082,12 +1267,6 @@ public final class CoinInstance {
         // switch or a rollback), and pre-first-poll zeros poisoned
         // confirmation math.
         blockCounts.computeIfAbsent(ticker, k -> new AtomicInteger(0)).set(blockCount);
-        // The constructor seeds 0: that initializes the map but is not a
-        // backend height — only a real (positive) tip starts the freshness
-        // clock, so "no height ever received" stays reachable and truthful.
-        if (blockCount > 0) {
-            lastBlockCountMillis = System.currentTimeMillis();
-        }
     }
 
     public void addCloudTransaction(CloudTransaction cloudTransaction) {
@@ -1184,6 +1363,7 @@ public final class CoinInstance {
         resolveRpcPort();
         if (configHelper.getAddressCount() != generatedAddressCount) {
             generateForwardAddresses(false);
+            syncHistoryAddresses();
         }
 
         if (coinRPCServer == null) {
@@ -1296,46 +1476,29 @@ public final class CoinInstance {
     }
 
     /**
-     * Records one failed backend height update.
+     * Scans the chain for the wallet's used addresses, then grows the wallet to match.
      *
-     * @return the new consecutive-failure streak (drives staleness logging and {@link
-     *     #isInstanceRunning})
+     * @return true when the scan covered the addresses it needed to; false when there is no session
+     *     yet or the scan was cut short, in which case the caller retries on the next connect
      */
-    public int incrementUpdateFailures() {
-        return updateFailures.incrementAndGet();
-    }
-
-    /**
-     * Records a successful backend height update.
-     *
-     * @return the streak just ended (0 when nothing had failed)
-     */
-    public int resetUpdateFailures() {
-        return updateFailures.getAndSet(0);
-    }
-
-    public int getUpdateFailures() {
-        return updateFailures.get();
-    }
-
-    /** Wall-clock millis of the last accepted backend height (0 = never). */
-    public long getLastBlockCountMillis() {
-        return lastBlockCountMillis;
-    }
-
-    public void runAddressDiscovery() {
+    public boolean runAddressDiscovery() {
         String currency = CoinTickerUtils.tickerToString(this.getTicker());
 
         if (!configHelper.isRpcEnabled()) {
             LOGGER.fine("[coin-" + currency + "] RPC disabled, skipping address discovery");
-            return;
+            return true;
         }
 
-        if (discoveryService == null) {
-            discoveryService = new AddressDiscoveryService(this);
-            LOGGER.fine("[coin-" + currency + "] AddressDiscoveryService created");
+        // Without a session there is nothing to scan; the next onReady retries.
+        ElectrumApi api = electrumApi;
+        if (api == null || !api.isConnected()) {
+            LOGGER.fine("[coin-" + currency + "] Provider not connected, deferring discovery");
+            return false;
         }
 
+        // A fresh service per attempt: it clears its cached chain key when it finishes, so a
+        // retry has to derive one again rather than scan with none.
+        AddressDiscoveryService discoveryService = new AddressDiscoveryService(this);
         int discoveredCount = discoveryService.discoverAddressCount();
         discoveryService.clearExternalChainKey();
         int currentCount = configHelper.getAddressCount();
@@ -1353,6 +1516,8 @@ public final class CoinInstance {
             // Update config and generate missing addresses
             configHelper.setAddressCount(discoveredCount);
             configHelper.writeConfig();
+            generateForwardAddresses(false);
+            syncHistoryAddresses();
 
             LOGGER.info("[coin-" + currency + "] Updated address count to " + discoveredCount);
         } else {
@@ -1363,10 +1528,39 @@ public final class CoinInstance {
                             + "keeping current count: "
                             + currentCount);
         }
+        return api.isConnected() && discoveryService.wasComplete();
+    }
+
+    /**
+     * Runs address discovery in the background, once per coin and only after a session is up.
+     *
+     * <p>It is the one startup task that needs the provider, so it must never be on the wallet- or
+     * RPC-start path: a coin the backend does not serve yet simply stays undiscovered until it is
+     * served, and a coin served later is discovered then.
+     */
+    private void scheduleAddressDiscovery() {
+        if (!addressDiscoveryEnabled
+                || discoveryComplete
+                || !discoveryRunning.compareAndSet(false, true)) {
+            return;
+        }
+        Thread worker =
+                new Thread(
+                        () -> {
+                            try {
+                                discoveryComplete = runAddressDiscovery();
+                            } finally {
+                                discoveryRunning.set(false);
+                            }
+                        },
+                        "discovery-" + CoinTickerUtils.tickerToString(ticker));
+        worker.setDaemon(true);
+        worker.start();
     }
 
     public boolean isInstanceRunning() {
-        return updateFailures.get() < 5;
+        HistoryEngine engine = historyEngine;
+        return engine != null && engine.isReady();
     }
 
     public static void setAddressDiscoveryEnabled(boolean enabled) {
