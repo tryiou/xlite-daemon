@@ -77,20 +77,6 @@ class HistoryMaterialiserTest {
     }
 
     @Test
-    void pureSelfTransferIsInvisible() {
-        transactions.put(
-                "p1", tx("p1", List.of(), List.of(output(1000.0, 0, WALLET_SCRIPT, WALLET))));
-        transactions.put(
-                "t1",
-                tx(
-                        "t1",
-                        List.of(input("p1", 0)),
-                        List.of(output(990.0, 0, WALLET_SCRIPT, WALLET))));
-
-        assertEquals(List.of(), rows("t1", 1));
-    }
-
-    @Test
     void foreignSendConsumesTheWholeInput() {
         transactions.put(
                 "p1", tx("p1", List.of(), List.of(output(1000.0, 0, WALLET_SCRIPT, WALLET))));
@@ -193,6 +179,105 @@ class HistoryMaterialiserTest {
         assertEquals(0, rows.get(0).getConfirmations());
         assertEquals(1_700_000_000, rows.get(0).getTime());
         assertNull(rows.get(0).getBlockhash());
+    }
+
+    /**
+     * A wallet that only moves its own coins still moved them, and paid a miner fee doing it.
+     *
+     * <p>No value left the wallet, so the row reports zero; the fee is the whole story, and without
+     * the row the transaction is absent from a history whose other rows then cannot account for the
+     * coins it consumed.
+     */
+    @Test
+    void aPureSelfTransferIsOneZeroValuedSendCarryingTheFee() {
+        transactions.put(
+                "p1", tx("p1", List.of(), List.of(output(1000.0, 0, WALLET_SCRIPT, WALLET))));
+        transactions.put(
+                "t1",
+                tx(
+                        "t1",
+                        List.of(input("p1", 0)),
+                        List.of(output(999.5, 0, WALLET_SCRIPT, WALLET))));
+
+        List<Transaction> rows = rows("t1", 1);
+
+        assertEquals(1, rows.size(), rows.toString());
+        assertEquals("send", rows.get(0).getCategory());
+        assertEquals(WALLET, rows.get(0).getAddress());
+        assertEquals(0.0, rows.get(0).getValue());
+        assertEquals(-0.5, rows.get(0).getFee());
+        assertEquals(0, rows.get(0).getVout());
+    }
+
+    /** The row names the largest own output, so a reader can follow it on chain. */
+    @Test
+    void aSelfTransferNamesTheLargestOwnOutput() {
+        transactions.put(
+                "p1", tx("p1", List.of(), List.of(output(1000.0, 0, WALLET_SCRIPT, WALLET))));
+        transactions.put(
+                "t1",
+                tx(
+                        "t1",
+                        List.of(input("p1", 0)),
+                        List.of(
+                                output(100.0, 0, WALLET_SCRIPT, WALLET),
+                                output(899.0, 1, WALLET_SCRIPT, WALLET))));
+
+        List<Transaction> rows = rows("t1", 1);
+
+        assertEquals(1, rows.size(), rows.toString());
+        assertEquals(1, rows.get(0).getVout());
+        assertEquals(-1.0, rows.get(0).getFee());
+    }
+
+    /** One transaction, one row: a wallet spending from several addresses reports it once. */
+    @Test
+    void aSelfTransferFromTwoWalletAddressesIsStillOneRow() {
+        byte[] otherScript = script("91");
+        String otherHashX = ScriptHashes.hashX(otherScript);
+        transactions.put(
+                "p1", tx("p1", List.of(), List.of(output(600.0, 0, WALLET_SCRIPT, WALLET))));
+        transactions.put(
+                "p2", tx("p2", List.of(), List.of(output(400.0, 0, otherScript, "OTHER"))));
+        transactions.put(
+                "t1",
+                tx(
+                        "t1",
+                        List.of(input("p1", 0), input("p2", 0)),
+                        List.of(output(999.0, 0, WALLET_SCRIPT, WALLET))));
+
+        Set<String> wallet = Set.of(WALLET_HASH_X, otherHashX);
+        List<Transaction> first =
+                materialiser().rows(WALLET, WALLET_HASH_X, wallet, List.of(new TxRef("t1", 1)));
+        List<Transaction> second =
+                materialiser().rows("OTHER", otherHashX, wallet, List.of(new TxRef("t1", 1)));
+
+        // Exactly one of the two passes owns the row, so the merged snapshot holds one.
+        assertEquals(1, first.size() + second.size(), first + " / " + second);
+        List<Transaction> owning = first.isEmpty() ? second : first;
+        assertEquals(0.0, owning.get(0).getValue());
+        assertEquals(-1.0, owning.get(0).getFee());
+    }
+
+    /** A transaction that pays someone else is not a self-transfer and gets no zero row. */
+    @Test
+    void aSendToAForeignOutputGetsNoSelfTransferRow() {
+        transactions.put(
+                "p1", tx("p1", List.of(), List.of(output(1000.0, 0, WALLET_SCRIPT, WALLET))));
+        transactions.put(
+                "t1",
+                tx(
+                        "t1",
+                        List.of(input("p1", 0)),
+                        List.of(
+                                output(10.0, 0, script("A1"), "X"),
+                                output(989.0, 1, WALLET_SCRIPT, WALLET))));
+
+        List<Transaction> rows = rows("t1", 1);
+
+        assertEquals(1, rows.size(), rows.toString());
+        assertEquals(-10.0, rows.get(0).getValue());
+        assertEquals(-1.0, rows.get(0).getFee());
     }
 
     @Test

@@ -35,7 +35,10 @@ import java.util.logging.Logger;
  *   <li>a foreign output funded by our inputs is a send capped by what we supplied;
  *   <li>an own output the wallet funded is change, and produces no row;
  *   <li>the fee is {@code sum(vout) - sum(vin)}, attached once to the largest send;
- *   <li>same-address send/receive pairs are netted, a pure self-transfer is invisible.
+ *   <li>same-address send/receive pairs are netted;
+ *   <li>a pure self-transfer — wallet inputs, only wallet outputs — is a single send of {@code 0}
+ *       carrying the miner fee, so the rows account for the coins the transaction consumed without
+ *       claiming any value left the wallet.
  * </ul>
  */
 final class HistoryMaterialiser {
@@ -121,6 +124,7 @@ final class HistoryMaterialiser {
         addOwnOutputs(context);
         attachFee(context);
         consolidate(context.spends);
+        addSelfTransfer(context);
         return context.spends;
     }
 
@@ -149,6 +153,10 @@ final class HistoryMaterialiser {
             if (context.view.owned.contains(previousHashX)) {
                 context.walletInput = true;
                 context.totalWalletInput += amount;
+                String funder = displayAddressOf(previousOutput);
+                if (funder != null) {
+                    context.recordWalletInput(funder);
+                }
             }
         }
         // The wallet, not the single address being read, is what funds a send:
@@ -207,6 +215,58 @@ final class HistoryMaterialiser {
             context.addRow(
                     context.view.address, output.get("value").getAsDouble(), "receive", output);
         }
+    }
+
+    /**
+     * A pure self-transfer, as one send row of zero carrying the fee.
+     *
+     * <p>Nothing left the wallet, so there is no amount to report; the miner fee did leave, and a
+     * transaction that consolidated or split the wallet's own coins is otherwise absent from the
+     * rows entirely. Only the address that funded the transaction emits it, so one transaction
+     * produces one row however many wallet addresses it touched.
+     *
+     * <p>The row names the largest own output, which is the one a reader can follow on chain, and
+     * carries that output's index so the row stays unique by {@code (txid, vout, category)}.
+     */
+    private void addSelfTransfer(Context context) {
+        if (!context.walletInput || context.biggestForeignAddress != null) {
+            return; // not a self-transfer: value went to someone else
+        }
+        if (context.fees >= 0 || !context.isPrimaryFunder()) {
+            return;
+        }
+        JsonObject largest = largestOwnOutput(context);
+        if (largest == null) {
+            return;
+        }
+        String address = displayAddressOf(largest);
+        if (address == null) {
+            return;
+        }
+        context.addRow(address, 0.0, "send", largest);
+        for (Transaction row : context.spends) {
+            if ("send".equals(row.getCategory()) && address.equals(row.getAddress())) {
+                row.setFee(truncate(context.fees));
+            }
+        }
+    }
+
+    /** The wallet output holding the most value: the one a reader can follow on chain. */
+    private JsonObject largestOwnOutput(Context context) {
+        JsonObject largest = null;
+        double best = -1;
+        for (JsonElement element : array(context.tx, "vout")) {
+            JsonObject output = element.getAsJsonObject();
+            if (!isOwnedByWallet(output, context.view.owned)) {
+                continue;
+            }
+            double amount = output.get("value").getAsDouble();
+            if (amount > best) {
+                best = amount;
+                largest = output;
+            }
+        }
+        return largest;
     }
 
     private static void attachFee(Context context) {
@@ -365,6 +425,26 @@ final class HistoryMaterialiser {
         private double fees;
         private double biggestForeignAmount;
         private String biggestForeignAddress;
+
+        /** The lowest address among the wallet's inputs, which owns the self-transfer row. */
+        private String primaryFunder;
+
+        private void recordWalletInput(String address) {
+            if (primaryFunder == null || address.compareTo(primaryFunder) < 0) {
+                primaryFunder = address;
+            }
+        }
+
+        /**
+         * One transaction, one self-transfer row: the lowest funding address speaks for it.
+         *
+         * <p>Every address's pass sees the same transaction, so the row must have exactly one
+         * owner. The lowest address string is the same rule the history service uses when it files
+         * a send, which keeps the two planes in step.
+         */
+        private boolean isPrimaryFunder() {
+            return view.address.equals(primaryFunder);
+        }
 
         private Context(JsonObject tx, int height, WalletView view) {
             this.tx = tx;
