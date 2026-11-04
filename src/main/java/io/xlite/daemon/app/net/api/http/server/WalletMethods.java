@@ -161,19 +161,23 @@ final class WalletMethods {
      *
      * <p>{@code coin.parseAddress} already decoded every accepted spelling — base58check, bech32
      * and a chain-specific alias such as CashAddr — so this method only has to turn the decoded
-     * address into its output script.
+     * address into its output script. Both legacy kinds have one: {@code P2PKH} pays to {@code
+     * OP_DUP OP_HASH160 <hash> OP_EQUALVERIFY OP_CHECKSIG}, {@code P2SH} to {@code OP_HASH160
+     * <hash> OP_EQUAL}. The decoded address decides which, so the two share one path.
+     *
+     * <p>The segwit branch is unreachable for the coins this daemon serves: none sets a bech32 HRP,
+     * so {@code parseAddress} rejects a bech32 string before it gets here. It is kept because the
+     * method is total over bitcoinj's address types, not because a current coin exercises it.
      */
     private AddressScript scriptOf(Address parsed) {
         if (parsed instanceof SegwitAddress segwit) {
             return new AddressScript(witnessScript(segwit), false);
         }
         LegacyAddress legacy = (LegacyAddress) parsed;
-        if (!legacy.isP2SHAddress()) {
-            return new AddressScript("", false);
-        }
         TransactionOutput output =
                 new TransactionOutput(coin.getNetworkParameters(), null, Coin.valueOf(0), legacy);
-        return new AddressScript(hex(output.getScriptPubKey().getProgram()), true);
+        return new AddressScript(
+                hex(output.getScriptPubKey().getProgram()), legacy.isP2SHAddress());
     }
 
     /**
