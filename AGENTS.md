@@ -10,21 +10,38 @@ Core packages: `crypto` (wallet encryption/key management), `net` (coin networki
 
 This is the **client-side** daemon behind the XLite wallet GUI: it serves one
 local JSON-RPC port per coin (`net/api/http/master/`) and fetches all blockchain
-data upstream over HTTP (`net/api/http/client/`).
+data from one remote provider over the **native ElectrumX protocol**
+(`net/electrumx/`). The local RPC surface is a contract for the GUI, BlockNet
+XBridge and go-xbridge; provider work never changes it.
 
-- **EXR mode:** CLI `--exr-endpoint <url>` or env `EXR_ENDPOINT`
-  (comma-separated pool → `EXRServerPool`). Capabilities are probed from GET
-  `/xrs/heights`; health checks every 5 s; requests route to a server that
-  supports the coin. Calls hit `<endpoint>/xrs/<method>` — GET `heights`/`fees`,
-  POST coin-first-param methods (`getutxos`, `sendrawtransaction`, …). Once EXR
-  is configured there is **NO fallback** to BASE_URL — requests for coins no EXR
-  server supports fail hard.
-- **BASE_URL path (used when `EXR_ENDPOINT`/`--exr-endpoint` is not set):**
-  an alternative path to reach the providers — `BASE_URL` =
-  `https://xliterevp.mywire.org/` in `App.java`; override with
-  `--development-endpoint`. POST `/` with `{method, params}` JSON.
-- Upstream chain: exrproxy `/xrs/<service>` → plugin-adapter xrm methods →
-  utxo-plugin containers.
+- **One provider.** Choose exactly one of `--exr-endpoint`/`EXR_ENDPOINT`
+  (service node) or `--development-endpoint`/`BASE_URL` (direct
+  plugin-adapter). Setting both is a startup error. There is **NO fallback**,
+  no pool aggregation and no per-method routing.
+- **One protocol.** The chosen base URL becomes
+  `ws(s)://<host>/ws/<TICKER>`; the daemon opens one session per coin and uses
+  it for history, unspents, transactions, broadcast and the tip. It does not
+  call `/xrs` for wallet data.
+- **`--electrum-endpoint`/`ELECTRUM_ENDPOINT`** is a single-indexer test
+  override (absolute WebSocket base). It cannot be combined with the other two.
+- The node answers `getblock`, `getblockhash` and `getrawmempool` on that same
+  socket from its coin daemon; stock ElectrumX has no equivalent, and the local
+  RPC must keep them for XBridge.
+- Upstream chain: xlite-daemon → plugin-adapter `/ws/<TICKER>` → stock
+  ElectrumX indexer (TCP 9000). `exrproxy` forwards `/ws/<TICKER>` to the
+  adapter when the connector is a service node.
+- **Startup never waits for the provider.** Wallets, configs and per-coin
+  listeners come up locally; the master endpoint is announced first. History
+  sync and address discovery run on the coin's workers, and readiness
+  (`isInstanceRunning()` / `getinfo.rpcready`) flips when the first full sync
+  completes. Nothing here may block on a socket.
+- **Probing is permanent.** A failed dial/handshake fails the request at once
+  (never queues until a 60 s timeout) and the client keeps retrying with
+  capped, jittered backoff. There is no terminal "not served" state: a coin the
+  backend adds or restores enables itself on the next successful connect.
+- **RPC availability is per method.** Local wallet methods always answer; only
+  chain-data methods return the `503 -1112` gate while the coin is not ready.
+
 - `net/xrouter/` and the `xrm*` handling in `BlocknetPeerGroup` are currently
   disabled XRouter-over-p2p paths (commented out at `CoinInstance.java:517-557`)
   — **work-in-progress, NOT abandoned**: never delete, prune, or "clean up" them;
