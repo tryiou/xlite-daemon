@@ -189,7 +189,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     private static JsonObject parseFailure(String content, RuntimeException cause) {
-        LOGGER.info("Failed Content: " + content);
+        // Same rule as the coin endpoint: a rejected body is never logged.
+        LOGGER.info("[http-master] Failed to parse a " + content.length() + "-byte request body");
         LOGGER.warning("[http-master] Failed to parse JSON-RPC request" + cause.getMessage());
         if (cause instanceof IllegalArgumentException) {
             LOGGER.finer(

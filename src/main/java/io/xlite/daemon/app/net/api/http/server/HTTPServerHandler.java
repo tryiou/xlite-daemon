@@ -281,7 +281,12 @@ public final class HTTPServerHandler extends SimpleChannelInboundHandler<FullHtt
     }
 
     private JsonObject parseFailure(String content, RuntimeException cause) {
-        LOGGER.info("Failed Content: " + content);
+        // The body is attacker-controlled and can be a secret: a malformed
+        // importprivkey call carries a private key. Record only its size.
+        LOGGER.info(
+                "[http-server-handler] Failed to parse a "
+                        + content.length()
+                        + "-byte request body");
         LOGGER.warning(
                 "[http-server-handler] Failed to parse JSON-RPC request for "
                         + CoinTickerUtils.tickerToString(coin.getTicker())

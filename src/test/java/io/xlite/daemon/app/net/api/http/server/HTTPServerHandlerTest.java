@@ -35,6 +35,10 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 /**
  * Contract tests for the per-coin JSON-RPC server's malformed-input handling.
@@ -259,6 +263,56 @@ class HTTPServerHandlerTest {
         FullHttpResponse response = post("this is not json");
         assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
         assertEquals(-1001, errorCode(response));
+    }
+
+    /**
+     * A rejected body is never written to the log: a malformed importprivkey call carries a private
+     * key, and the body must not survive in a log file just because it failed to parse.
+     */
+    @Test
+    void testRejectedBodyIsNeverLogged() {
+        String secret = "cVHiddenKeyMaterial";
+        String body = "{\"method\":\"importprivkey\",\"params\":[\"" + secret + "\"]";
+        List<LogRecord> records =
+                captureLogs(() -> {
+                    FullHttpResponse response = post(body);
+                    assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
+                });
+        assertFalse(records.isEmpty(), "no log record was captured");
+        assertFalse(
+                records.stream()
+                        .map(LogRecord::getMessage)
+                        .anyMatch(message -> message != null && message.contains(secret)),
+                "the rejected request body reached the log");
+    }
+
+    /** Runs an action with the global logger capturing every level. */
+    private static List<LogRecord> captureLogs(Runnable action) {
+        Logger logger = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
+        Level previous = logger.getLevel();
+        List<LogRecord> records = new ArrayList<>();
+        Handler handler =
+                new Handler() {
+                    @Override
+                    public void publish(LogRecord record) {
+                        records.add(record);
+                    }
+
+                    @Override
+                    public void flush() {}
+
+                    @Override
+                    public void close() {}
+                };
+        logger.setLevel(Level.ALL);
+        logger.addHandler(handler);
+        try {
+            action.run();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previous);
+        }
+        return records;
     }
 
     @Test
