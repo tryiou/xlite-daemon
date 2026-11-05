@@ -35,6 +35,8 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -256,6 +258,64 @@ class HTTPServerHandlerTest {
         FullHttpResponse response = post("{\"method\":\"nosuchmethod\",\"params\":[]}");
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(-32601, errorCode(response));
+    }
+
+    /**
+     * The help text is the only discovery surface a client has, so it must list exactly the methods
+     * the dispatcher serves. A method added without a help line (or a stale line for a removed one)
+     * is invisible or misleading to every consumer.
+     */
+    @Test
+    void helpListsEveryRegisteredMethod() {
+        FullHttpResponse response = post("{\"method\":\"help\",\"params\":[]}");
+        String text = envelopeOf(response).get("result").getAsString();
+        Set<String> listed = new TreeSet<>();
+        for (String line : text.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("=====")) {
+                continue;
+            }
+            // The preamble names the server, not a method; only a lowercase
+            // first token is a method line.
+            String name = trimmed.split("[ <]", 2)[0];
+            if (name.matches("[a-z]+")) {
+                listed.add(name);
+            }
+        }
+        assertEquals(
+                new TreeSet<>(
+                        List.of(
+                                "help",
+                                "version",
+                                "ping",
+                                "reloadconfig",
+                                "getinfo",
+                                "getblockcount",
+                                "getnetworkinfo",
+                                "getfees",
+                                "getblockchaininfo",
+                                "getrawmempool",
+                                "getblockhash",
+                                "getblock",
+                                "listunspent",
+                                "listtransactions",
+                                "historystatus",
+                                "getaddressesbyaccount",
+                                "getnewaddress",
+                                "importprivkey",
+                                "dumpprivkey",
+                                "validateaddress",
+                                "gettransaction",
+                                "getrawtransaction",
+                                "gettxout",
+                                "createrawtransaction",
+                                "decoderawtransaction",
+                                "signrawtransaction",
+                                "sendrawtransaction",
+                                "sendtransaction",
+                                "signmessage",
+                                "verifymessage")),
+                listed);
     }
 
     @Test
