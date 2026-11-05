@@ -32,9 +32,10 @@ XBridge and go-xbridge; provider work never changes it.
   adapter when the connector is a service node.
 - **Startup never waits for the provider.** Wallets, configs and per-coin
   listeners come up locally; the master endpoint is announced first. History
-  sync and address discovery run on the coin's workers, and readiness
-  (`isInstanceRunning()` / `getinfo.rpcready`) flips when the first full sync
-  completes. Nothing here may block on a socket.
+  sync and address discovery run on the coin's workers. Readiness
+  (`isInstanceRunning()` / `getinfo.rpcready`) is the provider session; history
+  is derived (`historystatus`, and `listtransactions` 3002 until complete).
+  Nothing here may block on a socket.
 - **Probing is permanent.** A failed dial/handshake fails the request at once
   (never queues until a 60 s timeout) and the client keeps retrying with
   capped, jittered backoff. There is no terminal "not served" state: a coin the
@@ -56,32 +57,35 @@ source ~/.jabba/jabba.sh && jabba use graalvm_community@21.0.2
 
 ```bash
 # Compile
-mvn compile -q
+./mvnw compile -q
 
 # Run all tests plus every gate (Spotless, Checkstyle, Error Prone, SpotBugs)
-mvn test
+./mvnw test
 
 # OpenRewrite code cleanup (opt-in; NOT part of routine builds)
-mvn -Prewrite process-classes
+./mvnw -Prewrite process-classes
 
 # Run a single test class
-mvn test -Dtest=KeyHandlerTest
+./mvnw test -Dtest=KeyHandlerTest
 
 # Run a single test method
-mvn test -Dtest=KeyHandlerTest#testGetBaseSeedRoundTrip
+./mvnw test -Dtest=KeyHandlerTest#testGetBaseSeedRoundTrip
 
 # Build shaded JAR
-mvn package -q
+./mvnw package -q
 
-# Build GraalVM native image
-mvn package -Pnative -Pnative-fast -q
+# Build GraalVM native image (fast profile skips tests)
+./mvnw package -Pnative
+./mvnw package -Pnative-fast
 
 # Requirements: Java 21 (jabba: graalvm_community@21.0.2), Maven 3.8.6+
 ```
 
 ## Code Style
 
-The rules are enforced, not advised: `./mvnw test` fails on any violation.
+The rules are enforced, not advised: `./mvnw test` fails on any formatting,
+Checkstyle, SpotBugs or test violation; Error Prone findings are reported as
+warnings.
 
 ### Formatting
 

@@ -37,7 +37,7 @@ lifecycle:
 |---|---|---|
 | Spotless + google-java-format (AOSP) | `process-sources` | layout: 4-space indent, 100 columns, import order |
 | Checkstyle 14.4 | `validate` | semantics: braces, naming, import bans, file shape, method size |
-| Error Prone 2.43 | `compile` | compiler-level bug patterns |
+| Error Prone 2.43 | `compile` | compiler-level bug patterns (reported as warnings) |
 | SpotBugs 4.9 | `process-classes` | bytecode-level bug patterns |
 | JUnit 5 | `test` | unit tests |
 
@@ -68,8 +68,8 @@ or, from a JAR build:
 ./mvnw exec:java
 ```
 
-The process starts a console menu unless `WALLET_MNEMONIC` and
-`WALLET_PASSWORD` are set:
+The process starts a console menu unless `WALLET_MNEMONIC` or
+`WALLET_PASSWORD` is set:
 
 ```bash
 export WALLET_MNEMONIC="word1 word2 ... word12"
@@ -102,8 +102,7 @@ endpoint instead of the second one starting without one.
 
 ## Data providers
 
-The daemon talks to exactly one provider. Two environment variables or
-command-line flags choose it:
+The daemon talks to exactly one provider. Set one of these:
 
 | setting | flag | environment |
 |---|---|---|
@@ -119,6 +118,8 @@ broadcast and the chain tip. There is no second transport and no fallback:
 mixing BASE_URL, EXR_ENDPOINT or ELECTRUM_ENDPOINT is a startup error, and a
 coin the node cannot serve fails instead of silently using another path.
 
+With none of them set, the daemon uses `https://xliterevp.mywire.org/`.
+
 `--electrum-endpoint` exists only for testing one indexer without a node; it
 takes an absolute WebSocket base and cannot be combined with the other two.
 
@@ -133,7 +134,7 @@ Startup is local. A coin's wallet, configuration and JSON-RPC listener come up
 without waiting for the provider; the master endpoint is announced before any
 coin has to answer. Provider work — the initial history sync and the address
 discovery that finds a wallet's used addresses — runs afterwards, on the coin's
-own workers, and the coin becomes ready when it completes.
+own workers.
 
 The provider is probed for the life of the process. A failed dial or handshake
 fails the request immediately instead of parking it behind a socket that may
@@ -143,33 +144,44 @@ stops serving, comes online by itself when a session succeeds, including one
 that appears minutes after launch.
 
 The local RPC reflects that state. `getinfo` always answers and reports
-`rpcready`: `false` until the coin's history is synchronised. Methods answered
-from local wallet state (`help`, `version`, `ping`, `getinfo`,
-`getnetworkinfo`, `getfees`, `getblockchaininfo`, `getblockcount`,
-`getaddressesbyaccount`, `getnewaddress`, `importprivkey`, `dumpprivkey`,
-`validateaddress`, `historystatus`, `signmessage`, `verifymessage`) keep
-working; methods that read chain data answer the documented
-`503 -1112 "This coin is temporarily unavailable."` until the coin is ready.
+`rpcready`: `true` while the coin's provider session is connected. History is
+separate: `historystatus` reports the snapshot and `listtransactions` answers
+`3002` until it is complete. Methods answered from local wallet state (`help`,
+`version`, `ping`, `getinfo`, `getnetworkinfo`, `getfees`,
+`getblockchaininfo`, `getblockcount`, `getaddressesbyaccount`,
+`getnewaddress`, `importprivkey`, `dumpprivkey`, `validateaddress`,
+`historystatus`, `signmessage`, `verifymessage`) keep working; methods that
+read chain data answer `503 -1112 "This coin is temporarily unavailable."`
+while the session is not connected.
 
 ## RPC surface
+
+The master endpoint (`config-master.json`, default port 9955) serves:
+
+```
+ping, version, help, stop, reloadconfig
+getCoins (alias listCoins)
+```
 
 Each coin endpoint speaks a Bitcoin-RPC-compatible subset. `help` lists it:
 
 ```
-getinfo, getnetworkinfo, getfees, getblockchaininfo, getrawmempool
-getblockcount, getblockhash <height>, getblock <hash>
-listunspent, listtransactions, gettransaction <txid>
+help, version, ping, reloadconfig
+getinfo, getnetworkinfo, getfees, getblockchaininfo, getblockcount
+getblockhash <height>, getblock <hash>, getrawmempool
+gettransaction <txid>, getrawtransaction <txid> [verbose]
+listunspent, gettxout <txid> <vout>, listtransactions [start] [end]
+historystatus
 getaddressesbyaccount <account>, getnewaddress
-importprivkey <privkey>, dumpprivkey <address>
+importprivkey <privkey>, dumpprivkey <address>, validateaddress <address>
 createrawtransaction, decoderawtransaction, signrawtransaction, sendrawtransaction
-gettxout <txid> <vout>
+sendtransaction <address> <amount> [dryrun]
 signmessage <address> <message>, verifymessage <address> <signature> <message>
-stop
 ```
 
-`getblockhash`, `getblock`, `getrawmempool`, `gettransaction` and
-`sendrawtransaction` are served from the provider's native session; the rest
-from the local wallet.
+`stop` is master-only. Chain reads and broadcasts are served from the
+provider's native session; the rest come from the local wallet.
+`sendtransaction` builds, signs and broadcasts under a per-coin lock.
 
 ## License
 

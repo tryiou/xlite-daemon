@@ -105,13 +105,19 @@ The XLite Daemon is a multi-cryptocurrency wallet backend that provides secure w
 Set these environment variables before running:
 
 ```bash
-# Required for wallet initialization
+# Wallet credentials: either one unlocks the wallet without the console menu.
 export WALLET_MNEMONIC="your twelve word mnemonic phrase here"
 export WALLET_PASSWORD="your secure password"
 
-# Optional: Custom EXR endpoints (comma-separated list of backend servers)
-export EXR_ENDPOINT="https://server1.example.com,https://server2.example.com"
+# Provider: set at most one. With none set, the daemon uses its built-in
+# default (https://xliterevp.mywire.org/).
+export EXR_ENDPOINT="http://exrproxy1.example.org:42114"
+# export BASE_URL="https://adapter.example.org"
+# export ELECTRUM_ENDPOINT="ws://127.0.0.1:5000"   # single-indexer test override
 ```
+
+`EXR_ENDPOINT` is one endpoint: a comma-separated value keeps only the first
+entry, and setting two provider variables is a startup error.
 
 ## Configuration
 
@@ -134,27 +140,31 @@ Each cryptocurrency has its own configuration file named `config-{ticker}.json`:
 
 ```json
 {
-    "fee": 0.0001,
-    "feeFlat": true,
+    "feeperbyte": 100,
+    "mintxfee": 10000,
     "rpcEnabled": true,
     "rpcUsername": "xlite",
     "rpcPassword": "securepassword123",
-    "rpcPort": 9955,
+    "rpcPort": 41419,
+    "rpcBindAddress": "127.0.0.1",
     "addressCount": 25
 }
 ```
+
+Fee values come from the coin's blockchain-configuration-files entry.
 
 ### Configuration Options
 
 | Setting | Type | Description | Default |
 |---------|------|-------------|---------|
-| `fee` | number | Transaction fee rate | 0.0001 |
-| `feeFlat` | boolean | Use flat fee vs dynamic | true |
-| `rpcEnabled` | boolean | Enable JSON-RPC server | false |
-| `rpcUsername` | string | RPC authentication username | "" |
-| `rpcPassword` | string | RPC authentication password | "" |
-| `rpcPort` | number | RPC server port | -1000 (auto) |
-| `addressCount` | number | Number of addresses to generate | 0 |
+| `feeperbyte` | number | Fee per byte, in satoshis | coin configuration |
+| `mintxfee` | number | Minimum transaction fee, in satoshis | coin configuration |
+| `rpcEnabled` | boolean | Enable the coin's JSON-RPC listener | `false` on first run |
+| `rpcUsername` | string | Basic-auth username | `""` |
+| `rpcPassword` | string | Basic-auth password | `""` |
+| `rpcPort` | number | Listener port; steps to the next free port when held | `-1000` (derive) |
+| `rpcBindAddress` | string | Interface to bind | loopback |
+| `addressCount` | number | Addresses to generate | `0` |
 
 ## Usage
 
@@ -167,7 +177,11 @@ Each cryptocurrency has its own configuration file named `config-{ticker}.json`:
 
 2. **With custom arguments**:
    ```bash
-   ./target/xlite-daemon --network=testnet --debug
+   # Pick a provider explicitly
+   ./target/xlite-daemon --exr-endpoint http://exrproxy1.example.org:42114
+
+   # Write or refresh every coin's RPC configuration, then exit
+   ./target/xlite-daemon --enablerpcandconfigure
    ```
 
 3. **As a background service**:
@@ -183,22 +197,26 @@ Each cryptocurrency has its own configuration file named `config-{ticker}.json`:
 
 #### Creating a New Wallet
 
-1. **Generate a new mnemonic**:
+1. **Create the wallet**:
    ```bash
-   # The daemon will automatically generate a 12-word mnemonic on first run
-   # or you can provide one via WALLET_MNEMONIC environment variable
+   # Non-interactively, with the password from WALLET_PASSWORD
+   ./target/xlite-daemon --createdefaultwallet
+
+   # Or restore an existing phrase
+   ./target/xlite-daemon --createwalletmnemonic
    ```
+   With no wallet, the console menu creates one (1) or imports a phrase (3).
 
 2. **Set a secure password**:
    ```bash
    export WALLET_PASSWORD="your-secure-password-here"
    ```
 
-3. **Verify password strength**:
-   The daemon includes a password strength calculator that evaluates:
-   - Length (8+ characters required)
-   - Character variety (uppercase, lowercase, numbers, symbols)
-   - Overall security score (0-10)
+3. **Password strength**:
+   The daemon scores the password and refuses anything below 9 points:
+   - a password shorter than 8 characters scores 0;
+   - length (8-9 vs 10+) is worth 1 or 2 points;
+   - digits, lowercase, uppercase and special characters add 2 points each.
 
 #### Importing an Existing Wallet
 
@@ -216,56 +234,87 @@ export WALLET_PASSWORD="your password"
 
 #### Basic Wallet Operations
 
+Every coin has its own listener and its own credentials. Both live in
+`settings/config-<ticker>.json`; the examples use BLOCK on port 41419.
+
 ```bash
-# Get wallet balance
-curl -X POST http://localhost:9955 \
+# Get wallet info for one coin
+curl -s -u "$RPC_USER:$RPC_PASSWORD" \
+  -X POST http://127.0.0.1:41419 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"getinfo","params":[],"id":1}'
 
-# Generate new address
-curl -X POST http://localhost:9955 \
+# Generate a new address
+curl -s -u "$RPC_USER:$RPC_PASSWORD" \
+  -X POST http://127.0.0.1:41419 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"getnewaddress","params":[],"id":1}'
 
-# List unspent transactions (UTXOs)
-curl -X POST http://localhost:9955 \
+# List unspent outputs
+curl -s -u "$RPC_USER:$RPC_PASSWORD" \
+  -X POST http://127.0.0.1:41419 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"listunspent","params":[],"id":1}'
+
+# The master endpoint lists the configured coins; it does not serve getinfo.
+curl -s -u "$MASTER_USER:$MASTER_PASSWORD" \
+  -X POST http://127.0.0.1:9955 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"getCoins","params":[],"id":1}'
 ```
 
 #### Transaction Operations
 
 ```bash
 # Create raw transaction
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_USER:$RPC_PASSWORD" \
+  -X POST http://127.0.0.1:41419 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"createrawtransaction","params":[[{"txid":"...","vout":0}],{"address":0.001}],"id":1}'
 
 # Sign transaction
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_USER:$RPC_PASSWORD" \
+  -X POST http://127.0.0.1:41419 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"signrawtransaction","params":["rawtx"],"id":1}'
 
 # Broadcast transaction
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_USER:$RPC_PASSWORD" \
+  -X POST http://127.0.0.1:41419 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"sendrawtransaction","params":["signedtx"],"id":1}'
+
+# Or build, sign and broadcast in one locked step; the third argument is a dry run.
+curl -s -u "$RPC_USER:$RPC_PASSWORD" \
+  -X POST http://127.0.0.1:41419 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"sendtransaction","params":["address",0.001,true],"id":1}'
 ```
 
 ## Supported Cryptocurrencies
 
-The daemon supports the following cryptocurrencies:
+The daemon supports the following coins:
 
-| Coin | Ticker | Network | RPC Port | Status |
-|------|--------|---------|----------|---------|
-| Blocknet | BLOCK | Mainnet | 41419 | ✅ Active |
-| Bitcoin | BTC | Mainnet | 8332 | ✅ Active |
-| Litecoin | LTC | Mainnet | 9332 | ✅ Active |
-| Dash | DASH | Mainnet | 9998 | ✅ Active |
-| Dogecoin | DOGE | Mainnet | 22555 | ✅ Active |
-| Syscoin | SYS | Mainnet | 8370 | ✅ Active |
-| PIVX | PIVX | Mainnet | 9951 | ✅ Active |
-| Unobtanium | UNO | Mainnet | 65111 | ✅ Active |
+| Coin | Ticker |
+|------|--------|
+| Blocknet | BLOCK |
+| Bitcoin | BTC |
+| Bitcoin Cash | BCH |
+| BitCore | BTX |
+| Litecoin | LTC |
+| Dash | DASH |
+| DigiByte | DGB |
+| Dogecoin | DOGE |
+| Syscoin | SYS |
+| PIVX | PIVX |
+| Ravencoin | RVN |
+| Unobtanium | UNO |
+| PKoin | PKOIN |
+| Verge | XVG |
+
+This is the wallet enum. Chain parameters — including each coin's default port
+— come from blockchain-configuration-files at runtime, and the manifest decides
+which of these coins a deployment actually serves.
 
 ### Network Configuration
 
@@ -361,15 +410,12 @@ ping blockexplorer.com
 
 #### 4. Memory Issues
 
-**Problem**: OutOfMemoryError or slow performance
+**Problem**: `OutOfMemoryError` (JAR build only; the native image has no Java heap)
 
 **Solution**:
 ```bash
-# Increase Java heap size
-export JAVA_OPTS="-Xmx2g -Xms1g"
-
-# Or modify the startup script
-java -Xmx2g -jar xlite-daemon.jar
+# JAR build: give the JVM a larger heap
+java -Xmx2g -jar target/xlite-daemon-*.jar
 ```
 
 ### Log Analysis
@@ -397,30 +443,27 @@ java -Xmx2g -jar xlite-daemon.jar
 
 ### Debug Mode
 
-Enable debug logging:
+Enable debug logging with the variable the daemon reads:
 
 ```bash
-# Set logging level
-export LOG_LEVEL=DEBUG
-
-# Or modify logging.properties
-handlers=java.util.logging.ConsoleHandler
-.level=FINE
+export XLITE_DAEMON_LOG_LEVEL=FINE   # SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST
 ```
+
+Diagnostics go to stderr, payloads to stdout. Logging is configured in code;
+there is no `logging.properties`.
 
 ### Performance Optimization
 
-#### Address Discovery Optimization
+#### Address Discovery
 
-1. **Batch Size**: Adjust batch size for your network
-2. **Gap Limit**: Modify gap limit for faster discovery
-3. **Timeout Settings**: Configure discovery timeouts
+Discovery is automatic and unconfigurable: batches until an empty one, three
+consecutive failures abort. No gap-limit or batch-size setting.
 
-#### Memory Management
+#### Memory
 
-1. **Heap Size**: Allocate sufficient memory
-2. **GC Tuning**: Optimize garbage collection
-3. **Connection Pooling**: Reuse network connections
+The packaged binary is a GraalVM native image, so there is no heap or GC flag
+to tune. For the JAR path, pass JVM options through `MAVEN_OPTS` when using
+`./mvnw exec:java`.
 
 ### Recovery Procedures
 
@@ -459,13 +502,18 @@ The daemon provides a comprehensive JSON-RPC API for wallet and blockchain opera
 
 #### Authentication
 
-All RPC requests require authentication:
+Every coin endpoint requires HTTP Basic auth with the credentials in that
+coin's `settings/config-<ticker>.json`; the master endpoint uses
+`config-master.json`. The examples below target one coin's listener, so the
+URL and the credentials are set once:
 
 ```bash
-# Set credentials in config file or environment
-rpcUsername=xlite
-rpcPassword=yourpassword
+export RPC_URL="http://127.0.0.1:41419"   # this coin's rpcPort
+export RPC_AUTH="xlite:yourpassword"      # rpcUsername:rpcPassword
 ```
+
+The master endpoint is a different port (default 9955) and serves only the
+master methods — `getinfo` is not one of them.
 
 #### Blockchain Operations
 
@@ -473,7 +521,7 @@ rpcPassword=yourpassword
 Get blockchain information
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"getblockchaininfo","params":[],"id":1}'
 ```
@@ -496,7 +544,7 @@ curl -X POST http://localhost:9955 \
 Get block hash by height
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"getblockhash","params":[700000],"id":1}'
 ```
@@ -505,7 +553,7 @@ curl -X POST http://localhost:9955 \
 Get block information
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"getblock","params":["blockhash"],"id":1}'
 ```
@@ -516,7 +564,7 @@ curl -X POST http://localhost:9955 \
 Get wallet information
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"getinfo","params":[],"id":1}'
 ```
@@ -548,7 +596,7 @@ curl -X POST http://localhost:9955 \
 Generate new wallet address
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"getnewaddress","params":[],"id":1}'
 ```
@@ -564,7 +612,7 @@ curl -X POST http://localhost:9955 \
 List unspent transaction outputs
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"listunspent","params":[],"id":1}'
 ```
@@ -590,7 +638,7 @@ curl -X POST http://localhost:9955 \
 Get transaction details
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"gettransaction","params":["txid"],"id":1}'
 ```
@@ -601,7 +649,7 @@ curl -X POST http://localhost:9955 \
 Create raw transaction
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"createrawtransaction","params":[[{"txid":"a1b2c3d4...","vout":0}],[{"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh":0.1}]],"id":1}'
 ```
@@ -610,7 +658,7 @@ curl -X POST http://localhost:9955 \
 Decode raw transaction
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"decoderawtransaction","params":["rawtx"],"id":1}'
 ```
@@ -619,7 +667,7 @@ curl -X POST http://localhost:9955 \
 Sign raw transaction
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"signrawtransaction","params":["rawtx"],"id":1}'
 ```
@@ -628,7 +676,7 @@ curl -X POST http://localhost:9955 \
 Broadcast transaction
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"sendrawtransaction","params":["signedtx"],"id":1}'
 ```
@@ -639,7 +687,7 @@ curl -X POST http://localhost:9955 \
 Export private key
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"dumpprivkey","params":["address"],"id":1}'
 ```
@@ -648,7 +696,7 @@ curl -X POST http://localhost:9955 \
 Import private key
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"importprivkey","params":["privatekey"],"id":1}'
 ```
@@ -657,7 +705,7 @@ curl -X POST http://localhost:9955 \
 Sign message with address
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"signmessage","params":["address","message"],"id":1}'
 ```
@@ -666,7 +714,7 @@ curl -X POST http://localhost:9955 \
 Verify signed message
 
 ```bash
-curl -X POST http://localhost:9955 \
+curl -s -u "$RPC_AUTH" "$RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"verifymessage","params":["address","signature","message"],"id":1}'
 ```
@@ -675,22 +723,25 @@ curl -X POST http://localhost:9955 \
 
 #### Common Error Codes
 
-| Code | Message | Description |
-|------|---------|-------------|
-| -1 | "Bad password" | Incorrect wallet password |
-| -2 | "Unsupported coin" | Coin not supported |
-| -3 | "Bad mnemonic" | Invalid mnemonic phrase |
-| -4 | "Change password failed" | Password change failed |
-| -5 | "Wallet not found" | No wallet file exists |
+| Code | Meaning |
+|------|---------|
+| `-1` | Invalid arguments; the message carries the usage line |
+| `-1001` | The body is not a JSON-RPC envelope |
+| `-1112` | The provider session is not connected (HTTP 503) |
+| `-32601` | Unknown method |
+| `3002` | Wallet data is not ready yet; retry the call |
+| `3003` | The indexer refuses an address the wallet owns; `historystatus` names it |
+| provider code | A failed chain read or broadcast is reported with the provider's own code |
 
 #### Error Response Format
 
 ```json
 {
   "error": {
-    "code": -1,
-    "message": "Bad password"
+    "code": -1001,
+    "message": "Error parsing JSON."
   },
+  "result": null,
   "id": 1
 }
 ```
@@ -703,72 +754,40 @@ Configure custom RPC ports for each coin:
 
 ```json
 {
-  "rpcPort": 9955,
+  "rpcPort": 41419,
   "rpcEnabled": true,
   "rpcUsername": "xlite",
   "rpcPassword": "securepassword"
 }
 ```
 
+Each coin needs its own port; master defaults to 9955 in `config-master.json`.
+A held port steps to the next free one and is written back to the file.
+
 ### Network Configuration
+
+#### Provider Selection
+
+No full node and no `customNodes`: one provider, chosen by `EXR_ENDPOINT`,
+`BASE_URL` or `ELECTRUM_ENDPOINT`. With none set, the built-in default is used.
 
 #### Proxy Settings
 
-Configure proxy for network connections:
-
-```bash
-# Set proxy environment variables
-export http_proxy="http://proxy.company.com:8080"
-export https_proxy="http://proxy.company.com:8080"
-```
-
-#### Custom Nodes
-
-Configure custom blockchain nodes:
-
-```json
-{
-  "customNodes": [
-    "node1.example.com:8333",
-    "node2.example.com:8333"
-  ]
-}
-```
-
-### Performance Tuning
-
-#### JVM Parameters
-
-Optimize Java Virtual Machine settings:
-
-```bash
-# High-performance settings
-export JAVA_OPTS="-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-```
-
-#### Network Optimization
-
-```bash
-# Increase connection limits
-export MAX_CONNECTIONS=50
-
-# Optimize network buffers
-export NETWORK_BUFFER_SIZE=65536
-```
+Proxy environment variables (`http_proxy`/`https_proxy`) are honoured by the
+underlying HTTP client for the provider connection.
 
 ### Security Hardening
 
 #### Firewall Configuration
 
-Allow necessary ports:
+Keep the listeners on loopback. Every coin binds `127.0.0.1` (or `::1`) by
+default and the master endpoint does too, so no inbound rule is needed. Only
+if an operator sets a non-loopback `rpcBindAddress` should the port be opened,
+and then only to the hosts that need it:
 
 ```bash
-# Linux (iptables)
-sudo iptables -A INPUT -p tcp --dport 9955 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 41419 -j ACCEPT
-
-# Windows (PowerShell)
-New-NetFirewallRule -DisplayName "XLite Daemon" -Direction Inbound -Protocol TCP -LocalPort 9955 -Action Allow
+# Linux (iptables), restricted to one trusted subnet
+sudo iptables -A INPUT -p tcp -s 10.0.0.0/24 --dport 41419 -j ACCEPT
 ```
 
 #### File Permissions
