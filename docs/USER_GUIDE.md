@@ -573,7 +573,7 @@ curl -s -u "$RPC_AUTH" "$RPC_URL" \
 ```json
 {
   "result": {
-    "version": "0.5.15",
+    "version": "0.6.0",
     "protocolversion": 70015,
     "walletversion": 169900,
     "balance": 1.50000000,

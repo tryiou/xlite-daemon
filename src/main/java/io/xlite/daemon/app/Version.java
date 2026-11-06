@@ -4,7 +4,7 @@ public final class Version {
     private Version() {}
 
     private static final String CLIENT_NAME = "xlite-daemon";
-    private static final String CLIENT_PROTOCOL_VERSION = "0.5.15";
+    private static final String CLIENT_PROTOCOL_VERSION = "0.6.0";
 
     public static final String CLIENT_TYPE = "CloudPeer";
     public static final String CLIENT_COMMENTS = "SPV";
