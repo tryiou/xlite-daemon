@@ -1,898 +1,320 @@
-# XLite Daemon User Guide
+# XLite Daemon — User Guide
 
-## Table of Contents
-1. [Overview](#overview)
-2. [System Requirements](#system-requirements)
-3. [Installation](#installation)
-4. [Configuration](#configuration)
-5. [Usage](#usage)
-6. [Supported Cryptocurrencies](#supported-cryptocurrencies)
-7. [Security Features](#security-features)
-8. [Troubleshooting](#troubleshooting)
-9. [API Reference](#api-reference)
-10. [Advanced Configuration](#advanced-configuration)
+Install, supported coins, startup variables, data-directory paths, and a request
+example are in the [README](../README.md). This guide covers wallet rules,
+configuration, the RPC reference, logs, and troubleshooting.
 
-## Overview
+## Wallet
 
-The XLite Daemon is a multi-cryptocurrency wallet backend that provides secure wallet management, blockchain connectivity, and JSON-RPC API services for various cryptocurrencies. It serves as the backend infrastructure for the XLite wallet application.
+Wallet creation and password changes require a score of at least 9 out of 10:
 
-### Key Features
-- **Multi-Currency Support**: every coin the configured
-  blockchain-configuration-files manifest lists, with no coin list compiled in
-- **Secure Wallet Management**: Industry-standard encryption with PBKDF2 key derivation
-- **Address Discovery**: Automatic detection of used addresses for wallet recovery
-- **JSON-RPC API**: Comprehensive API for wallet operations and blockchain queries
-- **XRouter Integration**: cross-chain messaging over the Blocknet p2p network.
-  This path is present but disabled in the current build; see `AGENTS.md`
-- **Native Compilation**: Optimized native binary for better performance
+- Passwords shorter than 8 characters score 0.
+- 8–9 characters score 1; 10 or more score 2.
+- Each class present adds 2: digit, lowercase, uppercase, and a special
+  character from `~!@#$%^&*()_-+=[]{|};:',.<>?/\`.
 
-## System Requirements
+In practice a password needs at least 8 characters and all four classes.
+Unlocking an existing wallet does not apply the score.
 
-### Minimum Requirements
-- **Operating System**: Windows 10+, macOS 10.14+, Linux (kernel 3.10+)
-- **Java**: JDK 21 or higher
-- **Maven**: 3.8.6 or higher
-- **Memory**: 2GB RAM minimum, 4GB recommended
-- **Storage**: 500MB free space for wallet data and blockchain metadata
+Menu creation asks for the password twice. After creation the daemon prints the
+12-word phrase once; store it offline. Flag-driven creation keeps stdout clean
+and points at `--getmnemonic`.
 
-### Recommended Requirements
-- **Operating System**: Latest stable version of your preferred OS
-- **Java**: Latest JDK 21 LTS
-- **Memory**: 8GB RAM or more
-- **Storage**: SSD with 1GB+ free space
-- **Network**: Stable internet connection
+### Mnemonic and password
 
-## Installation
+`WALLET_MNEMONIC` runs the wallet from the phrase without reading or writing
+`key.dat`; the wallet exists for that process only. Menu choice 3 behaves the
+same way.
 
-### Prerequisites
-1. Install JDK 21:
-   ```bash
-   # Ubuntu/Debian
-   sudo apt update && sudo apt install openjdk-21-jdk
-   
-   # macOS (using Homebrew)
-   brew install openjdk@21
-   
-   # Windows: Download from Oracle or Adoptium
-   ```
+`WALLET_PASSWORD` decrypts `key.dat`. When no `key.dat` exists and the password
+is strong enough, the daemon generates and stores a new wallet.
 
-2. Install Maven 3.8.6+:
-   ```bash
-   # Ubuntu/Debian
-   sudo apt install maven
-   
-   # macOS (using Homebrew)
-   brew install maven
-   
-   # Verify installation
-   java -version
-   mvn -version
-   ```
+### Command line
 
-### Building from Source
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/blocknetdx/xlite-daemon
-   cd xlite-daemon
-   ```
-
-2. **Make Maven wrapper executable** (Linux/macOS only):
-   ```bash
-   chmod +x mvnw
-   ```
-
-3. **Build the project**:
-   ```bash
-   # Full build with native compilation (recommended)
-   ./mvnw clean package -Pnative
-   
-   # Faster build without tests (development)
-   ./mvnw clean package -Pnative-fast
-   ```
-
-4. **Run the application**:
-   ```bash
-   # Using the native binary
-   ./target/xlite-daemon
-   
-   # Or using Maven
-   ./mvnw exec:java
-   ```
-
-### Environment Variables
-
-Set these environment variables before running:
-
-```bash
-# Wallet credentials: either one unlocks the wallet without the console menu.
-export WALLET_MNEMONIC="your twelve word mnemonic phrase here"
-export WALLET_PASSWORD="your secure password"
-
-# Provider: set at most one. With none set, the daemon uses its built-in
-# default (https://xliterevp.mywire.org/).
-export EXR_ENDPOINT="http://exrproxy1.example.org:42114"
-# export BASE_URL="https://adapter.example.org"
-# export ELECTRUM_ENDPOINT="ws://127.0.0.1:5000"   # single-indexer test override
+```
+--createdefaultwallet [password]
+--createwalletmnemonic [password] [mnemonic]
+--password <password>
+--getmnemonic <password>
+--changepassword <current> <new>
+--enablerpcandconfigure
+--exr-endpoint [url]
+--development-endpoint [url]
+--electrum-endpoint [url]
+--blockchain-configuration-files <path-or-url>
+--version
+--help
 ```
 
-`EXR_ENDPOINT` is one endpoint: a comma-separated value keeps only the first
-entry, and setting two provider variables is a startup error.
+| Flag | Effect |
+|---|---|
+| `--createdefaultwallet` | Creates `key.dat` from a new 12-word phrase, then exits |
+| `--createwalletmnemonic` | Creates `key.dat` from the given phrase, then exits |
+| `--password` | Logs in and runs the daemon |
+| `--getmnemonic` | Prints the wallet phrase to stdout, then exits |
+| `--changepassword` | Re-encrypts `key.dat` under a new password, then exits |
+| `--enablerpcandconfigure` | Writes new credentials, enables every coin listener and the master endpoint, then exits |
+| `--exr-endpoint` | Sets the indexing-service base URL |
+| `--development-endpoint` | Sets the indexing-service base URL |
+| `--electrum-endpoint` | Sets a single-indexer base URL for testing |
+| `--blockchain-configuration-files` | Sets the coin-metadata source |
+| `--version` | Prints the daemon version, then exits |
+| `--help` | Prints the flag list, then exits |
+
+Omitting a value after an endpoint or config-source flag falls back to its
+environment variable. Wallet creation flags do nothing when `key.dat` exists.
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Invalid input, failed operation, or unusable configuration |
+| `4` | `--getmnemonic` could not decrypt the wallet |
+| `5` | Wallet authentication failed during login |
+
+## Data directory
+
+| Path | Contents |
+|---|---|
+| `key.dat` | Encrypted wallet seed |
+| `settings/config-<TICKER>.json` | Per-coin RPC settings |
+| `settings/config-master.json` | Master endpoint settings |
+| `backups/key-YYYYMMDDHHMMSS.dat` | Wallet moved aside before a replacement write |
+| `error-YYYY-MM-DD.log.0` | Daily log; rotated files add `.1`–`.4` |
+| `coinconfig-cache/` | Cached coin metadata when the source is remote |
+| `.migration.lock` | Inter-process lock in the parent directory |
+
+`key.dat` is a four-line text file: format version, Base64 salt, Base64 IV, and
+the encrypted mnemonic. Encryption is AES-256-CBC with a key derived by
+PBKDF2-HMAC-SHA256 at 100,000 iterations. Wallets written by older versions
+(PBKDF2-HMAC-SHA1 / AES-ECB) are migrated on unlock.
+
+Back up `key.dat` and `settings/`. Recovery requires the wallet password or the
+mnemonic. A `CloudChains` directory in the same parent is migrated to
+`xlite-daemon` at startup.
 
 ## Configuration
 
-### Configuration Files Location
+### Coin endpoints
 
-The daemon stores configuration files in your system's application data directory:
+Each supported ticker has `settings/config-<TICKER>.json`:
 
-- **Windows**: `%appdata%\xlite-daemon\settings\config-*.json`
-- **macOS**: `~/Library/Application Support/xlite-daemon/settings/config-*.json`
-- **Linux**: `~/.config/xlite-daemon/settings/config-*.json`
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `rpcEnabled` | boolean | `false` | Start this coin's listener |
+| `rpcUsername` | string | `""` | Basic-auth username |
+| `rpcPassword` | string | `""` | Basic-auth password |
+| `rpcPort` | number | `-1000` | Listener port; `-1000` derives one |
+| `rpcBindAddress` | string | loopback | Interface to bind |
+| `addressCount` | number | `0` | Addresses the wallet tracks |
 
-Set `XLITE_DATA_HOME` to override the platform directory above. The
-daemon aborts at startup when no override is set and the platform
-default is missing (Windows with unset `%AppData%`, or an empty
-`user.home`).
+Fees used by `getfees`, `getinfo`, and transaction building come from
+blockchain-configuration-files.
 
-### Configuration Structure
+A coin listener starts only when all of these hold:
 
-Each cryptocurrency has its own configuration file named `config-{ticker}.json`:
+- `rpcEnabled` is true.
+- `rpcUsername` and `rpcPassword` are non-empty.
+- `rpcBindAddress` resolves to a specific local address; wildcard addresses are
+  refused.
 
-```json
-{
-    "feeperbyte": 100,
-    "mintxfee": 10000,
-    "rpcEnabled": true,
-    "rpcUsername": "xlite",
-    "rpcPassword": "securepassword123",
-    "rpcPort": 41419,
-    "rpcBindAddress": "127.0.0.1",
-    "addressCount": 25
-}
-```
+A missing, empty, or unparseable coin config is recreated at login with random
+credentials and `rpcEnabled` true. An unparseable file is preserved as
+`config-<TICKER>.json.corrupt-<epoch>`. A valid existing config is never
+modified.
 
-Fee values come from the coin's blockchain-configuration-files entry.
+`rpcEnabled` false means no listener. Except for `BLOCK` and `master`, the
+coin's wallet is also not initialized. Those two are always enabled; a stored
+`false` is rewritten to `true`.
 
-### Configuration Options
+A derived coin port is the coin's configured port plus 3. If that port is above
+the valid range the offset is subtracted. The port that binds is written back to
+the config file.
 
-| Setting | Type | Description | Default |
-|---------|------|-------------|---------|
-| `feeperbyte` | number | Fee per byte, in satoshis | coin configuration |
-| `mintxfee` | number | Minimum transaction fee, in satoshis | coin configuration |
-| `rpcEnabled` | boolean | Enable the coin's JSON-RPC listener | `false` on first run |
-| `rpcUsername` | string | Basic-auth username | `""` |
-| `rpcPassword` | string | Basic-auth password | `""` |
-| `rpcPort` | number | Listener port; steps to the next free port when held | `-1000` (derive) |
-| `rpcBindAddress` | string | Interface to bind | loopback |
-| `addressCount` | number | Addresses to generate | `0` |
+### Master endpoint
 
-## Usage
+`settings/config-master.json` configures the endpoint that lists coins. It
+defaults to port 9955, binds loopback, and starts with the wallet. Credentials
+are generated at startup and written before the listener binds; `rpcEnabled` is
+always true.
 
-### Starting the Daemon
+### Coin metadata source
 
-1. **Basic startup**:
-   ```bash
-   ./target/xlite-daemon
-   ```
+| Setting | Value |
+|---|---|
+| Flag | `--blockchain-configuration-files` |
+| Environment | `BLOCKCHAIN_CONFIGURATION_FILES` |
+| Default | `https://raw.githubusercontent.com/blocknetdx/blockchain-configuration-files/master` |
 
-2. **With custom arguments**:
-   ```bash
-   # Pick a provider explicitly
-   ./target/xlite-daemon --exr-endpoint http://exrproxy1.example.org:42114
+The value is a local directory or a base URL. GitHub web URLs are normalized to
+their raw form. A remote source is cached under `coinconfig-cache/`; when the
+source is unreachable and a cache exists, the cached copy is used.
 
-   # Write or refresh every coin's RPC configuration, then exit
-   ./target/xlite-daemon --enablerpcandconfigure
-   ```
+### Indexing service
 
-3. **As a background service**:
-   ```bash
-   # Linux/macOS
-   nohup ./target/xlite-daemon > daemon.log 2>&1 &
-   
-   # Windows
-   start /B xlite-daemon.exe > daemon.log
-   ```
+The daemon talks to one indexing service. Unless overridden, the built-in
+default is used. Exactly one of these may be set:
 
-### Wallet Management
+| Purpose | Flag | Environment |
+|---|---|---|
+| Single-indexer override | `--electrum-endpoint` | `ELECTRUM_ENDPOINT` |
+| Service-node connector | `--exr-endpoint` | `EXR_ENDPOINT` |
+| Direct provider | `--development-endpoint` | `BASE_URL` |
 
-#### Creating a New Wallet
+All three accept the same base-URL forms. Setting more than one, in any
+combination, aborts startup. A comma-separated `EXR_ENDPOINT` uses only its
+first entry.
 
-1. **Create the wallet**:
-   ```bash
-   # Non-interactively, with the password from WALLET_PASSWORD
-   ./target/xlite-daemon --createdefaultwallet
+`http://host` becomes `ws://host/ws/<TICKER>`; `https://host` becomes
+`wss://host/ws/<TICKER>`. The ticker is upper-cased. Each coin opens its own
+session. There is no fallback provider and no aggregation.
 
-   # Or restore an existing phrase
-   ./target/xlite-daemon --createwalletmnemonic
-   ```
-   With no wallet, the console menu creates one (1) or imports a phrase (3).
+Startup does not wait for the service. A coin whose session is not connected
+still has a listener; wallet-local methods answer, and methods that need chain
+data return the unavailable error described in the JSON-RPC section.
 
-2. **Set a secure password**:
-   ```bash
-   export WALLET_PASSWORD="your-secure-password-here"
-   ```
+## JSON-RPC
 
-3. **Password strength**:
-   The daemon scores the password and refuses anything below 9 points:
-   - a password shorter than 8 characters scores 0;
-   - length (8-9 vs 10+) is worth 1 or 2 points;
-   - digits, lowercase, uppercase and special characters add 2 points each.
+### Transport
 
-#### Importing an Existing Wallet
+- HTTP `POST` to `/` only.
+- HTTP Basic auth on every request.
+- Request body: JSON object with a `method` string and a `params` array.
+- Response body: `result` and `error`, exactly one of which is non-null.
+  The request `id` is not echoed and no `jsonrpc` member is added.
 
-```bash
-# Set your existing mnemonic
-export WALLET_MNEMONIC="your existing twelve word phrase here"
-export WALLET_PASSWORD="your password"
+Method-level failures return HTTP 200 with an error object. Transport failures
+use the HTTP status codes in the error table.
 
-# Start the daemon
-./target/xlite-daemon
-```
+### Master endpoint
 
+| Method | Parameters | Result |
+|---|---|---|
+| `ping` | none | `1` |
+| `version` | none | daemon version string |
+| `help` | none | method list |
+| `stop` | none | shuts the process down |
+| `reloadconfig` | `<ticker>` | `true`; reload runs after the reply |
+| `getCoins` (`listCoins`) | none | coin metadata array |
 
-### Supported Operations
+`getCoins` rows contain `ticker`, `blockchain`, `verId`, `addressPrefix`,
+`scriptPrefix`, `secretPrefix`, `coin`, `feePerByte`, `minTxFee`, `port`, and
+`dustAmount`.
 
-#### Basic Wallet Operations
+### Coin endpoints
 
-Every coin has its own listener and its own credentials. Both live in
-`settings/config-<ticker>.json`; the examples use BLOCK on port 41419.
+| Method | Parameters |
+|---|---|
+| `help`, `version`, `ping`, `reloadconfig` | none |
+| `getinfo`, `getblockcount`, `getnetworkinfo`, `getfees`, `getblockchaininfo` | none |
+| `getblockhash` | `<height>` |
+| `getblock` | `<hash>` |
+| `gettransaction` | `<txid>` |
+| `getrawtransaction` | `<txid> [verbose]` |
+| `getrawmempool` | none |
+| `listunspent` | none |
+| `gettxout` | `<txid> <vout> [include_mempool]` |
+| `listtransactions` | `[start] [end]`; used only when both are present |
+| `historystatus` | none |
+| `getaddressesbyaccount` | `<account>` |
+| `getnewaddress` | none |
+| `importprivkey` | `<privkey>` |
+| `dumpprivkey` | `<address>` |
+| `validateaddress` | `<address>` |
+| `createrawtransaction` | `<inputs> <outputs>` |
+| `decoderawtransaction` | `<rawtx>` |
+| `signrawtransaction` | `<rawtx>` |
+| `sendrawtransaction` | `<rawtx>` |
+| `sendtransaction` | `<address> <amount> [dryrun]` |
+| `signmessage` | `<address> <message>` |
+| `verifymessage` | `<address> <signature> <message>` |
 
-```bash
-# Get wallet info for one coin
-curl -s -u "$RPC_USER:$RPC_PASSWORD" \
-  -X POST http://127.0.0.1:41419 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getinfo","params":[],"id":1}'
+Notes:
 
-# Generate a new address
-curl -s -u "$RPC_USER:$RPC_PASSWORD" \
-  -X POST http://127.0.0.1:41419 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getnewaddress","params":[],"id":1}'
+- `reloadconfig` on a coin endpoint reloads that coin; a supplied ticker must
+  match it.
+- `importprivkey` adds the key to the running wallet only; it is not persisted.
+- `getaddressesbyaccount` accepts `main` and returns all wallet addresses. Any
+  other account returns an empty array.
+- `sendtransaction` builds, signs, and broadcasts. `dryrun` set to `true`
+  returns the transaction without broadcasting.
+- `listtransactions` returns rows in the requested time window; unconfirmed rows
+  are always included.
 
-# List unspent outputs
-curl -s -u "$RPC_USER:$RPC_PASSWORD" \
-  -X POST http://127.0.0.1:41419 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"listunspent","params":[],"id":1}'
+### Readiness and history
 
-# The master endpoint lists the configured coins; it does not serve getinfo.
-curl -s -u "$MASTER_USER:$MASTER_PASSWORD" \
-  -X POST http://127.0.0.1:9955 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getCoins","params":[],"id":1}'
-```
+`getinfo.rpcready` is true while the coin's indexing-service session is
+connected. `getinfo.blocks` and `getblockcount` report `0` until a tip is known.
 
-#### Transaction Operations
+`historystatus` reports:
 
-```bash
-# Create raw transaction
-curl -s -u "$RPC_USER:$RPC_PASSWORD" \
-  -X POST http://127.0.0.1:41419 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"createrawtransaction","params":[[{"txid":"...","vout":0}],{"address":0.001}],"id":1}'
+| Field | Meaning |
+|---|---|
+| `native` | History engine attached to this coin |
+| `ready` | First history pass finished |
+| `complete` | Every wallet address was readable |
+| `addresses` | Addresses in the snapshot |
+| `rows` | Rows published |
+| `tip` | Chain tip used |
+| `failed` | Addresses refused by the service, with reasons |
 
-# Sign transaction
-curl -s -u "$RPC_USER:$RPC_PASSWORD" \
-  -X POST http://127.0.0.1:41419 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"signrawtransaction","params":["rawtx"],"id":1}'
+### Error codes
 
-# Broadcast transaction
-curl -s -u "$RPC_USER:$RPC_PASSWORD" \
-  -X POST http://127.0.0.1:41419 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"sendrawtransaction","params":["signedtx"],"id":1}'
+| Code | HTTP | Meaning |
+|---|---|---|
+| `3002` | 200 | Wallet snapshot not available for this call |
+| `3003` | 200 | History is incomplete because at least one address was refused |
+| `-1112` | 503 | The coin's indexing-service session is not connected |
+| `-32601` | 200 | Method not found |
+| `-1` | 200 | Invalid arguments; the message carries the usage line |
+| `-5` | 200 | Raw transaction not found |
+| `-1001` | 400 | Body is not a valid request |
+| `-1002` | 400 | Path is not `/` |
+| `-1003` | 400 | Method is not `POST` |
+| `-1111` | 403 | Missing or wrong Basic credentials |
 
-# Or build, sign and broadcast in one locked step; the third argument is a dry run.
-curl -s -u "$RPC_USER:$RPC_PASSWORD" \
-  -X POST http://127.0.0.1:41419 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"sendtransaction","params":["address",0.001,true],"id":1}'
-```
+## Logs
 
-## Supported Cryptocurrencies
+The daemon writes diagnostics to stderr and to `error-YYYY-MM-DD.log.0` in the
+data directory. The mnemonic and `--help` output go to stdout.
 
-The daemon supports the following coins:
+`XLITE_DAEMON_LOG_LEVEL` sets a `java.util.logging` level (default `INFO`).
+`FINE`, `FINER`, and `FINEST` reach the console only; the file records `INFO`
+and above. The logger level filters both outputs.
 
-| Coin | Ticker |
-|------|--------|
-| Blocknet | BLOCK |
-| Bitcoin | BTC |
-| Bitcoin Cash | BCH |
-| BitCore | BTX |
-| Litecoin | LTC |
-| Dash | DASH |
-| DigiByte | DGB |
-| Dogecoin | DOGE |
-| Syscoin | SYS |
-| PIVX | PIVX |
-| Ravencoin | RVN |
-| Unobtanium | UNO |
-| PKoin | PKOIN |
-| Verge | XVG |
-
-This is the wallet enum. Chain parameters — including each coin's default port
-— come from blockchain-configuration-files at runtime, and the manifest decides
-which of these coins a deployment actually serves.
-
-### Network Configuration
-
-Each coin has specific network parameters:
-- **Mainnet**: Production blockchain networks
-- **Testnet**: Testing and development networks
-- **RPC Ports**: Default ports for JSON-RPC communication
-
-## Security Features
-
-### Wallet Encryption
-
-The daemon uses industry-standard security practices:
-
-1. **PBKDF2 Key Derivation**: SHA-256 with 100,000 iterations
-2. **AES Encryption**: 256-bit encryption for wallet data
-3. **Secure Random Generation**: Cryptographically strong random number generation
-4. **Memory Protection**: Sensitive data cleared from memory after use
-
-### Legacy Wallet Migration
-
-The daemon automatically migrates legacy wallets:
-
-1. **Detection**: Identifies SHA-1 based legacy wallets
-2. **Backup**: Creates backup before migration
-3. **Upgrade**: Migrates to SHA-256 with improved security
-4. **Validation**: Verifies migration success before cleanup
-
-### Password Security
-
-The daemon includes password strength validation:
-
-```bash
-# Password scoring system:
-# 8-9 characters: 1 point
-# 10+ characters: 2 points
-# Contains digit: +2 points
-# Contains lowercase: +2 points
-# Contains uppercase: +2 points
-# Contains special character: +2 points
-# Maximum score: 10 points
-```
-
-### Address Security
-
-1. **HD Wallet Support**: Hierarchical Deterministic wallet generation
-2. **Address Gap Limit**: Prevents address exhaustion attacks
-3. **Forward Address Generation**: Pre-generates addresses for performance
-4. **Address Discovery**: Automatically finds used addresses for recovery
+The file is appended, capped at 10 MB, and rotated up to five files per day.
+Daily files older than `XLITE_DAEMON_LOG_RETENTION_DAYS` (default 30, minimum 1)
+are deleted at startup.
 
 ## Troubleshooting
 
-### Common Issues
+**`Bad password.`** — the supplied password does not decrypt `key.dat`, or the
+password is too weak for wallet creation. Recovery needs the password or the
+mnemonic.
 
-#### 1. Port Already in Use
+**A coin has no endpoint.** Open `settings/config-<TICKER>.json` and check the
+listener settings described under Configuration: `rpcEnabled` must be true and
+both credentials must be set. Restart after editing.
+`--enablerpcandconfigure` re-enables every coin and replaces all credentials,
+so use it only when you intend to re-pair all of them.
 
-**Problem**: "Address already in use" error on startup
+**`getinfo.rpcready` is false.** The indexing-service session for that coin is
+not connected. Check the endpoint setting and the log.
 
-**Solution**:
-```bash
-# Check which process is using the port
-lsof -i :9955  # Linux/macOS
-netstat -ano | findstr :9955  # Windows
+**`listtransactions` returns `3002` or `3003`.** The history snapshot is not
+available, or at least one wallet address could not be read. `historystatus`
+lists the refused addresses.
 
-# Kill the process or change the port in config
-```
+**The port is not the one expected.** The config file records the port that
+actually bound. Read `rpcPort` from the coin's config.
 
-#### 2. Wallet Not Found
+**Startup fails before logging.** The platform data directory could not be
+resolved. Set `XLITE_DATA_HOME` to an explicit path.
 
-**Problem**: "Wallet not found on disk" error
+**An environment value is ignored.** A `.env` file in the working directory
+takes precedence over the process environment.
 
-**Solution**:
-```bash
-# Check if wallet file exists
-ls ~/.config/xlite-daemon/key.dat
+## License
 
-# Verify permissions
-chmod 600 ~/.config/xlite-daemon/key.dat
-```
-
-#### 3. Network Connection Issues
-
-**Problem**: Cannot connect to blockchain networks
-
-**Solution**:
-```bash
-# Check network connectivity
-ping blockexplorer.com
-
-# Verify firewall settings
-# Ensure outbound connections are allowed
-```
-
-#### 4. Memory Issues
-
-**Problem**: `OutOfMemoryError` (JAR build only; the native image has no Java heap)
-
-**Solution**:
-```bash
-# JAR build: give the JVM a larger heap
-java -Xmx2g -jar target/xlite-daemon-*.jar
-```
-
-### Log Analysis
-
-#### Log File Locations
-
-- **Error logs**: `~/.config/xlite-daemon/error-YYYY-MM-DD.log`
-- **Application logs**: Console output (configurable)
-
-#### Common Log Patterns
-
-```bash
-# Wallet initialization
-[wallet] Initializing wallet for BTC
-
-# Network connection
-[peer] Connecting to network...
-
-# RPC requests
-[rpc] Received JSON-RPC request: getinfo
-
-# Address discovery
-[discovery] Processing batch starting at index 100
-```
-
-### Debug Mode
-
-Enable debug logging with the variable the daemon reads:
-
-```bash
-export XLITE_DAEMON_LOG_LEVEL=FINE   # SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST
-```
-
-Diagnostics go to stderr, payloads to stdout. Logging is configured in code;
-there is no `logging.properties`.
-
-### Performance Optimization
-
-#### Address Discovery
-
-Discovery is automatic and unconfigurable: batches until an empty one, three
-consecutive failures abort. No gap-limit or batch-size setting.
-
-#### Memory
-
-The packaged binary is a GraalVM native image, so there is no heap or GC flag
-to tune. For the JAR path, pass JVM options through `MAVEN_OPTS` when using
-`./mvnw exec:java`.
-
-### Recovery Procedures
-
-#### Wallet Recovery
-
-1. **From Mnemonic**:
-   ```bash
-   export WALLET_MNEMONIC="your twelve word phrase"
-   ./target/xlite-daemon
-   ```
-
-2. **From Backup**:
-   ```bash
-   # Restore from backup directory
-   cp ~/.config/xlite-daemon/backups/key-backup-*.dat ~/.config/xlite-daemon/key.dat
-   ```
-
-#### Configuration Recovery
-
-1. **Reset Configuration**:
-   ```bash
-   # Remove config files to reset
-   rm ~/.config/xlite-daemon/settings/config-*.json
-   ```
-
-2. **Rebuild from Source**:
-   ```bash
-   ./mvnw clean package -Pnative
-   ```
-
-## API Reference
-
-### JSON-RPC API
-
-The daemon provides a comprehensive JSON-RPC API for wallet and blockchain operations.
-
-#### Authentication
-
-Every coin endpoint requires HTTP Basic auth with the credentials in that
-coin's `settings/config-<ticker>.json`; the master endpoint uses
-`config-master.json`. The examples below target one coin's listener, so the
-URL and the credentials are set once:
-
-```bash
-export RPC_URL="http://127.0.0.1:41419"   # this coin's rpcPort
-export RPC_AUTH="xlite:yourpassword"      # rpcUsername:rpcPassword
-```
-
-The master endpoint is a different port (default 9955) and serves only the
-master methods — `getinfo` is not one of them.
-
-#### Blockchain Operations
-
-##### getblockchaininfo
-Get blockchain information
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getblockchaininfo","params":[],"id":1}'
-```
-
-**Response**:
-```json
-{
-  "result": {
-    "chain": "main",
-    "blocks": 700000,
-    "headers": 700000,
-    "bestblockhash": "00000000000000000007bd1b11320e37172c4467554f7a87bf769874e65e361d",
-    "difficulty": 21768156514421.46,
-    "mediantime": 1640995200
-  }
-}
-```
-
-##### getblockhash
-Get block hash by height
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getblockhash","params":[700000],"id":1}'
-```
-
-##### getblock
-Get block information
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getblock","params":["blockhash"],"id":1}'
-```
-
-#### Wallet Operations
-
-##### getinfo
-Get wallet information
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getinfo","params":[],"id":1}'
-```
-
-**Response**:
-```json
-{
-  "result": {
-    "version": "0.6.0",
-    "protocolversion": 70015,
-    "walletversion": 169900,
-    "balance": 1.50000000,
-    "blocks": 700000,
-    "timeoffset": 0,
-    "connections": 8,
-    "proxy": "",
-    "difficulty": 21768156514421.46,
-    "testnet": false,
-    "keypoololdest": 1640995200,
-    "keypoolsize": 1000,
-    "paytxfee": 0.00001000,
-    "relayfee": 0.00001000,
-    "errors": ""
-  }
-}
-```
-
-##### getnewaddress
-Generate new wallet address
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getnewaddress","params":[],"id":1}'
-```
-
-**Response**:
-```json
-{
-  "result": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
-}
-```
-
-##### listunspent
-List unspent transaction outputs
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"listunspent","params":[],"id":1}'
-```
-
-**Response**:
-```json
-{
-  "result": [
-    {
-      "txid": "a1b2c3d4...",
-      "vout": 0,
-      "address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
-      "scriptPubKey": "001472749d6b6e...",
-      "amount": 0.50000000,
-      "confirmations": 100,
-      "spendable": true
-    }
-  ]
-}
-```
-
-##### gettransaction
-Get transaction details
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"gettransaction","params":["txid"],"id":1}'
-```
-
-#### Raw Transaction Operations
-
-##### createrawtransaction
-Create raw transaction
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"createrawtransaction","params":[[{"txid":"a1b2c3d4...","vout":0}],[{"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh":0.1}]],"id":1}'
-```
-
-##### decoderawtransaction
-Decode raw transaction
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"decoderawtransaction","params":["rawtx"],"id":1}'
-```
-
-##### signrawtransaction
-Sign raw transaction
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"signrawtransaction","params":["rawtx"],"id":1}'
-```
-
-##### sendrawtransaction
-Broadcast transaction
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"sendrawtransaction","params":["signedtx"],"id":1}'
-```
-
-#### Utility Operations
-
-##### dumpprivkey
-Export private key
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"dumpprivkey","params":["address"],"id":1}'
-```
-
-##### importprivkey
-Import private key
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"importprivkey","params":["privatekey"],"id":1}'
-```
-
-##### signmessage
-Sign message with address
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"signmessage","params":["address","message"],"id":1}'
-```
-
-##### verifymessage
-Verify signed message
-
-```bash
-curl -s -u "$RPC_AUTH" "$RPC_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"verifymessage","params":["address","signature","message"],"id":1}'
-```
-
-### Error Handling
-
-#### Common Error Codes
-
-| Code | Meaning |
-|------|---------|
-| `-1` | Invalid arguments; the message carries the usage line |
-| `-1001` | The body is not a JSON-RPC envelope |
-| `-1112` | The provider session is not connected (HTTP 503) |
-| `-32601` | Unknown method |
-| `3002` | Wallet data is not ready yet; retry the call |
-| `3003` | The indexer refuses an address the wallet owns; `historystatus` names it |
-| provider code | A failed chain read or broadcast is reported with the provider's own code |
-
-#### Error Response Format
-
-```json
-{
-  "error": {
-    "code": -1001,
-    "message": "Error parsing JSON."
-  },
-  "result": null,
-  "id": 1
-}
-```
-
-## Advanced Configuration
-
-### Custom RPC Ports
-
-Configure custom RPC ports for each coin:
-
-```json
-{
-  "rpcPort": 41419,
-  "rpcEnabled": true,
-  "rpcUsername": "xlite",
-  "rpcPassword": "securepassword"
-}
-```
-
-Each coin needs its own port; master defaults to 9955 in `config-master.json`.
-A held port steps to the next free one and is written back to the file.
-
-### Network Configuration
-
-#### Provider Selection
-
-No full node and no `customNodes`: one provider, chosen by `EXR_ENDPOINT`,
-`BASE_URL` or `ELECTRUM_ENDPOINT`. With none set, the built-in default is used.
-
-#### Proxy Settings
-
-Proxy environment variables (`http_proxy`/`https_proxy`) are honoured by the
-underlying HTTP client for the provider connection.
-
-### Security Hardening
-
-#### Firewall Configuration
-
-Keep the listeners on loopback. Every coin binds `127.0.0.1` (or `::1`) by
-default and the master endpoint does too, so no inbound rule is needed. Only
-if an operator sets a non-loopback `rpcBindAddress` should the port be opened,
-and then only to the hosts that need it:
-
-```bash
-# Linux (iptables), restricted to one trusted subnet
-sudo iptables -A INPUT -p tcp -s 10.0.0.0/24 --dport 41419 -j ACCEPT
-```
-
-#### File Permissions
-
-Secure wallet and configuration files:
-
-```bash
-# Set restrictive permissions
-chmod 600 ~/.config/xlite-daemon/key.dat
-chmod 600 ~/.config/xlite-daemon/settings/config-*.json
-chmod 700 ~/.config/xlite-daemon/
-```
-
-### Monitoring and Logging
-
-#### Log Rotation
-
-Configure automatic log rotation:
-
-```bash
-# Create logrotate configuration
-sudo nano /etc/logrotate.d/xlite-daemon
-
-# Add configuration
-/home/user/.config/xlite-daemon/error-*.log {
-    daily
-    rotate 30
-    compress
-    delaycompress
-    missingok
-    notifempty
-}
-```
-
-#### Health Monitoring
-
-Monitor daemon health:
-
-```bash
-# Check process status
-ps aux | grep xlite-daemon
-
-# Monitor logs in real-time
-tail -f ~/.config/xlite-daemon/error-*.log
-
-# Check network connections
-netstat -tulpn | grep xlite-daemon
-```
-
-### Backup and Recovery
-
-#### Automated Backups
-
-Create automated backup script:
-
-```bash
-#!/bin/bash
-# backup-wallet.sh
-
-BACKUP_DIR="/backup/xlite-daemon"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p "$BACKUP_DIR"
-
-# Backup wallet file
-cp ~/.config/xlite-daemon/key.dat "$BACKUP_DIR/key-$DATE.dat"
-
-# Backup configuration
-cp ~/.config/xlite-daemon/settings/config-*.json "$BACKUP_DIR/"
-
-# Compress backup
-tar -czf "$BACKUP_DIR/backup-$DATE.tar.gz" -C "$BACKUP_DIR" .
-
-# Clean old backups (keep 30 days)
-find "$BACKUP_DIR" -name "*.tar.gz" -mtime +30 -delete
-
-echo "Backup completed: $BACKUP_DIR/backup-$DATE.tar.gz"
-```
-
-#### Recovery Script
-
-Create recovery script:
-
-```bash
-#!/bin/bash
-# restore-wallet.sh
-
-BACKUP_FILE="$1"
-
-if [ -z "$BACKUP_FILE" ]; then
-    echo "Usage: $0 <backup-file.tar.gz>"
-    exit 1
-fi
-
-# Stop daemon
-pkill xlite-daemon
-
-# Backup current data
-mv ~/.config/xlite-daemon ~/.config/xlite-daemon.backup
-
-# Extract backup
-tar -xzf "$BACKUP_FILE" -C ~/.config/
-
-echo "Wallet restored from $BACKUP_FILE"
-echo "Start the daemon to verify recovery"
-```
-
-This comprehensive user guide provides everything needed to install, configure, and use the XLite Daemon effectively. For additional support, refer to the troubleshooting section or consult the API reference for detailed technical information.
+MIT — see [LICENSE](../LICENSE).
