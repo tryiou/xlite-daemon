@@ -14,6 +14,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -29,8 +31,8 @@ import java.util.stream.Stream;
 public class LogRotationManager {
     private static final LogManager LOGMANAGER = LogManager.getLogManager();
     private static final Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
-    private static final String LOG_PREFIX = "error-";
-    private static final String LOG_SUFFIX = ".log";
+    private static final Pattern LOG_FILE =
+            Pattern.compile("^error-(\\d{4}-\\d{2}-\\d{2})\\.log(?:\\.\\d+)?$");
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -168,10 +170,7 @@ public class LogRotationManager {
      * @return true if it's a log file, false otherwise
      */
     private boolean isLogFile(File file) {
-        String name = file.getName();
-        return name.startsWith(LOG_PREFIX)
-                && name.endsWith(LOG_SUFFIX)
-                && extractDateFromFileName(name) != null;
+        return LOG_FILE.matcher(file.getName()).matches();
     }
 
     /**
@@ -181,12 +180,12 @@ public class LogRotationManager {
      * @return LocalDate if valid, null otherwise
      */
     private LocalDate extractDateFromFileName(String fileName) {
+        Matcher matcher = LOG_FILE.matcher(fileName);
+        if (!matcher.matches()) {
+            return null;
+        }
         try {
-            // Remove prefix and suffix to get date part
-            String datePart =
-                    fileName.replaceFirst("^" + LOG_PREFIX, "").replaceFirst("\\.log.*$", "");
-
-            return LocalDate.parse(datePart, DATE_FORMATTER);
+            return LocalDate.parse(matcher.group(1), DATE_FORMATTER);
         } catch (DateTimeParseException e) {
             LOGGER.fine("[log-rotation] Could not parse date from filename: " + fileName);
             return null;

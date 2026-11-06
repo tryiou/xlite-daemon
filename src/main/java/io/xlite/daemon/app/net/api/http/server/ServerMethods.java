@@ -53,7 +53,7 @@ final class ServerMethods {
                 + "verifymessage <address> <signature> <message> - Verify a signature for a message"
                 + " signed by a given address\n"
                 + "validateaddress <address> - Validate a given address\n"
-                + "reloadconfig <ticker> - Reload configuration for the specified coin ticker\n"
+                + "reloadconfig - Reload this coin's configuration\n"
                 + "sendtransaction <address> <amount> [dryrun] - Create and broadcast a signed"
                 + " transaction to the network\n"
                 + "\n"
@@ -91,6 +91,14 @@ final class ServerMethods {
      * the coin's state is replaced.
      */
     private JsonObject reloadConfig(JsonArray params) {
+        if (params.size() > 1) {
+            return RpcResponse.usage("Usage: reloadconfig");
+        }
+        if (params.size() == 1
+                && !CoinTickerUtils.tickerToString(coin.getTicker())
+                        .equalsIgnoreCase(params.get(0).getAsString())) {
+            return RpcResponse.error(-1, "ticker does not match this endpoint");
+        }
         Thread reloader =
                 new Thread(() -> {
                     try {

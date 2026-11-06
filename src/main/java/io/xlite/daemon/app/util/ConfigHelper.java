@@ -35,8 +35,6 @@ public final class ConfigHelper {
     private String tickerStr;
     private File file;
 
-    private long feePerByte;
-    private long minTxFee;
     private boolean rpcEnabled;
     private String rpcUsername;
     private String rpcPassword;
@@ -57,8 +55,6 @@ public final class ConfigHelper {
     /** Every key a coin's config file is expected to hold. */
     private static final String[] CONFIG_KEYS =
             new String[] {
-                "feeperbyte",
-                "mintxfee",
                 "rpcEnabled",
                 "rpcUsername",
                 "rpcPassword",
@@ -69,6 +65,9 @@ public final class ConfigHelper {
 
     /** Ticker of the master listener's configuration, as on disk and in code. */
     public static final String MASTER_TICKER = "master";
+
+    /** Ticker of the Blocknet wallet, always enabled. */
+    private static final String BLOCK_TICKER = "BLOCK";
 
     /** Port the master listener uses when its configuration carries none. */
     public static final int DEFAULT_MASTER_PORT = 9955;
@@ -153,9 +152,9 @@ public final class ConfigHelper {
         }
     }
 
-    /** An empty file means a fresh coin: RPC off, no credentials, defaults for the rest. */
+    /** An empty file means a fresh config: no credentials, defaults for the rest. */
     private void applyEmptyDefaults() {
-        rpcEnabled = false;
+        rpcEnabled = alwaysEnabled();
         rpcUsername = "";
         rpcPassword = "";
         rpcPort = defaultRpcPort();
@@ -181,34 +180,22 @@ public final class ConfigHelper {
      * Applies every stored value, defaulting the missing ones; returns whether a rewrite is due.
      */
     private boolean applyStoredValues(JSONObject config) {
-        boolean needsWrite = applyFees(config);
+        boolean needsWrite = config.has("feeperbyte") || config.has("mintxfee");
         needsWrite |= applyCredentials(config);
         needsWrite |= applyRpcEndpoint(config);
         needsWrite |= applyAddressCount(config);
         return needsWrite;
     }
 
-    private boolean applyFees(JSONObject config) {
-        boolean needsWrite = false;
-        if (config.has("feeperbyte")) {
-            feePerByte = config.getLong("feeperbyte");
-        } else {
-            needsWrite = true;
-        }
-        if (config.has("mintxfee")) {
-            minTxFee = config.getLong("mintxfee");
-        } else {
-            needsWrite = true;
-        }
-        return needsWrite;
-    }
-
     private boolean applyCredentials(JSONObject config) {
+        boolean enforced = alwaysEnabled();
         boolean needsWrite = false;
         if (config.has("rpcEnabled")) {
-            rpcEnabled = config.getBoolean("rpcEnabled");
+            boolean stored = config.getBoolean("rpcEnabled");
+            rpcEnabled = stored || enforced;
+            needsWrite = enforced && !stored;
         } else {
-            rpcEnabled = false;
+            rpcEnabled = enforced;
             needsWrite = true;
         }
         if (config.has("rpcUsername")) {
@@ -323,16 +310,8 @@ public final class ConfigHelper {
         return configFile;
     }
 
-    public synchronized void setFeePerByte(long feePerByte) {
-        this.feePerByte = feePerByte;
-    }
-
-    public synchronized void setMinTxFee(long minTxFee) {
-        this.minTxFee = minTxFee;
-    }
-
     public synchronized void setRpcEnabled(boolean isEnabled) {
-        this.rpcEnabled = isEnabled;
+        this.rpcEnabled = isEnabled || alwaysEnabled();
     }
 
     public synchronized void setRpcUsername(String user) {
@@ -356,14 +335,6 @@ public final class ConfigHelper {
         this.addressCount = addressCount;
     }
 
-    public synchronized long getFeePerByte() {
-        return feePerByte;
-    }
-
-    public synchronized long getMinTxFee() {
-        return minTxFee;
-    }
-
     public synchronized boolean isRpcEnabled() {
         return rpcEnabled;
     }
@@ -374,6 +345,11 @@ public final class ConfigHelper {
 
     public synchronized String getRpcPassword() {
         return rpcPassword;
+    }
+
+    private boolean alwaysEnabled() {
+        return tickerStr.equalsIgnoreCase(MASTER_TICKER)
+                || tickerStr.equalsIgnoreCase(BLOCK_TICKER);
     }
 
     private int defaultRpcPort() {
@@ -444,8 +420,6 @@ public final class ConfigHelper {
 
     private JSONObject toConfigJson() {
         JSONObject config = new JSONObject();
-        config.put("feeperbyte", feePerByte);
-        config.put("mintxfee", minTxFee);
         config.put("rpcEnabled", rpcEnabled);
         config.put("rpcUsername", rpcUsername);
         config.put("rpcPassword", rpcPassword);

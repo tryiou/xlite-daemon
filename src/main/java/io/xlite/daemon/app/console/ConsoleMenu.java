@@ -18,7 +18,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -42,17 +41,8 @@ public class ConsoleMenu {
     /** Upper bound on waiting for coin initialisation before the master endpoint starts. */
     private static final int COIN_INIT_TIMEOUT_SECONDS = 30;
 
-    private static final Set<String> STARTUP_FLAGS =
-            Set.of(
-                    "--enablerpcandconfigure",
-                    "--development-endpoint",
-                    "--exr-endpoint",
-                    "--electrum-endpoint",
-                    "--blockchain-configuration-files",
-                    "--version",
-                    "--help");
-
     private final String[] arguments;
+    private List<String> activeArguments = List.of();
     private BackgroundTimerThread backgroundTimerThread = null;
 
     public ConsoleMenu(String[] args) {
@@ -94,9 +84,11 @@ public class ConsoleMenu {
                 KeyHandler.existsBaseECKeyFromLocal() ? "- Disabled. Wallet already exists." : "";
 
         // Environment variables are already applied; refuse a mixed pair before any
-        // wallet work. Flag-provided endpoints re-check as each one is applied.
+        // wallet work. Startup flags are applied first, so their position relative
+        // to --password does not matter.
         validateProviderOrExit();
-        if (arguments.length > 0 && handleArguments(input)) {
+        List<String> walletArguments = applyStartupFlags();
+        if (!walletArguments.isEmpty() && handleArguments(walletArguments, input)) {
             return;
         }
         if (loginFromEnvironment()) {
@@ -115,10 +107,46 @@ public class ConsoleMenu {
         }
     }
 
-    /** Handles the command-line flags. Returns true when startup is finished and no menu is due. */
-    private boolean handleArguments(Scanner input) {
+    /**
+     * Applies startup flags, returning the remaining wallet-action arguments.
+     *
+     * <p>Package-private so the ordering contract stays pinned by a unit test: every startup flag
+     * is consumed before any wallet action runs, regardless of where the flag appears in the
+     * command line.
+     */
+    List<String> applyStartupFlags() {
+        List<String> walletArguments = new ArrayList<>();
         for (int index = 0; index < arguments.length; index++) {
-            index = handleArgument(input, index);
+            String argument = arguments[index];
+            switch (argument) {
+                case "--enablerpcandconfigure" -> {
+                    autoGenerateRPCConfig();
+                    System.exit(0);
+                }
+                case "--development-endpoint" -> index = setDevelopmentEndpoint(arguments, index);
+                case "--exr-endpoint" -> index = setExrEndpoint(arguments, index);
+                case "--electrum-endpoint" -> index = setElectrumEndpoint(arguments, index);
+                case "--blockchain-configuration-files" ->
+                        index = consumeConfigSourceValue(arguments, index);
+                case "--version" -> {
+                    LOGGER.info(Version.CLIENT_VERSION);
+                    System.exit(0);
+                }
+                case "--help" -> {
+                    displayHelp();
+                    System.exit(0);
+                }
+                default -> walletArguments.add(argument);
+            }
+        }
+        return walletArguments;
+    }
+
+    /** Handles wallet actions. Returns true when startup is finished and no menu is due. */
+    private boolean handleArguments(List<String> args, Scanner input) {
+        activeArguments = args;
+        for (int index = 0; index < args.size(); index++) {
+            index = handleWalletAction(args, input, index);
             if (index == END_OF_ARGUMENTS) {
                 return true;
             }
@@ -126,40 +154,8 @@ public class ConsoleMenu {
         return false;
     }
 
-    private int handleArgument(Scanner input, int index) {
-        String argument = arguments[index];
-        if (STARTUP_FLAGS.contains(argument)) {
-            return handleStartupFlag(argument, index);
-        }
-        return handleWalletAction(argument, input, index);
-    }
-
-    private int handleStartupFlag(String argument, int index) {
-        return switch (argument) {
-            case "--enablerpcandconfigure" -> {
-                autoGenerateRPCConfig();
-                System.exit(0);
-                yield index;
-            }
-            case "--development-endpoint" -> setDevelopmentEndpoint(index);
-            case "--exr-endpoint" -> setExrEndpoint(index);
-            case "--electrum-endpoint" -> setElectrumEndpoint(index);
-            case "--blockchain-configuration-files" -> consumeConfigSourceValue(index);
-            case "--version" -> {
-                LOGGER.info(Version.CLIENT_VERSION);
-                System.exit(0);
-                yield index;
-            }
-            case "--help" -> {
-                displayHelp();
-                System.exit(0);
-                yield index;
-            }
-            default -> throw new IllegalStateException("Not a startup flag: " + argument);
-        };
-    }
-
-    private int handleWalletAction(String argument, Scanner input, int index) {
+    private int handleWalletAction(List<String> args, Scanner input, int index) {
+        String argument = args.get(index);
         return switch (argument) {
             case "--createdefaultwallet" -> {
                 createDefaultWallet(input, index);
@@ -192,9 +188,9 @@ public class ConsoleMenu {
         };
     }
 
-    private int setDevelopmentEndpoint(int index) {
-        if (index + 1 < arguments.length) {
-            String customEndpoint = arguments[index + 1];
+    private int setDevelopmentEndpoint(String[] args, int index) {
+        if (index + 1 < args.length) {
+            String customEndpoint = args[index + 1];
             if (customEndpoint.startsWith("--")) {
                 LOGGER.warning("Invalid endpoint: " + customEndpoint);
                 return index;
@@ -213,9 +209,9 @@ public class ConsoleMenu {
         return index;
     }
 
-    private int setExrEndpoint(int index) {
-        if (index + 1 < arguments.length) {
-            String exrEndpoint = arguments[index + 1];
+    private int setExrEndpoint(String[] args, int index) {
+        if (index + 1 < args.length) {
+            String exrEndpoint = args[index + 1];
             if (exrEndpoint.startsWith("--")) {
                 LOGGER.warning("Invalid endpoint: " + exrEndpoint);
                 return index;
@@ -232,9 +228,9 @@ public class ConsoleMenu {
         return index;
     }
 
-    private int setElectrumEndpoint(int index) {
-        if (index + 1 < arguments.length) {
-            String endpoint = arguments[index + 1];
+    private int setElectrumEndpoint(String[] args, int index) {
+        if (index + 1 < args.length) {
+            String endpoint = args[index + 1];
             if (endpoint.startsWith("--")) {
                 LOGGER.warning("Invalid endpoint: " + endpoint);
                 return index;
@@ -259,10 +255,10 @@ public class ConsoleMenu {
         validateProviderOrExit();
     }
 
-    private int consumeConfigSourceValue(int index) {
+    private int consumeConfigSourceValue(String[] args, int index) {
         // Flag already handled in App.initCoinConfigs(); consume the value here to avoid
         // falling through to the interactive menu.
-        if (index + 1 < arguments.length && !arguments[index + 1].startsWith("--")) {
+        if (index + 1 < args.length && !args[index + 1].startsWith("--")) {
             return index + 1;
         }
         String envVal = App.getEnv("BLOCKCHAIN_CONFIGURATION_FILES");
@@ -287,6 +283,8 @@ public class ConsoleMenu {
                 logBadPassword(null);
                 System.exit(1);
             }
+            LOGGER.info(
+                    "Wallet created. Run --getmnemonic <password> to display the recovery phrase.");
         } finally {
             Arrays.fill(password, '\0');
         }
@@ -389,9 +387,9 @@ public class ConsoleMenu {
         CoinInstance.CoinError error = CoinInstance.changePassword(currentPassword, newPassword);
         if (error != null) {
             logBadChangePass(error.getMessage());
-        } else {
-            LOGGER.info("Wallet password changed successfully");
+            System.exit(1);
         }
+        LOGGER.info("Wallet password changed successfully");
     }
 
     /** Logs in from the environment, so a headless container needs no menu. */
@@ -484,13 +482,9 @@ public class ConsoleMenu {
             LOGGER.info("Key already exists");
             return;
         }
-        Console console = System.console();
-        char[] password;
-        if (console != null) {
-            password = console.readPassword("Enter new password: ");
-        } else {
-            LOGGER.info("Enter new password: ");
-            password = input.next().toCharArray();
+        char[] password = readConfirmedPassword(input);
+        if (password == null) {
+            return;
         }
         try {
             if (KeyHandler.calculatePasswordStrength(password) < 9) {
@@ -498,9 +492,27 @@ public class ConsoleMenu {
                 return;
             }
             completeLogin(password, null, false);
+            showRecoveryPhrase(password);
         } finally {
             Arrays.fill(password, '\0');
         }
+    }
+
+    private void showRecoveryPhrase(char[] password) {
+        if (System.console() == null) {
+            LOGGER.info(
+                    "Wallet created. Run --getmnemonic <password> to display the recovery phrase.");
+            return;
+        }
+        List<String> seed = KeyHandler.getBaseSeed(password);
+        if (seed == null) {
+            LOGGER.warning("Wallet created, but the recovery phrase could not be read.");
+            return;
+        }
+        System.out.println(String.join(" ", seed));
+        System.out.println(
+                "Store this recovery phrase offline. It is the only way to restore the wallet"
+                        + " without the password.");
     }
 
     private void unlockWallet(Scanner input) {
@@ -540,11 +552,8 @@ public class ConsoleMenu {
         if (backgroundTimerThread != null) {
             backgroundTimerThread.stop();
         }
-        for (CoinTicker cointicker : CoinTicker.coins()) {
-            CoinInstance instance = CoinInstance.getInstance(cointicker);
-            if (instance != null) {
-                instance.deinit();
-            }
+        for (CoinInstance instance : CoinInstance.getCoinInstances()) {
+            instance.deinit();
         }
     }
 
@@ -757,19 +766,45 @@ public class ConsoleMenu {
      * negative {@code argPos} means this is not an argument-driven call. Caller MUST zero-fill the
      * returned array after use.
      */
+    private char[] readConfirmedPassword(Scanner input) {
+        char[] first = readPasswordInteractive(input, "Enter new password: ");
+        char[] second = readPasswordInteractive(input, "Confirm password: ");
+        boolean matches = Arrays.equals(first, second);
+        Arrays.fill(second, '\0');
+        if (!matches) {
+            Arrays.fill(first, '\0');
+            LOGGER.info("Passwords do not match.");
+            return null;
+        }
+        return first;
+    }
+
+    private char[] readPasswordInteractive(Scanner input, String prompt) {
+        Console console = System.console();
+        if (console != null) {
+            return console.readPassword(prompt);
+        }
+        LOGGER.info(prompt);
+        return input.next().toCharArray();
+    }
+
     private char[] readPasswordChars(Scanner input, int argPos, String msg, String envVar) {
         String prompt = msg.isEmpty() ? "Password:\n" : msg;
-        if (argPos < 0 || arguments.length <= argPos || arguments[argPos].contains("--")) {
+        if (argPos < 0
+                || activeArguments.size() <= argPos
+                || activeArguments.get(argPos).contains("--")) {
             if (envVar != null) {
                 String envVal = App.getEnv(envVar);
                 if (envVal != null && !envVal.isEmpty()) {
                     return envVal.toCharArray();
                 }
             }
-            System.out.println(prompt);
+            // Prompts are UI, not payload: stdout must carry only the requested value so
+            // --getmnemonic can be parsed without filtering a prompt line out of the phrase.
+            System.err.println(prompt);
             return input.nextLine().toCharArray();
         }
-        return arguments[argPos].toCharArray();
+        return activeArguments.get(argPos).toCharArray();
     }
 
     private static void displayHelp() {

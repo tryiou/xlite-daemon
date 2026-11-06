@@ -31,7 +31,6 @@ import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.net.CoinTicker;
 import io.xlite.daemon.app.net.CoinTickerUtils;
 import io.xlite.daemon.app.util.ConfigHelper;
-import io.xlite.daemon.app.util.SecureTokens;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -49,13 +48,6 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     public HTTPServerHandler() {
         configHelper = new ConfigHelper(ConfigHelper.MASTER_TICKER);
-
-        if (configHelper.getRpcUsername().isEmpty() && configHelper.getRpcPassword().isEmpty()) {
-            configHelper.setRpcUsername(SecureTokens.urlSafe(12));
-            configHelper.setRpcPassword(SecureTokens.urlSafe(32));
-
-            configHelper.writeConfig();
-        }
     }
 
     @Override

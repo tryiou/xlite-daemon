@@ -49,33 +49,11 @@ class ConfigHelperTest extends TestHelper {
 
     @Test
     void testDefaultConfigurationValues() {
-        assertEquals(0L, configHelper.getFeePerByte());
-        assertEquals(0L, configHelper.getMinTxFee());
         assertFalse(configHelper.isRpcEnabled());
         assertEquals("", configHelper.getRpcUsername());
         assertEquals("", configHelper.getRpcPassword());
         assertEquals(-1000, configHelper.getRpcPort());
         assertEquals(0, configHelper.getAddressCount());
-    }
-
-    @Test
-    void testSetAndGetFeePerByte() {
-        long newFeePerByte = 60L;
-        configHelper.setFeePerByte(newFeePerByte);
-        configHelper.writeConfig();
-
-        ConfigHelper reloadedConfig = new ConfigHelper("test");
-        assertEquals(newFeePerByte, reloadedConfig.getFeePerByte());
-    }
-
-    @Test
-    void testSetAndGetMinTxFee() {
-        long newMinTxFee = 12000L;
-        configHelper.setMinTxFee(newMinTxFee);
-        configHelper.writeConfig();
-
-        ConfigHelper reloadedConfig = new ConfigHelper("test");
-        assertEquals(newMinTxFee, reloadedConfig.getMinTxFee());
     }
 
     @Test
@@ -164,15 +142,11 @@ class ConfigHelperTest extends TestHelper {
 
     @Test
     void testConfigFilePersistence() {
-        configHelper.setFeePerByte(60L);
-        configHelper.setMinTxFee(12000L);
         configHelper.setRpcEnabled(true);
         configHelper.setAddressCount(100);
         configHelper.writeConfig();
 
         ConfigHelper newConfig = new ConfigHelper("test");
-        assertEquals(60L, newConfig.getFeePerByte());
-        assertEquals(12000L, newConfig.getMinTxFee());
         assertTrue(newConfig.isRpcEnabled());
         assertEquals(100, newConfig.getAddressCount());
     }
@@ -181,8 +155,6 @@ class ConfigHelperTest extends TestHelper {
     void testLoadConfigFromFile() {
         String configContent =
                 "{\n"
-                        + "    \"feeperbyte\": 60,\n"
-                        + "    \"mintxfee\": 12000,\n"
                         + "    \"rpcEnabled\": true,\n"
                         + "    \"rpcUsername\": \"testuser\",\n"
                         + "    \"rpcPassword\": \"testpass\",\n"
@@ -202,13 +174,54 @@ class ConfigHelperTest extends TestHelper {
 
         ConfigHelper loadedConfig = new ConfigHelper("test");
 
-        assertEquals(60L, loadedConfig.getFeePerByte());
-        assertEquals(12000L, loadedConfig.getMinTxFee());
         assertTrue(loadedConfig.isRpcEnabled());
         assertEquals("testuser", loadedConfig.getRpcUsername());
         assertEquals("testpass", loadedConfig.getRpcPassword());
         assertEquals(9000, loadedConfig.getRpcPort());
         assertEquals(25, loadedConfig.getAddressCount());
+    }
+
+    @Test
+    void testLegacyFeeKeysRemovedOnLoad() throws IOException {
+        String content =
+                "{\"rpcEnabled\":true,\"rpcUsername\":\"u\",\"rpcPassword\":\"p\","
+                        + "\"rpcPort\":9001,\"feeperbyte\":60,\"mintxfee\":12000,"
+                        + "\"addressCount\":7}";
+        File configFile =
+                new File(
+                        new File(ConfigHelper.getLocalDataDirectory(), "settings"),
+                        "config-test.json");
+        Files.write(configFile.toPath(), content.getBytes(StandardCharsets.UTF_8));
+
+        ConfigHelper loaded = new ConfigHelper("test");
+        String rewritten = Files.readString(configFile.toPath());
+
+        assertFalse(rewritten.contains("feeperbyte"));
+        assertFalse(rewritten.contains("mintxfee"));
+        assertTrue(loaded.isRpcEnabled());
+        assertEquals("u", loaded.getRpcUsername());
+        assertEquals("p", loaded.getRpcPassword());
+        assertEquals(9001, loaded.getRpcPort());
+        assertEquals(7, loaded.getAddressCount());
+    }
+
+    @Test
+    void testMasterAndBlockAlwaysEnabled() throws IOException {
+        ConfigHelper master = new ConfigHelper(ConfigHelper.MASTER_TICKER);
+        ConfigHelper block = new ConfigHelper("BLOCK");
+        assertTrue(master.isRpcEnabled());
+        assertTrue(block.isRpcEnabled());
+
+        File settingsDir = new File(ConfigHelper.getLocalDataDirectory(), "settings");
+        File masterFile = new File(settingsDir, "config-master.json");
+        File blockFile = new File(settingsDir, "config-BLOCK.json");
+        Files.writeString(masterFile.toPath(), "{\"rpcEnabled\":false}");
+        Files.writeString(blockFile.toPath(), "{\"rpcEnabled\":false}");
+
+        assertTrue(new ConfigHelper(ConfigHelper.MASTER_TICKER).isRpcEnabled());
+        assertTrue(new ConfigHelper("BLOCK").isRpcEnabled());
+        assertTrue(Files.readString(masterFile.toPath()).contains("\"rpcEnabled\": true"));
+        assertTrue(Files.readString(blockFile.toPath()).contains("\"rpcEnabled\": true"));
     }
 
     @Test

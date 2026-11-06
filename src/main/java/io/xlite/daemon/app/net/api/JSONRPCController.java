@@ -3,6 +3,7 @@ package io.xlite.daemon.app.net.api;
 import io.netty.util.concurrent.Future;
 import io.xlite.daemon.app.net.CoinInstance;
 import io.xlite.daemon.app.util.ConfigHelper;
+import io.xlite.daemon.app.util.SecureTokens;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,8 +26,20 @@ public final class JSONRPCController {
     // its multi-second release-wait.
     private static final ConcurrentHashMap<CoinInstance, ReentrantLock> LOCKS =
             new ConcurrentHashMap<>();
-    private static final ConfigHelper MASTER_CONFIG = new ConfigHelper(ConfigHelper.MASTER_TICKER);
+    private static final ConfigHelper MASTER_CONFIG = masterConfig();
     private static final JSONRPCMasterServer MASTER_SERVER = new JSONRPCMasterServer(MASTER_CONFIG);
+
+    /** Materializes the master listener's credentials and enabled state before it binds. */
+    static ConfigHelper masterConfig() {
+        ConfigHelper config = new ConfigHelper(ConfigHelper.MASTER_TICKER);
+        if (!config.validAuth()) {
+            config.setRpcUsername(SecureTokens.urlSafe(12));
+            config.setRpcPassword(SecureTokens.urlSafe(32));
+        }
+        config.setRpcEnabled(true);
+        config.writeConfig();
+        return config;
+    }
 
     public static JSONRPCMasterServer getMasterServer() {
         return MASTER_SERVER;

@@ -38,7 +38,7 @@ public final class App {
     private static volatile String exrEndpoint = null;
     private static volatile String electrumEndpoint = null;
 
-    private static final JSONRPCMasterServer MASTER_RPC = JSONRPCController.getMasterServer();
+    private static JSONRPCMasterServer masterRpc = null;
 
     private static ConsoleMenu console = null;
 
@@ -103,8 +103,11 @@ public final class App {
         }
     }
 
-    public static JSONRPCMasterServer getMasterRpc() {
-        return MASTER_RPC;
+    public static synchronized JSONRPCMasterServer getMasterRpc() {
+        if (masterRpc == null) {
+            masterRpc = JSONRPCController.getMasterServer();
+        }
+        return masterRpc;
     }
 
     public static String getEnv(String key) {
@@ -339,9 +342,9 @@ public final class App {
 
     public static void main(String[] args) {
         printImmediateArgument(args);
-        configureLogging();
-        installFileHandler();
         installConsoleHandler();
+        installFileHandler();
+        configureLogging();
         initExrEndpoint();
         initBaseUrl();
         initElectrumEndpoint();
@@ -430,7 +433,8 @@ public final class App {
     }
 
     private static void shutdownInner() {
-        if (MASTER_RPC.isAlive()) {
+        JSONRPCMasterServer master = masterRpc;
+        if (master != null && master.isAlive()) {
             System.out.println("Shutting down...");
         }
 
@@ -438,7 +442,9 @@ public final class App {
             console.deinit();
         }
 
-        MASTER_RPC.deinit();
+        if (master != null) {
+            master.deinit();
+        }
 
         // Every listener is retired by now; release the worker group they
         // all borrowed. Bounded so a wedged event loop cannot stall exit
